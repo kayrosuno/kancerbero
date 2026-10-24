@@ -1,12 +1,12 @@
 import SwiftUI
 
-struct PillTabBar: View {
-    @Binding var selection: NetworkingTab
+struct PillTabBar<Item: PillTabItem>: View {
+    @Binding var selection: Item
     @Namespace private var namespace
 
     var body: some View {
         HStack(spacing: 4) {
-            ForEach(NetworkingTab.allCases) { tab in
+            ForEach(Array(Item.allCases)) { tab in
                 Button {
                     withAnimation(.snappy(duration: 0.28)) {
                         selection = tab

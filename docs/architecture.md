@@ -18,9 +18,12 @@
   cabecera con marca y estado live, pie con fuente (daemon/local), privcheck y hora.
 - `NetworkingView`: cuatro tarjetas de resumen (`SummaryCard` + `Sparkline`), `PillTabBar` y las
   tablas (`NetworkingTables.swift`) dentro de una tarjeta con material.
-- `DiskView` y `DaemonsView`: `PlannedSectionView` con icono animado y lista de capacidades
-  previstas.
-- Persistencia: `@AppStorage("selectedSection")` y `@AppStorage("networkingTab")`.
+- `DiskView`: `PillTabBar` con Volumes / Analyzer. Volumes muestra el árbol
+  disco → partición → contenedor APFS → volumen, un inspector y `CapacityBar`; Analyzer muestra
+  controles de escaneo, progreso, `RadialDiskMap` y las tablas de contenidos y mayores archivos.
+- `DaemonsView`: inventario launchd con tabla, filtros e inspector de acciones.
+- Persistencia: `@AppStorage("selectedSection")`, `@AppStorage("networkingTab")` y
+  `@AppStorage("diskTab")`.
 - Captura interna para verificación: `--screenshot`, `--section`, `--tab`,
   `--sidebar-collapsed` (ver `docs/verification.md`).
 
@@ -68,6 +71,43 @@
 - La app enruta `system` al daemon (`daemonServices`/`daemonAction` por XPC) y ejecuta `gui`/`user`
   en local. Sin daemon, `system` es solo lectura.
 - La metadata de plists se cachea 30 s; el refresco de la vista es cada 5 s.
+
+## Disk
+
+- **Inventario (`DiskInventoryCollector`)**
+  - IOKit: `IOServiceMatching("IOMedia")` y el padre `IOMedia` de cada servicio reconstruyen la
+    jerarquía real del IORegistry: disco físico → partición → `AppleAPFSMedia` (contenedor) →
+    `AppleAPFSVolume`. Se leen `BSD Name`, `Size`, `Content`, `Whole`, `Leaf`, `UUID` y, en APFS,
+    `Role`, `RoleValue`, `VolGroupUUID` y `FullName`.
+  - DiskArbitration (`DADiskCreateFromIOMedia` + `DADiskCopyDescription`) aporta nombre de volumen,
+    tipo de sistema de ficheros, punto de montaje, UUID de volumen, modelo, protocolo, bus,
+    interno/remóvil/expulsable/escribible/cifrado.
+  - `getmntinfo` mapea los sistemas montados por `f_mntfromname` (`/dev/diskXsY`). Para cada volumen
+    montado, `getattrlist` con `ATTR_VOL_INFO | ATTR_VOL_SIZE | ATTR_VOL_SPACEFREE |
+    ATTR_VOL_SPACEAVAIL | ATTR_VOL_SPACEUSED` da el tamaño, libre, disponible y **usado real por
+    volumen APFS** (coincide con `CapacityInUse` de `diskutil`).
+  - El contenedor APFS hereda el libre de sus volúmenes montados (el espacio es compartido).
+  - No se ejecuta ningún proceso externo.
+- **Escaneo (`DiskScanner`)**
+  - Una llamada C a `kb_disk_list_directory` por directorio; la capa C usa `open(O_RDONLY |
+    O_DIRECTORY)` y `getattrlistbulk` con `ATTR_CMN_RETURNED_ATTRS | ATTR_CMN_ERROR | ATTR_CMN_NAME |
+    ATTR_CMN_OBJTYPE`, `ATTR_DIR_MOUNTSTATUS | ATTR_DIR_ALLOCSIZE` y
+    `ATTR_FILE_TOTALSIZE | ATTR_FILE_ALLOCSIZE`, con `FSOPT_NOFOLLOW`.
+  - DFS iterativo con pila de frames; al cerrar un directorio se construye un `KBDiskNode`
+    inmutable. Se retienen los `maxChildrenRetained` hijos mayores y el resto se agrupa en un nodo
+    “Other”. Límites `maxDepth`/`maxNodes` marcan `truncated`.
+  - Se cuentan hidden y packages, pero no se desciende por symlinks ni por puntos de montaje
+    (salvo opción). Los errores `EACCES`/`EPERM` se registran como rutas denegadas.
+  - Top-N de mayores archivos por inserción ordenada; progreso cada 100 ms; cancelación cooperativa.
+- **Estado y UI (`DiskModel`)**
+  - `@MainActor @Observable`, inyectado en `KancerberoApp`. Conserva el inventario, la selección, el
+    estado del escaneo, el snapshot, el nodo actual y las rutas denegadas.
+  - `RadialDiskMap` dibuja un sunburst con `Canvas`: anillos = profundidad, ángulo = tamaño
+    asignado; hit-test por radio/ángulo. El centro muestra el nodo actual y el porcentaje del
+    volumen. Respeta Reduce Motion.
+- **Límites:** SMART no está expuesto por APIs públicas; los volúmenes desmontados no tienen
+  libre/usado; los hard links se cuentan por entrada; clones/snapshots APFS hacen que la suma de
+  tamaños no coincida exactamente con el “Used” del contenedor.
 
 ## XPC
 

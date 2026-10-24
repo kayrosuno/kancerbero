@@ -32,8 +32,13 @@ App SwiftUI ──XPC──> KancerberoDaemon (root opcional)
 
 - **Networking** — tarjetas de resumen con sparklines y subnavegación Interfaces / Connections /
   Processes, con tablas e inspector de proceso.
-- **Disk** — placeholder con las capacidades previstas (I/O por proceso, volúmenes, histórico,
-  SMART).
+- **Disk** — dos subpestañas:
+  - **Volumes** — jerarquía nativa de discos físicos, particiones, contenedores APFS y volúmenes
+    (IOKit + DiskArbitration + `getmntinfo`/`getattrlist`), con capacidad, usado, libre, punto de
+    montaje, UUID, roles APFS, modelo/protocolo y cifrado. No ejecuta procesos externos.
+  - **Analyzer** — escaneo local de una carpeta o volumen con `getattrlistbulk`, mapa radial
+    interactivo, drill-down, mayores archivos, progreso y cancelación. Las rutas sin permiso se
+    listan como denegadas; no se lee contenido de ficheros.
 - **Daemons** — inventario de servicios launchd (System/GUI/User) con estado, PID, última salida,
   programa y plist. Inspector con Start / Stop / Restart / Enable·Disable / Load·Unload / Reveal.
   Las acciones de sistema requieren el daemon root y confirmación; GUI/User funcionan en local.
@@ -68,6 +73,8 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   --screenshot /tmp/kancerbero-ui.png \
   [--section networking|disk|daemons] \
   [--tab interfaces|connections|processes] \
+  [--disk-tab volumes|analyzer] \
+  [--disk-path=<carpeta>] [--disk-scan] [--disk-item <diskXsY>] \
   [--sidebar-collapsed]
 ```
 
@@ -107,6 +114,22 @@ Producción: firma Developer ID + `SMAppService.daemon(plistName:)` con el plist
 ./build/Build/Products/Debug/KancerberoProbe daemons system
 ./build/Build/Products/Debug/KancerberoProbe daemons gui
 ./build/Build/Products/Debug/KancerberoProbe daemon-action gui start <label>
+```
+
+## Disk
+
+- Inventario nativo, sin `diskutil`: IOKit (`IOMedia`, `AppleAPFSMedia`, `AppleAPFSVolume`) para la
+  jerarquía y los metadatos APFS; DiskArbitration para nombres, puntos de montaje, UUIDs, modelo y
+  cifrado; `getmntinfo` + `getattrlist(ATTR_VOL_*)` para capacidad y usado por volumen.
+- Análisis con `getattrlistbulk` por directorio (`ATTR_CMN_RETURNED_ATTRS`, `NAME`, `OBJTYPE`,
+  `ATTR_FILE_TOTALSIZE/ALLOCSIZE`, `ATTR_DIR_ALLOCSIZE/MOUNTSTATUS`), sin seguir symlinks y sin
+  cruzar puntos de montaje por defecto.
+- Diagnóstico:
+
+```bash
+./build/Build/Products/Debug/KancerberoProbe disk volumes
+./build/Build/Products/Debug/KancerberoProbe disk info disk3s5
+./build/Build/Products/Debug/KancerberoProbe disk scan "$HOME/Documents" --top 20
 ```
 
 ## Verificación

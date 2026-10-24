@@ -66,6 +66,46 @@ sysctl(mib, 6, &ifmibdata, &len, NULL, 0)
 
 `ifmibdata.ifmd_data` es `struct if_data64` y coincide exactamente con `netstat -ibI`.
 
+## Disk Inspector y Disk Utility (pestaña Disk)
+
+Análisis REA (Hopper) de `/Applications/Disk Inspector.app` (`com.nektony.diskinspector`, que se
+anuncia como “Disk Space Analyzer”) y de `/System/Applications/Utilities/Disk Utility.app`.
+
+### Disk Inspector 6.0.3
+
+| Función | Mecanismo observado | Evidencia |
+|---|---|---|
+| Enumerar directorios | `getattrlistbulk(fd, &attrlist, buf, 25600, FSOPT_NOFOLLOW)` en bucle | `-[SizeCalculationTask scanDirPointer:]` 0x100048bec |
+| Attrlist | `ATTR_BIT_MAP_COUNT`; common `RETURNED_ATTRS\|NAME\|OBJTYPE` (0x80000009); dir `MOUNTSTATUS`; file `ALLOCSIZE` | `-[SizeCalculationTask initWithFolderPath:]` 0x1000488d0 |
+| Abrir | `open(path, O_RDONLY)` | `-[SizeCalculationTask scanPath:]` 0x100048b68 |
+| Parsear | `length` + `attribute_set_t` + `attrreference_t` para el nombre; `VDIR==2`; tamaños `u64` | `-[TWalker scanDirEntry:pointer:]` 0x100055ac8 |
+| Recorrer | VDIR → pila de paths; resto → suma al nodo actual | `-[SizeCalculationTask processDirEntry:]` 0x100048d00 |
+| Árbol | `FolderSystemItem` con alloc size; hidden/package/access denied; `dispatch_group_async`; 4 walkers | `-[TWalker iterateFolderStack:withParent:]` 0x1000554f0 |
+| Paquetes | `.webplugin .wdgt .kext .fs .bundle .downloads .plugin .photoslibrary .dictionary`; `.app` vía LaunchServices | strings en 0x1003fb1b6 |
+| Mayores archivos | Ignora hidden; los paquetes se tratan como hoja | `-[FolderSystemItem fillBiggestFilesArray:]` 0x10002adf4 |
+| Escala radial | Máximos por nivel (hasta 14) para los anillos | `-[FolderSystemItem calcTotalSizeWithMaxSizes:withCurLevel:]` 0x10002ac40 |
+
+### Disk Utility
+
+- `-[SUDiskInfo _buildPropertiesForDisk:]` (0x100001d34) construye el panel de información con:
+  Disk Name, Simple Description, Partition Scheme, Mount Point, Type, Capacity, Free, Available,
+  Used, Owners, Device Identifier, Connection, Location, Disk Type, Child Count, Volume Count,
+  Physical Stores, Snapshot Name/UUID, Partition Map Type y SMART Status.
+- Usa los frameworks privados `StorageKit` (`SKDisk`, `SKAPFSDisk`, `SKAPFSContainerDisk`,
+  `SKAPFSStoreDisk`, `SKFilesystem`) y DiskArbitration (`DASessionCreate`,
+  `DADiskCreateFromBSDName`, `DADiskGetBSDName`). StorageKit/DiskManagement viven en la caché
+  dinámica y no son enlazables.
+- **Decisión:** no enlazar frameworks privados ni ejecutar `diskutil` desde la app. Se replica el
+  modelo con APIs públicas:
+  - IOKit: jerarquía `IOMedia` y propiedades APFS (`Role`, `VolGroupUUID`, `FullName`).
+  - DiskArbitration: nombre/tipo de volumen, mount point, UUIDs, modelo, protocolo, bus, flags.
+  - `getmntinfo` + `getattrlist(ATTR_VOL_*)`: capacidad, libre, disponible y usado por volumen.
+- Verificado en macOS 27: `ATTR_VOL_SPACEUSED` de `/` devuelve 13.655.425.024, idéntico al
+  `CapacityInUse` de `diskutil info`; el volumen Data devuelve 432.794.021.888 (diferencia de
+  milisegundos). IOKit expone `AppleAPFSMedia`/`AppleAPFSVolume` y `Whole`/`Content`/`Role`
+  exactamente como los muestra `ioreg`.
+- SMART no está expuesto por APIs públicas; se omite o se muestra “Unavailable”.
+
 ## Política de versión
 
 - macOS 14+, probado en macOS 27.0.1 arm64.

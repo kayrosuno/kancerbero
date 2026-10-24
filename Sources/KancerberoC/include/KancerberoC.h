@@ -3,6 +3,7 @@
 
 #include "KBModels.h"
 #include "KBLaunchd.h"
+#include "KBDisk.h"
 
 #ifdef __cplusplus
 extern "C" {

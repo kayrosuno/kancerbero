@@ -83,12 +83,15 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   --screenshot /tmp/kancerbero-ui.png \
   [--section networking|disk|daemons] \
   [--tab interfaces|connections|processes] \
+  [--disk-tab volumes|analyzer] \
+  [--disk-path=<carpeta>] [--disk-scan] [--disk-item <diskXsY>] \
   [--sidebar-collapsed]
 ```
 
-`--section` selecciona la sección de primer nivel, `--tab` la subpestaña de Networking y
-`--sidebar-collapsed` captura el panel lateral oculto. El PNG se escribe a escala de backing
-(2x en Retina) y la app termina con código 0.
+`--section` selecciona la sección de primer nivel, `--tab` la subpestaña de Networking,
+`--disk-tab` la de Disk, `--disk-path`/`--disk-scan` lanzan el analizador sobre una ruta y
+`--disk-item` preselecciona un dispositivo en Volumes. `--sidebar-collapsed` captura el panel
+lateral oculto. El PNG se escribe a escala de backing (2x en Retina) y la app termina con código 0.
 
 Capturas recomendadas:
 
@@ -152,6 +155,58 @@ Capturas:
   --screenshot /tmp/kb-daemons-detail.png --section daemons \
   --daemon-selected com.apple.Finder --screenshot-delay 5
 ```
+
+## Disk
+
+Inventario y detalle:
+
+```bash
+./build/Build/Products/Debug/KancerberoProbe disk volumes
+diskutil list
+ioreg -r -c IOMedia -w 0 | grep -E 'BSD Name|Whole|Content|Size'
+
+./build/Build/Products/Debug/KancerberoProbe disk info disk3s5
+diskutil info disk3s5
+```
+
+- La jerarquía debe coincidir con `diskutil list` y con el árbol `IOMedia` de `ioreg`: disco →
+  partición → contenedor APFS (`AppleAPFSMedia`) → volumen (`AppleAPFSVolume`).
+- El usado por volumen (`Used`/`CapacityInUse`) debe coincidir con `diskutil info`; procede de
+  `getattrlist(ATTR_VOL_SPACEUSED)` y no de una API privada.
+- `diskutil`, `ioreg` y `mount` se usan **solo como referencia externa**; la app no los ejecuta.
+  Comprobación:
+
+```bash
+grep -R "diskutil" Sources/ || echo "sin diskutil en el código"
+```
+
+Escaneo:
+
+```bash
+./build/Build/Products/Debug/KancerberoProbe disk scan "$HOME/Documents" --top 20
+du -skx "$HOME/Documents"     # KB; multiplicar por 1024 para bytes
+```
+
+- Tolerancia orientativa ±2–5 %. Diferencias esperadas: hard links (se cuentan por entrada),
+  clones/compresión/snapshots APFS y rutas denegadas (se reportan aparte).
+- Sin permisos, el escaneo debe continuar, marcar `accessDenied` y listar las rutas denegadas.
+- Conectar/expulsar un volumen externo y comprobar que Volumes se refresca; un volumen desmontado
+  aparece sin mount point ni libre/usado.
+- SMART no está disponible por APIs públicas y se muestra como “Unavailable”.
+
+Capturas:
+
+```bash
+./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
+  --screenshot /tmp/kb-disk-volumes.png --section disk --disk-tab volumes \
+  --screenshot-delay 5
+./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
+  --screenshot /tmp/kb-disk-analyzer.png --section disk --disk-tab analyzer \
+  --disk-path="$HOME/Documents" --disk-scan --screenshot-delay 8
+```
+
+Nota: usa `--disk-path=<ruta>` (un solo argumento). Un valor posicional que sea una ruta existente
+puede ser interpretado por macOS como “abrir documento” y bloquear la ventana antes de la captura.
 
 ## Rendimiento
 

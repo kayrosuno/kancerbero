@@ -6,4 +6,4 @@ DEFINES_MODULE = YES
 PRODUCT_MODULE_NAME = KancerberoC
 HEADER_SEARCH_PATHS = $(SRCROOT)/Sources/KancerberoC/include
 OTHER_CFLAGS = -fblocks -Wno-deprecated-declarations
-OTHER_LDFLAGS = -framework CoreFoundation
+OTHER_LDFLAGS = $(inherited) -framework CoreFoundation -framework IOKit -framework DiskArbitration

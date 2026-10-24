@@ -18,6 +18,12 @@ enum KBFormat {
         value.formatted(.number.notation(.compactName))
     }
 
+    static func percent(_ fraction: Double) -> String {
+        guard fraction.isFinite else { return "—" }
+        let value = min(max(fraction, 0), 1)
+        return (value * 100).formatted(.number.precision(.fractionLength(1))) + "%"
+    }
+
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"

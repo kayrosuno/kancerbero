@@ -3,11 +3,13 @@ import SwiftUI
 @main
 struct KancerberoApp: App {
     @State private var model = AppModel()
+    @State private var disk = DiskModel()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(model)
+                .environment(disk)
                 .frame(minWidth: 1040, minHeight: 640)
                 .task {
                     model.start()
@@ -30,8 +32,11 @@ struct KancerberoApp: App {
             }
 
             CommandGroup(after: .newItem) {
-                Button("Refresh Now") { model.refreshNow() }
-                    .keyboardShortcut("r")
+                Button("Refresh Now") {
+                    model.refreshNow()
+                    Task { await disk.refreshInventory(force: true) }
+                }
+                .keyboardShortcut("r")
                 Button(model.isPaused ? "Resume" : "Pause") {
                     model.isPaused.toggle()
                 }
