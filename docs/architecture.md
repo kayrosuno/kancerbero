@@ -118,7 +118,8 @@
     ancho para evitar saltos de layout.
   - `RadialDiskMap` dibuja un sunburst con `Canvas`: anillos = profundidad, ángulo = tamaño
     asignado; hit-test por radio/ángulo. Las etiquetas muestran nombre y tamaño humano en dos
-    líneas. El centro muestra el nodo actual y el porcentaje del volumen. Respeta Reduce Motion.
+    líneas. El centro muestra el nodo actual y el porcentaje del volumen; pulsarlo sube un
+    nivel. Respeta Reduce Motion.
 - **Límites:** SMART no está expuesto por APIs públicas; los volúmenes desmontados no tienen
   libre/usado; los hard links se cuentan por entrada; clones/snapshots APFS hacen que la suma de
   tamaños no coincida exactamente con el “Used” del contenedor.

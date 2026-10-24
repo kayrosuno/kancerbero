@@ -205,7 +205,12 @@ struct DiskAnalyzerView: View {
                     volumeCapacity: volumeCapacity(for: snapshot),
                     showHidden: disk.showHidden,
                     showPackageContents: disk.showPackageContents,
-                    onSelect: { disk.drillDown(to: $0) }
+                    onSelect: { disk.drillDown(to: $0) },
+                    onCenterTap: {
+                        guard let node = disk.currentNode,
+                              node.id != snapshot.root.id else { return }
+                        disk.drillUp()
+                    }
                 )
                 .id(node.id)
                 .padding(8)

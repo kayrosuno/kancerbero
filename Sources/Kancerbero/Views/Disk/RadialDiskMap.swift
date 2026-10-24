@@ -12,6 +12,7 @@ struct RadialDiskMap: View {
     let showHidden: Bool
     let showPackageContents: Bool
     let onSelect: (KBDiskNode) -> Void
+    let onCenterTap: () -> Void
 
     @State private var hoveredID: String?
 
@@ -59,6 +60,12 @@ struct RadialDiskMap: View {
             }
             .gesture(
                 DragGesture(minimumDistance: 0).onEnded { value in
+                    if isInsideCenter(value.startLocation, layout: layout) {
+                        if isInsideCenter(value.location, layout: layout) {
+                            onCenterTap()
+                        }
+                        return
+                    }
                     guard let sector = sector(at: value.location, layout: layout),
                           let node = sector.node,
                           node.isDirectory,
@@ -71,6 +78,9 @@ struct RadialDiskMap: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(focus.name), \(KBFormat.bytes(focus.allocatedBytes))")
         .accessibilityValue("\(focus.children.count) items")
+        .accessibilityAction(named: "Go up one level") {
+            onCenterTap()
+        }
         .animation(.snappy(duration: 0.25), value: focus.id)
     }
 
@@ -388,6 +398,12 @@ struct RadialDiskMap: View {
     }
 
     // MARK: - Hit testing
+
+    private func isInsideCenter(_ point: CGPoint, layout: Layout) -> Bool {
+        let dx = point.x - layout.center.x
+        let dy = point.y - layout.center.y
+        return dx * dx + dy * dy < layout.centerRadius * layout.centerRadius
+    }
 
     private func sector(at location: CGPoint, layout: Layout) -> Sector? {
         let dx = location.x - layout.center.x
