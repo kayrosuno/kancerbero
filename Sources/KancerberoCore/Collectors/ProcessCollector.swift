@@ -19,7 +19,7 @@ public enum ProcessCollector {
         var buffer = [CChar](repeating: 0, count: 4096)
         let result = kb_process_path(pid, &buffer, buffer.count)
         guard result > 0 else { return nil }
-        return String(cString: buffer)
+        return String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
     }
 
     public static func snapshot() throws -> [KBProcessInfo] {

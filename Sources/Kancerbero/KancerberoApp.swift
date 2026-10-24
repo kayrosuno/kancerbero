@@ -6,17 +6,29 @@ struct KancerberoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
                 .environment(model)
-                .frame(minWidth: 960, minHeight: 560)
+                .frame(minWidth: 1040, minHeight: 640)
                 .task {
                     model.start()
                     await ScreenshotMode.runIfRequested()
                 }
         }
-        .defaultSize(width: 1200, height: 720)
+        .defaultSize(width: 1320, height: 820)
         .windowStyle(.titleBar)
         .commands {
+            SidebarCommands()
+
+            CommandMenu("Sections") {
+                ForEach(AppSection.allCases) { section in
+                    Button(section.title) {
+                        NotificationCenter.default.post(name: .kbSelectSection,
+                                                        object: section.rawValue)
+                    }
+                    .keyboardShortcut(section.shortcut, modifiers: .command)
+                }
+            }
+
             CommandGroup(after: .newItem) {
                 Button("Refresh Now") { model.refreshNow() }
                     .keyboardShortcut("r")

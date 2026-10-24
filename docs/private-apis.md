@@ -73,3 +73,35 @@ sysctl(mib, 6, &ifmibdata, &len, NULL, 0)
   degradado; `KancerberoProbe symbols` sirve para re-verificar tras cada actualización de macOS.
 - `net.statistics_privcheck` debe ser 0 para usar el framework sin entitlement. Si vale 1, el
   daemon (sin el entitlement privado de Apple) no puede usarlo y la app muestra el modo degradado.
+
+## LaunchControl 2.12 (pestaña Daemons)
+
+Análisis REA 6.7.0 (Hopper) del binario principal y del helper privilegiado de
+`/Applications/LaunchControl.app`, sin ejecutarlos.
+
+| Función | Mecanismo observado | Evidencia |
+|---|---|---|
+| Enumerar | Plists en directorios estándar + bitmask por directorio; dominio 2 (usuario/gui) o 4 (sistema) | 0x10003cb1c, 0x10003c0cc |
+| Detalle | `ServiceDescription readPlist` (`Label`, `Program`, `ProgramArguments`, `RunAtLoad`, `KeepAlive`, `Disabled`, `EnvironmentVariables`, `WorkingDirectory`, `StartInterval`, `StartCalendarInterval`, `LastExitStatus`…) | 0x1001736a8 |
+| Estado usuario | SPI `launch_msg("GetJobs")` + `launch_data_dict_iterate` | 0x100097350, 0x100097520 |
+| Estado sistema | XPC `listWithReply:` al helper; helper con `launchctl_list` (`launch_msg`) | helper 0x100017fe0 |
+| Start/Stop usuario | `/bin/launchctl start|stop <label>` (NSTask) | 0x10003d850 |
+| Start/Stop sistema | XPC al helper; `launchctl start|stop` como root | helper 0x100017c94, 0x100017c0c |
+| Load/Unload | `/bin/sh -c "/bin/launchctl %@ -F %@ '%@'"`; helper para sistema | 0x10003d5a0 |
+| Enable/Disable | `launchctl enable|disable system/<label>` / `gui/<uid>/<label>` | 0x10004dafc |
+| Disabled | `launchctl print-disabled` + parser de `"disabled services"` | 0x10004d064 |
+| Helper | `SMAppService`/`SMJobBless`; XPC con list/status/start/stop/load/unload/savePlist/override/señales y **ejecución arbitraria** root (`performPrivilegedTaskWithLaunchPath:arguments:`); listener sin comprobación explícita | 0x100016c38, 0x100015c58 |
+
+Conclusiones y decisión para kancerbero:
+
+- LaunchControl **no** usa XPC directo a launchd ni libvproc: usa `launch_msg`, `/bin/launchctl` y
+  un helper XPC para el dominio `system`. Los endpoints XPC privados de launchd
+  (`com.apple.xpc.launchd`, `xpc_pipe_interface_routine`) no están documentados y no se usan.
+- kancerbero replica el enfoque con `launch_msg("GetJobs")` para el estado (`kb_launchd.c`,
+  `<launch.h>` del SDK) y `/bin/launchctl` para las acciones, con dominio explícito y sin shell.
+  Como fallback cuando `launch_msg` no aplica (p. ej. `system` sin root) se parsea
+  `launchctl print <domain>`.
+- **No** se implementa el endpoint genérico de ejecución root del helper de LaunchControl. El
+  daemon propio solo ejecuta operaciones concretas de `launchctl` y valida el cliente.
+- `launchctl kickstart -k` se queda esperando en macOS 27 con servicios de larga duración;
+  `restart` se implementa como `kill SIGTERM` + `kickstart`.

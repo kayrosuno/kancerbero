@@ -26,6 +26,22 @@ App SwiftUI ──XPC──> KancerberoDaemon (root opcional)
 - **Fallback**: si NetworkStatistics no está disponible, la app sigue mostrando conexiones e
   interfaces y marca el modo como degradado.
 
+## Interfaz
+
+`NavigationSplitView` con panel lateral colapsable:
+
+- **Networking** — tarjetas de resumen con sparklines y subnavegación Interfaces / Connections /
+  Processes, con tablas e inspector de proceso.
+- **Disk** — placeholder con las capacidades previstas (I/O por proceso, volúmenes, histórico,
+  SMART).
+- **Daemons** — inventario de servicios launchd (System/GUI/User) con estado, PID, última salida,
+  programa y plist. Inspector con Start / Stop / Restart / Enable·Disable / Load·Unload / Reveal.
+  Las acciones de sistema requieren el daemon root y confirmación; GUI/User funcionan en local.
+  Los login items quedan para una iteración posterior.
+
+El panel se oculta con el botón de la toolbar o `Cmd+Ctrl+S`; `Cmd+1/2/3` cambia de sección. Las
+animaciones respetan Reduce Motion.
+
 ## Compilar
 
 ```bash
@@ -49,7 +65,10 @@ Captura de la UI sin permisos de Grabación de pantalla (la app se dibuja a sí 
 
 ```bash
 build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
-  --screenshot /tmp/kancerbero-ui.png [--section 1]
+  --screenshot /tmp/kancerbero-ui.png \
+  [--section networking|disk|daemons] \
+  [--tab interfaces|connections|processes] \
+  [--sidebar-collapsed]
 ```
 
 ## Daemon
@@ -75,6 +94,20 @@ Instala el binario en `/Library/PrivilegedHelperTools/` y el plist en
 
 Producción: firma Developer ID + `SMAppService.daemon(plistName:)` con el plist
 `uno.kayros.kancerbero.daemon.smappservice.plist`. Ver `docs/security.md`.
+
+## Daemons
+
+- Estado e inventario con `launch_msg("GetJobs")` (`<launch.h>` del SDK) + plists; el daemon root
+  consulta el dominio `system` y la app los dominios `gui`/`user`.
+- Acciones con `/bin/launchctl` y dominio explícito, sin shell. Restart = stop + start.
+- Estado disabled desde `launchctl print-disabled`.
+- Diagnóstico:
+
+```bash
+./build/Build/Products/Debug/KancerberoProbe daemons system
+./build/Build/Products/Debug/KancerberoProbe daemons gui
+./build/Build/Products/Debug/KancerberoProbe daemon-action gui start <label>
+```
 
 ## Verificación
 

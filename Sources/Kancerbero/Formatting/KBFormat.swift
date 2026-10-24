@@ -14,6 +14,10 @@ enum KBFormat {
         value.formatted()
     }
 
+    static func compactCount(_ value: Int) -> String {
+        value.formatted(.number.notation(.compactName))
+    }
+
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"

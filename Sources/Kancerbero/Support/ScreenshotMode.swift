@@ -33,11 +33,19 @@ enum ScreenshotMode {
             fail("no visible window after 5s")
         }
         window.makeKeyAndOrderFront(nil)
-        window.setContentSize(NSSize(width: 1200, height: 720))
+        window.setContentSize(NSSize(width: 1320, height: 820))
         window.center()
 
         // Let the first daemon/local snapshot arrive and the table lay out.
-        try? await Task.sleep(for: .seconds(3))
+        let delay: TimeInterval
+        if let flag = arguments.firstIndex(of: "--screenshot-delay"),
+           flag + 1 < arguments.count,
+           let value = Double(arguments[flag + 1]) {
+            delay = value
+        } else {
+            delay = 4
+        }
+        try? await Task.sleep(for: .seconds(delay))
 
         do {
             try WindowSnapshot.capture(window, to: url)

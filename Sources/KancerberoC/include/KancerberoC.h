@@ -2,6 +2,7 @@
 #define KANCERBERO_C_H
 
 #include "KBModels.h"
+#include "KBLaunchd.h"
 
 #ifdef __cplusplus
 extern "C" {

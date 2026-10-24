@@ -33,7 +33,7 @@ enum KBInterop {
             let result = bytes.withUnsafeBytes { raw in
                 inet_ntop(AF_INET6, raw.baseAddress, &buffer, socklen_t(INET6_ADDRSTRLEN))
             }
-            return result == nil ? "" : String(cString: buffer)
+            return result == nil ? "" : String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
         default:
             return ""
         }

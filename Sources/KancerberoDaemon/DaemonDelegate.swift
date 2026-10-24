@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import KancerberoCore
 import os
@@ -13,11 +14,16 @@ final class DaemonDelegate: NSObject, NSXPCListenerDelegate {
         let uid = newConnection.effectiveUserIdentifier
         let path = ProcessCollector.path(for: pid) ?? "unknown"
 
-        logger.notice("incoming pid=\(pid) uid=\(uid) path=\(path, privacy: .public)")
+        // Development policy: the app bundle and same-uid clients may control
+        // services. Production must set `setCodeSigningRequirement` plus a
+        // Team ID check instead of relying on the path.
+        let isApp = path.contains("/Kancerbero.app/Contents/MacOS/")
+        let sameUser = uid == geteuid()
+        let canControl = isApp || sameUser
 
-        // Development policy: accept local clients and log their identity.
-        // Production must set `setCodeSigningRequirement` plus a Team ID check.
-        service.configure(connection: newConnection)
+        logger.notice("incoming pid=\(pid) uid=\(uid) canControl=\(canControl) path=\(path, privacy: .public)")
+
+        service.configure(connection: newConnection, canControl: canControl)
         newConnection.exportedInterface = NSXPCInterface(with: KancerberoDaemonXPC.self)
         newConnection.exportedObject = service
         newConnection.remoteObjectInterface = NSXPCInterface(with: KancerberoClientXPC.self)

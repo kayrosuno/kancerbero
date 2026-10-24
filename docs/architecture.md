@@ -10,6 +10,20 @@
 | `Kancerbero` | app | SwiftUI, inspector, cliente XPC y modo local |
 | `KancerberoProbe` | tool | Diagnóstico y comparación con herramientas del sistema |
 
+## UI
+
+- `RootView`: `NavigationSplitView` con `columnVisibility`; sidebar colapsable con
+  `SidebarCommands()` y botón propio en la toolbar.
+- `SidebarView`: selección propia con `matchedGeometryEffect` para Networking / Disk / Daemons;
+  cabecera con marca y estado live, pie con fuente (daemon/local), privcheck y hora.
+- `NetworkingView`: cuatro tarjetas de resumen (`SummaryCard` + `Sparkline`), `PillTabBar` y las
+  tablas (`NetworkingTables.swift`) dentro de una tarjeta con material.
+- `DiskView` y `DaemonsView`: `PlannedSectionView` con icono animado y lista de capacidades
+  previstas.
+- Persistencia: `@AppStorage("selectedSection")` y `@AppStorage("networkingTab")`.
+- Captura interna para verificación: `--screenshot`, `--section`, `--tab`,
+  `--sidebar-collapsed` (ver `docs/verification.md`).
+
 ## Flujo de datos
 
 1. **NStat (tráfico y conexiones)**
@@ -40,6 +54,20 @@
      `tcpsi_state`) o `pri_in` para UDP.
    - `PROC_PIDFDVNODEPATHINFO` para rutas y tamaño de ficheros.
    - `proc_pidfdinfo` exige mismo uid salvo root: el daemon root es necesario para otros usuarios.
+
+## Daemons
+
+- `DaemonsCollector(domain:)` enumera plists de `LaunchDaemons`/`LaunchAgents` y obtiene el
+  estado con `LaunchdQuery.jobs()` (`launch_msg("GetJobs")`): el app consulta `gui`/`user` y el
+  daemon root consulta `system`. Si `launch_msg` no aplica (p. ej. `system` sin root) se parsea
+  `launchctl print <domain>`.
+- `launchctl print-disabled <domain>` da el estado disabled; los plists dan programa, argumentos,
+  RunAtLoad, KeepAlive, StartInterval, WorkingDirectory y EnvironmentVariables.
+- Las acciones usan `LaunchctlRunner` (`/bin/launchctl`, dominio explícito, sin shell):
+  `kickstart`, `kill SIGTERM`, `enable`/`disable`, `bootstrap`/`bootout`; restart = stop + start.
+- La app enruta `system` al daemon (`daemonServices`/`daemonAction` por XPC) y ejecuta `gui`/`user`
+  en local. Sin daemon, `system` es solo lectura.
+- La metadata de plists se cachea 30 s; el refresco de la vista es cada 5 s.
 
 ## XPC
 

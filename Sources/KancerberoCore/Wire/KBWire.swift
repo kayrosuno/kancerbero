@@ -74,14 +74,35 @@ public struct KBRequestMessage: Codable, Sendable {
     public enum Kind: String, Codable, Sendable {
         case snapshot
         case processDetail
+        case daemonServices
+        case daemonAction
     }
 
     public var kind: Kind
     public var pid: Int32?
+    public var daemonRequest: KBDaemonActionRequest?
 
-    public init(kind: Kind, pid: Int32? = nil) {
+    public init(kind: Kind, pid: Int32? = nil,
+                daemonRequest: KBDaemonActionRequest? = nil) {
         self.kind = kind
         self.pid = pid
+        self.daemonRequest = daemonRequest
+    }
+}
+
+public struct KBDaemonSnapshotPayload: Codable, Sendable {
+    public var snapshot: KBDaemonSnapshot
+
+    public init(snapshot: KBDaemonSnapshot) {
+        self.snapshot = snapshot
+    }
+}
+
+public struct KBDaemonActionResultPayload: Codable, Sendable {
+    public var result: KBDaemonActionResult
+
+    public init(result: KBDaemonActionResult) {
+        self.result = result
     }
 }
 
