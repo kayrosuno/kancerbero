@@ -12,11 +12,11 @@ fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CONFIG="${CONFIG:-Debug}"
 SOURCE="$ROOT/build/Build/Products/$CONFIG/KancerberoDaemon"
-TARGET="/Library/PrivilegedHelperTools/com.alejandro.kancerbero.daemon"
-PLIST_SRC="$ROOT/Resources/LaunchDaemons/com.alejandro.kancerbero.daemon.plist"
-PLIST_DST="/Library/LaunchDaemons/com.alejandro.kancerbero.daemon.plist"
+TARGET="/Library/PrivilegedHelperTools/uno.kayros.kancerbero.daemon"
+PLIST_SRC="$ROOT/Resources/LaunchDaemons/uno.kayros.kancerbero.daemon.plist"
+PLIST_DST="/Library/LaunchDaemons/uno.kayros.kancerbero.daemon.plist"
 LOG_DIR="/Library/Logs/Kancerbero"
-LABEL="com.alejandro.kancerbero.daemon"
+LABEL="uno.kayros.kancerbero.daemon"
 
 if [ ! -x "$SOURCE" ]; then
     echo "missing $SOURCE; run scripts/build.sh first" >&2

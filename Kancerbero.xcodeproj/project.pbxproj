@@ -61,8 +61,8 @@
 		ABCDEF000000000000000096 /* Kancerbero.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Kancerbero.xcconfig; sourceTree = "<group>"; };
 		ABCDEF000000000000000097 /* KancerberoProbe.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = KancerberoProbe.xcconfig; sourceTree = "<group>"; };
 		ABCDEF000000000000000099 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		ABCDEF00000000000000009A /* com.alejandro.kancerbero.daemon.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "com.alejandro.kancerbero.daemon.plist"; sourceTree = "<group>"; };
-		ABCDEF00000000000000009C /* com.alejandro.kancerbero.daemon.smappservice.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "com.alejandro.kancerbero.daemon.smappservice.plist"; sourceTree = "<group>"; };
+		ABCDEF00000000000000009A /* uno.kayros.kancerbero.daemon.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "uno.kayros.kancerbero.daemon.plist"; sourceTree = "<group>"; };
+		ABCDEF00000000000000009C /* uno.kayros.kancerbero.daemon.smappservice.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "uno.kayros.kancerbero.daemon.smappservice.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -207,8 +207,8 @@
 		ABCDEF00000000000000000A /* LaunchDaemons */ = {
 			isa = PBXGroup;
 			children = (
-				ABCDEF00000000000000009A /* com.alejandro.kancerbero.daemon.plist */,
-				ABCDEF00000000000000009C /* com.alejandro.kancerbero.daemon.smappservice.plist */,
+				ABCDEF00000000000000009A /* uno.kayros.kancerbero.daemon.plist */,
+				ABCDEF00000000000000009C /* uno.kayros.kancerbero.daemon.smappservice.plist */,
 			);
 			path = LaunchDaemons;
 			sourceTree = "<group>";

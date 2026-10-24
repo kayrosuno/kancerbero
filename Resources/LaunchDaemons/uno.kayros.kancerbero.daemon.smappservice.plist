@@ -3,12 +3,12 @@
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>com.alejandro.kancerbero.daemon</string>
+	<string>uno.kayros.kancerbero.daemon</string>
 	<key>BundleProgram</key>
 	<string>Contents/Library/LaunchDaemons/KancerberoDaemon</string>
 	<key>MachServices</key>
 	<dict>
-		<key>com.alejandro.kancerbero.daemon</key>
+		<key>uno.kayros.kancerbero.daemon</key>
 		<true/>
 	</dict>
 	<key>RunAtLoad</key>
@@ -20,7 +20,7 @@
 	</dict>
 	<key>AssociatedBundleIdentifiers</key>
 	<array>
-		<string>com.alejandro.kancerbero</string>
+		<string>uno.kayros.kancerbero</string>
 	</array>
 </dict>
 </plist>

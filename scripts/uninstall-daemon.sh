@@ -6,7 +6,7 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-LABEL="com.alejandro.kancerbero.daemon"
+LABEL="uno.kayros.kancerbero.daemon"
 launchctl bootout "system/$LABEL" 2>/dev/null || true
 rm -f "/Library/LaunchDaemons/$LABEL.plist"
 rm -f "/Library/PrivilegedHelperTools/$LABEL"
