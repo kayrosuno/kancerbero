@@ -1,0 +1,9 @@
+#include "Base.xcconfig"
+
+PRODUCT_NAME = Kancerbero
+PRODUCT_BUNDLE_IDENTIFIER = com.alejandro.kancerbero
+GENERATE_INFOPLIST_FILE = NO
+INFOPLIST_FILE = Resources/App/Info.plist
+ENABLE_APP_SANDBOX = NO
+OTHER_LDFLAGS = -framework CoreFoundation
+SWIFT_INCLUDE_PATHS = $(BUILT_PRODUCTS_DIR) $(inherited)

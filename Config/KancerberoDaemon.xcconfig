@@ -1,0 +1,6 @@
+#include "Base.xcconfig"
+
+PRODUCT_NAME = KancerberoDaemon
+SKIP_INSTALL = YES
+OTHER_LDFLAGS = -framework CoreFoundation -framework Security
+SWIFT_INCLUDE_PATHS = $(BUILT_PRODUCTS_DIR) $(inherited)

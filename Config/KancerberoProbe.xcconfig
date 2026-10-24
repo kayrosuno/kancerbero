@@ -1,0 +1,6 @@
+#include "Base.xcconfig"
+
+PRODUCT_NAME = KancerberoProbe
+SKIP_INSTALL = YES
+OTHER_LDFLAGS = -framework CoreFoundation
+SWIFT_INCLUDE_PATHS = $(BUILT_PRODUCTS_DIR) $(inherited)
