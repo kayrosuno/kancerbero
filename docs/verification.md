@@ -236,6 +236,28 @@ Capturas:
   --disk-path="$HOME/Documents" --disk-scan --screenshot-delay 8
 ```
 
+Mapa en vivo durante el escaneo:
+
+```bash
+K=./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
+$K --screenshot /tmp/kb-disk-live-a.png --section disk --disk-tab analyzer \
+  --disk-path="$HOME/Library" --disk-scan --screenshot-delay 2
+$K --screenshot /tmp/kb-disk-live-b.png --section disk --disk-tab analyzer \
+  --disk-path="$HOME/Library" --disk-scan --screenshot-delay 5
+```
+
+- En ambas capturas deben verse la tarjeta de progreso, las tarjetas Scanned/Files/Folders/Denied
+  con valores crecientes (Scanned con caption “scanning…”), el mapa radial creciendo y las
+  etiquetas con nombre + tamaño humano. El panel derecho muestra el aviso de espera, sin tablas.
+- Comparar `live-a` y `live-b`: los bytes, ficheros y sectores deben ser distintos (más grandes a
+  los 5 s).
+- Al terminar, las tablas de contenidos y mayores archivos aparecen y la tarjeta Scanned muestra la
+  duración.
+- Cancelar a mitad debe mostrar “Scan cancelled. Showing partial results.”, mantener el mapa y las
+  tarjetas con el parcial y montar las tablas una sola vez; no debe haber más actualizaciones.
+- Consola sin avisos de reentrancy de `NSTableView` durante el escaneo (las tablas no están
+  montadas).
+
 Nota: usa `--disk-path=<ruta>` (un solo argumento). Un valor posicional que sea una ruta existente
 puede ser interpretado por macOS como “abrir documento” y bloquear la ventana antes de la captura.
 

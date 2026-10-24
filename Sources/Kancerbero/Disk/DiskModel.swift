@@ -23,6 +23,7 @@ final class DiskModel {
     var scanState: ScanState = .idle
     var scanProgress: KBDiskScanProgress?
     var scanSnapshot: KBDiskScanSnapshot?
+    var liveSnapshot: KBDiskScanSnapshot?
     var currentNodeID: String?
     var deniedPaths: [String] = []
 
@@ -62,17 +63,33 @@ final class DiskModel {
         return inventory.allItems.first { $0.deviceIdentifier == selectedItemID }
     }
 
+    var activeSnapshot: KBDiskScanSnapshot? {
+        scanSnapshot ?? liveSnapshot
+    }
+
     var currentNode: KBDiskNode? {
-        guard let snapshot = scanSnapshot else { return nil }
-        if let currentNodeID, let node = snapshot.root.node(at: currentNodeID) {
+        guard let snapshot = activeSnapshot else { return nil }
+        if let currentNodeID,
+           let node = Self.nearestNode(to: currentNodeID, in: snapshot.root) {
             return node
         }
         return snapshot.root
     }
 
     var lineToCurrentNode: [KBDiskNode] {
-        guard let snapshot = scanSnapshot, let node = currentNode else { return [] }
+        guard let snapshot = activeSnapshot, let node = currentNode else { return [] }
         return snapshot.root.lineage(to: node.path)
+    }
+
+    private static func nearestNode(to path: String, in root: KBDiskNode) -> KBDiskNode? {
+        var candidate = path
+        while candidate.count >= root.path.count {
+            if let node = root.node(at: candidate) { return node }
+            let parent = (candidate as NSString).deletingLastPathComponent
+            if parent == candidate || parent.isEmpty { break }
+            candidate = parent
+        }
+        return nil
     }
 
     var isScanning: Bool { scanState == .scanning }
@@ -122,6 +139,7 @@ final class DiskModel {
         scanState = .scanning
         scanProgress = nil
         scanSnapshot = nil
+        liveSnapshot = nil
         currentNodeID = nil
         deniedPaths = []
 
@@ -131,19 +149,38 @@ final class DiskModel {
         let task = Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
 
-            let snapshot = DiskScanner.scan(rootPath: target, options: options) { progress in
-                Task { @MainActor in
-                    guard self.scanGeneration == generation,
-                          self.scanState == .scanning else { return }
-                    self.scanProgress = progress
+            let snapshot = DiskScanner.scan(
+                rootPath: target,
+                options: options,
+                partial: { partial in
+                    Task { @MainActor in
+                        guard self.scanGeneration == generation,
+                              self.scanState == .scanning else { return }
+                        self.liveSnapshot = partial
+                    }
+                },
+                progress: { progress in
+                    Task { @MainActor in
+                        guard self.scanGeneration == generation,
+                              self.scanState == .scanning else { return }
+                        self.scanProgress = progress
+                    }
                 }
-            }
+            )
 
             await MainActor.run {
                 guard self.scanGeneration == generation else { return }
+                let resolvedID: String
+                if let current = self.currentNodeID,
+                   let node = Self.nearestNode(to: current, in: snapshot.root) {
+                    resolvedID = node.path
+                } else {
+                    resolvedID = snapshot.root.path
+                }
                 self.scanSnapshot = snapshot
+                self.liveSnapshot = nil
                 self.scanProgress = nil
-                self.currentNodeID = snapshot.root.path
+                self.currentNodeID = resolvedID
                 self.deniedPaths = snapshot.deniedPaths
                 if let error = snapshot.error {
                     self.scanState = .failed(error)
@@ -171,11 +208,13 @@ final class DiskModel {
     func drillDown(to node: KBDiskNode) {
         guard node.isDirectory, !node.isAggregate else { return }
         if node.isPackage && !showPackageContents { return }
+        guard let snapshot = activeSnapshot,
+              snapshot.root.node(at: node.path) != nil else { return }
         currentNodeID = node.path
     }
 
     func drillUp() {
-        guard let snapshot = scanSnapshot, let node = currentNode else { return }
+        guard let snapshot = activeSnapshot, let node = currentNode else { return }
         let lineage = snapshot.root.lineage(to: node.path)
         if lineage.count >= 2 {
             currentNodeID = lineage[lineage.count - 2].path

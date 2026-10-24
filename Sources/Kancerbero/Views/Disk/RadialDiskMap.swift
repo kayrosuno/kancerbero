@@ -305,19 +305,29 @@ struct RadialDiskMap: View {
 
             let span = sector.endAngle - sector.startAngle
             if span >= minimumLabelAngle,
-               sector.outerRadius - sector.innerRadius >= 18 {
+               sector.outerRadius - sector.innerRadius >= 20 {
                 let middle = (sector.startAngle + sector.endAngle) / 2
                 let radius = (sector.innerRadius + sector.outerRadius) / 2
                 let point = CGPoint(
                     x: layout.center.x + cos(middle) * radius,
                     y: layout.center.y + sin(middle) * radius
                 )
-                let text = context.resolve(
+                let nameText = context.resolve(
                     Text(sector.label)
                         .font(.system(size: 8, weight: .medium))
                         .foregroundColor(.white)
                 )
-                context.draw(text, at: point, anchor: .center)
+                let sizeText = context.resolve(
+                    Text(KBFormat.bytes(sector.size))
+                        .font(.system(size: 7, weight: .regular))
+                        .foregroundColor(.white.opacity(0.82))
+                )
+                context.draw(nameText,
+                             at: CGPoint(x: point.x, y: point.y - 4.5),
+                             anchor: .center)
+                context.draw(sizeText,
+                             at: CGPoint(x: point.x, y: point.y + 5),
+                             anchor: .center)
             }
         }
 
