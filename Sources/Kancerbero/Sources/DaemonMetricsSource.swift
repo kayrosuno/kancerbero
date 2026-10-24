@@ -91,6 +91,44 @@ final class DaemonMetricsSource: NSObject, KancerberoClientXPC, @unchecked Senda
         return payload.detail
     }
 
+    func requestDaemonServices() throws -> KBDaemonSnapshot {
+        let message = try KBWireCodec.encode(KBRequestMessage(kind: .daemonServices))
+        let data = try requestData(message)
+        let payload = try KBWireCodec.decode(KBDaemonSnapshotPayload.self, from: data)
+        return payload.snapshot
+    }
+
+    func performDaemonAction(_ request: KBDaemonActionRequest) throws -> KBDaemonActionResult {
+        let message = try KBWireCodec.encode(
+            KBRequestMessage(kind: .daemonAction, daemonRequest: request))
+        let data = try requestData(message)
+        let payload = try KBWireCodec.decode(KBDaemonActionResultPayload.self, from: data)
+        return payload.result
+    }
+
+    private func requestData(_ message: Data, timeout: TimeInterval = 5) throws -> Data {
+        lock.lock()
+        let remote = self.remote
+        lock.unlock()
+        guard let remote else {
+            throw KBCollectionError.unavailable("daemon is not connected")
+        }
+        let replyData = Box<Data>()
+        let replyError = Box<NSError>()
+        let semaphore = DispatchSemaphore(value: 0)
+        remote.request(message) { data, error in
+            replyData.value = data
+            replyError.value = error
+            semaphore.signal()
+        }
+        guard semaphore.wait(timeout: .now() + timeout) == .success,
+              let data = replyData.value else {
+            throw KBCollectionError.unavailable(replyError.value?.localizedDescription
+                                                ?? "daemon request timed out")
+        }
+        return data
+    }
+
     func requestSnapshot() throws -> KBCollectionSnapshot {
         lock.lock()
         let remote = self.remote

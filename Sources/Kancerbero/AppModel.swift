@@ -18,6 +18,31 @@ final class AppModel {
     var interval: TimeInterval = 1.0
     var usingDaemon = false
     var daemonVersion: String?
+    var rxHistory: [Double] = []
+    var txHistory: [Double] = []
+    var systemDaemons: [KBDaemonService] = []
+    var localDaemons: [KBDaemonService] = []
+    var daemonServicesError: String?
+    var daemonLastUpdate: Date?
+    var daemonActionInFlight = false
+    var daemonActionMessage: String?
+    var daemonIsRoot = false
+
+    var allDaemons: [KBDaemonService] {
+        (systemDaemons + localDaemons).sorted { lhs, rhs in
+            if lhs.domain != rhs.domain {
+                return lhs.domain.rawValue < rhs.domain.rawValue
+            }
+            return lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending
+        }
+    }
+
+    var canControlSystem: Bool { usingDaemon && daemonIsRoot }
+
+    var isLive: Bool {
+        guard let lastUpdate else { return false }
+        return Date().timeIntervalSince(lastUpdate) < max(3.0, interval * 2.5)
+    }
 
     private let collector = CollectionActor()
     private var daemonSource: DaemonMetricsSource?
@@ -85,11 +110,90 @@ final class AppModel {
         daemonSource?.stop()
         daemonSource = nil
         usingDaemon = false
+        daemonIsRoot = false
         Task { await collector.stop() }
     }
 
     func refreshNow() {
         Task { await refreshOnce() }
+    }
+
+    func refreshDaemons() async {
+        let uid = getuid()
+        let useDaemon = usingDaemon
+        let source = daemonSource
+
+        let localTask = Task.detached(priority: .utility) {
+            () -> ([KBDaemonService], String?) in
+            let gui = DaemonsCollector(domain: .gui, uid: uid).snapshot()
+            let user = DaemonsCollector(domain: .user, uid: uid).snapshot()
+            return (gui.services + user.services, gui.error ?? user.error)
+        }
+
+        let systemTask = Task.detached(priority: .utility) {
+            () -> ([KBDaemonService], String?) in
+            if useDaemon, let source {
+                do {
+                    let snapshot = try source.requestDaemonServices()
+                    return (snapshot.services, nil)
+                } catch let caught {
+                    let fallback = DaemonsCollector(domain: .system, uid: uid).snapshot()
+                    return (fallback.services, fallback.error ?? caught.localizedDescription)
+                }
+            }
+            let fallback = DaemonsCollector(domain: .system, uid: uid).snapshot()
+            return (fallback.services, fallback.error)
+        }
+
+        let local = await localTask.value
+        localDaemons = local.0
+        // Let the table settle between the two updates; the system list is
+        // larger and used to trigger a re-entrant NSTableView layout warning.
+        try? await Task.sleep(for: .milliseconds(250))
+        let system = await systemTask.value
+        systemDaemons = system.0
+        daemonServicesError = local.1 ?? system.1
+        daemonLastUpdate = Date()
+    }
+
+    func performDaemonAction(_ request: KBDaemonActionRequest) async -> KBDaemonActionResult {
+        daemonActionInFlight = true
+        defer { daemonActionInFlight = false }
+
+        let result: KBDaemonActionResult
+        if request.domain == .system {
+            guard usingDaemon, canControlSystem, let source = daemonSource else {
+                let message = usingDaemon
+                    ? "The daemon is not running as root; system services are read-only."
+                    : "Install the root daemon to control system services."
+                daemonActionMessage = message
+                return KBDaemonActionResult(ok: false, message: message)
+            }
+            do {
+                result = try await Task.detached(priority: .userInitiated) {
+                    try source.performDaemonAction(request)
+                }.value
+            } catch {
+                result = KBDaemonActionResult(ok: false, message: error.localizedDescription)
+            }
+        } else {
+            result = await Task.detached(priority: .userInitiated) {
+                let run = LaunchctlRunner.action(request)
+                let snapshot = DaemonsCollector(domain: request.domain).snapshot()
+                let message = run.ok
+                    ? "\(request.action.rawValue) \(request.label)"
+                    : (run.stderr.isEmpty
+                       ? "launchctl failed"
+                       : run.stderr.trimmingCharacters(in: .whitespacesAndNewlines))
+                return KBDaemonActionResult(ok: run.ok, message: message, snapshot: snapshot)
+            }.value
+        }
+
+        daemonActionMessage = result.ok
+            ? "\(request.action.rawValue.capitalized) \(request.label)"
+            : result.message
+        await refreshDaemons()
+        return result
     }
 
     func detail(for process: KBProcessInfo) async -> KBProcessDetail {
@@ -135,6 +239,7 @@ final class AppModel {
                 Task { @MainActor in
                     self?.usingDaemon = false
                     self?.daemonVersion = nil
+                    self?.daemonIsRoot = false
                 }
             }
             do {
@@ -144,6 +249,7 @@ final class AppModel {
                 guard let self else { return }
                 self.daemonSource = source
                 self.daemonVersion = hello.daemonVersion
+                self.daemonIsRoot = hello.capabilities.root
                 self.usingDaemon = true
                 self.daemonConnecting = false
             } catch {
@@ -221,6 +327,16 @@ final class AppModel {
         privcheck = snapshot.privcheck
         lastError = snapshot.error
         lastUpdate = snapshot.generatedAt
+        recordHistory()
+    }
+
+    private func recordHistory() {
+        let rates = systemRates
+        rxHistory.append(rates.rxBytesPerSecond)
+        txHistory.append(rates.txBytesPerSecond)
+        let limit = 60
+        if rxHistory.count > limit { rxHistory.removeFirst(rxHistory.count - limit) }
+        if txHistory.count > limit { txHistory.removeFirst(txHistory.count - limit) }
     }
 
     private func subtract(_ current: KBCounters, _ previous: KBCounters) -> KBCounters {

@@ -130,6 +130,19 @@ private func printSources() {
     }
 }
 
+private func printDaemons(domain: KBDaemonDomain) {
+    let snapshot = DaemonsCollector(domain: domain).snapshot()
+    write("daemons domain=\(domain.rawValue) source=\(snapshot.source) count=\(snapshot.services.count) error=\(snapshot.error ?? "-")\n")
+    for service in snapshot.services.prefix(25) {
+        write(String(format: "  %-52@ pid=%-7@ state=%-9@ program=%-46@ plist=%@\n",
+                     service.label as NSString,
+                     (service.pid.map { String($0) } ?? "—") as NSString,
+                     service.state.rawValue as NSString,
+                     (service.program.isEmpty ? "—" : service.program) as NSString,
+                     (service.plistPath.isEmpty ? "—" : (service.plistPath as NSString).lastPathComponent) as NSString))
+    }
+}
+
 private func printNStat(seconds: Int) {
     let collector = NStatCollector()
     do {
@@ -204,6 +217,21 @@ case "files":
         fail("usage: KancerberoProbe files <pid>")
     }
     printFiles(pid: pid)
+case "daemons":
+    let raw = remainder.first ?? "system"
+    printDaemons(domain: KBDaemonDomain(rawValue: raw) ?? .system)
+case "daemon-action":
+    guard remainder.count >= 3,
+          let domain = KBDaemonDomain(rawValue: remainder[0]),
+          let action = KBDaemonAction(rawValue: remainder[1]) else {
+        fail("usage: daemon-action <system|gui|user> <start|stop|restart|enable|disable|load|unload> <label> [plist]")
+    }
+    let plist = remainder.count > 3 ? remainder[3] : nil
+    let result = LaunchctlRunner.action(KBDaemonActionRequest(
+        label: remainder[2], domain: domain, action: action, plistPath: plist))
+    write("status=\(result.status) ok=\(result.ok) timedOut=\(result.timedOut)\n")
+    write("stdout: \(result.stdout)\n")
+    write("stderr: \(result.stderr)\n")
 case "sources":
     printSources()
 case "nstat":

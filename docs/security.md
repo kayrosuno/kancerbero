@@ -28,6 +28,17 @@ Pendiente para producción:
 - Firma Developer ID del daemon y de la app, hardened runtime, notarización.
 - Migración a `SMAppService.daemon(plistName:)` para el despliegue.
 
+## Acciones sobre servicios launchd
+
+- `DaemonDelegate` calcula `canControl` por conexión: en desarrollo acepta la ruta de
+  `Kancerbero.app` o un cliente del mismo uid; las denegaciones se registran. Producción debe usar
+  `setCodeSigningRequirement` + Team ID.
+- El daemon solo acepta acciones del dominio `system`; `gui`/`user` se ejecutan en la app.
+- `LaunchctlRunner` ejecuta únicamente operaciones concretas de `/bin/launchctl` con dominio y
+  label validados (`^[A-Za-z0-9._-]+$`). No hay shell, launchPath libre ni ejecución arbitraria.
+- Límite de 10 acciones/minuto por cliente y una acción en vuelo; timeout de 5–10 s.
+- La UI pide confirmación para acciones de sistema y para stop/disable.
+
 ## Superficie de ataque
 
 - Los mensajes XPC se decodifican con `PropertyListDecoder` desde `Data`; un payload inválido

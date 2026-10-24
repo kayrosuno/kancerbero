@@ -80,11 +80,78 @@ capturar su propia ventana con AppKit sin ese permiso:
 
 ```bash
 build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
-  --screenshot /tmp/kancerbero-ui.png [--section 0|1|2]
+  --screenshot /tmp/kancerbero-ui.png \
+  [--section networking|disk|daemons] \
+  [--tab interfaces|connections|processes] \
+  [--sidebar-collapsed]
 ```
 
-`--section` selecciona Interfaces, Conexiones o Procesos. El PNG se escribe a escala de backing
+`--section` selecciona la sección de primer nivel, `--tab` la subpestaña de Networking y
+`--sidebar-collapsed` captura el panel lateral oculto. El PNG se escribe a escala de backing
 (2x en Retina) y la app termina con código 0.
+
+Capturas recomendadas:
+
+```bash
+for args in \
+  "--section networking --tab interfaces" \
+  "--section networking --tab connections" \
+  "--section networking --tab processes" \
+  "--section disk" \
+  "--section daemons" \
+  "--section networking --sidebar-collapsed"
+do
+  ./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
+    --screenshot "/tmp/kb-$(echo $args | tr ' /' '__').png" $args
+done
+```
+
+## Daemons
+
+```bash
+./build/Build/Products/Debug/KancerberoProbe daemons system
+./build/Build/Products/Debug/KancerberoProbe daemons gui
+./build/Build/Products/Debug/KancerberoProbe daemons user
+```
+
+- Comparar label, dominio, PID y estado con `launchctl print system`, `launchctl print
+  gui/$(id -u)`, `launchctl print user/$(id -u)` y LaunchControl.
+- `launch_msg("GetJobs")` devuelve los mismos jobs que `launchctl list` en el dominio del usuario.
+- Estado disabled: comparar con `launchctl print-disabled <dominio>`.
+
+Prueba de control con un agente temporal (limpiar al terminar):
+
+```bash
+LABEL=uno.kayros.kancerbero.test
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+# ProgramArguments: /bin/sleep 300, RunAtLoad=false
+launchctl bootstrap "gui/$(id -u)" "$PLIST"
+./build/Build/Products/Debug/KancerberoProbe daemon-action gui start "$LABEL"
+./build/Build/Products/Debug/KancerberoProbe daemon-action gui restart "$LABEL"
+./build/Build/Products/Debug/KancerberoProbe daemon-action gui stop "$LABEL"
+./build/Build/Products/Debug/KancerberoProbe daemon-action gui disable "$LABEL"
+./build/Build/Products/Debug/KancerberoProbe daemon-action gui enable "$LABEL"
+./build/Build/Products/Debug/KancerberoProbe daemon-action gui unload "$LABEL"
+launchctl bootout "gui/$(id -u)/$LABEL"; rm -f "$PLIST"
+```
+
+Resultado esperado: start/restart devuelven estado 0 con PID nuevo; stop deja el servicio
+"not running"; disable/enable se reflejan en `print-disabled`; unload/load funcionan con
+`bootstrap`/`bootout`. Las acciones de system requieren el daemon root y una confirmación.
+
+Nota: con actualizaciones en vivo, SwiftUI `Table` puede registrar
+`reentrant operation in its NSTableView delegate` en macOS 27. No afecta a los datos; el refresco
+de Daemons se hace cada 5 s y la metadata se cachea 30 s para reducir esas ventanas.
+
+Capturas:
+
+```bash
+./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
+  --screenshot /tmp/kb-daemons.png --section daemons --screenshot-delay 5
+./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
+  --screenshot /tmp/kb-daemons-detail.png --section daemons \
+  --daemon-selected com.apple.Finder --screenshot-delay 5
+```
 
 ## Rendimiento
 

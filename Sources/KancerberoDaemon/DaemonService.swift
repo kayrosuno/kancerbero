@@ -38,10 +38,13 @@ final class DaemonService: NSObject, KancerberoDaemonXPC, @unchecked Sendable {
     private var task: Task<Void, Never>?
     private var sequence: UInt64 = 0
     private var subscribedAt: Date?
+    private var canControl = false
+    private var actionTimestamps: [Date] = []
 
-    func configure(connection: NSXPCConnection) {
+    func configure(connection: NSXPCConnection, canControl: Bool) {
         lock.lock()
         self.connection = connection
+        self.canControl = canControl
         lock.unlock()
     }
 
@@ -167,6 +170,48 @@ final class DaemonService: NSObject, KancerberoDaemonXPC, @unchecked Sendable {
                 let payload = KBDetailPayload(detail: detail)
                 box.send(try? KBWireCodec.encode(payload))
             }
+        case .daemonServices:
+            let box = ReplyBox(reply)
+            Task {
+                let snapshot = await Task.detached(priority: .utility) {
+                    DaemonsCollector(domain: .system).snapshot()
+                }.value
+                box.send(try? KBWireCodec.encode(KBDaemonSnapshotPayload(snapshot: snapshot)))
+            }
+        case .daemonAction:
+            guard let actionRequest = request.daemonRequest else {
+                reply(nil, NSError(domain: "kancerbero", code: 6,
+                                   userInfo: [NSLocalizedDescriptionKey: "missing daemon action"]))
+                return
+            }
+            guard actionRequest.domain == .system else {
+                reply(nil, NSError(domain: "kancerbero", code: 7,
+                                   userInfo: [NSLocalizedDescriptionKey: "gui/user actions run in the app"]))
+                return
+            }
+            guard isControlAllowed() else {
+                logger.warning("rejected daemon action from unauthorized client")
+                reply(nil, NSError(domain: "kancerbero", code: 8,
+                                   userInfo: [NSLocalizedDescriptionKey: "client is not authorized to control services"]))
+                return
+            }
+            guard allowActionRate() else {
+                reply(nil, NSError(domain: "kancerbero", code: 9,
+                                   userInfo: [NSLocalizedDescriptionKey: "too many actions, wait a minute"]))
+                return
+            }
+            let box = ReplyBox(reply)
+            Task {
+                let result = await Task.detached(priority: .userInitiated) {
+                    let run = LaunchctlRunner.action(actionRequest)
+                    let snapshot = DaemonsCollector(domain: .system).snapshot()
+                    let message = run.ok
+                        ? "\(actionRequest.action.rawValue) \(actionRequest.label)"
+                        : (run.stderr.isEmpty ? "launchctl failed" : run.stderr.trimmingCharacters(in: .whitespacesAndNewlines))
+                    return KBDaemonActionResult(ok: run.ok, message: message, snapshot: snapshot)
+                }.value
+                box.send(try? KBWireCodec.encode(KBDaemonActionResultPayload(result: result)))
+            }
         }
     }
 
@@ -176,6 +221,22 @@ final class DaemonService: NSObject, KancerberoDaemonXPC, @unchecked Sendable {
         task = nil
         lock.unlock()
         logger.notice("unsubscribed")
+    }
+
+    private func isControlAllowed() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return canControl
+    }
+
+    private func allowActionRate() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        let cutoff = Date().addingTimeInterval(-60)
+        actionTimestamps.removeAll { $0 < cutoff }
+        guard actionTimestamps.count < 10 else { return false }
+        actionTimestamps.append(Date())
+        return true
     }
 
     private static func processDetail(pid: Int32) async -> KBProcessDetail {
