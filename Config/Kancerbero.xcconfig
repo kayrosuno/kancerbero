@@ -4,6 +4,7 @@ PRODUCT_NAME = Kancerbero
 PRODUCT_BUNDLE_IDENTIFIER = uno.kayros.kancerbero
 GENERATE_INFOPLIST_FILE = NO
 INFOPLIST_FILE = Resources/App/Info.plist
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
 ENABLE_APP_SANDBOX = NO
 OTHER_LDFLAGS = $(inherited) -framework CoreFoundation -framework IOKit -framework DiskArbitration
 SWIFT_INCLUDE_PATHS = $(BUILT_PRODUCTS_DIR) $(inherited)

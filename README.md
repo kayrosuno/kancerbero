@@ -59,6 +59,19 @@ xcodebuild -project Kancerbero.xcodeproj -scheme Kancerbero \
 
 Productos en `build/Build/Products/Debug/`.
 
+## Icono
+
+El icono de la app vive en `Sources/Kancerbero/Assets.xcassets/AppIcon.appiconset` y se genera con:
+
+```bash
+./scripts/make-icon.sh [origen.png]
+```
+
+Por defecto usa `/Users/alejandro/CODE/Iconos/kancerbero/kancerbero_1024x1024.png` (1254×1254; el
+script lo reduce a 1024 para el slot mayor) y produce los 10 tamaños de macOS entre 16 y 1024.
+El logotipo interno de la barra lateral es independiente y no se modifica. Si Finder/Dock muestra
+un icono antiguo, es caché de LaunchServices: copia la app a otra ruta o reinicia Finder/Dock.
+
 ## Ejecutar
 
 ```bash
