@@ -1,0 +1,9 @@
+#include "Base.xcconfig"
+
+PRODUCT_NAME = KancerberoC
+SKIP_INSTALL = YES
+DEFINES_MODULE = YES
+PRODUCT_MODULE_NAME = KancerberoC
+HEADER_SEARCH_PATHS = $(SRCROOT)/Sources/KancerberoC/include
+OTHER_CFLAGS = -fblocks
+OTHER_LDFLAGS = -framework CoreFoundation

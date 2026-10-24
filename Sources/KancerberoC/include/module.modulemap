@@ -1,0 +1,4 @@
+module KancerberoC {
+    umbrella header "KancerberoC.h"
+    export *
+}
