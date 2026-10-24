@@ -63,6 +63,7 @@ public enum DiskScanner {
     public static func scan(
         rootPath: String,
         options: KBDiskScanOptions,
+        partial: @escaping @Sendable (KBDiskScanSnapshot) -> Void = { _ in },
         progress: @escaping @Sendable (KBDiskScanProgress) -> Void
     ) -> KBDiskScanSnapshot {
         let startedAt = Date()
@@ -93,6 +94,7 @@ public enum DiskScanner {
         var cancelled = false
         var scanError: String?
         var lastProgress = startedUptime
+        var lastPartial = startedUptime
 
         func reportProgress(path: String) {
             let now = DispatchTime.now().uptimeNanoseconds
@@ -188,6 +190,45 @@ public enum DiskScanner {
             stack[parentIndex].folderCount += node.folderCount
         }
 
+        /// Builds a snapshot of the tree discovered so far without touching the
+        /// real stack: it folds the open chain with `closeFrame` (which is pure)
+        /// and adds the in-progress child to each ancestor. Frames still in
+        /// `pending` are not visited yet, so they are intentionally omitted.
+        func partialNode(at index: Int) -> KBDiskNode {
+            var frame = stack[index]
+            if index + 1 < stack.count {
+                let child = partialNode(at: index + 1)
+                frame.children.append(child)
+                frame.allocated &+= child.allocatedBytes
+                frame.logical &+= child.logicalBytes
+                frame.fileCount += child.fileCount
+                frame.folderCount += child.folderCount
+            }
+            return closeFrame(frame)
+        }
+
+        func emitPartial(force: Bool = false) {
+            guard !stack.isEmpty else { return }
+            let now = DispatchTime.now().uptimeNanoseconds
+            guard force || now &- lastPartial >= 400_000_000 else { return }
+            if Task.isCancelled { return }
+            lastPartial = now
+
+            partial(KBDiskScanSnapshot(
+                root: partialNode(at: 0),
+                largestFiles: largestFiles.items,
+                deniedPaths: deniedPaths,
+                options: options,
+                generatedAt: Date(),
+                duration: Double(now &- startedUptime) / 1_000_000_000,
+                cancelled: false,
+                error: nil,
+                isPartial: true
+            ))
+        }
+
+        emitPartial(force: true)
+
         while let currentIndex = stack.indices.last {
             if Task.isCancelled {
                 cancelled = true
@@ -218,6 +259,7 @@ public enum DiskScanner {
 
                 guard let base = pointer, count > 0 else {
                     reportProgress(path: frame.path)
+                    emitPartial()
                     continue
                 }
                 defer { kb_disk_entries_free(base) }
@@ -319,6 +361,7 @@ public enum DiskScanner {
                     }
 
                     reportProgress(path: frame.path)
+                    emitPartial()
                 }
 
                 if cancelled {
@@ -326,6 +369,7 @@ public enum DiskScanner {
                 }
 
                 reportProgress(path: frame.path)
+                emitPartial()
                 continue
             }
 

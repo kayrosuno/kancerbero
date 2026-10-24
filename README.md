@@ -40,9 +40,11 @@ App SwiftUI ──XPC──> KancerberoDaemon (root opcional)
     tarjetas Disks / Volumes / Capacity / Free filtran la lista (medios, volúmenes montados,
     orden por tamaño o por menos espacio libre).
   - **Analyzer** — escaneo local de una carpeta o volumen con `getattrlistbulk`, mapa radial
-    interactivo, drill-down, mayores archivos, progreso y cancelación. Las tarjetas filtran el
-    panel derecho (todo, solo ficheros, solo carpetas o rutas denegadas); no se lee contenido de
-    ficheros.
+    interactivo, drill-down, mayores archivos, progreso y cancelación. El mapa y las tarjetas se
+    actualizan en vivo durante el escaneo; las tablas de contenidos y mayores archivos aparecen al
+    terminar. Las etiquetas del mapa muestran el nombre y el tamaño en formato humano. Las tarjetas
+    filtran el panel derecho (todo, solo ficheros, solo carpetas o rutas denegadas); no se lee
+    contenido de ficheros.
 - **Daemons** — inventario de servicios launchd con filtros combinables por tipo (agentes /
   daemons), ámbito (sistema / global / usuario / runtime), origen (Apple / custom / desconocido)
   y estado (running / stopped / disabled / not loaded), además de búsqueda. Los agentes

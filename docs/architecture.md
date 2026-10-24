@@ -106,12 +106,19 @@
   - Se cuentan hidden y packages, pero no se desciende por symlinks ni por puntos de montaje
     (salvo opción). Los errores `EACCES`/`EPERM` se registran como rutas denegadas.
   - Top-N de mayores archivos por inserción ordenada; progreso cada 100 ms; cancelación cooperativa.
+  - Snapshots parciales opcionales cada 400 ms (`partial:` en `DiskScanner.scan`): recorren la
+    cadena abierta de la pila y reutilizan `closeFrame` para plegar/ordenar, sin mutar la pila
+    real. Los frames en `pending` aún no visitados se omiten. Llevan `isPartial: true`.
 - **Estado y UI (`DiskModel`)**
   - `@MainActor @Observable`, inyectado en `KancerberoApp`. Conserva el inventario, la selección, el
-    estado del escaneo, el snapshot, el nodo actual y las rutas denegadas.
+    estado del escaneo, el snapshot final, el `liveSnapshot` parcial, el nodo actual y las rutas
+    denegadas. `activeSnapshot` prefiere el final y cae al vivo mientras se escanea.
+  - `DiskAnalyzerView` actualiza tarjetas y mapa con `activeSnapshot`; las tablas del panel derecho
+    solo se montan con el snapshot final. Mientras tanto se muestra un panel de espera del mismo
+    ancho para evitar saltos de layout.
   - `RadialDiskMap` dibuja un sunburst con `Canvas`: anillos = profundidad, ángulo = tamaño
-    asignado; hit-test por radio/ángulo. El centro muestra el nodo actual y el porcentaje del
-    volumen. Respeta Reduce Motion.
+    asignado; hit-test por radio/ángulo. Las etiquetas muestran nombre y tamaño humano en dos
+    líneas. El centro muestra el nodo actual y el porcentaje del volumen. Respeta Reduce Motion.
 - **Límites:** SMART no está expuesto por APIs públicas; los volúmenes desmontados no tienen
   libre/usado; los hard links se cuentan por entrada; clones/snapshots APFS hacen que la suma de
   tamaños no coincida exactamente con el “Used” del contenedor.

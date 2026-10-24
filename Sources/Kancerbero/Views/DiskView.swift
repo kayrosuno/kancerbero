@@ -76,7 +76,12 @@ struct DiskView: View {
             let count = disk.inventory?.mountedVolumes.count ?? 0
             return "\(count) mounted volumes"
         case .analyzer:
-            if disk.isScanning { return "Scanning…" }
+            if disk.isScanning {
+                if let live = disk.liveSnapshot {
+                    return "\(KBFormat.bytes(live.root.allocatedBytes)) · \(KBFormat.compactCount(live.root.fileCount)) files"
+                }
+                return "Scanning…"
+            }
             if let node = disk.currentNode {
                 return "\(KBFormat.bytes(node.allocatedBytes)) · \(KBFormat.compactCount(node.fileCount)) files"
             }

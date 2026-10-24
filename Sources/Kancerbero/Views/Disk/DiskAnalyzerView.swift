@@ -47,19 +47,24 @@ struct DiskAnalyzerView: View {
                 progressCard
             }
 
-            if let snapshot = disk.scanSnapshot {
+            if let snapshot = disk.activeSnapshot {
                 cards(snapshot)
                 if snapshot.cancelled {
                     banner("Scan cancelled. Showing partial results.",
                            icon: "stop.circle", tint: Color.secondary)
                 }
-                if !disk.deniedPaths.isEmpty {
+                if !snapshot.isPartial && !disk.deniedPaths.isEmpty {
                     deniedBanner
                 }
                 HStack(spacing: 12) {
                     mapCard(snapshot)
-                    rightPanel(snapshot)
-                        .frame(width: 460)
+                    if let final = disk.scanSnapshot {
+                        rightPanel(final)
+                            .frame(width: 460)
+                    } else if disk.isScanning {
+                        scanningPanel
+                            .frame(width: 460)
+                    }
                 }
             } else if !disk.isScanning {
                 emptyState
@@ -147,7 +152,9 @@ struct DiskAnalyzerView: View {
             SummaryCard(
                 title: "Scanned",
                 value: KBFormat.bytes(snapshot.root.allocatedBytes),
-                caption: String(format: "%.2f s", snapshot.duration),
+                caption: snapshot.isPartial
+                    ? "scanning…"
+                    : String(format: "%.2f s", snapshot.duration),
                 systemImage: "chart.pie.fill",
                 tint: Color(red: 0.94, green: 0.56, blue: 0.18),
                 action: { focus = .scanned },
@@ -259,9 +266,35 @@ struct DiskAnalyzerView: View {
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
+
+            if snapshot.isPartial {
+                ProgressView().controlSize(.mini)
+                Text("scanning…")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
+    }
+
+    private var scanningPanel: some View {
+        VStack(spacing: 10) {
+            ProgressView().controlSize(.small)
+            Text("Contents and largest files appear when the scan finishes")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
+                .fill(.regularMaterial)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
+                .strokeBorder(.quaternary.opacity(0.5), lineWidth: 1)
+        }
     }
 
     private func rightPanel(_ snapshot: KBDiskScanSnapshot) -> some View {

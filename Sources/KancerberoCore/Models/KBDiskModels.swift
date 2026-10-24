@@ -155,6 +155,8 @@ public struct KBDiskScanSnapshot: Sendable {
     public let duration: TimeInterval
     public let cancelled: Bool
     public let error: String?
+    /// True for the intermediate snapshots emitted while a scan is running.
+    public let isPartial: Bool
 
     public init(root: KBDiskNode,
                 largestFiles: [KBDiskFile],
@@ -163,7 +165,8 @@ public struct KBDiskScanSnapshot: Sendable {
                 generatedAt: Date,
                 duration: TimeInterval,
                 cancelled: Bool,
-                error: String?) {
+                error: String?,
+                isPartial: Bool = false) {
         self.root = root
         self.largestFiles = largestFiles
         self.deniedPaths = deniedPaths
@@ -172,6 +175,7 @@ public struct KBDiskScanSnapshot: Sendable {
         self.duration = duration
         self.cancelled = cancelled
         self.error = error
+        self.isPartial = isPartial
     }
 }
 
