@@ -67,7 +67,7 @@ Instala el binario en `/Library/PrivilegedHelperTools/` y el plist en
 `/Library/LaunchDaemons/`. Logs en `/Library/Logs/Kancerbero/`.
 
 Producción: firma Developer ID + `SMAppService.daemon(plistName:)` con el plist
-`com.alejandro.kancerbero.daemon.smappservice.plist`. Ver `docs/security.md`.
+`uno.kayros.kancerbero.daemon.smappservice.plist`. Ver `docs/security.md`.
 
 ## Verificación
 

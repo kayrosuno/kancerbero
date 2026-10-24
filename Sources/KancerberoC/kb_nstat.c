@@ -492,7 +492,7 @@ int kb_nstat_start(int tcp, int udp)
         return 0;
     }
 
-    g.queue = dispatch_queue_create("com.alejandro.kancerbero.nstat", DISPATCH_QUEUE_SERIAL);
+    g.queue = dispatch_queue_create("uno.kayros.kancerbero.nstat", DISPATCH_QUEUE_SERIAL);
     if (!g.queue) {
         kb_set_error("could not create NetworkStatistics queue");
         return -1;

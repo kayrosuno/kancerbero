@@ -2,7 +2,7 @@ import Foundation
 import KancerberoCore
 import os
 
-private let logger = Logger(subsystem: "com.alejandro.kancerbero", category: "daemon.client")
+private let logger = Logger(subsystem: "uno.kayros.kancerbero", category: "daemon.client")
 
 private final class Box<T>: @unchecked Sendable {
     var value: T?

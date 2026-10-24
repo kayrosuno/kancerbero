@@ -2,7 +2,7 @@ import Foundation
 import KancerberoCore
 import os
 
-private let logger = Logger(subsystem: "com.alejandro.kancerbero", category: "daemon.listener")
+private let logger = Logger(subsystem: "uno.kayros.kancerbero", category: "daemon.listener")
 
 final class DaemonDelegate: NSObject, NSXPCListenerDelegate {
     private let service = DaemonService()

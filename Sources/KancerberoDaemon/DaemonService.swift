@@ -3,7 +3,7 @@ import Foundation
 import KancerberoCore
 import os
 
-private let logger = Logger(subsystem: "com.alejandro.kancerbero", category: "daemon")
+private let logger = Logger(subsystem: "uno.kayros.kancerbero", category: "daemon")
 
 /// Sendable wrapper for an XPC reply closure used from a detached task.
 private final class ReplyBox: @unchecked Sendable {

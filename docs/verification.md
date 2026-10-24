@@ -64,12 +64,12 @@ kancerbero usa la ruta IFMIB (`net.link.generic.system.ifcount` +
 
 ```bash
 ./scripts/install-agent.sh
-launchctl print gui/$(id -u)/com.alejandro.kancerbero.agent
+launchctl print gui/$(id -u)/uno.kayros.kancerbero.agent
 # la app debe mostrar "source: daemon" en la barra inferior
 ./scripts/uninstall-agent.sh
 
 sudo ./scripts/install-daemon.sh
-sudo launchctl print system/com.alejandro.kancerbero.daemon
+sudo launchctl print system/uno.kayros.kancerbero.daemon
 sudo ./scripts/uninstall-daemon.sh
 ```
 

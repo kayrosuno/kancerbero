@@ -3,7 +3,7 @@ import Foundation
 import KancerberoCore
 import os
 
-private let logger = Logger(subsystem: "com.alejandro.kancerbero", category: "daemon.lifecycle")
+private let logger = Logger(subsystem: "uno.kayros.kancerbero", category: "daemon.lifecycle")
 
 let isDaemon = CommandLine.arguments.contains("--daemon")
 

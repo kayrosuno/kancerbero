@@ -9,7 +9,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CONFIG="${CONFIG:-Debug}"
 BIN="$ROOT/build/Build/Products/$CONFIG/KancerberoDaemon"
-LABEL="com.alejandro.kancerbero.agent"
+LABEL="uno.kayros.kancerbero.agent"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG_DIR="$HOME/Library/Logs/Kancerbero"
 
@@ -34,7 +34,7 @@ cat > "$PLIST" <<EOF
     </array>
     <key>MachServices</key>
     <dict>
-        <key>com.alejandro.kancerbero.daemon</key>
+        <key>uno.kayros.kancerbero.daemon</key>
         <true/>
     </dict>
     <key>RunAtLoad</key>
