@@ -16,15 +16,22 @@
   `SidebarCommands()` y botón propio en la toolbar.
 - `SidebarView`: selección propia con `matchedGeometryEffect` para Networking / Disk / Daemons;
   cabecera con marca y estado live, pie con fuente (daemon/local), privcheck y hora.
-- `NetworkingView`: cuatro tarjetas de resumen (`SummaryCard` + `Sparkline`), `PillTabBar` y las
-  tablas (`NetworkingTables.swift`) dentro de una tarjeta con material.
+- `NetworkingView`: cuatro tarjetas de resumen compactas (`SummaryCard` + `Sparkline`) que actúan
+  como filtros conmutadores, `PillTabBar` y las tablas (`NetworkingTables.swift`) dentro de una
+  tarjeta con material.
 - `DiskView`: `PillTabBar` con Volumes / Analyzer. Volumes muestra el árbol
   disco → partición → contenedor APFS → volumen, un inspector y `CapacityBar`; Analyzer muestra
   controles de escaneo, progreso, `RadialDiskMap` y las tablas de contenidos y mayores archivos.
-- `DaemonsView`: inventario launchd con tabla, filtros e inspector de acciones.
+  Las tarjetas de ambas subpestañas filtran el contenido (medios/volúmenes/orden por tamaño o
+  espacio libre; todo/ficheros/carpetas/denegados).
+- `DaemonsView`: inventario launchd deduplicado por label (`DaemonDeduplicator`), filtros
+  combinables de tipo, ámbito, origen y estado, tarjetas accionables e inspector de acciones.
+- `StatusBar`: barra inferior contextual; muestra métricas de la sección activa y el estado global
+  del daemon/actualización de la fuente correspondiente.
 - Persistencia: `@AppStorage("selectedSection")`, `@AppStorage("networkingTab")` y
   `@AppStorage("diskTab")`.
-- Captura interna para verificación: `--screenshot`, `--section`, `--tab`,
+- Captura interna para verificación: `--screenshot`, `--section`, `--tab`, `--disk-tab`,
+  `--networking-focus`, `--volumes-focus`, `--analyzer-focus`, filtros `--daemon-*` y
   `--sidebar-collapsed` (ver `docs/verification.md`).
 
 ## Flujo de datos

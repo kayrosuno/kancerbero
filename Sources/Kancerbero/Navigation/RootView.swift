@@ -8,24 +8,16 @@ struct RootView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility
 
     init() {
-        // Command-line overrides are used only by the screenshot mode. They are
-        // written before @AppStorage reads its value so the capture shows the
-        // requested section.
-        if let section = AppSection.fromCommandLine() {
-            UserDefaults.standard.set(section.rawValue, forKey: "selectedSection")
-        }
-        if let tab = NetworkingTab.fromCommandLine() {
-            UserDefaults.standard.set(tab.rawValue, forKey: "networkingTab")
-        }
-        if let tab = DiskTab.fromCommandLine() {
-            UserDefaults.standard.set(tab.rawValue, forKey: "diskTab")
-        }
         let collapsed = CommandLine.arguments.contains("--sidebar-collapsed")
         _columnVisibility = State(initialValue: collapsed ? .detailOnly : .all)
     }
 
+    /// Command-line values are screenshot-only overrides; they win over the
+    /// persisted selection without writing to UserDefaults.
     private var currentSection: AppSection {
-        AppSection(rawValue: sectionRaw) ?? .networking
+        AppSection.fromCommandLine()
+            ?? AppSection(rawValue: sectionRaw)
+            ?? .networking
     }
 
     private var selection: Binding<AppSection?> {
@@ -42,14 +34,22 @@ struct RootView: View {
 
     private var networkingTab: Binding<NetworkingTab> {
         Binding(
-            get: { NetworkingTab(rawValue: tabRaw) ?? .interfaces },
+            get: {
+                NetworkingTab.fromCommandLine()
+                    ?? NetworkingTab(rawValue: tabRaw)
+                    ?? .interfaces
+            },
             set: { tabRaw = $0.rawValue }
         )
     }
 
     private var diskTab: Binding<DiskTab> {
         Binding(
-            get: { DiskTab(rawValue: diskTabRaw) ?? .volumes },
+            get: {
+                DiskTab.fromCommandLine()
+                    ?? DiskTab(rawValue: diskTabRaw)
+                    ?? .volumes
+            },
             set: { diskTabRaw = $0.rawValue }
         )
     }
@@ -80,7 +80,7 @@ struct RootView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 Divider().opacity(0.5)
-                StatusBar()
+                StatusBar(section: currentSection)
             }
             .background(KBTheme.background)
             .animation(.snappy(duration: 0.3), value: sectionRaw)

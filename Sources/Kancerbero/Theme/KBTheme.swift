@@ -6,6 +6,10 @@ enum KBTheme {
     static let cardRadius: CGFloat = 16
     static let smallRadius: CGFloat = 12
 
+    static let summaryCardMinWidth: CGFloat = 170
+    static let summaryGridSpacing: CGFloat = 10
+    static let summaryColumns = [GridItem(.adaptive(minimum: 170), spacing: 10)]
+
     static var background: some View {
         ZStack {
             Color(nsColor: .windowBackgroundColor)

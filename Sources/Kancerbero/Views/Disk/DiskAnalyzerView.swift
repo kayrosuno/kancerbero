@@ -5,6 +5,20 @@ import KancerberoCore
 struct DiskAnalyzerView: View {
     @Environment(DiskModel.self) private var disk
     @State private var pathDraft = ""
+    @State private var focus: DiskAnalyzerFocus = .scanned
+
+    init() {
+        let arguments = CommandLine.arguments
+        let parsed: DiskAnalyzerFocus
+        if let flag = arguments.firstIndex(of: "--analyzer-focus"),
+           flag + 1 < arguments.count,
+           let value = DiskAnalyzerFocus(rawValue: arguments[flag + 1].lowercased()) {
+            parsed = value
+        } else {
+            parsed = .scanned
+        }
+        _focus = State(initialValue: parsed)
+    }
 
     private var hiddenBinding: Binding<Bool> {
         Binding(get: { disk.showHidden }, set: { disk.showHidden = $0 })
@@ -128,35 +142,47 @@ struct DiskAnalyzerView: View {
     }
 
     private func cards(_ snapshot: KBDiskScanSnapshot) -> some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 205), spacing: 12)],
-                  spacing: 12) {
+        LazyVGrid(columns: KBTheme.summaryColumns,
+                  spacing: KBTheme.summaryGridSpacing) {
             SummaryCard(
                 title: "Scanned",
                 value: KBFormat.bytes(snapshot.root.allocatedBytes),
                 caption: String(format: "%.2f s", snapshot.duration),
                 systemImage: "chart.pie.fill",
-                tint: Color(red: 0.94, green: 0.56, blue: 0.18)
+                tint: Color(red: 0.94, green: 0.56, blue: 0.18),
+                action: { focus = .scanned },
+                isSelected: focus == .scanned,
+                filterHint: "Show the full map and tables"
             )
             SummaryCard(
                 title: "Files",
                 value: KBFormat.compactCount(snapshot.root.fileCount),
                 caption: "counted in the tree",
                 systemImage: "doc.on.doc",
-                tint: Color(red: 0.16, green: 0.62, blue: 0.94)
+                tint: Color(red: 0.16, green: 0.62, blue: 0.94),
+                action: { toggleFocus(.files) },
+                isSelected: focus == .files,
+                filterHint: "Show only files in the contents table"
             )
             SummaryCard(
                 title: "Folders",
                 value: KBFormat.compactCount(snapshot.root.folderCount),
                 caption: "directories visited",
                 systemImage: "folder.fill",
-                tint: Color(red: 0.20, green: 0.70, blue: 0.62)
+                tint: Color(red: 0.20, green: 0.70, blue: 0.62),
+                action: { toggleFocus(.folders) },
+                isSelected: focus == .folders,
+                filterHint: "Show only folders in the contents table"
             )
             SummaryCard(
                 title: "Denied",
                 value: KBFormat.compactCount(snapshot.deniedPaths.count),
                 caption: "paths without permission",
                 systemImage: "lock.fill",
-                tint: Color(red: 0.62, green: 0.42, blue: 0.95)
+                tint: Color(red: 0.62, green: 0.42, blue: 0.95),
+                action: { toggleFocus(.denied) },
+                isSelected: focus == .denied,
+                filterHint: "List paths that could not be read"
             )
         }
     }
@@ -240,18 +266,32 @@ struct DiskAnalyzerView: View {
 
     private func rightPanel(_ snapshot: KBDiskScanSnapshot) -> some View {
         VStack(spacing: 12) {
-            if let node = disk.currentNode {
-                DiskChildrenTable(
-                    node: node,
-                    showHidden: disk.showHidden,
-                    showPackageContents: disk.showPackageContents,
-                    onSelect: { disk.drillDown(to: $0) }
-                )
-                .frame(maxHeight: .infinity)
-            }
+            if focus == .denied {
+                DeniedPathsList(paths: disk.deniedPaths)
+                    .frame(maxHeight: .infinity)
+            } else {
+                if let node = disk.currentNode {
+                    DiskChildrenTable(
+                        node: node,
+                        showHidden: disk.showHidden,
+                        showPackageContents: disk.showPackageContents,
+                        filter: focus,
+                        onSelect: { disk.drillDown(to: $0) }
+                    )
+                    .frame(maxHeight: .infinity)
+                }
 
-            DiskLargestFilesTable(files: snapshot.largestFiles)
-                .frame(height: 190)
+                if focus != .folders {
+                    DiskLargestFilesTable(files: snapshot.largestFiles)
+                        .frame(height: 190)
+                }
+            }
+        }
+    }
+
+    private func toggleFocus(_ newFocus: DiskAnalyzerFocus) {
+        withAnimation(.snappy(duration: 0.2)) {
+            focus = focus == newFocus ? .scanned : newFocus
         }
     }
 
@@ -347,6 +387,68 @@ struct DiskAnalyzerView: View {
         if panel.runModal() == .OK, let url = panel.url {
             pathDraft = url.path
             Task { await disk.startScan(path: url.path) }
+        }
+    }
+}
+
+private struct DeniedPathsList: View {
+    let paths: [String]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Denied paths")
+                    .font(.system(size: 11, weight: .semibold))
+                Spacer()
+                Text("\(paths.count) paths")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+
+            Divider().opacity(0.5)
+
+            if paths.isEmpty {
+                ContentUnavailableView(
+                    "No denied paths",
+                    systemImage: "checkmark.shield",
+                    description: Text("Every visited path could be read.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List(paths, id: \.self) { path in
+                    HStack(spacing: 8) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.orange)
+                        Text(path)
+                            .font(.system(size: 10, design: .monospaced))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .help(path)
+                        Spacer(minLength: 6)
+                        Button("Reveal") {
+                            NSWorkspace.shared.activateFileViewerSelecting(
+                                [URL(fileURLWithPath: path)]
+                            )
+                        }
+                        .buttonStyle(.link)
+                        .font(.system(size: 9))
+                    }
+                }
+                .listStyle(.inset)
+                .scrollContentBackground(.hidden)
+            }
+        }
+        .background {
+            RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
+                .fill(.regularMaterial)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
+                .strokeBorder(.quaternary.opacity(0.5), lineWidth: 1)
         }
     }
 }

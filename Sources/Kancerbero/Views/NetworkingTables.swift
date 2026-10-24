@@ -2,10 +2,11 @@ import SwiftUI
 import KancerberoCore
 
 struct InterfacesView: View {
+    let items: [KBInterfaceInfo]
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Table(model.interfaces) {
+        Table(items) {
             TableColumn("Interface") { item in
                 Text(item.name).monospaced()
             }
@@ -48,11 +49,10 @@ struct InterfacesView: View {
 }
 
 struct ConnectionsView: View {
+    let rows: [KBNStatSource]
     @Environment(AppModel.self) private var model
     @State private var selection: String?
     @State private var inspected: KBProcessInfo?
-
-    private var rows: [KBNStatSource] { model.sources }
 
     private var selectedSource: KBNStatSource? {
         guard let selection else { return nil }
@@ -132,6 +132,7 @@ struct ConnectionsView: View {
 }
 
 struct ProcessesView: View {
+    let items: [KBProcessInfo]
     @Environment(AppModel.self) private var model
     @State private var selection: KBProcessKey?
     @State private var inspected: KBProcessInfo?
@@ -146,7 +147,7 @@ struct ProcessesView: View {
                 Spacer()
             }
 
-            Table(model.processes, selection: $selection) {
+            Table(items, selection: $selection) {
                 TableColumn("PID") { item in
                     Text("\(item.pid)").monospacedDigit()
                 }
@@ -172,12 +173,12 @@ struct ProcessesView: View {
             }
             .contextMenu(forSelectionType: KBProcessKey.self) { keys in
                 if let key = keys.first,
-                   let process = model.processes.first(where: { $0.id == key }) {
+                   let process = items.first(where: { $0.id == key }) {
                     Button("Inspect \(process.name)") { inspected = process }
                 }
             } primaryAction: { keys in
                 if let key = keys.first,
-                   let process = model.processes.first(where: { $0.id == key }) {
+                   let process = items.first(where: { $0.id == key }) {
                     inspected = process
                 }
             }
@@ -190,45 +191,6 @@ struct ProcessesView: View {
 
     private var selectedProcess: KBProcessInfo? {
         guard let selection else { return nil }
-        return model.processes.first { $0.id == selection }
-    }
-}
-
-struct StatusBar: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        HStack(spacing: 14) {
-            LiveDot(isLive: model.isLive)
-            Text("\(model.processes.count) processes")
-            Text("\(model.sources.count) connections")
-            Text("RX \(KBFormat.rate(model.systemRates.rxBytesPerSecond))")
-            Text("TX \(KBFormat.rate(model.systemRates.txBytesPerSecond))")
-            Spacer()
-            Text(model.usingDaemon ? "Daemon" : "Local")
-                .padding(.horizontal, 7)
-                .padding(.vertical, 2)
-                .background {
-                    Capsule().fill(model.usingDaemon
-                                   ? Color.green.opacity(0.14)
-                                   : Color.orange.opacity(0.14))
-                }
-                .foregroundStyle(model.usingDaemon ? Color.green : Color.orange)
-            if model.privcheck >= 0 {
-                Text("privcheck \(model.privcheck)")
-            }
-            if let error = model.lastError {
-                Text(error)
-                    .foregroundStyle(.orange)
-                    .lineLimit(1)
-            }
-            Text(model.lastUpdate.map { "Updated \(KBFormat.time($0))" } ?? "Waiting…")
-                .foregroundStyle(.secondary)
-        }
-        .font(.system(size: 11))
-        .padding(.horizontal, 14)
-        .padding(.vertical, 7)
-        .background(.regularMaterial)
-        .animation(.snappy(duration: 0.25), value: model.systemRates.rxBytesPerSecond)
+        return items.first { $0.id == selection }
     }
 }

@@ -3,6 +3,7 @@ import KancerberoCore
 
 struct DaemonDetailView: View {
     let service: KBDaemonService
+    let domains: [KBDaemonDomain]
     let inFlight: Bool
     let canControlSystem: Bool
     let statusMessage: String?
@@ -106,6 +107,12 @@ struct DaemonDetailView: View {
 
     private var metadata: some View {
         VStack(alignment: .leading, spacing: 7) {
+            row("Type", service.serviceType.singularTitle)
+            row("Scope", service.scope.title)
+            row("Origin", service.origin.title)
+            if !domains.isEmpty {
+                row("Domains", domains.map(\.displayName).joined(separator: " + "))
+            }
             row("Program", service.program.isEmpty ? "—" : service.program)
             row("Arguments", service.arguments.isEmpty ? "—" : service.arguments)
             row("Plist", service.plistPath.isEmpty ? "—" : service.plistPath)

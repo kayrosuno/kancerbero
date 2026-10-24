@@ -4,6 +4,20 @@ import KancerberoCore
 struct NetworkingView: View {
     @Binding var tab: NetworkingTab
     @Environment(AppModel.self) private var model
+    @State private var focus: NetworkingFocus?
+
+    init(tab: Binding<NetworkingTab>) {
+        _tab = tab
+        let arguments = CommandLine.arguments
+        let parsed: NetworkingFocus?
+        if let flag = arguments.firstIndex(of: "--networking-focus"),
+           flag + 1 < arguments.count {
+            parsed = NetworkingFocus(rawValue: arguments[flag + 1].lowercased())
+        } else {
+            parsed = nil
+        }
+        _focus = State(initialValue: parsed)
+    }
 
     var body: some View {
         @Bindable var model = model
@@ -45,15 +59,18 @@ struct NetworkingView: View {
                 .help("Refresh now")
             }
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 205), spacing: 12)],
-                       spacing: 12) {
+            LazyVGrid(columns: KBTheme.summaryColumns,
+                      spacing: KBTheme.summaryGridSpacing) {
                 SummaryCard(
                     title: "Download",
                     value: KBFormat.rate(model.systemRates.rxBytesPerSecond),
                     caption: "system-wide receive",
                     systemImage: "arrow.down.circle.fill",
                     tint: Color(red: 0.16, green: 0.62, blue: 0.94),
-                    sparkline: model.rxHistory
+                    sparkline: model.rxHistory,
+                    action: { toggleFocus(.download) },
+                    isSelected: focus == .download,
+                    filterHint: "Show rows with receive traffic"
                 )
                 SummaryCard(
                     title: "Upload",
@@ -61,21 +78,30 @@ struct NetworkingView: View {
                     caption: "system-wide send",
                     systemImage: "arrow.up.circle.fill",
                     tint: Color(red: 0.62, green: 0.42, blue: 0.95),
-                    sparkline: model.txHistory
+                    sparkline: model.txHistory,
+                    action: { toggleFocus(.upload) },
+                    isSelected: focus == .upload,
+                    filterHint: "Show rows with send traffic"
                 )
                 SummaryCard(
                     title: "Connections",
                     value: KBFormat.compactCount(model.sources.count),
                     caption: "active flows",
                     systemImage: "point.3.connected.trianglepath.dotted",
-                    tint: Color(red: 0.20, green: 0.70, blue: 0.62)
+                    tint: Color(red: 0.20, green: 0.70, blue: 0.62),
+                    action: { toggleFocus(.connections) },
+                    isSelected: focus == .connections,
+                    filterHint: "Show rows tied to active connections"
                 )
                 SummaryCard(
                     title: "Processes",
                     value: KBFormat.compactCount(model.processes.count),
                     caption: "visible to the daemon",
                     systemImage: "square.stack.3d.up.fill",
-                    tint: Color(red: 0.94, green: 0.56, blue: 0.18)
+                    tint: Color(red: 0.94, green: 0.56, blue: 0.18),
+                    action: { toggleFocus(.processes) },
+                    isSelected: focus == .processes,
+                    filterHint: "Show rows attributable to processes"
                 )
             }
 
@@ -98,9 +124,24 @@ struct NetworkingView: View {
 
     private var contextLabel: String {
         switch tab {
-        case .interfaces: return "\(model.interfaces.count) interfaces"
-        case .connections: return "\(model.sources.count) connections"
-        case .processes: return "\(model.processes.count) processes"
+        case .interfaces:
+            let total = model.interfaces.count
+            let shown = model.filteredInterfaces(focus).count
+            return focus == nil ? "\(total) interfaces" : "\(shown) of \(total) interfaces"
+        case .connections:
+            let total = model.sources.count
+            let shown = model.filteredSources(focus).count
+            return focus == nil ? "\(total) connections" : "\(shown) of \(total) connections"
+        case .processes:
+            let total = model.processes.count
+            let shown = model.filteredProcesses(focus).count
+            return focus == nil ? "\(total) processes" : "\(shown) of \(total) processes"
+        }
+    }
+
+    private func toggleFocus(_ newFocus: NetworkingFocus) {
+        withAnimation(.snappy(duration: 0.2)) {
+            focus = focus == newFocus ? nil : newFocus
         }
     }
 
@@ -109,11 +150,11 @@ struct NetworkingView: View {
             Group {
                 switch tab {
                 case .interfaces:
-                    InterfacesView()
+                    InterfacesView(items: model.filteredInterfaces(focus))
                 case .connections:
-                    ConnectionsView()
+                    ConnectionsView(rows: model.filteredSources(focus))
                 case .processes:
-                    ProcessesView()
+                    ProcessesView(items: model.filteredProcesses(focus))
                 }
             }
             .id(tab)

@@ -47,11 +47,13 @@ public enum KBDaemonDomain: String, Codable, CaseIterable, Identifiable, Sendabl
     }
 }
 
-public enum KBDaemonState: String, Codable, Sendable {
+public enum KBDaemonState: String, Codable, CaseIterable, Identifiable, Sendable {
     case running
     case stopped
     case disabled
     case unloaded
+
+    public var id: String { rawValue }
 
     public var displayName: String {
         switch self {

@@ -149,12 +149,43 @@ de Daemons se hace cada 5 s y la metadata se cachea 30 s para reducir esas venta
 Capturas:
 
 ```bash
-./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
-  --screenshot /tmp/kb-daemons.png --section daemons --screenshot-delay 5
-./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
-  --screenshot /tmp/kb-daemons-detail.png --section daemons \
-  --daemon-selected com.apple.Finder --screenshot-delay 5
+K=./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
+$K --screenshot /tmp/kb-daemons.png --section daemons --screenshot-delay 5
+$K --screenshot /tmp/kb-daemons-running.png --section daemons \
+  --daemon-state running --screenshot-delay 5
+$K --screenshot /tmp/kb-daemons-user-agents.png --section daemons \
+  --daemon-type agent --daemon-scope user --screenshot-delay 5
+$K --screenshot /tmp/kb-daemons-detail.png --section daemons \
+  --daemon-selected com.apple.AMPArtworkAgent --screenshot-delay 5
 ```
+
+Comprobar además:
+
+- Cada label de agente aparece una sola vez (el dominio canónico es GUI si está cargado; si no,
+  User). El panel de detalle muestra `Domains` con ambos dominios cuando existen.
+- Los filtros se combinan con AND y las tarjetas Running / Stopped / Disabled reflejan el
+  subconjunto filtrado; volver a pulsar la tarjeta activa limpia el filtro.
+- `--daemon-domain system|gui|user` sigue funcionando como atajo: system selecciona daemons y
+  gui/user seleccionan agentes.
+- Sin daemon root, los servicios de sistema aparecen como `Not loaded`; no se reinterpretan como
+  `Stopped`.
+- Tras el refresco de 5 s, la selección y el panel de detalle se mantienen si el servicio sigue
+  cumpliendo el filtro.
+
+Networking y Disk (filtros de tarjetas):
+
+```bash
+$K --screenshot /tmp/kb-net-download.png --section networking \
+  --tab connections --networking-focus download --screenshot-delay 5
+$K --screenshot /tmp/kb-disk-free.png --section disk \
+  --disk-tab volumes --volumes-focus free --screenshot-delay 5
+$K --screenshot /tmp/kb-disk-folders.png --section disk \
+  --disk-tab analyzer --disk-path="$HOME/Documents" --disk-scan \
+  --analyzer-focus folders --screenshot-delay 8
+```
+
+La barra inferior debe mostrar métricas de la sección activa y la marca de actualización de su
+fuente (red, inventario de disco o servicios launchd).
 
 ## Disk
 

@@ -30,19 +30,30 @@ App SwiftUI ──XPC──> KancerberoDaemon (root opcional)
 
 `NavigationSplitView` con panel lateral colapsable:
 
-- **Networking** — tarjetas de resumen con sparklines y subnavegación Interfaces / Connections /
+- **Networking** — tarjetas de resumen compactas con sparklines que actúan como filtros
+  conmutadores (descarga, subida, conexiones, procesos), y subnavegación Interfaces / Connections /
   Processes, con tablas e inspector de proceso.
 - **Disk** — dos subpestañas:
   - **Volumes** — jerarquía nativa de discos físicos, particiones, contenedores APFS y volúmenes
     (IOKit + DiskArbitration + `getmntinfo`/`getattrlist`), con capacidad, usado, libre, punto de
-    montaje, UUID, roles APFS, modelo/protocolo y cifrado. No ejecuta procesos externos.
+    montaje, UUID, roles APFS, modelo/protocolo y cifrado. No ejecuta procesos externos. Las
+    tarjetas Disks / Volumes / Capacity / Free filtran la lista (medios, volúmenes montados,
+    orden por tamaño o por menos espacio libre).
   - **Analyzer** — escaneo local de una carpeta o volumen con `getattrlistbulk`, mapa radial
-    interactivo, drill-down, mayores archivos, progreso y cancelación. Las rutas sin permiso se
-    listan como denegadas; no se lee contenido de ficheros.
-- **Daemons** — inventario de servicios launchd (System/GUI/User) con estado, PID, última salida,
-  programa y plist. Inspector con Start / Stop / Restart / Enable·Disable / Load·Unload / Reveal.
+    interactivo, drill-down, mayores archivos, progreso y cancelación. Las tarjetas filtran el
+    panel derecho (todo, solo ficheros, solo carpetas o rutas denegadas); no se lee contenido de
+    ficheros.
+- **Daemons** — inventario de servicios launchd con filtros combinables por tipo (agentes /
+  daemons), ámbito (sistema / global / usuario / runtime), origen (Apple / custom / desconocido)
+  y estado (running / stopped / disabled / not loaded), además de búsqueda. Los agentes
+  duplicados entre los dominios GUI y User se deduplican por label, conservando ambos dominios en
+  el detalle. Inspector con Start / Stop / Restart / Enable·Disable / Load·Unload / Reveal.
   Las acciones de sistema requieren el daemon root y confirmación; GUI/User funcionan en local.
   Los login items quedan para una iteración posterior.
+
+La barra inferior es contextual: muestra métricas de la sección activa (tráfico, capacidad de
+disco o recuento de servicios) y, a la derecha, el estado global de la conexión con el daemon, la
+última actualización de la fuente correspondiente y el posible error.
 
 El panel se oculta con el botón de la toolbar o `Cmd+Ctrl+S`; `Cmd+1/2/3` cambia de sección. Las
 animaciones respetan Reduce Motion.
@@ -88,6 +99,13 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--tab interfaces|connections|processes] \
   [--disk-tab volumes|analyzer] \
   [--disk-path=<carpeta>] [--disk-scan] [--disk-item <diskXsY>] \
+  [--networking-focus download|upload|connections|processes] \
+  [--volumes-focus disks|volumes|capacity|free] \
+  [--analyzer-focus scanned|files|folders|denied] \
+  [--daemon-type agent|daemon] [--daemon-scope system|global|user|runtime] \
+  [--daemon-origin apple|custom|unknown] \
+  [--daemon-state running|stopped|disabled|unloaded] \
+  [--daemon-domain system|gui|user] [--daemon-selected <label>] \
   [--sidebar-collapsed]
 ```
 

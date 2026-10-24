@@ -2,34 +2,50 @@ import AppKit
 import SwiftUI
 import KancerberoCore
 
-private enum DaemonDomainFilter: String, CaseIterable, Identifiable {
+private enum DaemonTypeFilter: String, CaseIterable, Identifiable, Hashable {
     case all
-    case system
-    case gui
-    case user
+    case agents
+    case daemons
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .all: return "All"
-        case .system: return "System"
-        case .gui: return "GUI"
-        case .user: return "User"
+        case .agents: return "Agents"
+        case .daemons: return "Daemons"
         }
     }
 
-    func matches(_ service: KBDaemonService) -> Bool {
-        self == .all || service.domain.rawValue == rawValue
+    var systemImage: String {
+        switch self {
+        case .all: return "square.grid.2x2"
+        case .agents: return "person.crop.circle"
+        case .daemons: return "gearshape.2"
+        }
+    }
+
+    var tint: Color { AppSection.daemons.tint }
+
+    var serviceType: DaemonServiceType? {
+        switch self {
+        case .all: return nil
+        case .agents: return .agent
+        case .daemons: return .daemon
+        }
     }
 }
+
+extension DaemonTypeFilter: PillTabItem {}
 
 struct DaemonsView: View {
     @Environment(AppModel.self) private var model
 
     @State private var search = ""
-    @State private var domainFilter: DaemonDomainFilter
-    @State private var runningOnly = false
+    @State private var typeFilter: DaemonTypeFilter = .all
+    @State private var scopeFilter: DaemonScope?
+    @State private var originFilter: DaemonOrigin?
+    @State private var stateFilter: KBDaemonState?
     @State private var selection: String?
     @State private var pendingAction: KBDaemonAction?
     @State private var pendingService: KBDaemonService?
@@ -39,13 +55,31 @@ struct DaemonsView: View {
 
     init() {
         let arguments = CommandLine.arguments
-        var filter = DaemonDomainFilter.all
-        if let flag = arguments.firstIndex(of: "--daemon-domain"),
-           flag + 1 < arguments.count,
-           let parsed = DaemonDomainFilter(rawValue: arguments[flag + 1].lowercased()) {
-            filter = parsed
+
+        let type: DaemonTypeFilter
+        if let parsed = Self.value(for: "--daemon-type", in: arguments)
+            .flatMap(Self.typeFilter(from:)) {
+            type = parsed
+        } else if let domain = KBDaemonDomain.fromCommandLine() {
+            // Keep the previous screenshot flag working: system maps to
+            // daemons and both agent domains map to agents.
+            type = domain == .system ? .daemons : .agents
+        } else {
+            type = .all
         }
-        _domainFilter = State(initialValue: filter)
+        _typeFilter = State(initialValue: type)
+
+        let scope = Self.value(for: "--daemon-scope", in: arguments)
+            .flatMap { DaemonScope(rawValue: $0.lowercased()) }
+        _scopeFilter = State(initialValue: scope)
+
+        let origin = Self.value(for: "--daemon-origin", in: arguments)
+            .flatMap { DaemonOrigin(rawValue: $0.lowercased()) }
+        _originFilter = State(initialValue: origin)
+
+        let state = Self.value(for: "--daemon-state", in: arguments)
+            .flatMap { KBDaemonState(rawValue: $0.lowercased()) }
+        _stateFilter = State(initialValue: state)
 
         if let flag = arguments.firstIndex(of: "--daemon-selected"),
            flag + 1 < arguments.count {
@@ -55,20 +89,49 @@ struct DaemonsView: View {
         }
     }
 
-    private var filtered: [KBDaemonService] {
-        model.allDaemons.filter { service in
-            guard domainFilter.matches(service) else { return false }
-            guard !runningOnly || service.isRunning else { return false }
-            guard !search.isEmpty else { return true }
-            return service.label.localizedCaseInsensitiveContains(search)
-                || service.program.localizedCaseInsensitiveContains(search)
-                || service.plistPath.localizedCaseInsensitiveContains(search)
+    private static func value(for flag: String, in arguments: [String]) -> String? {
+        guard let index = arguments.firstIndex(of: flag),
+              index + 1 < arguments.count else { return nil }
+        return arguments[index + 1]
+    }
+
+    private static func typeFilter(from value: String) -> DaemonTypeFilter? {
+        switch value.lowercased() {
+        case "all": return .all
+        case "agent", "agents": return .agents
+        case "daemon", "daemons": return .daemons
+        default: return nil
         }
     }
 
-    private var selectedService: KBDaemonService? {
+    private var filter: DaemonFilter {
+        DaemonFilter(
+            search: search,
+            type: typeFilter.serviceType,
+            scope: scopeFilter,
+            origin: originFilter,
+            state: stateFilter
+        )
+    }
+
+    /// Counts on the cards ignore the state facet so each number matches the
+    /// rows shown after tapping it, even with other facets active.
+    private var baseFilter: DaemonFilter { filter.clearingState() }
+
+    private var entries: [DaemonListEntry] { model.daemonEntries }
+
+    private var baseEntries: [DaemonListEntry] {
+        entries.filter { baseFilter.matches($0.service) }
+    }
+
+    private var filteredEntries: [DaemonListEntry] {
+        entries.filter { filter.matches($0.service) }
+    }
+
+    private var selectedEntry: DaemonListEntry? {
         guard let selection else { return nil }
-        return model.allDaemons.first { $0.id == selection }
+        guard let entry = entries.first(where: { $0.id == selection }) else { return nil }
+        return filter.matches(entry.service) ? entry : nil
     }
 
     var body: some View {
@@ -78,14 +141,15 @@ struct DaemonsView: View {
             controls
             HStack(spacing: 12) {
                 tableCard
-                if let service = selectedService {
+                if let entry = selectedEntry {
                     DaemonDetailView(
-                        service: service,
+                        service: entry.service,
+                        domains: entry.domains,
                         inFlight: model.daemonActionInFlight,
                         canControlSystem: model.canControlSystem,
                         statusMessage: model.daemonActionMessage,
-                        onAction: { requestAction($0, for: service) },
-                        onReveal: { reveal(service) },
+                        onAction: { requestAction($0, for: entry.service) },
+                        onReveal: { reveal(entry.service) },
                         onClose: { selection = nil }
                     )
                     .frame(width: 330)
@@ -99,6 +163,9 @@ struct DaemonsView: View {
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .task { await refreshLoop() }
+        .onChange(of: filter) { _, _ in
+            reconcileSelection()
+        }
         .alert(actionTitle, isPresented: $showConfirmation, presenting: pendingService) { service in
             Button("Cancel", role: .cancel) { clearPending() }
             Button(actionTitle,
@@ -122,9 +189,9 @@ struct DaemonsView: View {
 
             Spacer()
 
-            TextField("Search label, program or plist", text: $search)
+            TextField("Search label, program, arguments or plist", text: $search)
                 .textFieldStyle(.roundedBorder)
-                .frame(width: 230)
+                .frame(width: 250)
 
             Button {
                 Task { await model.refreshDaemons() }
@@ -137,66 +204,81 @@ struct DaemonsView: View {
     }
 
     private var cards: some View {
-        let all = model.allDaemons
-        let running = all.filter(\.isRunning).count
-        let stopped = all.filter { $0.isLoaded && !$0.isRunning }.count
-        let disabled = all.filter(\.isDisabled).count
+        let base = baseEntries
+        let running = base.filter { $0.service.state == .running }.count
+        let stopped = base.filter { $0.service.state == .stopped }.count
+        let disabled = base.filter { $0.service.state == .disabled }.count
+        let showingAll = !filter.hasFacets && !filter.hasSearch
 
-        return LazyVGrid(columns: [GridItem(.adaptive(minimum: 205), spacing: 12)],
-                         spacing: 12) {
+        return LazyVGrid(columns: KBTheme.summaryColumns,
+                         spacing: KBTheme.summaryGridSpacing) {
             SummaryCard(
                 title: "Services",
-                value: KBFormat.compactCount(all.count),
-                caption: "across all domains",
+                value: KBFormat.compactCount(base.count),
+                caption: "matching filters",
                 systemImage: "list.bullet.rectangle",
-                tint: Color(red: 0.16, green: 0.62, blue: 0.94)
+                tint: Color(red: 0.16, green: 0.62, blue: 0.94),
+                action: { clearFilters() },
+                isSelected: showingAll,
+                filterHint: "Clear all filters"
             )
             SummaryCard(
                 title: "Running",
                 value: KBFormat.compactCount(running),
                 caption: "active jobs",
                 systemImage: "bolt.fill",
-                tint: Color(red: 0.20, green: 0.70, blue: 0.42)
+                tint: Color(red: 0.20, green: 0.70, blue: 0.42),
+                action: { toggleState(.running) },
+                isSelected: stateFilter == .running,
+                filterHint: "Show running services"
             )
             SummaryCard(
                 title: "Stopped",
                 value: KBFormat.compactCount(stopped),
                 caption: "loaded but idle",
                 systemImage: "pause.circle.fill",
-                tint: Color(red: 0.94, green: 0.56, blue: 0.18)
+                tint: Color(red: 0.94, green: 0.56, blue: 0.18),
+                action: { toggleState(.stopped) },
+                isSelected: stateFilter == .stopped,
+                filterHint: "Show stopped services"
             )
             SummaryCard(
                 title: "Disabled",
                 value: KBFormat.compactCount(disabled),
                 caption: "launchd overrides",
                 systemImage: "slash.circle.fill",
-                tint: Color(red: 0.62, green: 0.42, blue: 0.95)
+                tint: Color(red: 0.62, green: 0.42, blue: 0.95),
+                action: { toggleState(.disabled) },
+                isSelected: stateFilter == .disabled,
+                filterHint: "Show disabled services"
             )
         }
     }
 
     private var controls: some View {
         HStack(spacing: 12) {
-            Picker("Domain", selection: $domainFilter) {
-                ForEach(DaemonDomainFilter.allCases) { filter in
-                    Text(filter.title).tag(filter)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    PillTabBar(selection: $typeFilter)
+
+                    filterPicker("Scope", selection: $scopeFilter,
+                                 title: { $0.title })
+                    filterPicker("Origin", selection: $originFilter,
+                                 title: { $0.title })
+                    filterPicker("State", selection: $stateFilter,
+                                 title: { $0.displayName })
                 }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(maxWidth: 360)
 
-            Toggle("Running only", isOn: $runningOnly)
-                .toggleStyle(.switch)
-
-            Spacer()
+            Spacer(minLength: 8)
 
             if model.daemonActionInFlight {
                 ProgressView().controlSize(.small)
             }
-            Text("\(filtered.count) services")
+            Text("\(filteredEntries.count) of \(entries.count) services")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .monospacedDigit()
                 .contentTransition(.numericText())
             if let error = model.daemonServicesError {
                 Text(error)
@@ -208,63 +290,79 @@ struct DaemonsView: View {
         }
     }
 
+    private func filterPicker<Option: CaseIterable & Identifiable & Hashable>(
+        _ label: String,
+        selection: Binding<Option?>,
+        title: @escaping (Option) -> String
+    ) -> some View {
+        Picker(label, selection: selection) {
+            Text("All").tag(Optional<Option>.none)
+            ForEach(Array(Option.allCases)) { option in
+                Text(title(option)).tag(Optional(option))
+            }
+        }
+        .pickerStyle(.menu)
+        .fixedSize()
+    }
+
     private var tableCard: some View {
         VStack(spacing: 0) {
-            Table(filtered, selection: $selection) {
-                TableColumn("Label") { service in
-                    Text(service.label)
+            Table(filteredEntries, selection: $selection) {
+                TableColumn("Label") { entry in
+                    Text(entry.service.label)
                         .lineLimit(1)
-                        .help(service.label)
+                        .help(entry.service.label)
                 }
                 .width(min: 180, ideal: 280)
 
-                TableColumn("Domain") { service in
-                    Text(service.domain.displayName)
+                TableColumn("Type") { entry in
+                    Text(entry.service.serviceType.singularTitle)
                 }
-                .width(min: 60, ideal: 75)
+                .width(min: 60, ideal: 70)
 
-                TableColumn("PID") { service in
-                    Text(service.pid.map { String($0) } ?? "—").monospacedDigit()
+                TableColumn("Scope") { entry in
+                    Text(entry.service.scope.title)
+                }
+                .width(min: 55, ideal: 70)
+
+                TableColumn("PID") { entry in
+                    Text(entry.service.pid.map { String($0) } ?? "—").monospacedDigit()
                 }
                 .width(min: 45, ideal: 60)
 
-                TableColumn("State") { service in
-                    DaemonStateBadge(state: service.state)
+                TableColumn("State") { entry in
+                    DaemonStateBadge(state: entry.service.state)
                 }
                 .width(min: 75, ideal: 95)
 
-                TableColumn("Last exit") { service in
-                    Text(service.lastExitStatus.map { String($0) } ?? "—").monospacedDigit()
-                }
-                .width(min: 60, ideal: 80)
-
-                TableColumn("Program") { service in
-                    Text(service.program.isEmpty ? "—" : service.program)
+                TableColumn("Program") { entry in
+                    Text(entry.service.program.isEmpty ? "—" : entry.service.program)
                         .lineLimit(1)
-                        .help(service.program)
+                        .help(entry.service.program)
                 }
                 .width(min: 140, ideal: 220)
 
-                TableColumn("Plist") { service in
-                    Text(service.plistPath.isEmpty
+                TableColumn("Plist") { entry in
+                    Text(entry.service.plistPath.isEmpty
                          ? "—"
-                         : (service.plistPath as NSString).lastPathComponent)
+                         : (entry.service.plistPath as NSString).lastPathComponent)
                         .lineLimit(1)
-                        .help(service.plistPath)
+                        .help(entry.service.plistPath)
                 }
                 .width(min: 120, ideal: 180)
             }
             .contextMenu(forSelectionType: String.self) { keys in
                 if let id = keys.first,
-                   let service = model.allDaemons.first(where: { $0.id == id }) {
-                    Button("Start") { requestAction(.start, for: service) }
-                    Button("Restart") { requestAction(.restart, for: service) }
-                    Button("Stop") { requestAction(.stop, for: service) }
+                   let entry = entries.first(where: { $0.id == id }) {
+                    Button("Start") { requestAction(.start, for: entry.service) }
+                    Button("Restart") { requestAction(.restart, for: entry.service) }
+                    Button("Stop") { requestAction(.stop, for: entry.service) }
                     Divider()
-                    Button(service.isDisabled ? "Enable" : "Disable") {
-                        requestAction(service.isDisabled ? .enable : .disable, for: service)
+                    Button(entry.service.isDisabled ? "Enable" : "Disable") {
+                        requestAction(entry.service.isDisabled ? .enable : .disable,
+                                      for: entry.service)
                     }
-                    Button("Reveal plist") { reveal(service) }
+                    Button("Reveal plist") { reveal(entry.service) }
                 }
             } primaryAction: { keys in
                 if let id = keys.first { selection = id }
@@ -281,7 +379,7 @@ struct DaemonsView: View {
                 .strokeBorder(.quaternary.opacity(0.5), lineWidth: 1)
         }
         .overlay {
-            if filtered.isEmpty {
+            if filteredEntries.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "gearshape.2")
                         .font(.system(size: 26, weight: .light))
@@ -299,21 +397,49 @@ struct DaemonsView: View {
         pendingAction?.rawValue.capitalized ?? "Action"
     }
 
+    private func toggleState(_ state: KBDaemonState) {
+        withAnimation(.snappy(duration: 0.2)) {
+            stateFilter = stateFilter == state ? nil : state
+        }
+    }
+
+    private func clearFilters() {
+        withAnimation(.snappy(duration: 0.2)) {
+            search = ""
+            typeFilter = .all
+            scopeFilter = nil
+            originFilter = nil
+            stateFilter = nil
+        }
+    }
+
     private func refreshLoop() async {
         await model.refreshDaemons()
         applyPreselection()
+        reconcileSelection()
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(5))
             if Task.isCancelled { return }
             await model.refreshDaemons()
             applyPreselection()
+            reconcileSelection()
         }
     }
 
     private func applyPreselection() {
         guard selection == nil, let label = preselectedLabel else { return }
-        if let match = model.allDaemons.first(where: { $0.label == label }) {
+        if let match = entries.first(where: { $0.service.label == label }) {
             selection = match.id
+        }
+    }
+
+    private func reconcileSelection() {
+        guard let selection else { return }
+        let stillVisible = entries.contains {
+            $0.id == selection && filter.matches($0.service)
+        }
+        if !stillVisible {
+            self.selection = nil
         }
     }
 
