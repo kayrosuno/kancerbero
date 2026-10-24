@@ -3,7 +3,18 @@ import KancerberoCore
 
 struct ContentView: View {
     @Environment(AppModel.self) private var model
-    @State private var selection: String?
+    @State private var section: Int
+
+    init() {
+        var initial = 0
+        let arguments = CommandLine.arguments
+        if let flag = arguments.firstIndex(of: "--section"),
+           flag + 1 < arguments.count,
+           let value = Int(arguments[flag + 1]) {
+            initial = value
+        }
+        _section = State(initialValue: initial)
+    }
 
     var body: some View {
         @Bindable var model = model
@@ -16,7 +27,7 @@ struct ContentView: View {
                     Text("5 s").tag(5.0)
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 260)
+                .frame(width: 320)
 
                 Toggle("Pause", isOn: $model.isPaused)
                     .toggleStyle(.switch)
@@ -34,19 +45,35 @@ struct ContentView: View {
 
             Divider()
 
-            TabView {
-                InterfacesView()
-                    .tabItem { Label("Interfaces", systemImage: "network") }
-                ConnectionsView()
-                    .tabItem { Label("Connections", systemImage: "point.3.connected.trianglepath.dotted") }
-                ProcessesView()
-                    .tabItem { Label("Processes", systemImage: "list.bullet") }
+            HStack {
+                Picker("Section", selection: $section) {
+                    Text("Interfaces").tag(0)
+                    Text("Connections").tag(1)
+                    Text("Processes").tag(2)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(maxWidth: 420)
+                Spacer()
             }
-            .padding(8)
+            .padding(.horizontal, 12)
+            .padding(.top, 6)
+            .padding(.bottom, 4)
+
+            Group {
+                switch section {
+                case 0: InterfacesView()
+                case 1: ConnectionsView()
+                default: ProcessesView()
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 8)
 
             Divider()
             StatusBar()
         }
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 }
 
@@ -54,7 +81,7 @@ struct InterfacesView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Table(model.interfaces.sorted { $0.index < $1.index }) {
+        Table(model.interfaces) {
             TableColumn("Interface") { item in
                 Text(item.name).monospaced()
             }
@@ -101,11 +128,7 @@ struct ConnectionsView: View {
     @State private var selection: String?
     @State private var inspected: KBProcessInfo?
 
-    private var rows: [KBNStatSource] {
-        model.sources.sorted {
-            ($0.counters.rxBytes + $0.counters.txBytes) > ($1.counters.rxBytes + $1.counters.txBytes)
-        }
-    }
+    private var rows: [KBNStatSource] { model.sources }
 
     private var selectedSource: KBNStatSource? {
         guard let selection else { return nil }
@@ -141,13 +164,13 @@ struct ConnectionsView: View {
             }
             .width(min: 50, ideal: 60)
             TableColumn("Local") { source in
-                Text(source.local.display).monospaced()
+                Text(source.local.display).monospaced().help(source.local.display)
             }
-            .width(min: 160, ideal: 210)
+            .width(min: 160, ideal: 250)
             TableColumn("Remote") { source in
-                Text(source.remote.display).monospaced()
+                Text(source.remote.display).monospaced().help(source.remote.display)
             }
-            .width(min: 160, ideal: 210)
+            .width(min: 160, ideal: 250)
             TableColumn("State") { source in
                 Text(source.tcpState.isEmpty ? "—" : source.tcpState)
             }
@@ -205,7 +228,7 @@ struct ProcessesView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Table(model.processes.sorted { $0.pid < $1.pid }, selection: $selection) {
+            Table(model.processes, selection: $selection) {
                 TableColumn("PID") { item in
                     Text("\(item.pid)").monospacedDigit()
                 }
@@ -226,6 +249,7 @@ struct ProcessesView: View {
                     Text(item.path.isEmpty ? "—" : item.path)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .help(item.path)
                 }
             }
             .contextMenu(forSelectionType: KBProcessKey.self) { keys in

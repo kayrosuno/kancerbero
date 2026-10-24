@@ -73,6 +73,19 @@ sudo launchctl print system/uno.kayros.kancerbero.daemon
 sudo ./scripts/uninstall-daemon.sh
 ```
 
+## Captura visual de la UI sin TCC
+
+`screencapture` requiere el permiso de Grabación de pantalla para el proceso host. La app puede
+capturar su propia ventana con AppKit sin ese permiso:
+
+```bash
+build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
+  --screenshot /tmp/kancerbero-ui.png [--section 0|1|2]
+```
+
+`--section` selecciona Interfaces, Conexiones o Procesos. El PNG se escribe a escala de backing
+(2x en Retina) y la app termina con código 0.
+
 ## Rendimiento
 
 ```bash

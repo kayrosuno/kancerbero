@@ -194,6 +194,10 @@ final class AppModel {
             }
         }
 
+        sources.sort {
+            ($0.counters.rxBytes + $0.counters.txBytes) > ($1.counters.rxBytes + $1.counters.txBytes)
+        }
+
         var sourceCounters: [String: KBCounters] = [:]
         for source in sources { sourceCounters[source.id] = source.counters }
         previousSourceCounters = sourceCounters

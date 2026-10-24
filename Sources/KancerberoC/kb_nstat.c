@@ -88,6 +88,7 @@ static struct {
     kb_entry *entries;
     size_t count;
     size_t capacity;
+    uint64_t next_source_id;
 
     int poll_active;
     size_t poll_pending;
@@ -466,6 +467,9 @@ static void kb_on_source(kb_nstat_source_ref ref)
     memset(entry, 0, sizeof(*entry));
     entry->ref = ref;
     entry->active = 1;
+    /* UUID is the process UUID, not a per-flow identifier: assign our own
+       stable id so the UI can key rows uniquely. */
+    entry->sample.source_id = ++g.next_source_id;
     pthread_mutex_unlock(&g.mutex);
 
     g.set_description(ref, ^(CFDictionaryRef dict) {
@@ -656,6 +660,7 @@ void kb_nstat_close(void)
     g.entries = NULL;
     g.count = 0;
     g.capacity = 0;
+    g.next_source_id = 0;
     g.started = 0;
     g.opened = 0;
     g.manager = NULL;

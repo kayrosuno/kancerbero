@@ -162,6 +162,7 @@ public struct KBProcessInfo: Codable, Sendable, Identifiable, Hashable {
 }
 
 public struct KBNStatSource: Codable, Sendable, Identifiable, Hashable {
+    public var sourceID: UInt64
     public var pid: Int32
     public var epid: Int32
     public var processName: String
@@ -169,6 +170,7 @@ public struct KBNStatSource: Codable, Sendable, Identifiable, Hashable {
     public var tcpState: String
     public var interfaceName: String
     public var interfaceType: String
+    /// Process UUID from NetworkStatistics; it is not unique per flow.
     public var uuid: String
     public var local: KBEndpoint
     public var remote: KBEndpoint
@@ -187,7 +189,7 @@ public struct KBNStatSource: Codable, Sendable, Identifiable, Hashable {
     public var rates: KBRates = .zero
 
     public var id: String {
-        if !uuid.isEmpty { return uuid }
+        if sourceID != 0 { return String(sourceID) }
         return "\(pid)-\(local.display)-\(remote.display)-\(provider)"
     }
 

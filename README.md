@@ -45,6 +45,13 @@ open build/Build/Products/Debug/Kancerbero.app
 ./build/Build/Products/Debug/KancerberoProbe all --seconds 3
 ```
 
+Captura de la UI sin permisos de Grabación de pantalla (la app se dibuja a sí misma y termina):
+
+```bash
+build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
+  --screenshot /tmp/kancerbero-ui.png [--section 1]
+```
+
 ## Daemon
 
 ### Desarrollo sin sudo (LaunchAgent de usuario)

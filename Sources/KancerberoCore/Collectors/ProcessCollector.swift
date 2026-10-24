@@ -44,6 +44,6 @@ public enum ProcessCollector {
                 path: KBInterop.string(raw.path)
             ))
         }
-        return items
+        return items.sorted { $0.pid < $1.pid }
     }
 }
