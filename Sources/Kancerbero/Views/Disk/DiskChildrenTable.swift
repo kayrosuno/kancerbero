@@ -6,6 +6,7 @@ struct DiskChildrenTable: View {
     let node: KBDiskNode
     let showHidden: Bool
     let showPackageContents: Bool
+    var filter: DiskAnalyzerFocus? = nil
     let onSelect: (KBDiskNode) -> Void
 
     @State private var selection: String?
@@ -14,6 +15,13 @@ struct DiskChildrenTable: View {
         node.children
             .filter { showHidden || !$0.isHidden }
             .filter { showPackageContents || !$0.isPackage || $0.allocatedBytes > 0 }
+            .filter { child in
+                switch filter {
+                case .files: return !child.isDirectory
+                case .folders: return child.isDirectory
+                default: return true
+                }
+            }
             .sorted { $0.allocatedBytes > $1.allocatedBytes }
     }
 

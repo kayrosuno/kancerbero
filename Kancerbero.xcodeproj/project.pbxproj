@@ -61,8 +61,8 @@
 		ABCDEF000000000000000096 /* Kancerbero.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Kancerbero.xcconfig; sourceTree = "<group>"; };
 		ABCDEF000000000000000097 /* KancerberoProbe.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = KancerberoProbe.xcconfig; sourceTree = "<group>"; };
 		ABCDEF000000000000000099 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		ABCDEF00000000000000009A /* uno.kayros.kancerbero.daemon.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "uno.kayros.kancerbero.daemon.plist"; sourceTree = "<group>"; };
-		ABCDEF00000000000000009C /* uno.kayros.kancerbero.daemon.smappservice.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "uno.kayros.kancerbero.daemon.smappservice.plist"; sourceTree = "<group>"; };
+		ABCDEF00000000000000009A /* uno.kayros.kancerbero.daemon.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = uno.kayros.kancerbero.daemon.plist; sourceTree = "<group>"; };
+		ABCDEF00000000000000009C /* uno.kayros.kancerbero.daemon.smappservice.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = uno.kayros.kancerbero.daemon.smappservice.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -138,16 +138,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		ABCDEF00000000000000000B = {
-			isa = PBXGroup;
-			children = (
-				ABCDEF000000000000000006 /* Sources */,
-				ABCDEF000000000000000007 /* Config */,
-				ABCDEF000000000000000008 /* Resources */,
-				ABCDEF000000000000000002 /* Products */,
-			);
-			sourceTree = "<group>";
-		};
 		ABCDEF000000000000000002 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -211,6 +201,16 @@
 				ABCDEF00000000000000009C /* uno.kayros.kancerbero.daemon.smappservice.plist */,
 			);
 			path = LaunchDaemons;
+			sourceTree = "<group>";
+		};
+		ABCDEF00000000000000000B = {
+			isa = PBXGroup;
+			children = (
+				ABCDEF000000000000000006 /* Sources */,
+				ABCDEF000000000000000007 /* Config */,
+				ABCDEF000000000000000008 /* Resources */,
+				ABCDEF000000000000000002 /* Products */,
+			);
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */

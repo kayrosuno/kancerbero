@@ -28,13 +28,12 @@ final class AppModel {
     var daemonActionMessage: String?
     var daemonIsRoot = false
 
+    var daemonEntries: [DaemonListEntry] {
+        DaemonDeduplicator.entries(system: systemDaemons, local: localDaemons)
+    }
+
     var allDaemons: [KBDaemonService] {
-        (systemDaemons + localDaemons).sorted { lhs, rhs in
-            if lhs.domain != rhs.domain {
-                return lhs.domain.rawValue < rhs.domain.rawValue
-            }
-            return lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending
-        }
+        daemonEntries.map(\.service)
     }
 
     var canControlSystem: Bool { usingDaemon && daemonIsRoot }
