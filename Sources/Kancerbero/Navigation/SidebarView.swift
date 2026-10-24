@@ -133,14 +133,6 @@ private struct SidebarRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
-            if section.isPlanned {
-                Text("Soon")
-                    .font(.system(size: 9, weight: .semibold))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Capsule().fill(.quaternary.opacity(0.55)))
-                    .foregroundStyle(.secondary)
-            }
         }
     }
 }

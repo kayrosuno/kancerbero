@@ -4,6 +4,7 @@ struct RootView: View {
     @Environment(AppModel.self) private var model
     @AppStorage("selectedSection") private var sectionRaw = AppSection.networking.rawValue
     @AppStorage("networkingTab") private var tabRaw = NetworkingTab.interfaces.rawValue
+    @AppStorage("diskTab") private var diskTabRaw = DiskTab.volumes.rawValue
     @State private var columnVisibility: NavigationSplitViewVisibility
 
     init() {
@@ -15,6 +16,9 @@ struct RootView: View {
         }
         if let tab = NetworkingTab.fromCommandLine() {
             UserDefaults.standard.set(tab.rawValue, forKey: "networkingTab")
+        }
+        if let tab = DiskTab.fromCommandLine() {
+            UserDefaults.standard.set(tab.rawValue, forKey: "diskTab")
         }
         let collapsed = CommandLine.arguments.contains("--sidebar-collapsed")
         _columnVisibility = State(initialValue: collapsed ? .detailOnly : .all)
@@ -43,6 +47,13 @@ struct RootView: View {
         )
     }
 
+    private var diskTab: Binding<DiskTab> {
+        Binding(
+            get: { DiskTab(rawValue: diskTabRaw) ?? .volumes },
+            set: { diskTabRaw = $0.rawValue }
+        )
+    }
+
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(selection: selection)
@@ -56,7 +67,7 @@ struct RootView: View {
                     case .networking:
                         NetworkingView(tab: networkingTab)
                     case .disk:
-                        DiskView()
+                        DiskView(tab: diskTab)
                     case .daemons:
                         DaemonsView()
                     }

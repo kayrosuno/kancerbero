@@ -2,5 +2,5 @@
 
 PRODUCT_NAME = KancerberoProbe
 SKIP_INSTALL = YES
-OTHER_LDFLAGS = -framework CoreFoundation
+OTHER_LDFLAGS = $(inherited) -framework CoreFoundation -framework IOKit -framework DiskArbitration
 SWIFT_INCLUDE_PATHS = $(BUILT_PRODUCTS_DIR) $(inherited)

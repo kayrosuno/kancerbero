@@ -39,8 +39,6 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    var isPlanned: Bool { self == .disk }
-
     var shortcut: KeyEquivalent {
         switch self {
         case .networking: return "1"
@@ -66,7 +64,13 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
-enum NetworkingTab: String, CaseIterable, Identifiable, Hashable {
+protocol PillTabItem: CaseIterable, Identifiable, Hashable {
+    var title: String { get }
+    var systemImage: String { get }
+    var tint: Color { get }
+}
+
+enum NetworkingTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
     case interfaces
     case connections
     case processes
@@ -109,6 +113,49 @@ enum NetworkingTab: String, CaseIterable, Identifiable, Hashable {
         case "0": return .interfaces
         case "1": return .connections
         case "2": return .processes
+        default: return nil
+        }
+    }
+}
+
+enum DiskTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
+    case volumes
+    case analyzer
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .volumes: return "Volumes"
+        case .analyzer: return "Analyzer"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .volumes: return "internaldrive"
+        case .analyzer: return "chart.pie"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .volumes: return Color(red: 0.94, green: 0.56, blue: 0.18)
+        case .analyzer: return Color(red: 0.90, green: 0.42, blue: 0.25)
+        }
+    }
+
+    static func fromCommandLine() -> DiskTab? {
+        let arguments = CommandLine.arguments
+        guard let flag = arguments.firstIndex(of: "--disk-tab"),
+              flag + 1 < arguments.count else {
+            return nil
+        }
+        let value = arguments[flag + 1].lowercased()
+        if let tab = DiskTab(rawValue: value) { return tab }
+        switch value {
+        case "0": return .volumes
+        case "1": return .analyzer
         default: return nil
         }
     }

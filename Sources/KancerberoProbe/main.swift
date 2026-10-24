@@ -143,6 +143,94 @@ private func printDaemons(domain: KBDaemonDomain) {
     }
 }
 
+private func printDiskVolumes() {
+    let snapshot = DiskInventoryCollector().snapshot()
+    write("disk inventory source=\(snapshot.source) roots=\(snapshot.items.count) error=\(snapshot.error ?? "-")\n")
+
+    func visit(_ item: KBDiskItem, depth: Int) {
+        let indent = String(repeating: "  ", count: depth)
+        let used = item.usedBytes.map(formatBytes) ?? "-"
+        let free = item.freeBytes.map(formatBytes) ?? "-"
+        let available = item.availableBytes.map(formatBytes) ?? "-"
+        write("\(indent)\(item.deviceIdentifier) \(item.kind.rawValue) \"\(item.name)\" fs=\(item.fileSystem ?? "-") size=\(formatBytes(item.sizeBytes)) used=\(used) free=\(free) available=\(available) mount=\(item.mountPoint ?? "-") roles=\(item.roles.joined(separator: ","))\n")
+        for child in item.children {
+            visit(child, depth: depth + 1)
+        }
+    }
+
+    for item in snapshot.items {
+        visit(item, depth: 0)
+    }
+}
+
+private func printDiskInfo(_ identifier: String) {
+    let snapshot = DiskInventoryCollector().snapshot()
+    guard let item = snapshot.allItems.first(where: { $0.deviceIdentifier == identifier }) else {
+        fail("disk not found: \(identifier)")
+    }
+
+    write("identifier: \(item.deviceIdentifier)\n")
+    write("kind: \(item.kind.rawValue)\n")
+    write("name: \(item.name)\n")
+    write("filesystem: \(item.fileSystem ?? "-")\n")
+    write("content: \(item.content ?? "-")\n")
+    write("mount: \(item.mountPoint ?? "-")\n")
+    write("size: \(formatBytes(item.sizeBytes))\n")
+    write("used: \(item.usedBytes.map(formatBytes) ?? "-")\n")
+    write("free: \(item.freeBytes.map(formatBytes) ?? "-")\n")
+    write("available: \(item.availableBytes.map(formatBytes) ?? "-")\n")
+    write("volume-uuid: \(item.volumeUUID ?? "-")\n")
+    write("media-uuid: \(item.mediaUUID ?? "-")\n")
+    write("group-uuid: \(item.volumeGroupUUID ?? "-")\n")
+    write("roles: \(item.roles.joined(separator: ","))\n")
+    write("internal: \(item.isInternal.map { $0 ? "yes" : "no" } ?? "-")\n")
+    write("removable: \(item.isRemovable.map { $0 ? "yes" : "no" } ?? "-")\n")
+    write("writable: \(item.isWritable.map { $0 ? "yes" : "no" } ?? "-")\n")
+    write("encrypted: \(item.isEncrypted.map { $0 ? "yes" : "no" } ?? "-")\n")
+    write("model: \(item.deviceModel ?? "-")\n")
+    write("protocol: \(item.deviceProtocol ?? "-")\n")
+    write("bus: \(item.busName ?? "-")\n")
+    write("parent: \(item.parentID ?? "-")\n")
+}
+
+private func printDiskScan(path: String, top: Int, includeHidden: Bool) {
+    var options = KBDiskScanOptions()
+    options.largestFilesLimit = max(top, 10)
+    options.includeHiddenInLargestFiles = includeHidden
+
+    let snapshot = DiskScanner.scan(rootPath: path, options: options) { _ in }
+    write("scan root=\(snapshot.root.path) bytes=\(formatBytes(snapshot.root.allocatedBytes)) logical=\(formatBytes(snapshot.root.logicalBytes)) files=\(snapshot.root.fileCount) folders=\(snapshot.root.folderCount) denied=\(snapshot.deniedPaths.count) duration=\(String(format: "%.2f", snapshot.duration))s cancelled=\(snapshot.cancelled) error=\(snapshot.error ?? "-")\n")
+
+    write("folders:\n")
+    for child in snapshot.root.children.prefix(max(top, 1)) {
+        let percent = snapshot.root.allocatedBytes > 0
+            ? Double(child.allocatedBytes) / Double(snapshot.root.allocatedBytes) * 100
+            : 0
+        write(String(format: "  %6.1f%% %12@ files=%-8d folders=%-8d %@\n",
+                     percent,
+                     formatBytes(child.allocatedBytes) as NSString,
+                     child.fileCount,
+                     child.folderCount,
+                     child.path as NSString))
+    }
+
+    write("largest files:\n")
+    for file in snapshot.largestFiles.prefix(max(top, 1)) {
+        write(String(format: "  %12@ logical=%-12@ %@\n",
+                     formatBytes(file.allocatedBytes) as NSString,
+                     formatBytes(file.logicalBytes) as NSString,
+                     file.path as NSString))
+    }
+
+    if !snapshot.deniedPaths.isEmpty {
+        write("denied:\n")
+        for denied in snapshot.deniedPaths.prefix(20) {
+            write("  \(denied)\n")
+        }
+    }
+}
+
+
 private func printNStat(seconds: Int) {
     let collector = NStatCollector()
     do {
@@ -220,6 +308,26 @@ case "files":
 case "daemons":
     let raw = remainder.first ?? "system"
     printDaemons(domain: KBDaemonDomain(rawValue: raw) ?? .system)
+case "disk":
+    let subcommand = remainder.first ?? "volumes"
+    switch subcommand {
+    case "volumes":
+        printDiskVolumes()
+    case "info":
+        guard remainder.count >= 2 else {
+            fail("usage: disk info <deviceIdentifier>")
+        }
+        printDiskInfo(remainder[1])
+    case "scan":
+        guard remainder.count >= 2 else {
+            fail("usage: disk scan <path> [--top N] [--hidden]")
+        }
+        printDiskScan(path: remainder[1],
+                      top: integerOption("--top", default: 20),
+                      includeHidden: remainder.contains("--hidden"))
+    default:
+        fail("usage: disk <volumes|info <device>|scan <path>>")
+    }
 case "daemon-action":
     guard remainder.count >= 3,
           let domain = KBDaemonDomain(rawValue: remainder[0]),
@@ -243,5 +351,5 @@ case "all":
     printInterfaces()
     printNStat(seconds: integerOption("--seconds", default: 3))
 default:
-    fail("unknown command '\(command)'. Use: version|symbols|procs|ifaces|sockets <pid>|files <pid>|nstat|all")
+    fail("unknown command '\(command)'. Use: version|symbols|procs|ifaces|sockets <pid>|files <pid>|daemons|disk|nstat|all")
 }

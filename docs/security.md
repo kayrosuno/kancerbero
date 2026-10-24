@@ -9,6 +9,21 @@
 - El daemon solo expone lectura de inventario (procesos, sockets, ficheros, contadores). No lee
   contenido de ficheros, no ejecuta comandos y no escribe en disco.
 
+## Pestaña Disk
+
+- El inventario usa IOKit (`IOMedia`, `AppleAPFSMedia`, `AppleAPFSVolume`), DiskArbitration
+  (`DADiskCreateFromIOMedia`/`DADiskCopyDescription`), `getmntinfo` y
+  `getattrlist(ATTR_VOL_*)`. Son APIs públicas y de solo lectura.
+- La app **no** ejecuta `diskutil` ni ningún otro proceso para Disk. La información detallada se
+  obtiene directamente del sistema.
+- El escáner usa `open(O_RDONLY|O_DIRECTORY)` + `getattrlistbulk` por directorio. Solo lee
+  metadatos (nombre, tipo, tamaños); nunca abre ni lee el contenido de los ficheros.
+- No hay acciones destructivas: no se borra, mueve, monta, desmonta ni reparticiona. Las únicas
+  acciones son revelar en Finder, copiar identificadores y lanzar el analizador.
+- Los errores de permisos se registran como rutas denegadas y se muestran en la UI; no se eleva
+  privilegios ni se recurre al daemon root.
+- El daemon y su superficie XPC no cambian.
+
 ## Autorización XPC
 
 Estado actual (desarrollo):
