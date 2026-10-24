@@ -64,6 +64,7 @@ public final class NStatCollector: @unchecked Sendable {
                 scope: raw.remote_scope
             )
             items.append(KBNStatSource(
+                sourceID: raw.source_id,
                 pid: raw.pid,
                 epid: raw.epid,
                 processName: KBInterop.string(raw.process_name),

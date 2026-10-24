@@ -104,6 +104,32 @@ private func printFiles(pid: Int32) {
     }
 }
 
+private func printSources() {
+    let collector = NStatCollector()
+    do {
+        try collector.start()
+    } catch {
+        fail(error.localizedDescription)
+    }
+    defer { collector.stop() }
+    Thread.sleep(forTimeInterval: 1.5)
+    _ = collector.poll(timeoutMilliseconds: 800)
+    let sources = collector.snapshot()
+    write("sources: \(sources.count)\n")
+    for source in sources.sorted(by: { ($0.pid, $0.local.display) < ($1.pid, $1.local.display) }) {
+        write(String(format: "id=%-5llu pid=%-7d %-12@ %-5@ %-22@ -> %-22@ %-11@ uuid=%@ if=%@\n",
+                     source.sourceID,
+                     source.pid,
+                     (source.processName.isEmpty ? "?" : source.processName) as NSString,
+                     source.provider as NSString,
+                     source.local.display as NSString,
+                     source.remote.display as NSString,
+                     source.tcpState as NSString,
+                     (source.uuid.isEmpty ? "-" : source.uuid) as NSString,
+                     source.interfaceName as NSString))
+    }
+}
+
 private func printNStat(seconds: Int) {
     let collector = NStatCollector()
     do {
@@ -178,6 +204,8 @@ case "files":
         fail("usage: KancerberoProbe files <pid>")
     }
     printFiles(pid: pid)
+case "sources":
+    printSources()
 case "nstat":
     printNStat(seconds: integerOption("--seconds", default: 5))
 case "all":

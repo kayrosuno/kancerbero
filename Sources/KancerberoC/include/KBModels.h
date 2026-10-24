@@ -21,6 +21,7 @@ typedef struct {
 } kb_process;
 
 typedef struct {
+    uint64_t source_id;
     int32_t pid;
     int32_t epid;
     uint32_t uid;

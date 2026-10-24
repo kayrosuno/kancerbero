@@ -9,8 +9,12 @@ struct KancerberoApp: App {
             ContentView()
                 .environment(model)
                 .frame(minWidth: 960, minHeight: 560)
-                .task { model.start() }
+                .task {
+                    model.start()
+                    await ScreenshotMode.runIfRequested()
+                }
         }
+        .defaultSize(width: 1200, height: 720)
         .windowStyle(.titleBar)
         .commands {
             CommandGroup(after: .newItem) {
