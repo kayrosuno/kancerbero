@@ -13,7 +13,7 @@
 ## UI
 
 - `RootView`: `NavigationSplitView` con `columnVisibility`; sidebar colapsable con
-  `SidebarCommands()` y botón propio en la toolbar.
+  `SidebarCommands()` y el toggle nativo que macOS dibuja en la toolbar.
 - `SidebarView`: selección propia con `matchedGeometryEffect` para Networking / Disk / Daemons;
   cabecera con marca y estado live, pie con fuente (daemon/local), privcheck y hora.
 - `NetworkingView`: cuatro tarjetas de resumen compactas (`SummaryCard` + `Sparkline`) que actúan
@@ -29,7 +29,16 @@
 - `StatusBar`: barra inferior contextual; muestra métricas de la sección activa y el estado global
   del daemon/actualización de la fuente correspondiente.
 - Persistencia: `@AppStorage("selectedSection")`, `@AppStorage("networkingTab")` y
-  `@AppStorage("diskTab")`.
+  `@AppStorage("diskTab")`. El estado de UI de cada sección (filtros, tarjeta activa, selección,
+  panel de detalle y árbol expandido) vive en `UIState`, un `@Observable` inyectado desde
+  `KancerberoApp`. Es **solo de sesión**: sobrevive a la destrucción de las vistas al cambiar de
+  sección/subpestaña, pero no se guarda en disco. Los overrides `--networking-focus`,
+  `--daemon-*`, `--volumes-focus` y `--analyzer-focus` se aplican una sola vez al crear
+  `UIState`.
+- Disk → Volumes mantiene `expanded` y `volumesFocus` en `UIState`. La expansión inicial se hace
+  una sola vez (`didExpandVolumesOnce`); los refrescos de inventario solo podan ids obsoletos, así
+  que el colapso manual se conserva. La tarjeta All limpia el filtro y re-expande el árbol
+  completo.
 - Captura interna para verificación: `--screenshot`, `--section`, `--tab`, `--disk-tab`,
   `--networking-focus`, `--volumes-focus`, `--analyzer-focus`, filtros `--daemon-*` y
   `--sidebar-collapsed` (ver `docs/verification.md`).

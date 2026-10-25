@@ -2,115 +2,30 @@ import AppKit
 import SwiftUI
 import KancerberoCore
 
-private enum DaemonTypeFilter: String, CaseIterable, Identifiable, Hashable {
-    case all
-    case agents
-    case daemons
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .all: return "All"
-        case .agents: return "Agents"
-        case .daemons: return "Daemons"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .all: return "square.grid.2x2"
-        case .agents: return "person.crop.circle"
-        case .daemons: return "gearshape.2"
-        }
-    }
-
-    var tint: Color { AppSection.daemons.tint }
-
-    var serviceType: DaemonServiceType? {
-        switch self {
-        case .all: return nil
-        case .agents: return .agent
-        case .daemons: return .daemon
-        }
-    }
-}
-
-extension DaemonTypeFilter: PillTabItem {}
-
 struct DaemonsView: View {
     @Environment(AppModel.self) private var model
+    @Environment(UIState.self) private var ui
 
-    @State private var search = ""
-    @State private var typeFilter: DaemonTypeFilter = .all
-    @State private var scopeFilter: DaemonScope?
-    @State private var originFilter: DaemonOrigin?
-    @State private var stateFilter: KBDaemonState?
-    @State private var selection: String?
     @State private var pendingAction: KBDaemonAction?
     @State private var pendingService: KBDaemonService?
     @State private var showConfirmation = false
 
-    private let preselectedLabel: String?
-
-    init() {
-        let arguments = CommandLine.arguments
-
-        let type: DaemonTypeFilter
-        if let parsed = Self.value(for: "--daemon-type", in: arguments)
-            .flatMap(Self.typeFilter(from:)) {
-            type = parsed
-        } else if let domain = KBDaemonDomain.fromCommandLine() {
-            // Keep the previous screenshot flag working: system maps to
-            // daemons and both agent domains map to agents.
-            type = domain == .system ? .daemons : .agents
-        } else {
-            type = .all
-        }
-        _typeFilter = State(initialValue: type)
-
-        let scope = Self.value(for: "--daemon-scope", in: arguments)
-            .flatMap { DaemonScope(rawValue: $0.lowercased()) }
-        _scopeFilter = State(initialValue: scope)
-
-        let origin = Self.value(for: "--daemon-origin", in: arguments)
-            .flatMap { DaemonOrigin(rawValue: $0.lowercased()) }
-        _originFilter = State(initialValue: origin)
-
-        let state = Self.value(for: "--daemon-state", in: arguments)
-            .flatMap { KBDaemonState(rawValue: $0.lowercased()) }
-        _stateFilter = State(initialValue: state)
-
-        if let flag = arguments.firstIndex(of: "--daemon-selected"),
-           flag + 1 < arguments.count {
-            preselectedLabel = arguments[flag + 1]
-        } else {
-            preselectedLabel = nil
-        }
-    }
-
-    private static func value(for flag: String, in arguments: [String]) -> String? {
-        guard let index = arguments.firstIndex(of: flag),
-              index + 1 < arguments.count else { return nil }
-        return arguments[index + 1]
-    }
-
-    private static func typeFilter(from value: String) -> DaemonTypeFilter? {
-        switch value.lowercased() {
-        case "all": return .all
-        case "agent", "agents": return .agents
-        case "daemon", "daemons": return .daemons
-        default: return nil
-        }
+    private func bind<Value>(
+        _ keyPath: WritableKeyPath<DaemonsUIState, Value>
+    ) -> Binding<Value> {
+        Binding(
+            get: { ui.daemons[keyPath: keyPath] },
+            set: { ui.daemons[keyPath: keyPath] = $0 }
+        )
     }
 
     private var filter: DaemonFilter {
         DaemonFilter(
-            search: search,
-            type: typeFilter.serviceType,
-            scope: scopeFilter,
-            origin: originFilter,
-            state: stateFilter
+            search: ui.daemons.search,
+            type: ui.daemons.type.serviceType,
+            scope: ui.daemons.scope,
+            origin: ui.daemons.origin,
+            state: ui.daemons.state
         )
     }
 
@@ -129,7 +44,7 @@ struct DaemonsView: View {
     }
 
     private var selectedEntry: DaemonListEntry? {
-        guard let selection else { return nil }
+        guard let selection = ui.daemons.selection else { return nil }
         guard let entry = entries.first(where: { $0.id == selection }) else { return nil }
         return filter.matches(entry.service) ? entry : nil
     }
@@ -150,13 +65,13 @@ struct DaemonsView: View {
                         statusMessage: model.daemonActionMessage,
                         onAction: { requestAction($0, for: entry.service) },
                         onReveal: { reveal(entry.service) },
-                        onClose: { selection = nil }
+                        onClose: { ui.daemons.selection = nil }
                     )
                     .frame(width: 330)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
-            .animation(.snappy(duration: 0.28), value: selection)
+            .animation(.snappy(duration: 0.28), value: ui.daemons.selection)
         }
         .padding(.horizontal, KBTheme.contentPadding)
         .padding(.top, 14)
@@ -189,7 +104,7 @@ struct DaemonsView: View {
 
             Spacer()
 
-            TextField("Search label, program, arguments or plist", text: $search)
+            TextField("Search label, program, arguments or plist", text: bind(\.search))
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 250)
 
@@ -229,7 +144,7 @@ struct DaemonsView: View {
                 systemImage: "bolt.fill",
                 tint: Color(red: 0.20, green: 0.70, blue: 0.42),
                 action: { toggleState(.running) },
-                isSelected: stateFilter == .running,
+                isSelected: ui.daemons.state == .running,
                 filterHint: "Show running services"
             )
             SummaryCard(
@@ -239,7 +154,7 @@ struct DaemonsView: View {
                 systemImage: "pause.circle.fill",
                 tint: Color(red: 0.94, green: 0.56, blue: 0.18),
                 action: { toggleState(.stopped) },
-                isSelected: stateFilter == .stopped,
+                isSelected: ui.daemons.state == .stopped,
                 filterHint: "Show stopped services"
             )
             SummaryCard(
@@ -249,7 +164,7 @@ struct DaemonsView: View {
                 systemImage: "slash.circle.fill",
                 tint: Color(red: 0.62, green: 0.42, blue: 0.95),
                 action: { toggleState(.disabled) },
-                isSelected: stateFilter == .disabled,
+                isSelected: ui.daemons.state == .disabled,
                 filterHint: "Show disabled services"
             )
         }
@@ -259,13 +174,13 @@ struct DaemonsView: View {
         HStack(spacing: 12) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
-                    PillTabBar(selection: $typeFilter)
+                    PillTabBar(selection: bind(\.type))
 
-                    filterPicker("Scope", selection: $scopeFilter,
+                    filterPicker("Scope", selection: bind(\.scope),
                                  title: { $0.title })
-                    filterPicker("Origin", selection: $originFilter,
+                    filterPicker("Origin", selection: bind(\.origin),
                                  title: { $0.title })
-                    filterPicker("State", selection: $stateFilter,
+                    filterPicker("State", selection: bind(\.state),
                                  title: { $0.displayName })
                 }
             }
@@ -307,7 +222,7 @@ struct DaemonsView: View {
 
     private var tableCard: some View {
         VStack(spacing: 0) {
-            Table(filteredEntries, selection: $selection) {
+            Table(filteredEntries, selection: bind(\.selection)) {
                 TableColumn("Label") { entry in
                     Text(entry.service.label)
                         .lineLimit(1)
@@ -365,7 +280,7 @@ struct DaemonsView: View {
                     Button("Reveal plist") { reveal(entry.service) }
                 }
             } primaryAction: { keys in
-                if let id = keys.first { selection = id }
+                if let id = keys.first { ui.daemons.selection = id }
             }
             .padding(8)
         }
@@ -399,17 +314,17 @@ struct DaemonsView: View {
 
     private func toggleState(_ state: KBDaemonState) {
         withAnimation(.snappy(duration: 0.2)) {
-            stateFilter = stateFilter == state ? nil : state
+            ui.daemons.state = ui.daemons.state == state ? nil : state
         }
     }
 
     private func clearFilters() {
         withAnimation(.snappy(duration: 0.2)) {
-            search = ""
-            typeFilter = .all
-            scopeFilter = nil
-            originFilter = nil
-            stateFilter = nil
+            ui.daemons.search = ""
+            ui.daemons.type = .all
+            ui.daemons.scope = nil
+            ui.daemons.origin = nil
+            ui.daemons.state = nil
         }
     }
 
@@ -427,19 +342,23 @@ struct DaemonsView: View {
     }
 
     private func applyPreselection() {
-        guard selection == nil, let label = preselectedLabel else { return }
+        guard ui.daemons.selection == nil,
+              let label = ui.daemons.pendingSelectionLabel else { return }
         if let match = entries.first(where: { $0.service.label == label }) {
-            selection = match.id
+            ui.daemons.selection = match.id
+        }
+        if !entries.isEmpty {
+            ui.daemons.pendingSelectionLabel = nil
         }
     }
 
     private func reconcileSelection() {
-        guard let selection else { return }
+        guard let selection = ui.daemons.selection else { return }
         let stillVisible = entries.contains {
             $0.id == selection && filter.matches($0.service)
         }
         if !stillVisible {
-            self.selection = nil
+            ui.daemons.selection = nil
         }
     }
 

@@ -4,20 +4,13 @@ import KancerberoCore
 
 struct DiskAnalyzerView: View {
     @Environment(DiskModel.self) private var disk
-    @State private var pathDraft = ""
-    @State private var focus: DiskAnalyzerFocus = .scanned
+    @Environment(UIState.self) private var ui
 
-    init() {
-        let arguments = CommandLine.arguments
-        let parsed: DiskAnalyzerFocus
-        if let flag = arguments.firstIndex(of: "--analyzer-focus"),
-           flag + 1 < arguments.count,
-           let value = DiskAnalyzerFocus(rawValue: arguments[flag + 1].lowercased()) {
-            parsed = value
-        } else {
-            parsed = .scanned
-        }
-        _focus = State(initialValue: parsed)
+    private var pathDraft: Binding<String> {
+        Binding(
+            get: { ui.disk.analyzerPathDraft ?? disk.scanRootPath },
+            set: { ui.disk.analyzerPathDraft = $0 }
+        )
     }
 
     private var hiddenBinding: Binding<Bool> {
@@ -70,15 +63,19 @@ struct DiskAnalyzerView: View {
                 emptyState
             }
         }
-        .onAppear { pathDraft = disk.scanRootPath }
+        .onAppear {
+            if ui.disk.analyzerPathDraft == nil {
+                ui.disk.analyzerPathDraft = disk.scanRootPath
+            }
+        }
         .onChange(of: disk.scanRootPath) { _, newValue in
-            pathDraft = newValue
+            ui.disk.analyzerPathDraft = newValue
         }
     }
 
     private var controls: some View {
         HStack(spacing: 10) {
-            TextField("Folder or volume path", text: $pathDraft)
+            TextField("Folder or volume path", text: pathDraft)
                 .textFieldStyle(.roundedBorder)
                 .frame(minWidth: 240)
                 .onSubmit { scan() }
@@ -157,8 +154,8 @@ struct DiskAnalyzerView: View {
                     : String(format: "%.2f s", snapshot.duration),
                 systemImage: "chart.pie.fill",
                 tint: Color(red: 0.94, green: 0.56, blue: 0.18),
-                action: { focus = .scanned },
-                isSelected: focus == .scanned,
+                action: { ui.disk.analyzerFocus = .scanned },
+                isSelected: ui.disk.analyzerFocus == .scanned,
                 filterHint: "Show the full map and tables"
             )
             SummaryCard(
@@ -168,7 +165,7 @@ struct DiskAnalyzerView: View {
                 systemImage: "doc.on.doc",
                 tint: Color(red: 0.16, green: 0.62, blue: 0.94),
                 action: { toggleFocus(.files) },
-                isSelected: focus == .files,
+                isSelected: ui.disk.analyzerFocus == .files,
                 filterHint: "Show only files in the contents table"
             )
             SummaryCard(
@@ -178,7 +175,7 @@ struct DiskAnalyzerView: View {
                 systemImage: "folder.fill",
                 tint: Color(red: 0.20, green: 0.70, blue: 0.62),
                 action: { toggleFocus(.folders) },
-                isSelected: focus == .folders,
+                isSelected: ui.disk.analyzerFocus == .folders,
                 filterHint: "Show only folders in the contents table"
             )
             SummaryCard(
@@ -188,7 +185,7 @@ struct DiskAnalyzerView: View {
                 systemImage: "lock.fill",
                 tint: Color(red: 0.62, green: 0.42, blue: 0.95),
                 action: { toggleFocus(.denied) },
-                isSelected: focus == .denied,
+                isSelected: ui.disk.analyzerFocus == .denied,
                 filterHint: "List paths that could not be read"
             )
         }
@@ -304,7 +301,7 @@ struct DiskAnalyzerView: View {
 
     private func rightPanel(_ snapshot: KBDiskScanSnapshot) -> some View {
         VStack(spacing: 12) {
-            if focus == .denied {
+            if ui.disk.analyzerFocus == .denied {
                 DeniedPathsList(paths: disk.deniedPaths)
                     .frame(maxHeight: .infinity)
             } else {
@@ -313,13 +310,13 @@ struct DiskAnalyzerView: View {
                         node: node,
                         showHidden: disk.showHidden,
                         showPackageContents: disk.showPackageContents,
-                        filter: focus,
+                        filter: ui.disk.analyzerFocus,
                         onSelect: { disk.drillDown(to: $0) }
                     )
                     .frame(maxHeight: .infinity)
                 }
 
-                if focus != .folders {
+                if ui.disk.analyzerFocus != .folders {
                     DiskLargestFilesTable(files: snapshot.largestFiles)
                         .frame(height: 190)
                 }
@@ -329,7 +326,7 @@ struct DiskAnalyzerView: View {
 
     private func toggleFocus(_ newFocus: DiskAnalyzerFocus) {
         withAnimation(.snappy(duration: 0.2)) {
-            focus = focus == newFocus ? .scanned : newFocus
+            ui.disk.analyzerFocus = ui.disk.analyzerFocus == newFocus ? .scanned : newFocus
         }
     }
 
@@ -410,7 +407,7 @@ struct DiskAnalyzerView: View {
     }
 
     private func scan() {
-        let path = pathDraft
+        let path = pathDraft.wrappedValue
         Task { await disk.startScan(path: path) }
     }
 
@@ -420,10 +417,10 @@ struct DiskAnalyzerView: View {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
-        panel.directoryURL = URL(fileURLWithPath: pathDraft)
+        panel.directoryURL = URL(fileURLWithPath: pathDraft.wrappedValue)
         panel.prompt = "Scan"
         if panel.runModal() == .OK, let url = panel.url {
-            pathDraft = url.path
+            ui.disk.analyzerPathDraft = url.path
             Task { await disk.startScan(path: url.path) }
         }
     }

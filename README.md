@@ -37,8 +37,9 @@ App SwiftUI ──XPC──> KancerberoDaemon (root opcional)
   - **Volumes** — jerarquía nativa de discos físicos, particiones, contenedores APFS y volúmenes
     (IOKit + DiskArbitration + `getmntinfo`/`getattrlist`), con capacidad, usado, libre, punto de
     montaje, UUID, roles APFS, modelo/protocolo y cifrado. No ejecuta procesos externos. Las
-    tarjetas Disks / Volumes / Capacity / Free filtran la lista (medios, volúmenes montados,
-    orden por tamaño o por menos espacio libre).
+    tarjetas All / Disks / Volumes / Capacity / Free filtran la lista (vista completa, medios,
+    volúmenes montados, orden por tamaño o por menos espacio libre); All restaura el árbol
+    completo expandido.
   - **Analyzer** — escaneo local de una carpeta o volumen con `getattrlistbulk`, mapa radial
     interactivo (clic en un sector para bajar, clic en el centro para subir), drill-down, mayores
     archivos, progreso y cancelación. El mapa y las tarjetas se actualizan en vivo durante el
@@ -57,7 +58,11 @@ La barra inferior es contextual: muestra métricas de la sección activa (tráfi
 disco o recuento de servicios) y, a la derecha, el estado global de la conexión con el daemon, la
 última actualización de la fuente correspondiente y el posible error.
 
-El panel se oculta con el botón de la toolbar o `Cmd+Ctrl+S`; `Cmd+1/2/3` cambia de sección. Las
+Las selecciones y configuraciones de cada sección (filtros, tarjeta activa, fila seleccionada,
+panel de detalle y árbol expandido) se conservan al cambiar de pestaña o sección durante la
+sesión; al reiniciar la app se vuelven a los valores iniciales.
+
+El panel se oculta con el toggle de la toolbar o `Cmd+Ctrl+S`; `Cmd+1/2/3` cambia de sección. Las
 animaciones respetan Reduce Motion.
 
 ## Compilar

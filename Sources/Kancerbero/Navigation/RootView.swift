@@ -87,18 +87,6 @@ struct RootView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button {
-                    withAnimation(.snappy(duration: 0.28)) {
-                        columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
-                    }
-                } label: {
-                    Image(systemName: "sidebar.leading")
-                }
-                .help("Toggle sidebar")
-                .accessibilityLabel("Toggle sidebar")
-            }
-
             ToolbarItemGroup(placement: .primaryAction) {
                 if currentSection == .networking {
                     Button {

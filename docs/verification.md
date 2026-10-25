@@ -187,6 +187,20 @@ $K --screenshot /tmp/kb-disk-folders.png --section disk \
 La barra inferior debe mostrar métricas de la sección activa y la marca de actualización de su
 fuente (red, inventario de disco o servicios launchd).
 
+Continuidad de estado al cambiar de pestaña (manual):
+
+1. Networking: seleccionar una conexión y un proceso, activar la tarjeta Download; ir a Disk y
+   Daemons, volver → tarjeta y selecciones restauradas (si el flujo desapareció, se limpia).
+2. Daemons: fijar búsqueda, tipo, ámbito, origen, estado y una selección; cambiar de sección y
+   volver → todo restaurado; esperar 5 s y comprobar que la selección sigue si el servicio existe.
+3. Disk → Volumes: expandir y colapsar varios nodos, activar la tarjeta Volumes, ir a Analyzer y
+   volver → foco y expansión intactos. Refresh de volúmenes → no se re-expande. Pulsar All →
+   árbol completo expandido y tarjeta All marcada.
+4. Disk → Analyzer: activar Files y teclear una ruta sin escanear; cambiar de pestaña y volver →
+   foco y borrador conservados.
+5. Reiniciar la app: el estado de UI vuelve a los valores iniciales; sección y subpestañas se
+   recuerdan por `@AppStorage`.
+
 ## Disk
 
 Inventario y detalle:

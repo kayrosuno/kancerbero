@@ -4,12 +4,14 @@ import SwiftUI
 struct KancerberoApp: App {
     @State private var model = AppModel()
     @State private var disk = DiskModel()
+    @State private var ui = UIState()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(model)
                 .environment(disk)
+                .environment(ui)
                 .frame(minWidth: 1040, minHeight: 640)
                 .task {
                     model.start()
