@@ -44,12 +44,15 @@ struct KancerberoApp: App {
                 Button("Enable Background Daemon") {
                     Task { await model.registerDaemonService() }
                 }
-                .disabled(model.legacyServiceDetected || model.serviceStatus == .enabled)
+                .disabled(model.legacyServiceDetected
+                          || model.serviceStatus == .enabled
+                          || model.serviceActionInFlight)
 
                 Button("Disable Background Daemon") {
                     Task { await model.unregisterDaemonService() }
                 }
-                .disabled(model.serviceStatus == .notRegistered)
+                .disabled(model.serviceStatus == .notRegistered
+                          || model.serviceActionInFlight)
 
                 Divider()
 

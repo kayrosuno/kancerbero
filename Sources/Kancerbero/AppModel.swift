@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import ServiceManagement
@@ -55,7 +56,13 @@ final class AppModel {
     var memoryUsageHistory: [Double] = []
     var serviceStatus: SMAppService.Status = .notRegistered
     var serviceError: String?
-    var legacyServiceDetected = false
+    var serviceActionInFlight = false
+    var legacyAgentDetected = false
+    var legacyDaemonDetected = false
+
+    var legacyServiceDetected: Bool {
+        legacyAgentDetected || legacyDaemonDetected
+    }
 
     var daemonEntries: [DaemonListEntry] {
         DaemonDeduplicator.entries(system: systemDaemons, local: localDaemons)
@@ -89,6 +96,57 @@ final class AppModel {
     private var resolvingUIDs: Set<UInt32> = []
 
     var isRoot: Bool { geteuid() == 0 }
+
+    var isConnectingToDaemon: Bool { daemonConnecting }
+
+    var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+            ?? KBVersion.current
+    }
+
+    var appBundlePath: String {
+        Bundle.main.bundleURL.path
+    }
+
+    var appIsInApplications: Bool {
+        appBundlePath.hasPrefix("/Applications/")
+    }
+
+    private var daemonBundleDirectory: URL {
+        Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Library/LaunchDaemons", isDirectory: true)
+    }
+
+    var daemonHelperPresent: Bool {
+        FileManager.default.isExecutableFile(
+            atPath: daemonBundleDirectory.appendingPathComponent("KancerberoDaemon").path)
+    }
+
+    var daemonPlistPresent: Bool {
+        FileManager.default.fileExists(
+            atPath: daemonBundleDirectory.appendingPathComponent(Self.daemonServicePlist).path)
+    }
+
+    var hasFullDataAccess: Bool {
+        (usingDaemon && daemonIsRoot) || isRoot
+    }
+
+    var legacyRemovalCommands: String {
+        var commands: [String] = []
+        if legacyAgentDetected { commands.append("./scripts/uninstall-agent.sh") }
+        if legacyDaemonDetected { commands.append("sudo ./scripts/uninstall-daemon.sh") }
+        return commands.joined(separator: "\n")
+    }
+
+    private var legacyServiceMessage: String {
+        let commands = legacyRemovalCommands
+        guard !commands.isEmpty else { return "" }
+        return "A legacy background service is installed. Remove it first:\n\(commands)"
+    }
+
+    private var helperMissingMessage: String {
+        "The background helper is missing from this app bundle. Reinstall a complete signed build in /Applications."
+    }
 
     var modeDescription: String {
         if usingDaemon {
@@ -164,17 +222,27 @@ final class AppModel {
     func refreshServiceStatus() {
         serviceStatus = daemonService.status
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        legacyServiceDetected =
-            FileManager.default.fileExists(
-                atPath: "\(home)/Library/LaunchAgents/uno.kayros.kancerbero.agent.plist")
-            || FileManager.default.fileExists(
-                atPath: "/Library/LaunchDaemons/uno.kayros.kancerbero.daemon.plist")
+        legacyAgentDetected = FileManager.default.fileExists(
+            atPath: "\(home)/Library/LaunchAgents/uno.kayros.kancerbero.agent.plist")
+        legacyDaemonDetected = FileManager.default.fileExists(
+            atPath: "/Library/LaunchDaemons/uno.kayros.kancerbero.daemon.plist")
     }
 
     func registerDaemonService() async {
+        guard !serviceActionInFlight else { return }
+        serviceActionInFlight = true
+        defer { serviceActionInFlight = false }
+        await registerDaemonServiceInternal()
+    }
+
+    private func registerDaemonServiceInternal() async {
         serviceError = nil
         if legacyServiceDetected {
-            serviceError = "Remove the legacy agent first: scripts/uninstall-agent.sh"
+            serviceError = legacyServiceMessage
+            return
+        }
+        guard daemonHelperPresent && daemonPlistPresent else {
+            serviceError = helperMissingMessage
             return
         }
         let plistName = Self.daemonServicePlist
@@ -200,6 +268,13 @@ final class AppModel {
     }
 
     func unregisterDaemonService() async {
+        guard !serviceActionInFlight else { return }
+        serviceActionInFlight = true
+        defer { serviceActionInFlight = false }
+        await unregisterDaemonServiceInternal()
+    }
+
+    private func unregisterDaemonServiceInternal() async {
         daemonSource?.stop()
         daemonSource = nil
         usingDaemon = false
@@ -220,8 +295,53 @@ final class AppModel {
         refreshServiceStatus()
     }
 
+    /// Removes and re-adds the service registration so macOS can ask for
+    /// approval again. Privileged collection pauses until it is approved.
+    func repairDaemonService() async {
+        guard !serviceActionInFlight else { return }
+        serviceActionInFlight = true
+        defer { serviceActionInFlight = false }
+        if legacyServiceDetected {
+            serviceError = legacyServiceMessage
+            return
+        }
+        guard daemonHelperPresent && daemonPlistPresent else {
+            serviceError = helperMissingMessage
+            return
+        }
+        await unregisterDaemonServiceInternal()
+        await registerDaemonServiceInternal()
+    }
+
+    func retryDaemonConnection() {
+        serviceError = nil
+        refreshServiceStatus()
+        guard !daemonConnecting, !usingDaemon else { return }
+        if serviceStatus != .enabled && !legacyServiceDetected {
+            serviceError = "Enable and approve the background service first."
+            return
+        }
+        lastDaemonAttempt = .distantPast
+        connectDaemon()
+    }
+
     func openLoginItemsSettings() {
         SMAppService.openSystemSettingsLoginItems()
+    }
+
+    func revealAppInFinder() {
+        NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
+    }
+
+    func openApplicationsFolder() {
+        NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications"))
+    }
+
+    func copyLegacyRemovalCommands() {
+        let commands = legacyRemovalCommands
+        guard !commands.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(commands, forType: .string)
     }
 
     func stop() {
