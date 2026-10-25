@@ -4,13 +4,28 @@ import KancerberoCore
 struct DiskView: View {
     @Binding var tab: DiskTab
     @Environment(DiskModel.self) private var disk
+    @AppStorage(KBPreferences.tabAnimationsKey)
+    private var tabAnimations = KBPreferences.tabAnimationsDefault
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var pillAnimation: Animation? {
+        KBPreferences.tabAnimation(stored: tabAnimations,
+                                   reduceMotion: reduceMotion,
+                                   duration: 0.28)
+    }
+
+    private var tabTransition: AnyTransition {
+        KBPreferences.enabled(stored: tabAnimations, reduceMotion: reduceMotion)
+            ? .opacity
+            : .identity
+    }
 
     var body: some View {
         VStack(spacing: 14) {
             header
 
             HStack(spacing: 12) {
-                PillTabBar(selection: $tab)
+                PillTabBar(selection: $tab, selectionAnimation: pillAnimation)
                 Spacer()
                 Text(contextLabel)
                     .font(.caption)
@@ -22,7 +37,9 @@ struct DiskView: View {
                 switch tab {
                 case .volumes:
                     DiskVolumesView { path in
-                        tab = .analyzer
+                        withAnimation(pillAnimation) {
+                            tab = .analyzer
+                        }
                         Task { await disk.startScan(path: path) }
                     }
                 case .analyzer:
@@ -30,7 +47,7 @@ struct DiskView: View {
                 }
             }
             .id(tab)
-            .transition(.opacity)
+            .transition(tabTransition)
         }
         .padding(.horizontal, KBTheme.contentPadding)
         .padding(.top, 14)

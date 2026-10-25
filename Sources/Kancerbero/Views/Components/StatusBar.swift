@@ -24,7 +24,7 @@ struct StatusBar: View {
         switch section {
         case .networking:
             LiveDot(isLive: model.isLive)
-            Text("\(model.processes.count) processes")
+            Text("\(model.processInventory.count) networked processes")
             Text("\(model.sources.count) connections")
             Text("RX \(KBFormat.bitRate(model.systemRates.rxBytesPerSecond))")
             Text("TX \(KBFormat.bitRate(model.systemRates.txBytesPerSecond))")
@@ -57,6 +57,25 @@ struct StatusBar: View {
                     .foregroundStyle(.orange)
                     .lineLimit(1)
                     .help(error)
+            }
+
+        case .cpu:
+            if let cpu = model.hostMetrics?.cpu {
+                LiveDot(isLive: model.isLive)
+                Text("\(cpu.coreCount) cores")
+                Text("CPU \(KBFormat.usagePercent(cpu.totalUsagePercent))")
+                Text("Load \(KBFormat.load(cpu.load1))")
+                if cpu.threadsRestricted > 0 {
+                    Text("partial")
+                        .foregroundStyle(.orange)
+                        .help("\(cpu.threadsRestricted) processes belong to another user; install the root daemon for their CPU and memory counters.")
+                }
+            } else {
+                Text("Waiting for CPU metrics…")
+                    .foregroundStyle(.secondary)
+            }
+            if let memory = model.hostMetrics?.memory {
+                Text("\(KBFormat.bytes(memory.usedBytes)) / \(KBFormat.bytes(memory.totalBytes))")
             }
         }
     }
@@ -96,6 +115,8 @@ struct StatusBar: View {
             return date.map { "Updated \(KBFormat.time($0))" } ?? "Waiting…"
         case .daemons:
             return model.daemonLastUpdate.map { "Updated \(KBFormat.time($0))" } ?? "Waiting…"
+        case .cpu:
+            return model.lastUpdate.map { "Updated \(KBFormat.time($0))" } ?? "Waiting…"
         }
     }
 

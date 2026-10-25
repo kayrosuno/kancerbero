@@ -81,16 +81,18 @@ capturar su propia ventana con AppKit sin ese permiso:
 ```bash
 build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   --screenshot /tmp/kancerbero-ui.png \
-  [--section networking|disk|daemons] \
+  [--section networking|disk|daemons|cpu] \
   [--tab interfaces|connections|processes] \
   [--disk-tab volumes|analyzer] \
   [--disk-path=<carpeta>] [--disk-scan] [--disk-item <diskXsY>] \
+  [--cpu-search <texto>] [--cpu-selected <pid>] \
   [--sidebar-collapsed]
 ```
 
 `--section` selecciona la sección de primer nivel, `--tab` la subpestaña de Networking,
 `--disk-tab` la de Disk, `--disk-path`/`--disk-scan` lanzan el analizador sobre una ruta y
-`--disk-item` preselecciona un dispositivo en Volumes. `--sidebar-collapsed` captura el panel
+`--disk-item` preselecciona un dispositivo en Volumes. `--cpu-search` aplica el filtro inicial de
+la tabla de CPU y `--cpu-selected` preselecciona un PID. `--sidebar-collapsed` captura el panel
 lateral oculto. El PNG se escribe a escala de backing (2x en Retina) y la app termina con código 0.
 
 Capturas recomendadas:
@@ -102,6 +104,7 @@ for args in \
   "--section networking --tab processes" \
   "--section disk" \
   "--section daemons" \
+  "--section cpu" \
   "--section networking --sidebar-collapsed"
 do
   ./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
@@ -183,28 +186,129 @@ $K --screenshot /tmp/kb-disk-folders.png --section disk \
 ```
 
 La barra inferior debe mostrar métricas de la sección activa y la marca de actualización de su
-fuente (red, inventario de disco o servicios launchd).
+fuente (red, inventario de disco, servicios launchd o CPU/memoria).
 
-Tarjeta Traffic (gráfico combinado y unidades):
+## Settings y animaciones de pestaña
+
+Abrir **Kancerbero → Settings…** (⌘,) y comprobar el toggle “Animate tab changes”. La preferencia
+se guarda en `UserDefaults` con la clave `tabAnimationsEnabled`; si la clave no existe, el valor
+por defecto es activado.
+
+```bash
+defaults read uno.kayros.kancerbero tabAnimationsEnabled
+defaults write uno.kayros.kancerbero tabAnimationsEnabled -bool false
+defaults write uno.kayros.kancerbero tabAnimationsEnabled -bool true
+defaults delete uno.kayros.kancerbero tabAnimationsEnabled   # vuelve al valor por defecto: on
+```
+
+Tras un `defaults write`/`delete` externo puede hacer falta relanzar la app para que el cambio se
+refleje; el toggle de Settings se actualiza en vivo.
+
+- Con el toggle apagado: cambiar Networking/Disk/Daemons/CPU por sidebar y por ⌘1–⌘4, cambiar las
+  píldoras de Networking y Disk y usar Volumes → Analyzer. No debe haber fundido, deslizamiento
+  ni movimiento del resaltado; todo cambia de golpe.
+- Con el toggle encendido: las transiciones vuelven sin reiniciar. Cada cambio debe animarse una
+  sola vez (sin doble transacción).
+- Tras reiniciar la app, el valor del toggle se conserva.
+- Con Reduce Motion activo en Ajustes del Sistema → Accesibilidad → Pantalla, no debe animarse
+  ninguna pestaña aunque el toggle esté encendido; Settings muestra el aviso y conserva el valor.
+- El filtro All/Agents/Daemons sigue animando su píldora con el toggle apagado, porque es un
+  filtro y no una pestaña.
+- Confirmar que siguen animándose sparklines, valores de la barra de estado, hover de tarjetas,
+  `numericText`, paneles de detalle, filtros/foco y LiveDot.
+
+## CPU y memoria
+
+```bash
+P=./build/Build/Products/Debug/KancerberoProbe
+$P cpu --interval 1
+$P procs --cpu --limit 20
+sudo $P procs --cpu --limit 20
+
+K=./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
+$K --screenshot /tmp/kb-cpu.png --section cpu --screenshot-delay 6
+$K --screenshot /tmp/kb-cpu-filter.png --section cpu \
+  --cpu-search java --screenshot-delay 6
+$K --screenshot /tmp/kb-cpu-selected.png --section cpu \
+  --cpu-selected 9680 --screenshot-delay 6
+```
+
+- Comparar CPU por núcleo con `top` (±1–2%) y el agregado con la suma ponderada por ticks, no
+  con la media de porcentajes. Comparar load con `uptime` (±0,01), uptime con `uptime` (±1 s) y
+  swap con `sysctl -n vm.swapusage`.
+- RSS de procesos propios con `ps -o rss`; con `sudo`, para todos. La memoria “used” puede diferir
+  de `top`/Activity Monitor por definición (`active + wired + compressed`); documentar la cifra.
+- Sin daemon root la tabla solo enumera procesos del uid actual y muestra “your processes only”.
+  Con el daemon root aparecen todos. Los procesos sin task info muestran `—`, nunca 0.
+- CPU% puede superar 100% en multithread; `TIME+` es tiempo acumulado. Ordenar por cada columna,
+  filtrar y cambiar de sección: búsqueda, selección y orden se conservan.
+- Igual que en otras tablas con refresco en vivo, macOS 27 puede registrar
+  `reentrant operation in its NSTableView delegate`; no afecta a los datos.
+- Para fugas: dejar la pestaña abierta varios minutos con intervalo de 0,5 s y comprobar que el
+  RSS de Kancerbero se mantiene estable (`ps -o rss`, `leaks`). El sampler libera el array de
+  `host_processor_info` y el puerto Mach en cada tick.
+
+Tarjeta Traffic, Activity, Protocols y filtros de protocolo:
 
 ```bash
 APP=./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
-$APP --screenshot /tmp/kb-net-traffic.png --section networking --tab interfaces \
+$APP --screenshot /tmp/kb-net-cards.png --section networking --tab interfaces \
   --screenshot-delay 5
-$APP --screenshot /tmp/kb-net-traffic-download.png --section networking --tab connections \
+$APP --screenshot /tmp/kb-net-tcp.png --section networking --tab connections \
+  --networking-transport tcp --screenshot-delay 5
+$APP --screenshot /tmp/kb-net-ipv6.png --section networking --tab connections \
+  --networking-ip ipv6 --screenshot-delay 5
+$APP --screenshot /tmp/kb-net-combined.png --section networking --tab processes \
+  --networking-focus connections --networking-transport udp --networking-ip ipv4 \
+  --screenshot-delay 5
+$APP --screenshot /tmp/kb-net-download.png --section networking --tab connections \
   --networking-focus download --screenshot-delay 5
-$APP --screenshot /tmp/kb-net-traffic-upload.png --section networking --tab processes \
-  --networking-focus upload --screenshot-delay 5
 ```
 
-- El gráfico muestra download (azul) por encima de la línea central y upload (violeta) por debajo,
-  con escala compartida. Con `--networking-focus download|upload`, el botón correspondiente queda
-  seleccionado, la serie opuesta se atenúa y la tabla se filtra.
-- Las velocidades aparecen en `bps`, `Kbps`, `Mbps` o `Gbps` en la tarjeta, la barra inferior y
-  las columnas `RX bit/s`/`TX bit/s` de Interfaces. `Received`/`Sent`, Connections y Disk siguen
-  en Bytes.
-- Comparar capturas a 0,3 s y 5 s: la fila de tarjetas, pills y tabla deben mantener la misma
-  posición vertical (sin salto al llegar la primera muestra).
+- Traffic: Download/Upload en la cabecera, gráfico espejado con cuadrícula, etiquetas Y en
+  `bps/Kbps/Mbps/Gbps` y eje temporal `-60s/-30s/now` (con el intervalo de 1 s). Sin salto de
+  layout entre 0,3 s y 5 s.
+- Activity: agrupa Connections y Processes; los números aplican el filtro de protocolo e ignoran
+  el foco. Protocols muestra la barra y la leyenda de los seis tipos; el filtro IP reduce el
+  desglose, el filtro Transport no.
+- Los selectores Transport/IP aparecen solo en Connections/Processes; el contador muestra
+  “N of M” y la tabla respeta ambos filtros combinados con el foco.
+- `--networking-transport all` y `--networking-ip all` equivalen a “All”.
+
+Tabla de Connections (orden y columnas):
+
+```bash
+$APP --screenshot /tmp/kb-connections-columns.png --section networking \
+  --tab connections --screenshot-delay 5
+```
+
+- Orden de columnas: Local, Remote, Protocol, RX, TX, State, Iface, PID y Process (última).
+- Pulsar cada cabecera: debe mostrarse el indicador de orden y alternar ascendente/descendente.
+  Local/Remote ordenan numéricamente (no `10.x` antes que `2.x`); RX/TX/PID numéricamente; el
+  resto por texto.
+- Seleccionar una fila, ordenar y cambiar de subpestaña/sección: la selección y el criterio de
+  orden se conservan (estado de sesión en `UIState`). Si el filtro hace desaparecer la fila, la
+  selección se limpia.
+- Comprobar direcciones IPv6 largas (truncadas con tooltip) y el scroll horizontal a 1040×640.
+
+Tabla de Processes (flujos + sockets):
+
+```bash
+$APP --screenshot /tmp/kb-processes.png --section networking --tab processes \
+  --screenshot-delay 12
+./build/Build/Products/Debug/KancerberoProbe sockets-summary
+./build/Build/Products/Debug/KancerberoProbe sockets <pid>
+```
+
+- La tabla solo lista procesos con flujos TCP/UDP o sockets (UNIX/RAW incluidos). Comparar los
+  tipos y conteos con `lsof -nP -i`/`netstat` y con el inspector del proceso.
+- Comprobar badges de protocolo (TCP4/TCP6/UDP4/UDP6/UNIX/RAW4/RAW6/OTHER), tipos de socket
+  (stream/dgram/raw/seqpacket/other), Flows, RX/TX (Bytes) y “—” en procesos solo-locales.
+- En modo local, los procesos de otros uid pueden mostrar Protocols/Flows/RX/TX pero Sockets
+  “—” (restringido); con el daemon root deben mostrar también sus sockets.
+- Ordenar por cada cabecera y comprobar que el criterio se conserva al cambiar de pestaña/sección.
+- Verificar que el primer inventario de sockets puede añadir filas tras ~1–10 s sin cambiar las
+  columnas ni la altura de la tabla. Comprobar CPU/RSS con el barrido periódico.
 
 Continuidad de estado al cambiar de pestaña (manual):
 
@@ -294,6 +398,30 @@ $K --screenshot /tmp/kb-disk-live-b.png --section disk --disk-tab analyzer \
 
 Nota: usa `--disk-path=<ruta>` (un solo argumento). Un valor posicional que sea una ruta existente
 puede ser interpretado por macOS como “abrir documento” y bloquear la ventana antes de la captura.
+
+## Servicio en background (SMAppService)
+
+```bash
+./scripts/build-release.sh
+codesign --verify --deep --strict --verbose=2 \
+  build/Build/Products/Release/Kancerbero.app
+./scripts/notarize.sh
+./scripts/install-app.sh
+open /Applications/Kancerbero.app
+```
+
+- En el footer del sidebar o en el menú **Daemon**, pulsar “Enable background daemon”.
+  El estado debe pasar a `requiresApproval` o `enabled`; “Allow in Settings…” abre Login Items.
+- Aprobar en **Ajustes → General → Login Items & Extensions → Allow in the Background**. El
+  ítem debe mostrar **Kancerbero con el icono de la app**.
+- `launchctl print system/uno.kayros.kancerbero.daemon` y
+  `log show --predicate 'subsystem == "uno.kayros.kancerbero"' --last 5m --info`.
+- La app debe pasar a “Daemon connected” y usar XPC privilegiado. Desregistrar debe detenerlo y
+  volver a modo local.
+- Sin notarización, Gatekeeper marca la app como “Unnotarized Developer ID” y el registro del
+  daemon no es fiable; completar `notarytool store-credentials` + `scripts/notarize.sh`.
+- Antes de registrar, eliminar los plists legacy (`scripts/uninstall-agent.sh`,
+  `sudo scripts/uninstall-daemon.sh`).
 
 ## Rendimiento
 

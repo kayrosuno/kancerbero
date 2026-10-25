@@ -5,10 +5,39 @@ struct NetworkingView: View {
     @Binding var tab: NetworkingTab
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
+    @AppStorage(KBPreferences.tabAnimationsKey)
+    private var tabAnimations = KBPreferences.tabAnimationsDefault
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var pillAnimation: Animation? {
+        KBPreferences.tabAnimation(stored: tabAnimations,
+                                   reduceMotion: reduceMotion,
+                                   duration: 0.28)
+    }
+
+    private var tabTransition: AnyTransition {
+        KBPreferences.enabled(stored: tabAnimations, reduceMotion: reduceMotion)
+            ? .opacity
+            : .identity
+    }
 
     var body: some View {
         @Bindable var model = model
         let rates = model.systemRates
+        let protocolFilter = ui.networking.protocolFilter
+        let activityConnections = model.filteredSources(nil, matching: protocolFilter).count
+        let activityProcesses = model.filteredProcessRows(nil, matching: protocolFilter).count
+        let ipOnly = NetworkingProtocolFilter(ipVersion: ui.networking.ipVersion)
+        let protocolCounts = Dictionary(
+            grouping: model.sources.filter(ipOnly.matches),
+            by: \.protocolBucket
+        ).mapValues(\.count)
+
+        let matchingInterfaces = model.filteredInterfaces(ui.networking.focus)
+        let matchingSources = model.filteredSources(ui.networking.focus,
+                                                    matching: protocolFilter)
+        let matchingProcesses = model.filteredProcessRows(ui.networking.focus,
+                                                          matching: protocolFilter)
 
         VStack(spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
@@ -18,18 +47,29 @@ struct NetworkingView: View {
                     Text("Live traffic, sockets and process inventory")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
 
                 Spacer()
 
-                Picker("Interval", selection: $model.interval) {
-                    Text("0.5 s").tag(0.5)
-                    Text("1 s").tag(1.0)
-                    Text("2 s").tag(2.0)
-                    Text("5 s").tag(5.0)
+                HStack(spacing: 8) {
+                    Text("Interval")
+                        .font(.body)
+                        .lineLimit(1)
+                        .fixedSize()
+
+                    Picker("Interval", selection: $model.interval) {
+                        Text("0.5 s").tag(0.5)
+                        Text("1 s").tag(1.0)
+                        Text("2 s").tag(2.0)
+                        Text("5 s").tag(5.0)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 250)
+                    .accessibilityLabel("Interval")
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 250)
+                .fixedSize(horizontal: true, vertical: false)
 
                 Toggle(isOn: $model.isPaused) {
                     Image(systemName: model.isPaused ? "play.fill" : "pause.fill")
@@ -54,48 +94,51 @@ struct NetworkingView: View {
                     downloadHistory: model.rxHistory,
                     uploadHistory: model.txHistory,
                     focus: ui.networking.focus,
+                    sampleInterval: model.interval,
                     onToggle: toggleFocus
                 )
-                .frame(minWidth: 330, maxWidth: .infinity)
+                .frame(minWidth: 400, maxWidth: .infinity)
 
-                SummaryCard(
-                    title: "Connections",
-                    value: KBFormat.compactCount(model.sources.count),
-                    caption: "active flows",
-                    systemImage: "point.3.connected.trianglepath.dotted",
-                    tint: Color(red: 0.20, green: 0.70, blue: 0.62),
-                    action: { toggleFocus(.connections) },
-                    isSelected: ui.networking.focus == .connections,
-                    filterHint: "Show rows tied to active connections",
-                    fillsHeight: true
-                )
-                .frame(minWidth: 150, idealWidth: 180, maxWidth: 220)
+                VStack(spacing: KBTheme.summaryGridSpacing) {
+                    ActivityCard(
+                        connectionsCount: activityConnections,
+                        processesCount: activityProcesses,
+                        isFiltered: protocolFilter.isActive,
+                        focus: ui.networking.focus,
+                        onToggle: toggleFocus
+                    )
 
-                SummaryCard(
-                    title: "Processes",
-                    value: KBFormat.compactCount(model.processes.count),
-                    caption: "visible to the daemon",
-                    systemImage: "square.stack.3d.up.fill",
-                    tint: Color(red: 0.94, green: 0.56, blue: 0.18),
-                    action: { toggleFocus(.processes) },
-                    isSelected: ui.networking.focus == .processes,
-                    filterHint: "Show rows attributable to processes",
-                    fillsHeight: true
-                )
-                .frame(minWidth: 150, idealWidth: 180, maxWidth: 220)
+                    ProtocolCard(
+                        counts: protocolCounts,
+                        ipVersion: ui.networking.ipVersion
+                    )
+                }
+                .frame(minWidth: 232, idealWidth: 248, maxWidth: 256)
             }
-            .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 12) {
-                PillTabBar(selection: $tab)
-                Spacer()
-                Text(contextLabel)
+                PillTabBar(selection: $tab, selectionAnimation: pillAnimation)
+                if tab != .interfaces {
+                    OptionFilterPicker("Transport",
+                                       selection: transportBinding,
+                                       optionTitle: { $0.title })
+                    OptionFilterPicker("IP",
+                                       selection: ipVersionBinding,
+                                       optionTitle: { $0.title })
+                }
+                Spacer(minLength: 8)
+                Text(contextLabel(interfaces: matchingInterfaces,
+                                  sources: matchingSources,
+                                  processes: matchingProcesses))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
                     .contentTransition(.numericText())
             }
 
-            tableCard
+            tableCard(interfaces: matchingInterfaces,
+                      sources: matchingSources,
+                      processes: matchingProcesses)
         }
         .padding(.horizontal, KBTheme.contentPadding)
         .padding(.top, 14)
@@ -103,20 +146,41 @@ struct NetworkingView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    private var contextLabel: String {
+    private var transportBinding: Binding<NetworkingTransport?> {
+        Binding(
+            get: { ui.networking.transport },
+            set: { ui.networking.transport = $0 }
+        )
+    }
+
+    private var ipVersionBinding: Binding<NetworkingIPVersion?> {
+        Binding(
+            get: { ui.networking.ipVersion },
+            set: { ui.networking.ipVersion = $0 }
+        )
+    }
+
+    private func contextLabel(interfaces: [KBInterfaceInfo],
+                              sources: [KBNStatSource],
+                              processes: [ProcessInventoryRow]) -> String {
         switch tab {
         case .interfaces:
             let total = model.interfaces.count
-            let shown = model.filteredInterfaces(ui.networking.focus).count
-            return ui.networking.focus == nil ? "\(total) interfaces" : "\(shown) of \(total) interfaces"
+            return ui.networking.focus == nil
+                ? "\(total) interfaces"
+                : "\(interfaces.count) of \(total) interfaces"
         case .connections:
             let total = model.sources.count
-            let shown = model.filteredSources(ui.networking.focus).count
-            return ui.networking.focus == nil ? "\(total) connections" : "\(shown) of \(total) connections"
+            let active = ui.networking.focus != nil || ui.networking.protocolFilter.isActive
+            return active
+                ? "\(sources.count) of \(total) connections"
+                : "\(total) connections"
         case .processes:
-            let total = model.processes.count
-            let shown = model.filteredProcesses(ui.networking.focus).count
-            return ui.networking.focus == nil ? "\(total) processes" : "\(shown) of \(total) processes"
+            let total = model.processInventory.count
+            let active = ui.networking.focus != nil || ui.networking.protocolFilter.isActive
+            return active
+                ? "\(processes.count) of \(total) networked processes"
+                : "\(total) networked processes"
         }
     }
 
@@ -126,20 +190,22 @@ struct NetworkingView: View {
         }
     }
 
-    private var tableCard: some View {
+    private func tableCard(interfaces: [KBInterfaceInfo],
+                           sources: [KBNStatSource],
+                           processes: [ProcessInventoryRow]) -> some View {
         VStack(spacing: 0) {
             Group {
                 switch tab {
                 case .interfaces:
-                    InterfacesView(items: model.filteredInterfaces(ui.networking.focus))
+                    InterfacesView(items: interfaces)
                 case .connections:
-                    ConnectionsView(rows: model.filteredSources(ui.networking.focus))
+                    ConnectionsView(rows: sources)
                 case .processes:
-                    ProcessesView(items: model.filteredProcesses(ui.networking.focus))
+                    ProcessesView(rows: processes)
                 }
             }
             .id(tab)
-            .transition(.opacity)
+            .transition(tabTransition)
             .padding(8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -152,6 +218,5 @@ struct NetworkingView: View {
                 .strokeBorder(.quaternary.opacity(0.5), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
-        .animation(.snappy(duration: 0.25), value: tab)
     }
 }

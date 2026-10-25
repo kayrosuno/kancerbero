@@ -33,6 +33,11 @@ int kb_process_path(int32_t pid, char *buffer, size_t size);
 int kb_socket_list(int32_t pid, kb_socket **out, size_t *count);
 void kb_socket_list_free(kb_socket *items);
 
+/* Aggregated socket counts per PID (same uid unless root). */
+int kb_socket_summary_all(const int32_t *pids, size_t pid_count,
+                          kb_socket_summary **out, size_t *out_count);
+void kb_socket_summary_free(kb_socket_summary *items);
+
 /* Per-process open descriptors with paths when available. */
 int kb_open_file_list(int32_t pid, kb_open_file **out, size_t *count);
 void kb_open_file_list_free(kb_open_file *items);
@@ -42,6 +47,9 @@ int kb_interface_list(kb_interface **out, size_t *count);
 void kb_interface_list_free(kb_interface *items);
 
 int kb_sysctl_int(const char *name, int *value);
+
+/* CPU cores, memory, swap, load average and boot time. */
+int kb_host_stats_read(kb_host_stats *out);
 
 #ifdef __cplusplus
 }

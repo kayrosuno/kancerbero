@@ -6,7 +6,12 @@ struct TrafficCard: View {
     let downloadHistory: [Double]
     let uploadHistory: [Double]
     let focus: NetworkingFocus?
+    var sampleInterval: TimeInterval = 1
     let onToggle: (NetworkingFocus) -> Void
+
+    static let cardHeight: CGFloat = 208
+    private static let headerHeight: CGFloat = 38
+    private static let metricWidth: CGFloat = 116
 
     private var downloadValue: String {
         KBFormat.bitRate(downloadBytesPerSecond)
@@ -17,31 +22,74 @@ struct TrafficCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            header
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
-                metricButton(.download,
-                             title: "Download",
-                             icon: "arrow.down.circle.fill",
-                             value: downloadValue,
-                             tint: KBTheme.downloadTint,
-                             caption: "system-wide receive",
-                             hint: "Show rows with receive traffic")
-                metricButton(.upload,
-                             title: "Upload",
-                             icon: "arrow.up.circle.fill",
-                             value: uploadValue,
-                             tint: KBTheme.uploadTint,
-                             caption: "system-wide send",
-                             hint: "Show rows with send traffic")
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 22, height: 22)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(LinearGradient(
+                                colors: [KBTheme.downloadTint, KBTheme.uploadTint],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing))
+                    )
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Traffic")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text("bit rate")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tertiary)
+                }
+
+                Spacer(minLength: 8)
+
+                MetricTile(
+                    layout: .inline,
+                    title: "Download",
+                    value: downloadValue,
+                    icon: "arrow.down.circle.fill",
+                    tint: KBTheme.downloadTint,
+                    caption: "system-wide receive",
+                    hint: "Show rows with receive traffic",
+                    isSelected: focus == .download,
+                    valueSize: 16,
+                    verticalPadding: 3
+                ) {
+                    onToggle(.download)
+                }
+                .frame(width: Self.metricWidth)
+
+                MetricTile(
+                    layout: .inline,
+                    title: "Upload",
+                    value: uploadValue,
+                    icon: "arrow.up.circle.fill",
+                    tint: KBTheme.uploadTint,
+                    caption: "system-wide send",
+                    hint: "Show rows with send traffic",
+                    isSelected: focus == .upload,
+                    valueSize: 16,
+                    verticalPadding: 3
+                ) {
+                    onToggle(.upload)
+                }
+                .frame(width: Self.metricWidth)
             }
+            .frame(height: Self.headerHeight)
+
             TrafficChart(download: downloadHistory,
                          upload: uploadHistory,
-                         focus: focus)
-                .frame(height: 56)
+                         focus: focus,
+                         sampleInterval: sampleInterval)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: Self.cardHeight)
         .background {
             RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
                 .fill(.regularMaterial)
@@ -52,76 +100,6 @@ struct TrafficCard: View {
         }
         .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
         .accessibilityElement(children: .contain)
-    }
-
-    private var header: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "chart.line.uptrend.xyaxis")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 22, height: 22)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(LinearGradient(
-                            colors: [KBTheme.downloadTint, KBTheme.uploadTint],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing))
-                )
-            Text("Traffic")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 2)
-            Text("bit rate")
-                .font(.system(size: 9))
-                .foregroundStyle(.tertiary)
-        }
-    }
-
-    private func metricButton(_ value: NetworkingFocus, title: String,
-                              icon: String, value text: String, tint: Color,
-                              caption: String, hint: String) -> some View {
-        let isSelected = focus == value
-        return Button {
-            onToggle(value)
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(tint)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(title)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Text(text)
-                        .font(.system(size: 17, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(tint.opacity(isSelected ? 0.14 : 0.045))
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(isSelected ? tint.opacity(0.9) : tint.opacity(0.18),
-                                  lineWidth: isSelected ? 1.5 : 1)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title): \(text), \(caption)")
-        .accessibilityHint(hint)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .help(hint)
     }
 
     private var borderStyle: AnyShapeStyle {

@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 public struct KBCollectionSnapshot: Codable, Sendable {
@@ -10,11 +11,15 @@ public struct KBCollectionSnapshot: Codable, Sendable {
     public var error: String?
     public var generatedAt: Date
     public var monotonicNanoseconds: UInt64
+    public var socketInventory: KBSocketInventory?
+    public var hostMetrics: KBHostMetrics?
 
     public init(processes: [KBProcessInfo], interfaces: [KBInterfaceInfo],
                 sources: [KBNStatSource], mode: KBMode, privcheck: Int32,
                 isRoot: Bool, error: String?, generatedAt: Date,
-                monotonicNanoseconds: UInt64) {
+                monotonicNanoseconds: UInt64,
+                socketInventory: KBSocketInventory? = nil,
+                hostMetrics: KBHostMetrics? = nil) {
         self.processes = processes
         self.interfaces = interfaces
         self.sources = sources
@@ -24,6 +29,8 @@ public struct KBCollectionSnapshot: Codable, Sendable {
         self.error = error
         self.generatedAt = generatedAt
         self.monotonicNanoseconds = monotonicNanoseconds
+        self.socketInventory = socketInventory
+        self.hostMetrics = hostMetrics
     }
 }
 
@@ -37,6 +44,11 @@ public actor CollectionActor {
     private var lastInterfaceRates: [UInt32: KBRates] = [:]
     private var lastSampleNanoseconds: UInt64 = 0
     private var privcheck: Int32 = -1
+    private var socketInventory: KBSocketInventory?
+    private var socketScanTask: Task<Void, Never>?
+    private var lastSocketScanNanoseconds: UInt64 = 0
+    private var hostSampler = HostMetricsSampler()
+    private var processCPUTracker = ProcessCPUTracker()
 
     public init() {}
 
@@ -78,10 +90,20 @@ public actor CollectionActor {
             if errorMessage == nil { errorMessage = error.localizedDescription }
         }
 
+        maybeStartSocketScan(processes: processes, sources: sources, now: now)
+
         let elapsed = lastSampleNanoseconds == 0
             ? 0
             : Double(now &- lastSampleNanoseconds) / 1_000_000_000.0
         let validInterval = elapsed > 0 && elapsed < 5.0
+
+        let host = hostSampler.sample(processes: processes)
+        if let host {
+            processCPUTracker.annotate(&processes,
+                                       elapsed: validInterval ? elapsed : 0,
+                                       totalMemoryBytes: host.memory.totalBytes,
+                                       coreCount: host.cpu.coreCount)
+        }
 
         var interfaceRates: [UInt32: KBRates] = [:]
         if validInterval {
@@ -136,8 +158,49 @@ public actor CollectionActor {
             isRoot: geteuid() == 0,
             error: errorMessage,
             generatedAt: Date(),
-            monotonicNanoseconds: now
+            monotonicNanoseconds: now,
+            socketInventory: socketInventory,
+            hostMetrics: host
         )
+    }
+
+    /// Socket enumeration is expensive compared to the regular tick, so it runs
+    /// in the background at most every 10 seconds. Without root only processes
+    /// of the current uid are readable. NStat PIDs missing from the process
+    /// inventory are included as synthetic entries: libproc will report them as
+    /// restricted when they belong to another uid.
+    private func maybeStartSocketScan(processes: [KBProcessInfo],
+                                      sources: [KBNStatSource],
+                                      now: UInt64) {
+        guard socketScanTask == nil else { return }
+        let interval: UInt64 = 10_000_000_000
+        guard lastSocketScanNanoseconds == 0
+                || now &- lastSocketScanNanoseconds >= interval else { return }
+
+        var candidates = processes
+        var known = Set(processes.map(\.pid))
+        for source in sources where source.pid > 0 && !known.contains(source.pid) {
+            known.insert(source.pid)
+            candidates.append(KBProcessInfo(pid: source.pid, name: source.processName))
+        }
+        guard !candidates.isEmpty else { return }
+
+        let euid = geteuid()
+        let visible = euid == 0
+            ? candidates
+            : candidates.filter { $0.uid == 0 || $0.uid == euid }
+        guard !visible.isEmpty else { return }
+
+        lastSocketScanNanoseconds = now
+        socketScanTask = Task.detached(priority: .utility) { [weak self] in
+            let inventory = SocketSummaryCollector.summaries(for: visible)
+            await self?.storeSocketInventory(inventory)
+        }
+    }
+
+    private func storeSocketInventory(_ inventory: KBSocketInventory) {
+        socketInventory = inventory
+        socketScanTask = nil
     }
 
     public func interfaceRates() -> [UInt32: KBRates] {
@@ -145,6 +208,8 @@ public actor CollectionActor {
     }
 
     public func stop() {
+        socketScanTask?.cancel()
+        socketScanTask = nil
         nstat.stop()
         nstatStarted = false
     }

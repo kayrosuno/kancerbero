@@ -14,14 +14,26 @@
 
 - `RootView`: `NavigationSplitView` con `columnVisibility`; sidebar colapsable con
   `SidebarCommands()` y el toggle nativo que macOS dibuja en la toolbar.
-- `SidebarView`: selección propia con `matchedGeometryEffect` para Networking / Disk / Daemons;
-  cabecera con marca y estado live, pie con fuente (daemon/local), privcheck y hora.
-- `NetworkingView`: una `TrafficCard` ancha con `TrafficChart` (gráfico espejado de dos series,
-  escala compartida, ventana de 60 muestras anclada a la derecha) y botones Download/Upload que
-  actúan como filtros; al lado, `SummaryCard` para Connections y Processes. Debajo, `PillTabBar`
-  y las tablas (`NetworkingTables.swift`) dentro de una tarjeta con material. Los historiales y
-  `KBRates` siguen en bytes/s; la presentación usa `KBFormat.bitRate` (bps/Kbps/Mbps/Gbps) y los
-  totales acumulados siguen usando `KBFormat.bytes`.
+- `SidebarView`: selección propia con `matchedGeometryEffect` para Networking / Disk / Daemons /
+  CPU; cabecera con marca y estado live, pie con fuente (daemon/local), privcheck y hora.
+- `NetworkingView`: `TrafficCard` ancha con Download/Upload en la cabecera y `TrafficChart`
+  (gráfico espejado, escala compartida con techo 1/2/5×10^n, cuadrícula, niveles y eje temporal;
+  ventana de 60 muestras anclada a la derecha). Debajo, `PillTabBar` y las tablas
+  (`NetworkingTables.swift`). La columna derecha agrupa `ActivityCard` (Connections+Processes) y
+  `ProtocolCard` (desglose por `protocolBucket`). Los filtros `NetworkingTransport` (TCP/UDP/Other)
+  y `NetworkingIPVersion` (IPv4/IPv6) viven en `NetworkingUIState`, se combinan con
+  `NetworkingFocus` y se aplican en `filteredSources`/`filteredProcessRows`. La tabla de
+  Connections ordena por cualquier columna (`Table` + `KeyPathComparator`); Local/Remote usan un
+  comparador numérico de endpoints y el criterio se guarda en `connectionSortOrder` dentro de
+  `NetworkingUIState`. La tabla de Processes usa `ProcessInventoryRow` (agregado de flujos NStat
+  + inventario de sockets libproc) y ordena con `processSortOrder`. `SocketSummaryCollector`
+  enumera sockets por PID (TCP4/6, UDP4/6, UNIX, RAW4/6, OTHER y tipos stream/dgram/raw),
+  deduplica FDs por `soi_so` dentro de cada PID y corre en `CollectionActor` cada ~10 s en
+  background, sin bloquear NStat. El resultado viaja como campo **opcional**
+  `socketInventory` en `KBCollectionSnapshot` (sin subir `schema`), por lo que también lo
+  produce el daemon root. Sin root solo cubre el uid actual. Los historiales y
+  `KBRates` siguen en bytes/s; la presentación usa `KBFormat.bitRate` y los totales acumulados
+  `KBFormat.bytes`.
 - `DiskView`: `PillTabBar` con Volumes / Analyzer. Volumes muestra el árbol
   disco → partición → contenedor APFS → volumen, un inspector y `CapacityBar`; Analyzer muestra
   controles de escaneo, progreso, `RadialDiskMap` y las tablas de contenidos y mayores archivos.
@@ -29,6 +41,13 @@
   espacio libre; todo/ficheros/carpetas/denegados).
 - `DaemonsView`: inventario launchd deduplicado por label (`DaemonDeduplicator`), filtros
   combinables de tipo, ámbito, origen y estado, tarjetas accionables e inspector de acciones.
+- `CPUView`: dashboard tipo `htop`. Cuatro `SummaryCard` (CPU, load, tareas/hilos, memoria) con
+  `Sparkline`; tarjeta de núcleos con `SegmentedMeter` (user/system/nice/idle) y uptime; tarjeta
+  de memoria/swap con segmentos Active/Wired/Compressed/Cached/Free y `CapacityBar`; tabla de
+  procesos `CPUProcessTable` (PID, USER, PRI/NI, VIRT, RES, S/THR, CPU%, MEM%, TIME+, Command)
+  ordenable, con búsqueda, selección persistida e inspector. `CPUProcessRow` añade claves de
+  orden no opcionales para que los procesos sin task info queden al final. SwiftUI limita el
+  `TableColumnBuilder` a 10 columnas, así que PRI/NI y S/THR se muestran combinadas.
 - `StatusBar`: barra inferior contextual; muestra métricas de la sección activa y el estado global
   del daemon/actualización de la fuente correspondiente.
 - Persistencia: `@AppStorage("selectedSection")`, `@AppStorage("networkingTab")` y
@@ -36,14 +55,22 @@
   panel de detalle y árbol expandido) vive en `UIState`, un `@Observable` inyectado desde
   `KancerberoApp`. Es **solo de sesión**: sobrevive a la destrucción de las vistas al cambiar de
   sección/subpestaña, pero no se guarda en disco. Los overrides `--networking-focus`,
-  `--daemon-*`, `--volumes-focus` y `--analyzer-focus` se aplican una sola vez al crear
+  `--networking-transport`, `--networking-ip`, `--daemon-*`, `--volumes-focus`,
+  `--analyzer-focus`, `--cpu-search` y `--cpu-selected` se aplican una sola vez al crear
   `UIState`.
+- Settings: `KancerberoApp` añade una escena nativa `Settings` con `SettingsView`. El toggle
+  “Animate tab changes” persiste en `@AppStorage("tabAnimationsEnabled")` (por defecto `true`) y
+  condiciona únicamente las transiciones de cambio de pestaña: `RootView` (secciones),
+  `PillTabBar` + `NetworkingView`/`DiskView` (subpestañas) y el resaltado del sidebar. Con
+  Reduce Motion activo no se anima aunque el toggle esté encendido. Sparklines, valores de la
+  barra de estado, hover, `numericText`, paneles de detalle, filtros/foco y LiveDot no se tocan.
 - Disk → Volumes mantiene `expanded` y `volumesFocus` en `UIState`. La expansión inicial se hace
   una sola vez (`didExpandVolumesOnce`); los refrescos de inventario solo podan ids obsoletos, así
   que el colapso manual se conserva. La tarjeta All limpia el filtro y re-expande el árbol
   completo.
 - Captura interna para verificación: `--screenshot`, `--section`, `--tab`, `--disk-tab`,
-  `--networking-focus`, `--volumes-focus`, `--analyzer-focus`, filtros `--daemon-*` y
+  `--networking-focus`, `--networking-transport`, `--networking-ip`, `--volumes-focus`,
+  `--analyzer-focus`, `--cpu-search`, `--cpu-selected`, filtros `--daemon-*` y
   `--sidebar-collapsed` (ver `docs/verification.md`).
 
 ## Flujo de datos
@@ -68,7 +95,12 @@
 
 3. **Procesos**
    - `proc_listallpids` devuelve **bytes**, no número de PIDs (verificado en macOS 27).
-   - `proc_pidinfo(PROC_PIDTBSDINFO)` para pid/ppid/uid/start time/nombre y `proc_pidpath`.
+   - `PROC_PIDTASKALLINFO` aporta identidad BSD (pid/ppid/uid/estado/nice/start time) y task info
+     (CPU acumulada, RSS/VSZ, hilos, prioridad) en una sola llamada. Si falla, se cae a
+     `PROC_PIDTBSDINFO` y se marca `has_task_info = 0`. `proc_pidpath` da la ruta.
+   - **Límite real:** sin root, `proc_listallpids` y `proc_pidinfo` solo devuelven procesos del
+     uid actual; macOS no expone los demás a un proceso sin el entitlement privado de Apple. El
+     daemon root enumera todos. La UI lo indica en la tabla de CPU.
 
 4. **Sockets y ficheros (inspector)**
    - `proc_pidinfo(PROC_PIDLISTFDS)` + `proc_pidfdinfo`.
@@ -136,16 +168,59 @@
   libre/usado; los hard links se cuentan por entrada; clones/snapshots APFS hacen que la suma de
   tamaños no coincida exactamente con el “Used” del contenedor.
 
+## CPU y memoria
+
+- **Fuentes públicas** (`kb_host_stats_read` en `kb_sysctl.c`):
+  - `host_processor_info(PROCESSOR_CPU_LOAD_INFO)` → ticks por núcleo
+    (`CPU_STATE_USER/SYSTEM/IDLE/NICE`), liberados con `vm_deallocate`.
+  - `host_statistics64(HOST_VM_INFO64)` + `host_page_size` → páginas de memoria; `hw.memsize`
+    para el total.
+  - `sysctlbyname("vm.swapusage")` (`xsw_usage`, ya en bytes) y
+    `sysctl({CTL_KERN, KERN_BOOTTIME})`.
+  - `getloadavg` para load 1/5/15.
+- **CPU por núcleo** (`HostMetricsSampler`): deltas de ticks de 32 bits con resta wrapping
+  (`current &- previous`); `used = user + system + nice`, `total = used + idle`; el agregado se
+  calcula sumando ticks de todos los núcleos, no promediando porcentajes. La primera muestra no
+  tiene baseline y reporta 0.
+- **CPU por proceso** (`ProcessCPUTracker`): `PROC_PIDTASKINFO.pti_total_user/system` está en
+  unidades mach absolute; se convierte con `mach_timebase_info` cacheado (125/3 en Apple
+  silicon, 1/1 en Intel). `cpu% = delta_segundos / elapsed * 100`, primera muestra 0, se recorta
+  a `0...100×núcleos`; puede superar 100% en multihilo. Clave `KBProcessKey(pid,startTimeUS)`
+  para PID reuse; el diccionario baseline se reemplaza completo en cada tick.
+- **Memoria:** `used = active + wired + compressed`; `cached = inactive`;
+  `free = total - used - cached` (clamp ≥ 0) para que la barra no supere el total. `top`/Activity
+  Monitor usan definiciones distintas de “used”; `free_count` de `vm_statistics64` ya incluye
+  speculative y no se suma dos veces.
+- **Estado y nice:** en macOS 27 `pbi_status` vale 2 (SRUN) tanto para procesos dormidos como
+  activos; se usa `pti_numrunning` (>0 → R, 0 → S) y se conserva el mapeo de `pbi_status` para
+  idle/stopped/zombie. `pbi_nice` viene del BSD info. `PRI` es `pti_priority` (escala de task de
+  macOS, no paridad con `ps`). Sin task info el estado queda `nil` y la tabla muestra `—`.
+- **Wire:** `KBCollectionSnapshot.hostMetrics` es **opcional** (igual que `socketInventory`), así
+  que un daemon antiguo decodifica con `nil` y no se sube `KBVersion.schema`. La pestaña muestra
+  un aviso si el daemon conectado no reporta estas métricas.
+- **Permisos:** CPU global, memoria, swap, load, uptime y procesos propios no requieren root.
+  Task info de otros uid y la enumeración de sus PIDs requieren el daemon root; sin él la tabla
+  solo lista el uid actual y lo indica. No se usan entitlements privados ni `task_for_pid`.
+
 ## XPC
 
 - Mach service: `uno.kayros.kancerbero.daemon`.
 - Protocolo: `handshake`, `subscribe`, `request`, `unsubscribe`; callback `push`.
 - Envelopes `KBWireEnvelope` con `schemaVersion`, `kind`, `sequence` y payload
   `PropertyListEncoder` binario.
+- `KBCollectionSnapshot` transporta `socketInventory` y `hostMetrics` como campos opcionales;
+  ambos se añadieron sin subir el schema, así que un daemon/app anterior sigue conectando.
 - El daemon comparte un único `CollectionActor`; el intervalo efectivo es el de la suscripción
   (0.5–10 s).
 - Si no hay daemon, la app usa `CollectionActor` en proceso y vuelve a intentar el daemon al
   arrancar.
+- Distribución: el helper y su plist van embebidos en
+  `Kancerbero.app/Contents/Library/LaunchDaemons/`; la app los registra con
+  `SMAppService.daemon(plistName:)` y el usuario aprueba en Login Items. El cliente usa
+  `NSXPCConnection` con `.privileged` para el daemon de sistema. El plist incluye
+  `AssociatedBundleIdentifiers`, que asocia el servicio con el icono/nombre de la app. Requiere
+  Developer ID + notarización. Los scripts `install-agent.sh`/`install-daemon.sh` son el modo
+  legacy de desarrollo y no pueden convivir con el daemon SMAppService.
 
 ## Modos
 

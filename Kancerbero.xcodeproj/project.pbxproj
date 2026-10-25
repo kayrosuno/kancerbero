@@ -13,6 +13,8 @@
 		ABCDEF000000000000000084 /* libKancerberoCore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000021 /* libKancerberoCore.a */; };
 		ABCDEF000000000000000085 /* libKancerberoCore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000021 /* libKancerberoCore.a */; };
 		ABCDEF000000000000000086 /* libKancerberoCore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000021 /* libKancerberoCore.a */; };
+		ABCDEF000000000000000087 /* KancerberoDaemon in Embed Daemon */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000022 /* KancerberoDaemon */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		ABCDEF000000000000000088 /* uno.kayros.kancerbero.daemon.plist in Embed Daemon */ = {isa = PBXBuildFile; fileRef = ABCDEF00000000000000009C /* uno.kayros.kancerbero.daemon.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -44,7 +46,29 @@
 			remoteGlobalIDString = ABCDEF000000000000000011;
 			remoteInfo = KancerberoCore;
 		};
+		ABCDEF000000000000000078 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = ABCDEF000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = ABCDEF000000000000000012;
+			remoteInfo = KancerberoDaemon;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		ABCDEF00000000000000004B /* Embed Daemon */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchDaemons;
+			dstSubfolderSpec = 1;
+			files = (
+				ABCDEF000000000000000088 /* uno.kayros.kancerbero.daemon.plist in Embed Daemon */,
+				ABCDEF000000000000000087 /* KancerberoDaemon in Embed Daemon */,
+			);
+			name = "Embed Daemon";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		ABCDEF000000000000000020 /* libKancerberoC.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libKancerberoC.a; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -61,8 +85,8 @@
 		ABCDEF000000000000000096 /* Kancerbero.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Kancerbero.xcconfig; sourceTree = "<group>"; };
 		ABCDEF000000000000000097 /* KancerberoProbe.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = KancerberoProbe.xcconfig; sourceTree = "<group>"; };
 		ABCDEF000000000000000099 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		ABCDEF00000000000000009A /* uno.kayros.kancerbero.daemon.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = uno.kayros.kancerbero.daemon.plist; sourceTree = "<group>"; };
-		ABCDEF00000000000000009C /* uno.kayros.kancerbero.daemon.smappservice.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = uno.kayros.kancerbero.daemon.smappservice.plist; sourceTree = "<group>"; };
+		ABCDEF00000000000000009A /* uno.kayros.kancerbero.daemon.legacy.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = uno.kayros.kancerbero.daemon.legacy.plist; sourceTree = "<group>"; };
+		ABCDEF00000000000000009C /* uno.kayros.kancerbero.daemon.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = uno.kayros.kancerbero.daemon.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -197,8 +221,8 @@
 		ABCDEF00000000000000000A /* LaunchDaemons */ = {
 			isa = PBXGroup;
 			children = (
-				ABCDEF00000000000000009A /* uno.kayros.kancerbero.daemon.plist */,
-				ABCDEF00000000000000009C /* uno.kayros.kancerbero.daemon.smappservice.plist */,
+				ABCDEF00000000000000009A /* uno.kayros.kancerbero.daemon.legacy.plist */,
+				ABCDEF00000000000000009C /* uno.kayros.kancerbero.daemon.plist */,
 			);
 			path = LaunchDaemons;
 			sourceTree = "<group>";
@@ -282,11 +306,13 @@
 				ABCDEF000000000000000046 /* Sources */,
 				ABCDEF000000000000000047 /* Frameworks */,
 				ABCDEF000000000000000048 /* Resources */,
+				ABCDEF00000000000000004B /* Embed Daemon */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				ABCDEF000000000000000074 /* PBXTargetDependency */,
+				ABCDEF000000000000000079 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				ABCDEF000000000000000033 /* Kancerbero */,
@@ -435,6 +461,11 @@
 			target = ABCDEF000000000000000011 /* KancerberoCore */;
 			targetProxy = ABCDEF000000000000000077 /* PBXContainerItemProxy */;
 		};
+		ABCDEF000000000000000079 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = ABCDEF000000000000000012 /* KancerberoDaemon */;
+			targetProxy = ABCDEF000000000000000078 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -442,6 +473,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = ABCDEF000000000000000091 /* Debug.xcconfig */;
 			buildSettings = {
+				DEVELOPMENT_TEAM = AK37TK8X2Y;
 			};
 			name = Debug;
 		};
@@ -449,6 +481,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = ABCDEF000000000000000092 /* Release.xcconfig */;
 			buildSettings = {
+				DEVELOPMENT_TEAM = AK37TK8X2Y;
 			};
 			name = Release;
 		};
@@ -498,6 +531,16 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = ABCDEF000000000000000096 /* Kancerbero.xcconfig */;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 261025;
+				DEVELOPMENT_TEAM = AK37TK8X2Y;
+				INFOPLIST_KEY_CFBundleDisplayName = Kancerbero;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				MARKETING_VERSION = 0.1.0;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 			};
 			name = Debug;
 		};
@@ -505,6 +548,16 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = ABCDEF000000000000000096 /* Kancerbero.xcconfig */;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 261025;
+				DEVELOPMENT_TEAM = AK37TK8X2Y;
+				INFOPLIST_KEY_CFBundleDisplayName = Kancerbero;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				MARKETING_VERSION = 0.1.0;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 			};
 			name = Release;
 		};

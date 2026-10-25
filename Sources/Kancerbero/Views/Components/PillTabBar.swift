@@ -2,13 +2,15 @@ import SwiftUI
 
 struct PillTabBar<Item: PillTabItem>: View {
     @Binding var selection: Item
+    /// Pass `nil` to disable the pill highlight and dependent content transition.
+    var selectionAnimation: Animation? = .snappy(duration: 0.28)
     @Namespace private var namespace
 
     var body: some View {
         HStack(spacing: 4) {
             ForEach(Array(Item.allCases)) { tab in
                 Button {
-                    withAnimation(.snappy(duration: 0.28)) {
+                    withAnimation(selectionAnimation) {
                         selection = tab
                     }
                 } label: {

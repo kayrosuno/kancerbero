@@ -94,13 +94,16 @@ public enum KBMode: String, Codable, Sendable {
     case interfacesOnly
 }
 
-public enum KBConnectionProtocol: String, Codable, Sendable {
+public enum KBConnectionProtocol: String, Codable, CaseIterable, Identifiable, Hashable,
+                                    Sendable {
     case tcp4
     case tcp6
     case udp4
     case udp6
     case unix
     case other
+
+    public var id: String { rawValue }
 
     public var displayName: String {
         switch self {
@@ -147,17 +150,25 @@ public struct KBProcessInfo: Codable, Sendable, Identifiable, Hashable {
     public var startTimeUS: UInt64
     public var name: String
     public var path: String
+    public var state: KBProcessState?
+    public var nice: Int32?
+    public var usage: KBProcessUsage?
 
     public var id: KBProcessKey { KBProcessKey(pid: pid, startTimeUS: startTimeUS) }
 
     public init(pid: Int32, ppid: Int32 = 0, uid: UInt32 = 0,
-                startTimeUS: UInt64 = 0, name: String = "", path: String = "") {
+                startTimeUS: UInt64 = 0, name: String = "", path: String = "",
+                state: KBProcessState? = nil, nice: Int32? = nil,
+                usage: KBProcessUsage? = nil) {
         self.pid = pid
         self.ppid = ppid
         self.uid = uid
         self.startTimeUS = startTimeUS
         self.name = name
         self.path = path
+        self.state = state
+        self.nice = nice
+        self.usage = usage
     }
 }
 
@@ -469,6 +480,102 @@ public struct KBSocketInfo: Codable, Sendable, Identifiable, Hashable {
         self.state = state
         self.local = local
         self.remote = remote
+    }
+}
+
+public struct KBSocketBucketCounts: Codable, Sendable, Hashable {
+    public var tcp4: Int
+    public var tcp6: Int
+    public var udp4: Int
+    public var udp6: Int
+    public var unix: Int
+    public var raw4: Int
+    public var raw6: Int
+    public var other: Int
+
+    public var total: Int {
+        tcp4 + tcp6 + udp4 + udp6 + unix + raw4 + raw6 + other
+    }
+
+    public init(tcp4: Int = 0, tcp6: Int = 0, udp4: Int = 0, udp6: Int = 0,
+                unix: Int = 0, raw4: Int = 0, raw6: Int = 0, other: Int = 0) {
+        self.tcp4 = tcp4
+        self.tcp6 = tcp6
+        self.udp4 = udp4
+        self.udp6 = udp6
+        self.unix = unix
+        self.raw4 = raw4
+        self.raw6 = raw6
+        self.other = other
+    }
+}
+
+public struct KBSocketTypeCounts: Codable, Sendable, Hashable {
+    public var stream: Int
+    public var dgram: Int
+    public var raw: Int
+    public var seqpacket: Int
+    public var otherType: Int
+
+    public var total: Int { stream + dgram + raw + seqpacket + otherType }
+
+    public init(stream: Int = 0, dgram: Int = 0, raw: Int = 0,
+                seqpacket: Int = 0, otherType: Int = 0) {
+        self.stream = stream
+        self.dgram = dgram
+        self.raw = raw
+        self.seqpacket = seqpacket
+        self.otherType = otherType
+    }
+}
+
+public struct KBProcessSocketSummary: Codable, Sendable, Identifiable, Hashable {
+    public var key: KBProcessKey
+    public var buckets: KBSocketBucketCounts
+    public var types: KBSocketTypeCounts
+    public var socketFDs: Int
+    public var uniqueSockets: Int
+    public var restricted: Bool
+    public var truncated: Bool
+
+    public var id: KBProcessKey { key }
+
+    public init(key: KBProcessKey, buckets: KBSocketBucketCounts,
+                types: KBSocketTypeCounts, socketFDs: Int, uniqueSockets: Int,
+                restricted: Bool, truncated: Bool) {
+        self.key = key
+        self.buckets = buckets
+        self.types = types
+        self.socketFDs = socketFDs
+        self.uniqueSockets = uniqueSockets
+        self.restricted = restricted
+        self.truncated = truncated
+    }
+}
+
+public struct KBSocketInventory: Codable, Sendable {
+    public var summaries: [KBProcessSocketSummary]
+    public var generatedAt: Date
+    public var durationMilliseconds: Double
+    public var scannedProcesses: Int
+    public var restrictedProcesses: Int
+    public var truncated: Bool
+    public var error: String?
+
+    public init(summaries: [KBProcessSocketSummary] = [],
+                generatedAt: Date = Date(),
+                durationMilliseconds: Double = 0,
+                scannedProcesses: Int = 0,
+                restrictedProcesses: Int = 0,
+                truncated: Bool = false,
+                error: String? = nil) {
+        self.summaries = summaries
+        self.generatedAt = generatedAt
+        self.durationMilliseconds = durationMilliseconds
+        self.scannedProcesses = scannedProcesses
+        self.restrictedProcesses = restrictedProcesses
+        self.truncated = truncated
+        self.error = error
     }
 }
 

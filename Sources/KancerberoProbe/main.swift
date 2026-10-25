@@ -1,4 +1,5 @@
 import Darwin
+import Dispatch
 import Foundation
 import KancerberoCore
 
@@ -48,6 +49,93 @@ private func printProcesses(limit: Int) {
     }
 }
 
+private func formatPercent(_ value: Double?) -> String {
+    guard let value else { return "—" }
+    return String(format: "%.1f%%", value)
+}
+
+private func formatDuration(_ nanoseconds: UInt64) -> String {
+    let total = nanoseconds / 1_000_000_000
+    let hours = total / 3600
+    let minutes = (total % 3600) / 60
+    let seconds = total % 60
+    return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+}
+
+private func printCPU(interval: Double) {
+    var sampler = HostMetricsSampler()
+    let before = (try? ProcessCollector.snapshot()) ?? []
+    _ = sampler.sample(processes: before)
+    Thread.sleep(forTimeInterval: max(0.1, interval))
+    let after = (try? ProcessCollector.snapshot()) ?? []
+    guard let metrics = sampler.sample(processes: after) else {
+        fail("host metrics unavailable")
+    }
+
+    write("cpu cores=\(metrics.cpu.coreCount) load=\(String(format: "%.2f", metrics.cpu.load1))/\(String(format: "%.2f", metrics.cpu.load5))/\(String(format: "%.2f", metrics.cpu.load15))\n")
+    for core in metrics.cpu.cores {
+        write(String(format: "  cpu%-3d user=%5.1f%% system=%5.1f%% nice=%5.1f%% idle=%5.1f%% usage=%5.1f%%\n",
+                     core.index + 1, core.userPercent, core.systemPercent,
+                     core.nicePercent, core.idlePercent, core.usagePercent))
+    }
+    let cpu = metrics.cpu
+    write(String(format: "aggregate user=%.1f%% system=%.1f%% nice=%.1f%% idle=%.1f%% usage=%.1f%%\n",
+                 cpu.userPercent, cpu.systemPercent, cpu.nicePercent,
+                 cpu.idlePercent, cpu.totalUsagePercent))
+    write("tasks=\(cpu.taskCount) threads=\(cpu.threadCount) restricted=\(cpu.threadsRestricted) uptime=\(formatDuration(UInt64(cpu.uptimeSeconds * 1_000_000_000)))\n")
+    let memory = metrics.memory
+    write("memory used=\(formatBytes(memory.usedBytes)) active=\(formatBytes(memory.activeBytes)) wired=\(formatBytes(memory.wiredBytes)) compressed=\(formatBytes(memory.compressedBytes)) cached=\(formatBytes(memory.cachedBytes)) free=\(formatBytes(memory.barFreeBytes)) total=\(formatBytes(memory.totalBytes))\n")
+    write("swap used=\(formatBytes(memory.swapUsedBytes)) total=\(formatBytes(memory.swapTotalBytes)) encrypted=\(memory.swapEncrypted ? 1 : 0)\n")
+}
+
+private func printProcessesCPU(limit: Int, interval: Double) {
+    var sampler = HostMetricsSampler()
+    var tracker = ProcessCPUTracker()
+    let started = DispatchTime.now().uptimeNanoseconds
+    var processes = (try? ProcessCollector.snapshot()) ?? []
+    let firstHost = sampler.sample(processes: processes)
+    tracker.annotate(&processes, elapsed: 0,
+                     totalMemoryBytes: firstHost?.memory.totalBytes ?? 0,
+                     coreCount: firstHost?.cpu.coreCount ?? 1)
+
+    Thread.sleep(forTimeInterval: max(0.1, interval))
+    let elapsed = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000_000
+    processes = (try? ProcessCollector.snapshot()) ?? []
+    let host = sampler.sample(processes: processes)
+    tracker.annotate(&processes, elapsed: elapsed,
+                     totalMemoryBytes: host?.memory.totalBytes ?? 0,
+                     coreCount: host?.cpu.coreCount ?? 1)
+
+    write(String(format: "%7@ %-16@ %-2@ %5@ %5@ %5@ %8@ %7@ %10@ %10@ %-10@ %@\n",
+                 "PID" as NSString, "USER" as NSString, "S" as NSString,
+                 "PRI" as NSString, "NI" as NSString, "THR" as NSString,
+                 "CPU%" as NSString, "MEM%" as NSString,
+                 "RSS" as NSString, "VSZ" as NSString, "TIME+" as NSString,
+                 "COMMAND" as NSString))
+    let sorted = processes.sorted {
+        ($0.usage?.cpuPercent ?? -1) > ($1.usage?.cpuPercent ?? -1)
+    }
+    for item in sorted.prefix(limit) {
+        let usage = item.usage
+        let state = item.state?.rawValue ?? "?"
+        let priority = usage.map { String($0.priority) } ?? "—"
+        let nice = item.nice.map { String($0) } ?? "—"
+        let threads = usage.map { String($0.threads) } ?? "—"
+        let cpuPercent = formatPercent(usage?.cpuPercent)
+        let memoryPercent = formatPercent(usage?.memoryPercent)
+        let resident = usage.map { formatBytes($0.residentBytes) } ?? "—"
+        let virtual = usage.map { formatBytes($0.virtualBytes) } ?? "—"
+        let time = usage.map { formatDuration($0.cpuTimeNanoseconds) } ?? "—"
+        let user = UserCollector.name(for: item.uid) ?? "\(item.uid)"
+        write(String(format: "%7d %-16@ %-2@ %5@ %5@ %5@ %8@ %7@ %10@ %10@ %-10@ %@\n",
+                     item.pid, user as NSString, state as NSString,
+                     priority as NSString, nice as NSString, threads as NSString,
+                     cpuPercent as NSString, memoryPercent as NSString,
+                     resident as NSString, virtual as NSString, time as NSString,
+                     item.name as NSString))
+    }
+}
+
 private func printInterfaces() {
     do {
         let items = try InterfaceCollector.snapshot()
@@ -87,6 +175,19 @@ private func printSockets(pid: Int32) {
         }
     } catch {
         fail(error.localizedDescription)
+    }
+}
+
+private func printSocketSummary(_ inventory: KBSocketInventory) {
+    write("sockets-summary: processes=\(inventory.summaries.count) scanned=\(inventory.scannedProcesses) restricted=\(inventory.restrictedProcesses) duration=\(String(format: "%.1f", inventory.durationMilliseconds))ms\n")
+    for item in inventory.summaries where item.uniqueSockets > 0 || item.restricted {
+        let b = item.buckets
+        let t = item.types
+        write(String(format: "  pid=%-7d sockets=%-4d tcp4=%d tcp6=%d udp4=%d udp6=%d unix=%d raw4=%d raw6=%d other=%d types=[stream=%d dgram=%d raw=%d seq=%d other=%d] restricted=%d truncated=%d\n",
+                     item.key.pid, item.uniqueSockets,
+                     b.tcp4, b.tcp6, b.udp4, b.udp6, b.unix, b.raw4, b.raw6, b.other,
+                     t.stream, t.dgram, t.raw, t.seqpacket, t.otherType,
+                     item.restricted ? 1 : 0, item.truncated ? 1 : 0))
     }
 }
 
@@ -286,13 +387,28 @@ func integerOption(_ name: String, default defaultValue: Int) -> Int {
     return value
 }
 
+func doubleOption(_ name: String, default defaultValue: Double) -> Double {
+    guard let index = remainder.firstIndex(of: name), index + 1 < remainder.count,
+          let value = Double(remainder[index + 1]) else {
+        return defaultValue
+    }
+    return value
+}
+
 switch command {
 case "version":
     printVersion()
 case "symbols":
     printSymbols()
 case "procs":
-    printProcesses(limit: integerOption("--limit", default: 20))
+    if remainder.contains("--cpu") {
+        printProcessesCPU(limit: integerOption("--limit", default: 20),
+                          interval: doubleOption("--interval", default: 1))
+    } else {
+        printProcesses(limit: integerOption("--limit", default: 20))
+    }
+case "cpu":
+    printCPU(interval: doubleOption("--interval", default: 1))
 case "ifaces":
     printInterfaces()
 case "sockets":
@@ -300,6 +416,22 @@ case "sockets":
         fail("usage: KancerberoProbe sockets <pid>")
     }
     printSockets(pid: pid)
+case "sockets-summary":
+    let allProcesses: [KBProcessInfo]
+    do {
+        allProcesses = try ProcessCollector.snapshot()
+    } catch {
+        fail(error.localizedDescription)
+    }
+    let processes: [KBProcessInfo]
+    if remainder.isEmpty {
+        processes = allProcesses
+    } else {
+        let wanted = Set(remainder.compactMap { Int32($0) })
+        let byPID = Dictionary(uniqueKeysWithValues: allProcesses.map { ($0.pid, $0) })
+        processes = wanted.map { byPID[$0] ?? KBProcessInfo(pid: $0) }
+    }
+    printSocketSummary(SocketSummaryCollector.summaries(for: processes))
 case "files":
     guard let pid = Int32(remainder.first ?? "") else {
         fail("usage: KancerberoProbe files <pid>")
@@ -351,5 +483,5 @@ case "all":
     printInterfaces()
     printNStat(seconds: integerOption("--seconds", default: 3))
 default:
-    fail("unknown command '\(command)'. Use: version|symbols|procs|ifaces|sockets <pid>|files <pid>|daemons|disk|nstat|all")
+    fail("unknown command '\(command)'. Use: version|symbols|procs [--cpu]|cpu|ifaces|sockets <pid>|sockets-summary [pid...]|files <pid>|daemons|disk|nstat|all")
 }

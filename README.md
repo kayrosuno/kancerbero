@@ -30,12 +30,19 @@ App SwiftUI ──XPC──> KancerberoDaemon (root opcional)
 
 `NavigationSplitView` con panel lateral colapsable:
 
-- **Networking** — una tarjeta **Traffic** con gráfico espejado (download hacia arriba, upload
-  hacia abajo, escala compartida) y botones Download/Upload que actúan como filtros
-  conmutadores; junto a las tarjetas Connections y Processes. Subnavegación Interfaces /
-  Connections / Processes, con tablas e inspector de proceso. Las **velocidades** se muestran en
-  bits con unidades humanas (`bps`, `Kbps`, `Mbps`, `Gbps`); los **totales acumulados** siguen en
-  Bytes (`KB`, `MB`, `GB`).
+- **Networking** — tarjeta **Traffic** ancha con Download/Upload en la cabecera y un gráfico
+  espejado (download arriba, upload abajo) con cuadrícula, niveles y eje temporal. Al lado, una
+  tarjeta **Activity** que agrupa Connections y Processes, y una tarjeta **Protocols** con el
+  desglose TCP4/TCP6/UDP4/UDP6/UNIX/OTHER. Los selectores **Transport** (TCP/UDP/Other) e **IP**
+  (IPv4/IPv6) filtran las tablas de Connections/Processes y se combinan con el foco de las
+  tarjetas. La tabla de Connections muestra Local, Remote, Protocol, RX, TX, State, Iface, PID y
+  Process (última), y permite ordenar por cualquier columna. La tabla de Processes lista solo
+  procesos con flujos TCP/UDP o sockets (incluye UNIX y RAW vía libproc), con badges de
+  protocolo, tipos de socket (stream/dgram/raw), número de flujos, RX/TX acumulados y Path;
+  también se puede ordenar por cualquier columna. Sin root solo se leen sockets del propio
+  usuario; el daemon root cubre el resto. Las **velocidades** se muestran en bits con unidades
+  humanas (`bps`, `Kbps`, `Mbps`, `Gbps`); los **totales acumulados** siguen en Bytes (`KB`, `MB`,
+  `GB`).
 - **Disk** — dos subpestañas:
   - **Volumes** — jerarquía nativa de discos físicos, particiones, contenedores APFS y volúmenes
     (IOKit + DiskArbitration + `getmntinfo`/`getattrlist`), con capacidad, usado, libre, punto de
@@ -56,17 +63,26 @@ App SwiftUI ──XPC──> KancerberoDaemon (root opcional)
   el detalle. Inspector con Start / Stop / Restart / Enable·Disable / Load·Unload / Reveal.
   Las acciones de sistema requieren el daemon root y confirmación; GUI/User funcionan en local.
   Los login items quedan para una iteración posterior.
+- **CPU** — dashboard tipo `htop`: tarjetas de CPU, load average, tareas/hilos y memoria con
+  sparklines; medidores segmentados por núcleo (user/system/nice/idle); uptime; memoria y swap
+  con desglose Active/Wired/Compressed/Cached/Free; y tabla de procesos ordenable con búsqueda
+  (PID, USER, PRI/NI, VIRT, RES, S/THR, CPU%, MEM%, TIME+ y Command). CPU% no se normaliza
+  (puede superar 100% en multihilo). Sin daemon root macOS solo enumera los procesos del uid
+  actual; el daemon root muestra todos.
 
 La barra inferior es contextual: muestra métricas de la sección activa (tráfico, capacidad de
-disco o recuento de servicios) y, a la derecha, el estado global de la conexión con el daemon, la
-última actualización de la fuente correspondiente y el posible error.
+disco, servicios o CPU/memoria) y, a la derecha, el estado global de la conexión con el daemon,
+la última actualización de la fuente correspondiente y el posible error.
 
 Las selecciones y configuraciones de cada sección (filtros, tarjeta activa, fila seleccionada,
 panel de detalle y árbol expandido) se conservan al cambiar de pestaña o sección durante la
-sesión; al reiniciar la app se vuelven a los valores iniciales.
+sesión; al reiniciar la app se vuelven a los valores iniciales. La preferencia de animaciones es
+la excepción: **Kancerbero → Settings… (⌘,)** permite activar o desactivar las animaciones de
+cambio de sección/subpestaña y del resaltado del sidebar y las píldoras. Se guarda en
+`UserDefaults` y respeta Reduce Motion de macOS.
 
-El panel se oculta con el toggle de la toolbar o `Cmd+Ctrl+S`; `Cmd+1/2/3` cambia de sección. Las
-animaciones respetan Reduce Motion.
+El panel se oculta con el toggle de la toolbar o `Cmd+Ctrl+S`; `Cmd+1/2/3/4` cambia de sección
+(Networking, Disk, Daemons, CPU).
 
 ## Compilar
 
@@ -98,6 +114,8 @@ un icono antiguo, es caché de LaunchServices: copia la app a otra ruta o reinic
 ```bash
 open build/Build/Products/Debug/Kancerbero.app
 ./build/Build/Products/Debug/KancerberoProbe all --seconds 3
+./build/Build/Products/Debug/KancerberoProbe cpu --interval 1
+./build/Build/Products/Debug/KancerberoProbe procs --cpu --limit 20
 ```
 
 Captura de la UI sin permisos de Grabación de pantalla (la app se dibuja a sí misma y termina):
@@ -105,11 +123,13 @@ Captura de la UI sin permisos de Grabación de pantalla (la app se dibuja a sí 
 ```bash
 build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   --screenshot /tmp/kancerbero-ui.png \
-  [--section networking|disk|daemons] \
+  [--section networking|disk|daemons|cpu] \
   [--tab interfaces|connections|processes] \
   [--disk-tab volumes|analyzer] \
   [--disk-path=<carpeta>] [--disk-scan] [--disk-item <diskXsY>] \
+  [--cpu-search <texto>] [--cpu-selected <pid>] \
   [--networking-focus download|upload|connections|processes] \
+  [--networking-transport tcp|udp|other] [--networking-ip ipv4|ipv6] \
   [--volumes-focus disks|volumes|capacity|free] \
   [--analyzer-focus scanned|files|folders|denied] \
   [--daemon-type agent|daemon] [--daemon-scope system|global|user|runtime] \
@@ -121,16 +141,45 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
 
 ## Daemon
 
-### Desarrollo sin sudo (LaunchAgent de usuario)
+### Servicio en background (SMAppService)
+
+La app embebe el helper y su plist en
+`Kancerbero.app/Contents/Library/LaunchDaemons/` y los registra con
+`SMAppService.daemon(plistName:)` desde el footer del sidebar o el menú **Daemon**. macOS lo
+muestra en **Ajustes → General → Login Items & Extensions → Allow in the Background** con el
+icono de Kancerbero (vía `AssociatedBundleIdentifiers`); el usuario debe aprobarlo. La app usa
+`NSXPCConnection` privilegiado para el daemon de sistema.
+
+Requisitos de distribución:
 
 ```bash
-./scripts/install-agent.sh     # registra el Mach service en tu sesión
+./scripts/build-release.sh      # Developer ID + hardened runtime, embebe el daemon
+# Crear el perfil de notarización una sola vez:
+xcrun notarytool store-credentials kancerbero-notary \
+  --apple-id "<Apple ID>" --team-id AK37TK8X2Y --password "<app-specific password>"
+./scripts/notarize.sh           # notarytool + stapler + spctl
+./scripts/install-app.sh        # copia a /Applications/Kancerbero.app
+```
+
+Un daemon registrado con `SMAppService` exige app firmada con Developer ID y **notarizada**.
+La build Debug ad-hoc puede mostrar la UI y el estado, pero no se espera que `register()` funcione.
+
+Antes de registrar, elimina cualquier registro legacy: comparte label y Mach service.
+
+```bash
+./scripts/uninstall-agent.sh
+sudo ./scripts/uninstall-daemon.sh
+```
+
+### Modo legacy de desarrollo
+
+```bash
+./scripts/install-agent.sh     # LaunchAgent de usuario, sin sudo
 ./scripts/uninstall-agent.sh
 ```
 
-Sirve para probar el camino XPC completo. Solo ve procesos de tu usuario.
-
-### Acceso completo (LaunchDaemon root)
+Sirve para probar el camino XPC completo en desarrollo. Solo ve procesos de tu usuario y no
+puede convivir con el daemon SMAppService.
 
 ```bash
 sudo ./scripts/install-daemon.sh
@@ -138,10 +187,7 @@ sudo ./scripts/uninstall-daemon.sh
 ```
 
 Instala el binario en `/Library/PrivilegedHelperTools/` y el plist en
-`/Library/LaunchDaemons/`. Logs en `/Library/Logs/Kancerbero/`.
-
-Producción: firma Developer ID + `SMAppService.daemon(plistName:)` con el plist
-`uno.kayros.kancerbero.daemon.smappservice.plist`. Ver `docs/security.md`.
+`/Library/LaunchDaemons/`. Es el modo legacy de desarrollo, no el camino de distribución.
 
 ## Daemons
 
