@@ -51,12 +51,7 @@ final class DaemonMetricsSource: NSObject, KancerberoClientXPC, @unchecked Senda
             throw KBCollectionError.unavailable("daemon schema \(hello.schemaVersion) is incompatible with \(KBVersion.schema)")
         }
 
-        let subscription = try KBWireCodec.encode(KBSubscription(interval: interval))
-        remote.subscribe(subscription) { _, error in
-            if let error {
-                logger.error("subscribe failed: \(error.localizedDescription, privacy: .public)")
-            }
-        }
+        try sendSubscription(interval: interval, remote: remote)
 
         lock.lock()
         self.connection = connection
@@ -66,6 +61,24 @@ final class DaemonMetricsSource: NSObject, KancerberoClientXPC, @unchecked Senda
 
         logger.notice("connected to daemon \(hello.daemonVersion, privacy: .public)")
         return hello
+    }
+
+    /// Replaces the daemon subscription so a picker change takes effect without
+    /// reconnecting. `DaemonService.subscribe` cancels the previous task and
+    /// starts a new one with the requested interval.
+    func updateInterval(_ interval: TimeInterval) {
+        lock.lock()
+        let remote = self.remote
+        let isActive = self.active
+        lock.unlock()
+
+        guard isActive, let remote else { return }
+        do {
+            try sendSubscription(interval: interval, remote: remote)
+            logger.notice("resubscribed interval=\(interval, privacy: .public)")
+        } catch {
+            logger.error("resubscribe failed: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     func requestDetail(pid: Int32) throws -> KBProcessDetail {
@@ -175,6 +188,16 @@ final class DaemonMetricsSource: NSObject, KancerberoClientXPC, @unchecked Senda
     }
 
     // MARK: - Private
+
+    private func sendSubscription(interval: TimeInterval,
+                                  remote: KancerberoDaemonXPC) throws {
+        let subscription = try KBWireCodec.encode(KBSubscription(interval: interval))
+        remote.subscribe(subscription) { _, error in
+            if let error {
+                logger.error("subscribe failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
 
     private func handleInvalidate() {
         lock.lock()

@@ -15,8 +15,24 @@ final class AppModel {
     var privcheck: Int32 = -1
     var lastError: String?
     var lastUpdate: Date?
-    var isPaused = false
-    var interval: TimeInterval = 1.0
+    var isPaused = false {
+        didSet {
+            guard oldValue != isPaused else { return }
+            if !isPaused && !usingDaemon {
+                wakeRefreshLoop()
+            }
+        }
+    }
+    var interval: TimeInterval = 1.0 {
+        didSet {
+            guard oldValue != interval else { return }
+            resetHistory()
+            daemonSource?.updateInterval(interval)
+            if !usingDaemon {
+                wakeRefreshLoop()
+            }
+        }
+    }
     var usingDaemon = false
     var daemonVersion: String?
     var rxHistory: [Double] = []
@@ -59,6 +75,7 @@ final class AppModel {
     private let collector = CollectionActor()
     private var daemonSource: DaemonMetricsSource?
     private var task: Task<Void, Never>?
+    private var sleepTask: Task<Void, Never>?
     private static let daemonServicePlist = "uno.kayros.kancerbero.daemon.plist"
 
     private var daemonService: SMAppService {
@@ -117,11 +134,31 @@ final class AppModel {
                     self.lastDaemonAttempt = Date()
                     self.connectDaemon()
                 }
+                if Task.isCancelled { return }
                 let interval = self.isPaused ? 0.5 : self.interval
-                try? await Task.sleep(for: .seconds(interval))
+                await self.sleepForRefreshInterval(interval)
             }
         }
         connectDaemon()
+    }
+
+    /// Sleeps in an unstructured task so an interval or pause change can cancel
+    /// just the sleep without cancelling the polling loop.
+    private func sleepForRefreshInterval(_ seconds: TimeInterval) async {
+        let sleeper = Task {
+            do {
+                try await Task.sleep(for: .seconds(seconds))
+            } catch {
+                // Cancelled by wakeRefreshLoop or stop().
+            }
+        }
+        sleepTask = sleeper
+        await sleeper.value
+        sleepTask = nil
+    }
+
+    private func wakeRefreshLoop() {
+        sleepTask?.cancel()
     }
 
     func refreshServiceStatus() {
@@ -188,6 +225,8 @@ final class AppModel {
     }
 
     func stop() {
+        sleepTask?.cancel()
+        sleepTask = nil
         task?.cancel()
         task = nil
         daemonSource?.stop()
@@ -345,6 +384,9 @@ final class AppModel {
                 self.daemonIsRoot = hello.capabilities.root
                 self.usingDaemon = true
                 self.daemonConnecting = false
+                if self.interval != requestedInterval {
+                    source.updateInterval(self.interval)
+                }
             } catch {
                 source.stop()
                 self?.daemonConnecting = false
@@ -430,6 +472,17 @@ final class AppModel {
         lastError = snapshot.error
         lastUpdate = snapshot.generatedAt
         recordHistory()
+    }
+
+    /// The chart window is expressed in samples, so mixing cadences would lie
+    /// about the time axis. Start a fresh window when the interval changes.
+    private func resetHistory() {
+        rxHistory.removeAll()
+        txHistory.removeAll()
+        cpuUsageHistory.removeAll()
+        loadHistory.removeAll()
+        threadHistory.removeAll()
+        memoryUsageHistory.removeAll()
     }
 
     private func recordHistory() {

@@ -211,7 +211,9 @@
 - `KBCollectionSnapshot` transporta `socketInventory` y `hostMetrics` como campos opcionales;
   ambos se añadieron sin subir el schema, así que un daemon/app anterior sigue conectando.
 - El daemon comparte un único `CollectionActor`; el intervalo efectivo es el de la suscripción
-  (0.5–10 s).
+  (0.5–10 s). Cambiar el selector de intervalo reenvía `subscribe` desde `DaemonMetricsSource`;
+  el daemon cancela la tarea anterior y la reemplaza. En modo local, `AppModel` cancela el sueño
+  del bucle de polling para aplicar el nuevo intervalo de inmediato.
 - Si no hay daemon, la app usa `CollectionActor` en proceso y vuelve a intentar el daemon al
   arrancar.
 - Distribución: el helper y su plist van embebidos en

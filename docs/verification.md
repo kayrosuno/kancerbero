@@ -217,6 +217,26 @@ refleje; el toggle de Settings se actualiza en vivo.
 - Confirmar que siguen animándose sparklines, valores de la barra de estado, hover de tarjetas,
   `numericText`, paneles de detalle, filtros/foco y LiveDot.
 
+## Intervalo de actualización
+
+- Con daemon conectado, ejecutar
+
+```bash
+log stream --predicate 'subsystem == "uno.kayros.kancerbero"' --info --debug
+```
+
+  y cambiar el selector 5 → 0,5 → 2 s en Networking o CPU. Debe aparecer un
+  `resubscribed interval=…` en el cliente y un nuevo `subscribed interval=…` en el daemon por
+  cada valor distinto. Volver a seleccionar el mismo valor no debe reenviar la suscripción.
+- Comprobar la cadencia real por la hora de “Updated” y el avance de los sparklines: a 0,5 s la
+  ventana de 60 muestras abarca ~30 s; a 5 s, ~5 min. Al cambiar el intervalo los historiales se
+  reinician, así que el eje temporal no mezcla cadencias.
+- Sin daemon, cambiar de 5 s a 0,5 s y verificar que la siguiente actualización llega en ~0,5 s,
+  no tras el sueño anterior. Pausa/Play debe seguir funcionando y el refresh manual debe
+  actualizar aunque esté pausado.
+- Daemons mantiene su refresco de 5 s y Disk su caché de inventario; el selector no está visible
+  en esas pestañas.
+
 ## CPU y memoria
 
 ```bash
