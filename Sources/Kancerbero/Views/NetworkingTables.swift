@@ -69,6 +69,13 @@ struct ConnectionsView: View {
         )
     }
 
+    private var stateSelection: Binding<NetworkingConnectionState?> {
+        Binding(
+            get: { ui.networking.connectionState },
+            set: { ui.networking.connectionState = $0 }
+        )
+    }
+
     private var displayRows: [KBNStatSource] {
         ui.networking.connectionSortOrder.isEmpty
             ? rows
@@ -82,14 +89,23 @@ struct ConnectionsView: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            HStack {
+            HStack(spacing: 10) {
+                Text("Connections")
+                    .font(.system(size: 12, weight: .semibold))
+
+                OptionFilterPicker("State",
+                                   selection: stateSelection,
+                                   optionTitle: { $0.title })
+                    .help("TCP connection state; UDP flows have no state")
+
+                Spacer()
+
                 Button("Inspect Process") {
                     if let source = selectedSource {
                         inspected = process(for: source)
                     }
                 }
                 .disabled(selectedSource == nil)
-                Spacer()
             }
 
             Table(displayRows, selection: selection, sortOrder: sortOrder) {
@@ -266,6 +282,13 @@ struct ProcessesView: View {
         )
     }
 
+    private var search: Binding<String> {
+        Binding(
+            get: { ui.networking.processSearch },
+            set: { ui.networking.processSearch = $0 }
+        )
+    }
+
     private var displayRows: [ProcessInventoryRow] {
         ui.networking.processSortOrder.isEmpty
             ? rows
@@ -274,12 +297,21 @@ struct ProcessesView: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            HStack {
+            HStack(spacing: 10) {
+                Text("Processes")
+                    .font(.system(size: 12, weight: .semibold))
+
+                TextField("Filter processes", text: search)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 220)
+                    .help("Filter by name, path, PID or user")
+
+                Spacer()
+
                 Button("Inspect Selected") {
                     inspected = selectedRow?.process
                 }
                 .disabled(selectedRow == nil)
-                Spacer()
             }
 
             Table(displayRows, selection: selection, sortOrder: sortOrder) {

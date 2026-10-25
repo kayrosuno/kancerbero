@@ -68,6 +68,71 @@ enum NetworkingIPVersion: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+enum NetworkingConnectionState: String, CaseIterable, Identifiable, Hashable, Sendable {
+    case established
+    case listening
+    case connecting
+    case closing
+    case other
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .established: return "Established"
+        case .listening: return "Listening"
+        case .connecting: return "Connecting (SYN)"
+        case .closing: return "Closing (Close/Fin/Time Wait)"
+        case .other: return "Other"
+        }
+    }
+
+    /// "all" and unknown values return nil (no filter), matching Transport/IP.
+    init?(cliValue: String) {
+        switch cliValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "established", "estab": self = .established
+        case "listening", "listen": self = .listening
+        case "connecting", "syn": self = .connecting
+        case "closing", "close", "timewait", "time-wait", "fin": self = .closing
+        case "other": self = .other
+        default: return nil
+        }
+    }
+
+    /// Empty states (UDP) match no category. Every non-empty unrecognized
+    /// state (Closed, Unknown, …) belongs to `other`.
+    static func category(for rawState: String) -> NetworkingConnectionState? {
+        let value = normalized(rawState)
+        guard !value.isEmpty else { return nil }
+        switch value {
+        case "ESTABLISHED":
+            return .established
+        case "LISTEN", "LISTENING":
+            return .listening
+        case "SYN", "SYNSENT", "SYNRECEIVED", "SYNRCVD":
+            return .connecting
+        case "CLOSEWAIT", "CLOSING", "FINWAIT1", "FINWAIT2", "LASTACK", "TIMEWAIT":
+            return .closing
+        default:
+            return .other
+        }
+    }
+
+    func matches(_ rawState: String) -> Bool {
+        Self.category(for: rawState) == self
+    }
+
+    /// "TSI_SYN_SENT", "SynSent", "syn sent" → "SYNSENT".
+    private static func normalized(_ rawState: String) -> String {
+        var value = rawState
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased()
+        value = value.filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
+        if value.hasPrefix("TSI") { value.removeFirst(3) }
+        return value
+    }
+}
+
 struct NetworkingProtocolFilter: Equatable, Sendable {
     var transport: NetworkingTransport?
     var ipVersion: NetworkingIPVersion?
@@ -139,9 +204,13 @@ extension AppModel {
     }
 
     func filteredSources(_ focus: NetworkingFocus?,
-                         matching filter: NetworkingProtocolFilter = .none)
+                         matching filter: NetworkingProtocolFilter = .none,
+                         state: NetworkingConnectionState? = nil)
         -> [KBNStatSource] {
-        let base = filter.isActive ? sources.filter(filter.matches) : sources
+        var base = filter.isActive ? sources.filter(filter.matches) : sources
+        if let state {
+            base = base.filter { state.matches($0.tcpState) }
+        }
         guard let focus else { return base }
         switch focus {
         case .download:
@@ -156,10 +225,12 @@ extension AppModel {
     }
 
     func filteredProcessRows(_ focus: NetworkingFocus?,
-                             matching filter: NetworkingProtocolFilter = .none)
+                             matching filter: NetworkingProtocolFilter = .none,
+                             search: String = "")
         -> [ProcessInventoryRow] {
         processInventory.filter { row in
             guard filter.matches(row) else { return false }
+            guard row.process.matchesSearch(search, userNames: userNames) else { return false }
             switch focus {
             case .download:
                 return row.rates.rxBytesPerSecond > 0

@@ -86,14 +86,18 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--disk-tab volumes|analyzer] \
   [--disk-path=<carpeta>] [--disk-scan] [--disk-item <diskXsY>] \
   [--cpu-search <texto>] [--cpu-selected <pid>] \
+  [--networking-state established|listening|connecting|closing|other] \
+  [--networking-search <texto>] \
   [--sidebar-collapsed]
 ```
 
 `--section` selecciona la sección de primer nivel, `--tab` la subpestaña de Networking,
 `--disk-tab` la de Disk, `--disk-path`/`--disk-scan` lanzan el analizador sobre una ruta y
 `--disk-item` preselecciona un dispositivo en Volumes. `--cpu-search` aplica el filtro inicial de
-la tabla de CPU y `--cpu-selected` preselecciona un PID. `--sidebar-collapsed` captura el panel
-lateral oculto. El PNG se escribe a escala de backing (2x en Retina) y la app termina con código 0.
+la tabla de CPU, `--cpu-selected` preselecciona un PID, `--networking-state` aplica la categoría
+de estado TCP y `--networking-search` el filtro de la tabla de procesos. `--sidebar-collapsed`
+captura el panel lateral oculto. El PNG se escribe a escala de backing (2x en Retina) y la app
+termina con código 0.
 
 Capturas recomendadas:
 
@@ -283,17 +287,36 @@ $APP --screenshot /tmp/kb-net-combined.png --section networking --tab processes 
   --screenshot-delay 5
 $APP --screenshot /tmp/kb-net-download.png --section networking --tab connections \
   --networking-focus download --screenshot-delay 5
+$APP --screenshot /tmp/kb-net-state-listening.png --section networking \
+  --tab connections --networking-state listening --screenshot-delay 5
+$APP --screenshot /tmp/kb-net-state-established.png --section networking \
+  --tab connections --networking-state established --screenshot-delay 5
+$APP --screenshot /tmp/kb-net-state-combined.png --section networking \
+  --tab connections --networking-state established \
+  --networking-transport tcp --networking-ip ipv4 --screenshot-delay 5
+$APP --screenshot /tmp/kb-net-process-search.png --section networking \
+  --tab processes --networking-search rapportd --screenshot-delay 5
 ```
 
 - Traffic: Download/Upload en la cabecera, gráfico espejado con cuadrícula, etiquetas Y en
   `bps/Kbps/Mbps/Gbps` y eje temporal `-60s/-30s/now` (con el intervalo de 1 s). Sin salto de
   layout entre 0,3 s y 5 s.
 - Activity: agrupa Connections y Processes; los números aplican el filtro de protocolo e ignoran
-  el foco. Protocols muestra la barra y la leyenda de los seis tipos; el filtro IP reduce el
-  desglose, el filtro Transport no.
+  el foco. Mientras Connections está activo, Connections cuenta también el filtro State;
+  mientras Processes está activo, Processes cuenta también la búsqueda. Protocols muestra la
+  barra y la leyenda de los seis tipos; el filtro IP reduce el desglose, el filtro Transport no.
 - Los selectores Transport/IP aparecen solo en Connections/Processes; el contador muestra
   “N of M” y la tabla respeta ambos filtros combinados con el foco.
-- `--networking-transport all` y `--networking-ip all` equivalen a “All”.
+- Connections muestra en su cabecera el selector State (All, Established, Listening, Connecting
+  (SYN), Closing (Close/Fin/Time Wait), Other); la columna State sigue mostrando el valor exacto.
+  La normalización cubre `Listen`, `Established`, `SynSent`, `TimeWait`, `TSI_*`, etc. UDP no
+  tiene estado, así que cualquier categoría seleccionada oculta sus filas.
+- Processes muestra en su cabecera `Filter processes` y filtra por nombre, ruta, PID o usuario,
+  igual que CPU. El contador “N of M” refleja la búsqueda.
+- State solo se aplica en Connections y la búsqueda solo en Processes; al cambiar de subpestaña
+  se conservan, pero no afectan a la otra tabla.
+- `--networking-transport all` y `--networking-ip all` equivalen a “All”;
+  `--networking-state all` y un valor desconocido equivalen a sin filtro de estado.
 
 Tabla de Connections (orden y columnas):
 

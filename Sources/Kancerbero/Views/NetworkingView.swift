@@ -25,8 +25,12 @@ struct NetworkingView: View {
         @Bindable var model = model
         let rates = model.systemRates
         let protocolFilter = ui.networking.protocolFilter
-        let activityConnections = model.filteredSources(nil, matching: protocolFilter).count
-        let activityProcesses = model.filteredProcessRows(nil, matching: protocolFilter).count
+        let connectionState = tab == .connections ? ui.networking.connectionState : nil
+        let processSearch = tab == .processes ? ui.networking.processSearch : ""
+        let activityConnections = model.filteredSources(nil, matching: protocolFilter,
+                                                        state: connectionState).count
+        let activityProcesses = model.filteredProcessRows(nil, matching: protocolFilter,
+                                                          search: processSearch).count
         let ipOnly = NetworkingProtocolFilter(ipVersion: ui.networking.ipVersion)
         let protocolCounts = Dictionary(
             grouping: model.sources.filter(ipOnly.matches),
@@ -35,9 +39,11 @@ struct NetworkingView: View {
 
         let matchingInterfaces = model.filteredInterfaces(ui.networking.focus)
         let matchingSources = model.filteredSources(ui.networking.focus,
-                                                    matching: protocolFilter)
+                                                    matching: protocolFilter,
+                                                    state: connectionState)
         let matchingProcesses = model.filteredProcessRows(ui.networking.focus,
-                                                          matching: protocolFilter)
+                                                          matching: protocolFilter,
+                                                          search: processSearch)
 
         VStack(spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
@@ -103,7 +109,9 @@ struct NetworkingView: View {
                     ActivityCard(
                         connectionsCount: activityConnections,
                         processesCount: activityProcesses,
-                        isFiltered: protocolFilter.isActive,
+                        connectionsFiltered: protocolFilter.isActive || connectionState != nil,
+                        processesFiltered: protocolFilter.isActive
+                            || !processSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                         focus: ui.networking.focus,
                         onToggle: toggleFocus
                     )
@@ -171,13 +179,18 @@ struct NetworkingView: View {
                 : "\(interfaces.count) of \(total) interfaces"
         case .connections:
             let total = model.sources.count
-            let active = ui.networking.focus != nil || ui.networking.protocolFilter.isActive
+            let active = ui.networking.focus != nil
+                || ui.networking.protocolFilter.isActive
+                || ui.networking.connectionState != nil
             return active
                 ? "\(sources.count) of \(total) connections"
                 : "\(total) connections"
         case .processes:
             let total = model.processInventory.count
-            let active = ui.networking.focus != nil || ui.networking.protocolFilter.isActive
+            let active = ui.networking.focus != nil
+                || ui.networking.protocolFilter.isActive
+                || !ui.networking.processSearch
+                    .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             return active
                 ? "\(processes.count) of \(total) networked processes"
                 : "\(total) networked processes"

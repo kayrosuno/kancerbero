@@ -3,7 +3,8 @@ import SwiftUI
 struct ActivityCard: View {
     let connectionsCount: Int
     let processesCount: Int
-    let isFiltered: Bool
+    let connectionsFiltered: Bool
+    let processesFiltered: Bool
     let focus: NetworkingFocus?
     let onToggle: (NetworkingFocus) -> Void
 
@@ -34,7 +35,7 @@ struct ActivityCard: View {
                     value: KBFormat.compactCount(connectionsCount),
                     icon: "point.3.connected.trianglepath.dotted",
                     tint: KBTheme.connectionsTint,
-                    caption: isFiltered ? "matching flows" : "active flows",
+                    caption: connectionsFiltered ? "matching flows" : "active flows",
                     hint: "Show rows tied to active connections",
                     isSelected: focus == .connections,
                     valueSize: 19,
@@ -50,7 +51,7 @@ struct ActivityCard: View {
                     value: KBFormat.compactCount(processesCount),
                     icon: "square.stack.3d.up.fill",
                     tint: KBTheme.processesTint,
-                    caption: isFiltered ? "matching processes" : "with sockets",
+                    caption: processesFiltered ? "matching processes" : "with sockets",
                     hint: "Show rows attributable to processes",
                     isSelected: focus == .processes,
                     valueSize: 19,

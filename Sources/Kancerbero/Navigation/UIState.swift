@@ -24,6 +24,9 @@ final class UIState {
         if let raw = Self.value(for: "--networking-ip", in: arguments) {
             networking.ipVersion = NetworkingIPVersion(cliValue: raw)
         }
+        networking.connectionState = Self.value(for: "--networking-state", in: arguments)
+            .flatMap { NetworkingConnectionState(cliValue: $0) }
+        networking.processSearch = Self.value(for: "--networking-search", in: arguments) ?? ""
 
         if let raw = Self.value(for: "--daemon-type", in: arguments) {
             switch raw.lowercased() {
@@ -67,6 +70,8 @@ struct NetworkingUIState: Equatable {
     var focus: NetworkingFocus?
     var transport: NetworkingTransport?
     var ipVersion: NetworkingIPVersion?
+    var connectionState: NetworkingConnectionState?
+    var processSearch = ""
     var selectedConnection: String?
     var selectedProcess: KBProcessKey?
     var connectionSortOrder: [KeyPathComparator<KBNStatSource>] = []

@@ -36,10 +36,12 @@ App SwiftUI ──XPC──> KancerberoDaemon (root opcional)
   desglose TCP4/TCP6/UDP4/UDP6/UNIX/OTHER. Los selectores **Transport** (TCP/UDP/Other) e **IP**
   (IPv4/IPv6) filtran las tablas de Connections/Processes y se combinan con el foco de las
   tarjetas. La tabla de Connections muestra Local, Remote, Protocol, RX, TX, State, Iface, PID y
-  Process (última), y permite ordenar por cualquier columna. La tabla de Processes lista solo
-  procesos con flujos TCP/UDP o sockets (incluye UNIX y RAW vía libproc), con badges de
-  protocolo, tipos de socket (stream/dgram/raw), número de flujos, RX/TX acumulados y Path;
-  también se puede ordenar por cualquier columna. Sin root solo se leen sockets del propio
+  Process (última), y permite ordenar por cualquier columna; su cabecera añade un selector
+  **State** (All, Established, Listening, Connecting (SYN), Closing (Close/Fin/Time Wait), Other).
+  La tabla de Processes lista solo procesos con flujos TCP/UDP o sockets (incluye UNIX y RAW vía
+  libproc), con badges de protocolo, tipos de socket (stream/dgram/raw), número de flujos, RX/TX
+  acumulados y Path; su cabecera añade **Filter processes** (nombre, ruta, PID o usuario). Ambas
+  tablas se pueden ordenar por cualquier columna. Sin root solo se leen sockets del propio
   usuario; el daemon root cubre el resto. Las **velocidades** se muestran en bits con unidades
   humanas (`bps`, `Kbps`, `Mbps`, `Gbps`); los **totales acumulados** siguen en Bytes (`KB`, `MB`,
   `GB`). El selector de **Interval** ajusta la cadencia real de Networking y CPU; con el daemon
@@ -132,6 +134,8 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--cpu-search <texto>] [--cpu-selected <pid>] \
   [--networking-focus download|upload|connections|processes] \
   [--networking-transport tcp|udp|other] [--networking-ip ipv4|ipv6] \
+  [--networking-state established|listening|connecting|closing|other] \
+  [--networking-search <texto>] \
   [--volumes-focus disks|volumes|capacity|free] \
   [--analyzer-focus scanned|files|folders|denied] \
   [--daemon-type agent|daemon] [--daemon-scope system|global|user|runtime] \
