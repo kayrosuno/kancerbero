@@ -204,3 +204,16 @@ enum ProcessInventoryBuilder {
         return rows
     }
 }
+
+extension KBProcessInfo {
+    /// Shared by the CPU and Networking process tables.
+    func matchesSearch(_ query: String, userNames: [UInt32: String]) -> Bool {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !needle.isEmpty else { return true }
+        if String(pid).contains(needle) { return true }
+        if name.lowercased().contains(needle) { return true }
+        if path.lowercased().contains(needle) { return true }
+        let user = userNames[uid] ?? String(uid)
+        return user.lowercased().contains(needle)
+    }
+}

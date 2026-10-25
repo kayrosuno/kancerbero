@@ -83,12 +83,6 @@ struct CPUProcessRow: Identifiable, Hashable {
     }
 
     func matches(_ query: String, userNames: [UInt32: String]) -> Bool {
-        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !needle.isEmpty else { return true }
-        if String(process.pid).contains(needle) { return true }
-        if process.name.lowercased().contains(needle) { return true }
-        if process.path.lowercased().contains(needle) { return true }
-        let user = userNames[process.uid] ?? String(process.uid)
-        return user.lowercased().contains(needle)
+        process.matchesSearch(query, userNames: userNames)
     }
 }
