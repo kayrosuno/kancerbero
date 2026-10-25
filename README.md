@@ -30,9 +30,12 @@ App SwiftUI ──XPC──> KancerberoDaemon (root opcional)
 
 `NavigationSplitView` con panel lateral colapsable:
 
-- **Networking** — tarjetas de resumen compactas con sparklines que actúan como filtros
-  conmutadores (descarga, subida, conexiones, procesos), y subnavegación Interfaces / Connections /
-  Processes, con tablas e inspector de proceso.
+- **Networking** — una tarjeta **Traffic** con gráfico espejado (download hacia arriba, upload
+  hacia abajo, escala compartida) y botones Download/Upload que actúan como filtros
+  conmutadores; junto a las tarjetas Connections y Processes. Subnavegación Interfaces /
+  Connections / Processes, con tablas e inspector de proceso. Las **velocidades** se muestran en
+  bits con unidades humanas (`bps`, `Kbps`, `Mbps`, `Gbps`); los **totales acumulados** siguen en
+  Bytes (`KB`, `MB`, `GB`).
 - **Disk** — dos subpestañas:
   - **Volumes** — jerarquía nativa de discos físicos, particiones, contenedores APFS y volúmenes
     (IOKit + DiskArbitration + `getmntinfo`/`getattrlist`), con capacidad, usado, libre, punto de

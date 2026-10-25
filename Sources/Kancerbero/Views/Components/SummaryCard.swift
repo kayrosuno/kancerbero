@@ -10,6 +10,7 @@ struct SummaryCard: View {
     var action: (() -> Void)? = nil
     var isSelected = false
     var filterHint: String? = nil
+    var fillsHeight = false
 
     @State private var hovering = false
 
@@ -83,7 +84,9 @@ struct SummaryCard: View {
             }
         }
         .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity,
+               maxHeight: fillsHeight ? .infinity : nil,
+               alignment: fillsHeight ? .topLeading : .leading)
         .background {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(.regularMaterial)

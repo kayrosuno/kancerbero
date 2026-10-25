@@ -27,12 +27,12 @@ struct InterfacesView: View {
                 Text(KBFormat.bytes(item.counters.txBytes)).monospacedDigit()
             }
             .width(min: 90, ideal: 110)
-            TableColumn("RX/s") { item in
-                Text(KBFormat.rate(model.interfaceRates[item.id]?.rxBytesPerSecond ?? 0)).monospacedDigit()
+            TableColumn("RX bit/s") { item in
+                Text(KBFormat.bitRate(model.interfaceRates[item.id]?.rxBytesPerSecond ?? 0)).monospacedDigit()
             }
             .width(min: 90, ideal: 110)
-            TableColumn("TX/s") { item in
-                Text(KBFormat.rate(model.interfaceRates[item.id]?.txBytesPerSecond ?? 0)).monospacedDigit()
+            TableColumn("TX bit/s") { item in
+                Text(KBFormat.bitRate(model.interfaceRates[item.id]?.txBytesPerSecond ?? 0)).monospacedDigit()
             }
             .width(min: 90, ideal: 110)
             TableColumn("MTU") { item in

@@ -10,6 +10,9 @@ enum KBTheme {
     static let summaryGridSpacing: CGFloat = 10
     static let summaryColumns = [GridItem(.adaptive(minimum: 170), spacing: 10)]
 
+    static let downloadTint = Color(red: 0.16, green: 0.62, blue: 0.94)
+    static let uploadTint = Color(red: 0.62, green: 0.42, blue: 0.95)
+
     static var background: some View {
         ZStack {
             Color(nsColor: .windowBackgroundColor)
