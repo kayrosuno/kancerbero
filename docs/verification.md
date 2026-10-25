@@ -172,11 +172,9 @@ Comprobar además:
 - Tras el refresco de 5 s, la selección y el panel de detalle se mantienen si el servicio sigue
   cumpliendo el filtro.
 
-Networking y Disk (filtros de tarjetas):
+Disk (filtros de tarjetas):
 
 ```bash
-$K --screenshot /tmp/kb-net-download.png --section networking \
-  --tab connections --networking-focus download --screenshot-delay 5
 $K --screenshot /tmp/kb-disk-free.png --section disk \
   --disk-tab volumes --volumes-focus free --screenshot-delay 5
 $K --screenshot /tmp/kb-disk-folders.png --section disk \
@@ -187,10 +185,32 @@ $K --screenshot /tmp/kb-disk-folders.png --section disk \
 La barra inferior debe mostrar métricas de la sección activa y la marca de actualización de su
 fuente (red, inventario de disco o servicios launchd).
 
+Tarjeta Traffic (gráfico combinado y unidades):
+
+```bash
+APP=./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
+$APP --screenshot /tmp/kb-net-traffic.png --section networking --tab interfaces \
+  --screenshot-delay 5
+$APP --screenshot /tmp/kb-net-traffic-download.png --section networking --tab connections \
+  --networking-focus download --screenshot-delay 5
+$APP --screenshot /tmp/kb-net-traffic-upload.png --section networking --tab processes \
+  --networking-focus upload --screenshot-delay 5
+```
+
+- El gráfico muestra download (azul) por encima de la línea central y upload (violeta) por debajo,
+  con escala compartida. Con `--networking-focus download|upload`, el botón correspondiente queda
+  seleccionado, la serie opuesta se atenúa y la tabla se filtra.
+- Las velocidades aparecen en `bps`, `Kbps`, `Mbps` o `Gbps` en la tarjeta, la barra inferior y
+  las columnas `RX bit/s`/`TX bit/s` de Interfaces. `Received`/`Sent`, Connections y Disk siguen
+  en Bytes.
+- Comparar capturas a 0,3 s y 5 s: la fila de tarjetas, pills y tabla deben mantener la misma
+  posición vertical (sin salto al llegar la primera muestra).
+
 Continuidad de estado al cambiar de pestaña (manual):
 
-1. Networking: seleccionar una conexión y un proceso, activar la tarjeta Download; ir a Disk y
-   Daemons, volver → tarjeta y selecciones restauradas (si el flujo desapareció, se limpia).
+1. Networking: seleccionar una conexión y un proceso, activar el botón Download de la tarjeta
+   Traffic; ir a Disk y Daemons, volver → filtro y selecciones restauradas (si el flujo
+   desapareció, se limpia).
 2. Daemons: fijar búsqueda, tipo, ámbito, origen, estado y una selección; cambiar de sección y
    volver → todo restaurado; esperar 5 s y comprobar que la selección sigue si el servicio existe.
 3. Disk → Volumes: expandir y colapsar varios nodos, activar la tarjeta Volumes, ir a Analyzer y

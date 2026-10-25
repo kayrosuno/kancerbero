@@ -8,6 +8,7 @@ struct NetworkingView: View {
 
     var body: some View {
         @Bindable var model = model
+        let rates = model.systemRates
 
         VStack(spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
@@ -46,30 +47,17 @@ struct NetworkingView: View {
                 .help("Refresh now")
             }
 
-            LazyVGrid(columns: KBTheme.summaryColumns,
-                      spacing: KBTheme.summaryGridSpacing) {
-                SummaryCard(
-                    title: "Download",
-                    value: KBFormat.rate(model.systemRates.rxBytesPerSecond),
-                    caption: "system-wide receive",
-                    systemImage: "arrow.down.circle.fill",
-                    tint: Color(red: 0.16, green: 0.62, blue: 0.94),
-                    sparkline: model.rxHistory,
-                    action: { toggleFocus(.download) },
-                    isSelected: ui.networking.focus == .download,
-                    filterHint: "Show rows with receive traffic"
+            HStack(alignment: .top, spacing: KBTheme.summaryGridSpacing) {
+                TrafficCard(
+                    downloadBytesPerSecond: rates.rxBytesPerSecond,
+                    uploadBytesPerSecond: rates.txBytesPerSecond,
+                    downloadHistory: model.rxHistory,
+                    uploadHistory: model.txHistory,
+                    focus: ui.networking.focus,
+                    onToggle: toggleFocus
                 )
-                SummaryCard(
-                    title: "Upload",
-                    value: KBFormat.rate(model.systemRates.txBytesPerSecond),
-                    caption: "system-wide send",
-                    systemImage: "arrow.up.circle.fill",
-                    tint: Color(red: 0.62, green: 0.42, blue: 0.95),
-                    sparkline: model.txHistory,
-                    action: { toggleFocus(.upload) },
-                    isSelected: ui.networking.focus == .upload,
-                    filterHint: "Show rows with send traffic"
-                )
+                .frame(minWidth: 330, maxWidth: .infinity)
+
                 SummaryCard(
                     title: "Connections",
                     value: KBFormat.compactCount(model.sources.count),
@@ -78,8 +66,11 @@ struct NetworkingView: View {
                     tint: Color(red: 0.20, green: 0.70, blue: 0.62),
                     action: { toggleFocus(.connections) },
                     isSelected: ui.networking.focus == .connections,
-                    filterHint: "Show rows tied to active connections"
+                    filterHint: "Show rows tied to active connections",
+                    fillsHeight: true
                 )
+                .frame(minWidth: 150, idealWidth: 180, maxWidth: 220)
+
                 SummaryCard(
                     title: "Processes",
                     value: KBFormat.compactCount(model.processes.count),
@@ -88,9 +79,12 @@ struct NetworkingView: View {
                     tint: Color(red: 0.94, green: 0.56, blue: 0.18),
                     action: { toggleFocus(.processes) },
                     isSelected: ui.networking.focus == .processes,
-                    filterHint: "Show rows attributable to processes"
+                    filterHint: "Show rows attributable to processes",
+                    fillsHeight: true
                 )
+                .frame(minWidth: 150, idealWidth: 180, maxWidth: 220)
             }
+            .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 12) {
                 PillTabBar(selection: $tab)

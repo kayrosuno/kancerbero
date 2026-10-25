@@ -16,9 +16,12 @@
   `SidebarCommands()` y el toggle nativo que macOS dibuja en la toolbar.
 - `SidebarView`: selección propia con `matchedGeometryEffect` para Networking / Disk / Daemons;
   cabecera con marca y estado live, pie con fuente (daemon/local), privcheck y hora.
-- `NetworkingView`: cuatro tarjetas de resumen compactas (`SummaryCard` + `Sparkline`) que actúan
-  como filtros conmutadores, `PillTabBar` y las tablas (`NetworkingTables.swift`) dentro de una
-  tarjeta con material.
+- `NetworkingView`: una `TrafficCard` ancha con `TrafficChart` (gráfico espejado de dos series,
+  escala compartida, ventana de 60 muestras anclada a la derecha) y botones Download/Upload que
+  actúan como filtros; al lado, `SummaryCard` para Connections y Processes. Debajo, `PillTabBar`
+  y las tablas (`NetworkingTables.swift`) dentro de una tarjeta con material. Los historiales y
+  `KBRates` siguen en bytes/s; la presentación usa `KBFormat.bitRate` (bps/Kbps/Mbps/Gbps) y los
+  totales acumulados siguen usando `KBFormat.bytes`.
 - `DiskView`: `PillTabBar` con Volumes / Analyzer. Volumes muestra el árbol
   disco → partición → contenedor APFS → volumen, un inspector y `CapacityBar`; Analyzer muestra
   controles de escaneo, progreso, `RadialDiskMap` y las tablas de contenidos y mayores archivos.

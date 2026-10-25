@@ -26,8 +26,8 @@ struct StatusBar: View {
             LiveDot(isLive: model.isLive)
             Text("\(model.processes.count) processes")
             Text("\(model.sources.count) connections")
-            Text("RX \(KBFormat.rate(model.systemRates.rxBytesPerSecond))")
-            Text("TX \(KBFormat.rate(model.systemRates.txBytesPerSecond))")
+            Text("RX \(KBFormat.bitRate(model.systemRates.rxBytesPerSecond))")
+            Text("TX \(KBFormat.bitRate(model.systemRates.txBytesPerSecond))")
 
         case .disk:
             LiveDot(isLive: disk.inventory != nil && !disk.isLoadingInventory)
