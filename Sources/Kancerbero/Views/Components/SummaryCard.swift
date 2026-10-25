@@ -6,12 +6,14 @@ struct SummaryCard: View {
     let caption: String
     let systemImage: String
     let tint: Color
-    var sparkline: [Double] = []
+    var sparkline: [Double]? = nil
     var action: (() -> Void)? = nil
     var isSelected = false
     var filterHint: String? = nil
 
     @State private var hovering = false
+
+    private let sparklineHeight: CGFloat = 20
 
     private var isInteractive: Bool { action != nil }
 
@@ -68,9 +70,16 @@ struct SummaryCard: View {
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
 
-            if !sparkline.isEmpty {
-                Sparkline(values: sparkline, tint: tint)
-                    .frame(height: 20)
+            if let sparkline {
+                if sparkline.isEmpty {
+                    // Reserve the chart's height before the first sample arrives
+                    // so the grid row (and everything below it) does not jump.
+                    Color.clear
+                        .frame(height: sparklineHeight)
+                } else {
+                    Sparkline(values: sparkline, tint: tint)
+                        .frame(height: sparklineHeight)
+                }
             }
         }
         .padding(10)
