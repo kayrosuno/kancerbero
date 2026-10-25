@@ -42,7 +42,9 @@ App SwiftUI ──XPC──> KancerberoDaemon (root opcional)
   también se puede ordenar por cualquier columna. Sin root solo se leen sockets del propio
   usuario; el daemon root cubre el resto. Las **velocidades** se muestran en bits con unidades
   humanas (`bps`, `Kbps`, `Mbps`, `Gbps`); los **totales acumulados** siguen en Bytes (`KB`, `MB`,
-  `GB`).
+  `GB`). El selector de **Interval** ajusta la cadencia real de Networking y CPU; con el daemon
+  conectado reenvía la suscripción y en local despierta el bucle de polling. Al cambiarlo, los
+  historiales se reinician para que el eje temporal del gráfico coincida con la nueva cadencia.
 - **Disk** — dos subpestañas:
   - **Volumes** — jerarquía nativa de discos físicos, particiones, contenedores APFS y volúmenes
     (IOKit + DiskArbitration + `getmntinfo`/`getattrlist`), con capacidad, usado, libre, punto de
