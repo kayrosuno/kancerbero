@@ -1,4 +1,4 @@
-import ServiceManagement
+import Foundation
 import SwiftUI
 import KancerberoCore
 
@@ -6,6 +6,7 @@ struct SidebarView: View {
     @Binding var selection: AppSection?
     @Environment(AppModel.self) private var model
     @Namespace private var namespace
+    @State private var showStatus = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -17,6 +18,17 @@ struct SidebarView: View {
             footer
         }
         .background(.ultraThinMaterial)
+        .onAppear(perform: autoOpenStatusPopoverIfRequested)
+    }
+
+    private func autoOpenStatusPopoverIfRequested() {
+        guard CommandLine.arguments.contains("--show-status"),
+              !CommandLine.arguments.contains("--sidebar-collapsed"),
+              !showStatus else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(800))
+            showStatus = true
+        }
     }
 
     private var navigation: some View {
@@ -84,13 +96,32 @@ struct SidebarView: View {
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(model.usingDaemon ? Color.green : Color.orange)
-                    .frame(width: 6, height: 6)
-                Text(model.usingDaemon ? "Daemon connected" : "Local mode")
-                    .font(.system(size: 10, weight: .medium))
+            Button {
+                showStatus.toggle()
+            } label: {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(statusTint)
+                        .frame(width: 6, height: 6)
+                    Text(model.usingDaemon ? "Daemon connected" : "Local mode")
+                        .font(.system(size: 10, weight: .medium))
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .help("System status and background service setup")
+            .accessibilityLabel(model.usingDaemon
+                ? "System status: daemon connected"
+                : "System status: local mode")
+            .accessibilityHint("Shows the background service and permission checklist")
+            .popover(isPresented: $showStatus, arrowEdge: .bottom) {
+                SystemStatusView()
+                    .environment(model)
+            }
+
             Text("Updated \(KBFormat.time(model.lastUpdate))")
             if model.privcheck >= 0 {
                 Text("privcheck \(model.privcheck)")
@@ -100,7 +131,11 @@ struct SidebarView: View {
                     .foregroundStyle(.orange)
                     .lineLimit(1)
             }
-            serviceControls
+            if let error = model.serviceError {
+                Text(error)
+                    .foregroundStyle(.orange)
+                    .lineLimit(1)
+            }
         }
         .font(.system(size: 10))
         .foregroundStyle(.secondary)
@@ -109,45 +144,12 @@ struct SidebarView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    @ViewBuilder
-    private var serviceControls: some View {
-        Divider().opacity(0.4)
-        if model.legacyServiceDetected {
-            Text("Legacy background service detected. Run scripts/uninstall-agent.sh before enabling the SMAppService daemon.")
-                .foregroundStyle(.orange)
-                .lineLimit(3)
-        } else {
-            switch model.serviceStatus {
-            case .enabled:
-                Label("Background daemon enabled", systemImage: "checkmark.seal.fill")
-                    .foregroundStyle(.green)
-            case .requiresApproval:
-                Button("Allow in Settings…") {
-                    model.openLoginItemsSettings()
-                }
-                .buttonStyle(.link)
-            case .notRegistered:
-                Button("Enable background daemon") {
-                    Task { await model.registerDaemonService() }
-                }
-                .buttonStyle(.link)
-            case .notFound:
-                Text("Background service unavailable — check bundle and notarization")
-                    .foregroundStyle(.orange)
-                    .lineLimit(3)
-                Button("Retry registration") {
-                    Task { await model.registerDaemonService() }
-                }
-                .buttonStyle(.link)
-            @unknown default:
-                EmptyView()
-            }
+    private var statusTint: Color {
+        if model.legacyServiceDetected { return .orange }
+        if model.usingDaemon {
+            return model.daemonIsRoot ? .green : .orange
         }
-        if let error = model.serviceError {
-            Text(error)
-                .foregroundStyle(.orange)
-                .lineLimit(2)
-        }
+        return .orange
     }
 }
 

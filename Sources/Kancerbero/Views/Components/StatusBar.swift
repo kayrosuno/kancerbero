@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import KancerberoCore
 
@@ -5,6 +6,7 @@ struct StatusBar: View {
     let section: AppSection
     @Environment(AppModel.self) private var model
     @Environment(DiskModel.self) private var disk
+    @State private var showStatus = false
 
     var body: some View {
         HStack(spacing: 14) {
@@ -17,6 +19,17 @@ struct StatusBar: View {
         .padding(.vertical, 7)
         .background(.regularMaterial)
         .animation(.snappy(duration: 0.25), value: model.systemRates.rxBytesPerSecond)
+        .onAppear(perform: autoOpenStatusPopoverIfRequested)
+    }
+
+    private func autoOpenStatusPopoverIfRequested() {
+        guard CommandLine.arguments.contains("--show-status"),
+              CommandLine.arguments.contains("--sidebar-collapsed"),
+              !showStatus else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(800))
+            showStatus = true
+        }
     }
 
     @ViewBuilder
@@ -82,15 +95,32 @@ struct StatusBar: View {
 
     private var globalStatus: some View {
         HStack(spacing: 14) {
-            Text(model.usingDaemon ? "Daemon" : "Local")
+            Button {
+                showStatus.toggle()
+            } label: {
+                HStack(spacing: 4) {
+                    Text(model.usingDaemon ? "Daemon" : "Local")
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 9, weight: .semibold))
+                }
                 .padding(.horizontal, 7)
                 .padding(.vertical, 2)
                 .background {
-                    Capsule().fill(model.usingDaemon
-                                   ? Color.green.opacity(0.14)
-                                   : Color.orange.opacity(0.14))
+                    Capsule().fill(statusTint.opacity(0.14))
                 }
-                .foregroundStyle(model.usingDaemon ? Color.green : Color.orange)
+                .foregroundStyle(statusTint)
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .help("System status and background service setup")
+            .accessibilityLabel(model.usingDaemon
+                ? "System status: daemon connected"
+                : "System status: local mode")
+            .popover(isPresented: $showStatus, arrowEdge: .bottom) {
+                SystemStatusView()
+                    .environment(model)
+            }
+
             if model.privcheck >= 0 {
                 Text("privcheck \(model.privcheck)")
             }
@@ -102,6 +132,14 @@ struct StatusBar: View {
             Text(updatedLabel)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var statusTint: Color {
+        if model.legacyServiceDetected { return .orange }
+        if model.usingDaemon {
+            return model.daemonIsRoot ? .green : .orange
+        }
+        return .orange
     }
 
     private var updatedLabel: String {

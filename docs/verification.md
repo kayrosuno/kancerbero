@@ -453,8 +453,11 @@ codesign --verify --deep --strict --verbose=2 \
 open /Applications/Kancerbero.app
 ```
 
-- En el footer del sidebar o en el menú **Daemon**, pulsar “Enable background daemon”.
-  El estado debe pasar a `requiresApproval` o `enabled`; “Allow in Settings…” abre Login Items.
+- Pulsar **Local mode / Daemon connected** en el footer del sidebar o el pill **Local / Daemon**
+  de la barra inferior; se abre el popover **System status**.
+- El panel muestra el checklist y las acciones. “Enable background service” / “Open Login Items”
+  deben llevar a `requiresApproval` o `enabled`; “Repair / re-register…” pide confirmación y
+  desregistra/registra el helper para que macOS pueda volver a pedir aprobación.
 - Aprobar en **Ajustes → General → Login Items & Extensions → Allow in the Background**. El
   ítem debe mostrar **Kancerbero con el icono de la app**.
 - `launchctl print system/uno.kayros.kancerbero.daemon` y
@@ -464,7 +467,41 @@ open /Applications/Kancerbero.app
 - Sin notarización, Gatekeeper marca la app como “Unnotarized Developer ID” y el registro del
   daemon no es fiable; completar `notarytool store-credentials` + `scripts/notarize.sh`.
 - Antes de registrar, eliminar los plists legacy (`scripts/uninstall-agent.sh`,
-  `sudo scripts/uninstall-daemon.sh`).
+  `sudo scripts/uninstall-daemon.sh`). El panel detecta el agente/daemon legacy, muestra los
+  comandos y los copia; no los ejecuta.
+
+### Verificación visual del panel
+
+`ScreenshotMode` captura solo la ventana principal; para el popover se usa `screencapture` desde
+Otty, que tiene permiso de Grabación de pantalla. El hook `--show-status` auto-abre el popover
+del sidebar; con `--sidebar-collapsed` auto-abre el de la barra inferior.
+
+```bash
+APP=./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
+
+"$APP" --show-status &
+PID=$!
+sleep 3
+osascript -e 'tell application "Kancerbero" to activate'
+sleep 2
+# Capturar solo la ventana del popover: con -w se elige con el ratón;
+# también se puede usar -l <windowid> obtenido de CGWindowListCopyWindowInfo.
+screencapture -x -w /tmp/kb-status-sidebar.png
+kill "$PID" 2>/dev/null || true
+
+"$APP" --show-status --sidebar-collapsed &
+PID=$!
+sleep 3
+osascript -e 'tell application "Kancerbero" to activate'
+sleep 2
+screencapture -x -w /tmp/kb-status-bar.png
+kill "$PID" 2>/dev/null || true
+```
+
+Revisar que se ven el banner general, las ocho filas, el botón Repair y las acciones. El contenido
+restante (pasos y troubleshooting) está en el ScrollView. Probar los estados
+`unregister`/`register` y la confirmación de Repair; no se puede automatizar la aprobación de
+macOS. Evitar capturas de pantalla completa: pueden incluir ventanas ajenas.
 
 ## Rendimiento
 
