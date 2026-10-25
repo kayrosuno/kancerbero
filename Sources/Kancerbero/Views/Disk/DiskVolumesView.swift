@@ -4,22 +4,8 @@ import KancerberoCore
 
 struct DiskVolumesView: View {
     @Environment(DiskModel.self) private var disk
-    @State private var expanded: Set<String> = []
-    @State private var focus: DiskVolumesFocus?
+    @Environment(UIState.self) private var ui
     let onAnalyze: (String) -> Void
-
-    init(onAnalyze: @escaping (String) -> Void) {
-        self.onAnalyze = onAnalyze
-        let arguments = CommandLine.arguments
-        let parsed: DiskVolumesFocus?
-        if let flag = arguments.firstIndex(of: "--volumes-focus"),
-           flag + 1 < arguments.count {
-            parsed = DiskVolumesFocus(rawValue: arguments[flag + 1].lowercased())
-        } else {
-            parsed = nil
-        }
-        _focus = State(initialValue: parsed)
-    }
 
     private var selection: Binding<String?> {
         Binding(
@@ -49,12 +35,16 @@ struct DiskVolumesView: View {
         }
         .task {
             await disk.refreshInventory()
-            expandAll()
+            pruneExpanded()
+            expandVolumesIfNeeded()
+            reconcileSelection()
         }
         .onChange(of: disk.inventory?.generatedAt) { _, _ in
-            expandAll()
+            pruneExpanded()
+            expandVolumesIfNeeded()
+            reconcileSelection()
         }
-        .onChange(of: focus) { _, _ in
+        .onChange(of: ui.disk.volumesFocus) { _, _ in
             reconcileSelection()
         }
     }
@@ -69,13 +59,23 @@ struct DiskVolumesView: View {
         return LazyVGrid(columns: KBTheme.summaryColumns,
                          spacing: KBTheme.summaryGridSpacing) {
             SummaryCard(
+                title: "All",
+                value: KBFormat.compactCount(inventory?.allItems.count ?? 0),
+                caption: "items across the tree",
+                systemImage: "square.grid.2x2.fill",
+                tint: Color(red: 0.42, green: 0.46, blue: 0.54),
+                action: { showAll() },
+                isSelected: ui.disk.volumesFocus == nil,
+                filterHint: "Show all disks, containers and volumes"
+            )
+            SummaryCard(
                 title: "Disks",
                 value: "\(disks)",
                 caption: "physical and virtual media",
                 systemImage: "internaldrive",
                 tint: Color(red: 0.94, green: 0.56, blue: 0.18),
                 action: { toggleFocus(.disks) },
-                isSelected: focus == .disks,
+                isSelected: ui.disk.volumesFocus == .disks,
                 filterHint: "Show only top-level media"
             )
             SummaryCard(
@@ -85,7 +85,7 @@ struct DiskVolumesView: View {
                 systemImage: "externaldrive.fill",
                 tint: Color(red: 0.20, green: 0.70, blue: 0.62),
                 action: { toggleFocus(.volumes) },
-                isSelected: focus == .volumes,
+                isSelected: ui.disk.volumesFocus == .volumes,
                 filterHint: "Show only mounted volumes"
             )
             SummaryCard(
@@ -95,7 +95,7 @@ struct DiskVolumesView: View {
                 systemImage: "square.stack.3d.up.fill",
                 tint: Color(red: 0.16, green: 0.62, blue: 0.94),
                 action: { toggleFocus(.capacity) },
-                isSelected: focus == .capacity,
+                isSelected: ui.disk.volumesFocus == .capacity,
                 filterHint: "Show items ordered by size"
             )
             SummaryCard(
@@ -105,7 +105,7 @@ struct DiskVolumesView: View {
                 systemImage: "circle.dashed",
                 tint: Color(red: 0.62, green: 0.42, blue: 0.95),
                 action: { toggleFocus(.free) },
-                isSelected: focus == .free,
+                isSelected: ui.disk.volumesFocus == .free,
                 filterHint: "Show items with the least free space first"
             )
         }
@@ -117,14 +117,14 @@ struct DiskVolumesView: View {
                 List(selection: selection) {
                     ForEach(displayedRows(inventory), id: \.item.deviceIdentifier) { row in
                         HStack(spacing: 6) {
-                            if row.item.children.isEmpty || focus != nil {
+                            if row.item.children.isEmpty || ui.disk.volumesFocus != nil {
                                 Color.clear
                                     .frame(width: 14, height: 14)
                             } else {
                                 Button {
                                     toggle(row.item.deviceIdentifier)
                                 } label: {
-                                    Image(systemName: expanded.contains(row.item.deviceIdentifier)
+                                    Image(systemName: ui.disk.expanded.contains(row.item.deviceIdentifier)
                                           ? "chevron.down" : "chevron.right")
                                         .font(.system(size: 9, weight: .semibold))
                                         .frame(width: 14, height: 14)
@@ -135,7 +135,7 @@ struct DiskVolumesView: View {
 
                             DiskTreeRow(item: row.item)
                         }
-                        .padding(.leading, focus == nil ? CGFloat(row.depth) * 14 : 0)
+                        .padding(.leading, ui.disk.volumesFocus == nil ? CGFloat(row.depth) * 14 : 0)
                         .tag(row.item.deviceIdentifier)
                     }
                 }
@@ -175,7 +175,7 @@ struct DiskVolumesView: View {
         var rows: [VisibleRow] = []
         func visit(_ item: KBDiskItem, depth: Int) {
             rows.append(VisibleRow(item: item, depth: depth))
-            guard expanded.contains(item.deviceIdentifier) else { return }
+            guard ui.disk.expanded.contains(item.deviceIdentifier) else { return }
             for child in item.children {
                 visit(child, depth: depth + 1)
             }
@@ -185,7 +185,7 @@ struct DiskVolumesView: View {
     }
 
     private func displayedRows(_ inventory: KBDiskInventorySnapshot) -> [VisibleRow] {
-        guard let focus else { return visibleRows(inventory.items) }
+        guard let focus = ui.disk.volumesFocus else { return visibleRows(inventory.items) }
         switch focus {
         case .disks:
             return inventory.items.map { VisibleRow(item: $0, depth: 0) }
@@ -208,8 +208,27 @@ struct DiskVolumesView: View {
 
     private func toggleFocus(_ newFocus: DiskVolumesFocus) {
         withAnimation(.snappy(duration: 0.2)) {
-            focus = focus == newFocus ? nil : newFocus
+            ui.disk.volumesFocus = ui.disk.volumesFocus == newFocus ? nil : newFocus
         }
+    }
+
+    private func showAll() {
+        withAnimation(.snappy(duration: 0.2)) {
+            ui.disk.volumesFocus = nil
+        }
+        expandAll()
+    }
+
+    private func expandVolumesIfNeeded() {
+        guard !ui.disk.didExpandVolumesOnce, disk.inventory != nil else { return }
+        expandAll()
+        ui.disk.didExpandVolumesOnce = true
+    }
+
+    private func pruneExpanded() {
+        guard let inventory = disk.inventory else { return }
+        let ids = Set(inventory.allItems.map(\.deviceIdentifier))
+        ui.disk.expanded.formIntersection(ids)
     }
 
     private func reconcileSelection() {
@@ -223,10 +242,10 @@ struct DiskVolumesView: View {
     }
 
     private func toggle(_ identifier: String) {
-        if expanded.contains(identifier) {
-            expanded.remove(identifier)
+        if ui.disk.expanded.contains(identifier) {
+            ui.disk.expanded.remove(identifier)
         } else {
-            expanded.insert(identifier)
+            ui.disk.expanded.insert(identifier)
         }
     }
 
@@ -240,7 +259,7 @@ struct DiskVolumesView: View {
             for child in item.children { visit(child) }
         }
         for item in inventory.items { visit(item) }
-        expanded.formUnion(identifiers)
+        ui.disk.expanded.formUnion(identifiers)
     }
 }
 

@@ -4,20 +4,7 @@ import KancerberoCore
 struct NetworkingView: View {
     @Binding var tab: NetworkingTab
     @Environment(AppModel.self) private var model
-    @State private var focus: NetworkingFocus?
-
-    init(tab: Binding<NetworkingTab>) {
-        _tab = tab
-        let arguments = CommandLine.arguments
-        let parsed: NetworkingFocus?
-        if let flag = arguments.firstIndex(of: "--networking-focus"),
-           flag + 1 < arguments.count {
-            parsed = NetworkingFocus(rawValue: arguments[flag + 1].lowercased())
-        } else {
-            parsed = nil
-        }
-        _focus = State(initialValue: parsed)
-    }
+    @Environment(UIState.self) private var ui
 
     var body: some View {
         @Bindable var model = model
@@ -69,7 +56,7 @@ struct NetworkingView: View {
                     tint: Color(red: 0.16, green: 0.62, blue: 0.94),
                     sparkline: model.rxHistory,
                     action: { toggleFocus(.download) },
-                    isSelected: focus == .download,
+                    isSelected: ui.networking.focus == .download,
                     filterHint: "Show rows with receive traffic"
                 )
                 SummaryCard(
@@ -80,7 +67,7 @@ struct NetworkingView: View {
                     tint: Color(red: 0.62, green: 0.42, blue: 0.95),
                     sparkline: model.txHistory,
                     action: { toggleFocus(.upload) },
-                    isSelected: focus == .upload,
+                    isSelected: ui.networking.focus == .upload,
                     filterHint: "Show rows with send traffic"
                 )
                 SummaryCard(
@@ -90,7 +77,7 @@ struct NetworkingView: View {
                     systemImage: "point.3.connected.trianglepath.dotted",
                     tint: Color(red: 0.20, green: 0.70, blue: 0.62),
                     action: { toggleFocus(.connections) },
-                    isSelected: focus == .connections,
+                    isSelected: ui.networking.focus == .connections,
                     filterHint: "Show rows tied to active connections"
                 )
                 SummaryCard(
@@ -100,7 +87,7 @@ struct NetworkingView: View {
                     systemImage: "square.stack.3d.up.fill",
                     tint: Color(red: 0.94, green: 0.56, blue: 0.18),
                     action: { toggleFocus(.processes) },
-                    isSelected: focus == .processes,
+                    isSelected: ui.networking.focus == .processes,
                     filterHint: "Show rows attributable to processes"
                 )
             }
@@ -126,22 +113,22 @@ struct NetworkingView: View {
         switch tab {
         case .interfaces:
             let total = model.interfaces.count
-            let shown = model.filteredInterfaces(focus).count
-            return focus == nil ? "\(total) interfaces" : "\(shown) of \(total) interfaces"
+            let shown = model.filteredInterfaces(ui.networking.focus).count
+            return ui.networking.focus == nil ? "\(total) interfaces" : "\(shown) of \(total) interfaces"
         case .connections:
             let total = model.sources.count
-            let shown = model.filteredSources(focus).count
-            return focus == nil ? "\(total) connections" : "\(shown) of \(total) connections"
+            let shown = model.filteredSources(ui.networking.focus).count
+            return ui.networking.focus == nil ? "\(total) connections" : "\(shown) of \(total) connections"
         case .processes:
             let total = model.processes.count
-            let shown = model.filteredProcesses(focus).count
-            return focus == nil ? "\(total) processes" : "\(shown) of \(total) processes"
+            let shown = model.filteredProcesses(ui.networking.focus).count
+            return ui.networking.focus == nil ? "\(total) processes" : "\(shown) of \(total) processes"
         }
     }
 
     private func toggleFocus(_ newFocus: NetworkingFocus) {
         withAnimation(.snappy(duration: 0.2)) {
-            focus = focus == newFocus ? nil : newFocus
+            ui.networking.focus = ui.networking.focus == newFocus ? nil : newFocus
         }
     }
 
@@ -150,11 +137,11 @@ struct NetworkingView: View {
             Group {
                 switch tab {
                 case .interfaces:
-                    InterfacesView(items: model.filteredInterfaces(focus))
+                    InterfacesView(items: model.filteredInterfaces(ui.networking.focus))
                 case .connections:
-                    ConnectionsView(rows: model.filteredSources(focus))
+                    ConnectionsView(rows: model.filteredSources(ui.networking.focus))
                 case .processes:
-                    ProcessesView(items: model.filteredProcesses(focus))
+                    ProcessesView(items: model.filteredProcesses(ui.networking.focus))
                 }
             }
             .id(tab)

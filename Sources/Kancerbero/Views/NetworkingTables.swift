@@ -51,12 +51,19 @@ struct InterfacesView: View {
 struct ConnectionsView: View {
     let rows: [KBNStatSource]
     @Environment(AppModel.self) private var model
-    @State private var selection: String?
+    @Environment(UIState.self) private var ui
     @State private var inspected: KBProcessInfo?
 
+    private var selection: Binding<String?> {
+        Binding(
+            get: { ui.networking.selectedConnection },
+            set: { ui.networking.selectedConnection = $0 }
+        )
+    }
+
     private var selectedSource: KBNStatSource? {
-        guard let selection else { return nil }
-        return rows.first { $0.id == selection }
+        guard let id = ui.networking.selectedConnection else { return nil }
+        return rows.first { $0.id == id }
     }
 
     var body: some View {
@@ -71,7 +78,7 @@ struct ConnectionsView: View {
                 Spacer()
             }
 
-            Table(rows, selection: $selection) {
+            Table(rows, selection: selection) {
                 TableColumn("Process") { source in
                     Text(source.processName.isEmpty ? "Unknown" : source.processName)
                 }
@@ -123,6 +130,11 @@ struct ConnectionsView: View {
             ProcessInspectorView(process: process)
                 .environment(model)
         }
+        .onChange(of: rows.map(\.id), initial: true) { _, ids in
+            guard let selected = ui.networking.selectedConnection,
+                  !ids.contains(selected) else { return }
+            ui.networking.selectedConnection = nil
+        }
     }
 
     private func process(for source: KBNStatSource) -> KBProcessInfo {
@@ -134,8 +146,15 @@ struct ConnectionsView: View {
 struct ProcessesView: View {
     let items: [KBProcessInfo]
     @Environment(AppModel.self) private var model
-    @State private var selection: KBProcessKey?
+    @Environment(UIState.self) private var ui
     @State private var inspected: KBProcessInfo?
+
+    private var selection: Binding<KBProcessKey?> {
+        Binding(
+            get: { ui.networking.selectedProcess },
+            set: { ui.networking.selectedProcess = $0 }
+        )
+    }
 
     var body: some View {
         VStack(spacing: 8) {
@@ -147,7 +166,7 @@ struct ProcessesView: View {
                 Spacer()
             }
 
-            Table(items, selection: $selection) {
+            Table(items, selection: selection) {
                 TableColumn("PID") { item in
                     Text("\(item.pid)").monospacedDigit()
                 }
@@ -187,10 +206,15 @@ struct ProcessesView: View {
             ProcessInspectorView(process: process)
                 .environment(model)
         }
+        .onChange(of: items.map(\.id), initial: true) { _, ids in
+            guard let selected = ui.networking.selectedProcess,
+                  !ids.contains(selected) else { return }
+            ui.networking.selectedProcess = nil
+        }
     }
 
     private var selectedProcess: KBProcessInfo? {
-        guard let selection else { return nil }
+        guard let selection = ui.networking.selectedProcess else { return nil }
         return items.first { $0.id == selection }
     }
 }
