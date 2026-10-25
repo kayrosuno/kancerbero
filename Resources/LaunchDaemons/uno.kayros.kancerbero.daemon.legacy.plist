@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>uno.kayros.kancerbero.daemon</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Library/PrivilegedHelperTools/uno.kayros.kancerbero.daemon</string>
+		<string>--daemon</string>
+	</array>
+	<key>MachServices</key>
+	<dict>
+		<key>uno.kayros.kancerbero.daemon</key>
+		<true/>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
+	<key>ProcessType</key>
+	<string>Interactive</string>
+	<key>ThrottleInterval</key>
+	<integer>5</integer>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>KB_LOG_LEVEL</key>
+		<string>debug</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>/Library/Logs/Kancerbero/daemon.out.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Library/Logs/Kancerbero/daemon.err.log</string>
+</dict>
+</plist>

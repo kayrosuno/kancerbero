@@ -52,6 +52,13 @@ contadores a 0; los valores reales llegan en el bloque de counts (`NStatSourceQu
 `proc_listallpids` devuelve bytes (`proc_listallpids(NULL, 0)` → tamaño necesario), no PIDs.
 `proc_pidinfo`/`proc_pidfdinfo` requieren mismo uid salvo root.
 
+Para el resumen de sockets se usa `PROC_PIDLISTFDS` + `PROC_PIDFDSOCKETINFO` por PID:
+`soi_kind` (`SOCKINFO_TCP`/`IN`/`UN`), `soi_family` (AF_INET=2, AF_INET6=30, AF_UNIX=1),
+`soi_type` (stream/dgram/raw/seqpacket) y `soi_protocol` (TCP/UDP/raw). `soi_so` es el handle
+opaco del socket y se usa solo para deduplicar FDs duplicados dentro del mismo PID; no se
+persiste ni viaja por XPC. `pri_un` permite identificar AF_UNIX. El inventario expone únicamente
+conteos agregados, no direcciones ni rutas.
+
 ### sysctl
 
 Activity Monitor usa `NET_RT_IFLIST2` para el gráfico global, pero en macOS 27 esa ruta
@@ -65,6 +72,30 @@ sysctl(mib, 6, &ifmibdata, &len, NULL, 0)
 ```
 
 `ifmibdata.ifmd_data` es `struct if_data64` y coincide exactamente con `netstat -ibI`.
+
+## CPU y procesos (pestaña CPU)
+
+Análisis REA de `/opt/homebrew/Cellar/htop/3.5.3/bin/htop` (arm64, sha256
+`fc141c6d72271dc3b24d3f5aeb55c461de47aab235fbe758df804c61d070ca0d`, Ghidra 12.2). Se
+inspeccionaron `_CPUMeterCommonDraw`, `_CPUMeter_updateValues`, `_Platform_setCPUValues`,
+`_TasksMeter_updateValues`, `_UptimeMeter_updateValues`, `_MemoryMeter_updateValues`,
+`_Platform_setMemoryValues` y `_Process_updateCPUFieldWidths`.
+
+- htop obtiene ticks por núcleo de Mach (`PROCESSOR_CPU_LOAD_INFO`), memoria de
+  `HOST_VM_INFO64`, load con `getloadavg`, uptime con `kern.boottime` y CPU/RSS de procesos con
+  task info de libproc/Mach. Son las mismas APIs públicas que usa kancerbero; no hay dependencia
+  de frameworks privados.
+- Los porcentajes por núcleo de htop son deltas normalizados por ticks; el CPU% por proceso puede
+  superar 100% (no se divide por el número de núcleos). kancerbero replica ambas convenciones.
+- Hallazgo de macOS 27: `proc_bsdinfo.pbi_status` devuelve 2 (SRUN) para procesos dormidos y
+  activos por igual. Para el estado se usa `proc_taskinfo.pti_numrunning` (>0 → R, 0 → S) y se
+  reserva `pbi_status` para idle/stopped/zombie.
+- `ps` y `top` de Apple ven procesos de otros uid sin root porque están firmados con el
+  entitlement privado `com.apple.system-task-ports.read`. kancerbero **no** usa ese entitlement:
+  sin daemon root solo enumera el uid actual; con el daemon root obtiene task info de todos.
+- `PROC_PIDTASKALLINFO`, `PROC_PIDTBSDINFO`, `host_processor_info`, `host_statistics64`,
+  `sysctlbyname` y `getloadavg` son APIs públicas del SDK; no se usan símbolos privados de
+  `libsysmon` ni `task_for_pid`.
 
 ## Disk Inspector y Disk Utility (pestaña Disk)
 

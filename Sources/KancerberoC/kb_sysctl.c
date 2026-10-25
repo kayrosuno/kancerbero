@@ -1,5 +1,10 @@
 #include "KancerberoC.h"
 
+#include <mach/mach.h>
+#include <mach/mach_host.h>
+#include <mach/machine.h>
+#include <mach/processor_info.h>
+#include <mach/vm_statistics.h>
 #include <net/if.h>
 #include <net/if_mib.h>
 #include <stdio.h>
@@ -8,6 +13,7 @@
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 /*
  * Interface counters come from the IFMIB sysctl, not NET_RT_IFLIST2.
@@ -95,4 +101,98 @@ int kb_sysctl_int(const char *name, int *value)
     }
     size_t length = sizeof(*value);
     return sysctlbyname(name, value, &length, NULL, 0);
+}
+
+int kb_host_stats_read(kb_host_stats *out)
+{
+    if (!out) {
+        return -1;
+    }
+    memset(out, 0, sizeof(*out));
+
+    mach_port_t host = mach_host_self();
+    if (host == MACH_PORT_NULL) {
+        return -1;
+    }
+
+    vm_size_t page_size = 0;
+    if (host_page_size(host, &page_size) == KERN_SUCCESS && page_size > 0) {
+        out->page_size = (uint64_t)page_size;
+    } else {
+        long fallback = sysconf(_SC_PAGESIZE);
+        out->page_size = fallback > 0 ? (uint64_t)fallback : 4096;
+    }
+
+    size_t length = sizeof(out->mem_total);
+    if (sysctlbyname("hw.memsize", &out->mem_total, &length, NULL, 0) != 0) {
+        out->mem_total = 0;
+    }
+
+    struct xsw_usage swap;
+    memset(&swap, 0, sizeof(swap));
+    length = sizeof(swap);
+    if (sysctlbyname("vm.swapusage", &swap, &length, NULL, 0) == 0) {
+        out->swap_total = swap.xsu_total;
+        out->swap_used = swap.xsu_used;
+        out->swap_avail = swap.xsu_avail;
+        out->swap_encrypted = swap.xsu_encrypted ? 1 : 0;
+    }
+
+    struct timeval boot_time;
+    memset(&boot_time, 0, sizeof(boot_time));
+    length = sizeof(boot_time);
+    int boot_mib[2] = {CTL_KERN, KERN_BOOTTIME};
+    if (sysctl(boot_mib, 2, &boot_time, &length, NULL, 0) == 0) {
+        out->boot_time_us = ((uint64_t)boot_time.tv_sec * 1000000ULL) +
+                            (uint64_t)boot_time.tv_usec;
+    }
+
+    double loads[3] = {0, 0, 0};
+    if (getloadavg(loads, 3) == 3) {
+        out->load_valid = 1;
+        out->load1 = loads[0];
+        out->load5 = loads[1];
+        out->load15 = loads[2];
+    }
+
+    vm_statistics64_data_t vm;
+    memset(&vm, 0, sizeof(vm));
+    mach_msg_type_number_t vm_count = HOST_VM_INFO64_COUNT;
+    if (host_statistics64(host, HOST_VM_INFO64,
+                          (host_info64_t)&vm, &vm_count) == KERN_SUCCESS) {
+        uint64_t page = out->page_size;
+        out->mem_free = (uint64_t)vm.free_count * page;
+        out->mem_active = (uint64_t)vm.active_count * page;
+        out->mem_inactive = (uint64_t)vm.inactive_count * page;
+        out->mem_wired = (uint64_t)vm.wire_count * page;
+        out->mem_compressor = (uint64_t)vm.compressor_page_count * page;
+        out->mem_speculative = (uint64_t)vm.speculative_count * page;
+        out->mem_purgeable = (uint64_t)vm.purgeable_count * page;
+        out->mem_internal = (uint64_t)vm.internal_page_count * page;
+        out->mem_external = (uint64_t)vm.external_page_count * page;
+    }
+
+    natural_t cpu_count = 0;
+    processor_info_array_t cpu_info = NULL;
+    mach_msg_type_number_t cpu_info_count = 0;
+    if (host_processor_info(host, PROCESSOR_CPU_LOAD_INFO,
+                            &cpu_count, &cpu_info, &cpu_info_count) == KERN_SUCCESS
+        && cpu_info != NULL) {
+        processor_cpu_load_info_t load =
+            (processor_cpu_load_info_t)cpu_info;
+        uint32_t count = cpu_count < KB_MAX_CORES ? (uint32_t)cpu_count : KB_MAX_CORES;
+        out->core_count = count;
+        for (uint32_t index = 0; index < count; index++) {
+            out->cores[index].index = index;
+            out->cores[index].user_ticks = load[index].cpu_ticks[CPU_STATE_USER];
+            out->cores[index].system_ticks = load[index].cpu_ticks[CPU_STATE_SYSTEM];
+            out->cores[index].idle_ticks = load[index].cpu_ticks[CPU_STATE_IDLE];
+            out->cores[index].nice_ticks = load[index].cpu_ticks[CPU_STATE_NICE];
+        }
+        vm_deallocate(mach_task_self(), (vm_address_t)cpu_info,
+                      (vm_size_t)cpu_info_count * sizeof(integer_t));
+    }
+
+    mach_port_deallocate(mach_task_self(), host);
+    return 0;
 }

@@ -4,6 +4,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     case networking
     case disk
     case daemons
+    case cpu
 
     var id: String { rawValue }
 
@@ -12,6 +13,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .networking: return "Networking"
         case .disk: return "Disk"
         case .daemons: return "Daemons"
+        case .cpu: return "CPU"
         }
     }
 
@@ -20,6 +22,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .networking: return "Traffic & connections"
         case .disk: return "Storage & I/O"
         case .daemons: return "launchd services"
+        case .cpu: return "Cores & processes"
         }
     }
 
@@ -28,6 +31,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .networking: return "network"
         case .disk: return "internaldrive"
         case .daemons: return "gearshape.2"
+        case .cpu: return "cpu"
         }
     }
 
@@ -36,6 +40,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .networking: return Color(red: 0.16, green: 0.62, blue: 0.94)
         case .disk: return Color(red: 0.94, green: 0.56, blue: 0.18)
         case .daemons: return Color(red: 0.62, green: 0.42, blue: 0.95)
+        case .cpu: return Color(red: 0.20, green: 0.72, blue: 0.52)
         }
     }
 
@@ -44,6 +49,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .networking: return "1"
         case .disk: return "2"
         case .daemons: return "3"
+        case .cpu: return "4"
         }
     }
 
@@ -59,6 +65,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case "0": return .networking
         case "1": return .disk
         case "2": return .daemons
+        case "3": return .cpu
         default: return nil
         }
     }

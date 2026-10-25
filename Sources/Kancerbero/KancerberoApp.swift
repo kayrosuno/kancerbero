@@ -14,6 +14,13 @@ struct KancerberoApp: App {
                 .environment(ui)
                 .frame(minWidth: 1040, minHeight: 640)
                 .task {
+                    if CommandLine.arguments.contains("--register-service") {
+                        await model.registerDaemonService()
+                        print("service status: \(model.serviceStatus)")
+                    } else if CommandLine.arguments.contains("--unregister-service") {
+                        await model.unregisterDaemonService()
+                        print("service status: \(model.serviceStatus)")
+                    }
                     model.start()
                     await ScreenshotMode.runIfRequested()
                 }
@@ -33,6 +40,24 @@ struct KancerberoApp: App {
                 }
             }
 
+            CommandMenu("Daemon") {
+                Button("Enable Background Daemon") {
+                    Task { await model.registerDaemonService() }
+                }
+                .disabled(model.legacyServiceDetected || model.serviceStatus == .enabled)
+
+                Button("Disable Background Daemon") {
+                    Task { await model.unregisterDaemonService() }
+                }
+                .disabled(model.serviceStatus == .notRegistered)
+
+                Divider()
+
+                Button("Open Login Items Settings…") {
+                    model.openLoginItemsSettings()
+                }
+            }
+
             CommandGroup(after: .newItem) {
                 Button("Refresh Now") {
                     model.refreshNow()
@@ -44,6 +69,10 @@ struct KancerberoApp: App {
                 }
                 .keyboardShortcut(.space, modifiers: [])
             }
+        }
+
+        Settings {
+            SettingsView()
         }
     }
 }

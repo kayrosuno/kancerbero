@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import ServiceManagement
 import SwiftUI
 import KancerberoCore
 
@@ -27,6 +28,18 @@ final class AppModel {
     var daemonActionInFlight = false
     var daemonActionMessage: String?
     var daemonIsRoot = false
+    var socketInventory: KBSocketInventory?
+    var processInventory: [ProcessInventoryRow] = []
+    var hostMetrics: KBHostMetrics?
+    var cpuProcessRows: [CPUProcessRow] = []
+    var userNames: [UInt32: String] = [:]
+    var cpuUsageHistory: [Double] = []
+    var loadHistory: [Double] = []
+    var threadHistory: [Double] = []
+    var memoryUsageHistory: [Double] = []
+    var serviceStatus: SMAppService.Status = .notRegistered
+    var serviceError: String?
+    var legacyServiceDetected = false
 
     var daemonEntries: [DaemonListEntry] {
         DaemonDeduplicator.entries(system: systemDaemons, local: localDaemons)
@@ -46,11 +59,17 @@ final class AppModel {
     private let collector = CollectionActor()
     private var daemonSource: DaemonMetricsSource?
     private var task: Task<Void, Never>?
+    private static let daemonServicePlist = "uno.kayros.kancerbero.daemon.plist"
+
+    private var daemonService: SMAppService {
+        .daemon(plistName: Self.daemonServicePlist)
+    }
     private var previousSourceCounters: [String: KBCounters] = [:]
     private var previousInterfaceCounters: [UInt32: KBCounters] = [:]
     private var previousTimestamp: UInt64 = 0
     private var daemonConnecting = false
     private var lastDaemonAttempt = Date.distantPast
+    private var resolvingUIDs: Set<UInt32> = []
 
     var isRoot: Bool { geteuid() == 0 }
 
@@ -85,9 +104,11 @@ final class AppModel {
 
     func start() {
         guard task == nil else { return }
+        refreshServiceStatus()
         task = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
+                self.refreshServiceStatus()
                 if !self.isPaused && !self.usingDaemon {
                     await self.refreshOnce()
                 }
@@ -101,6 +122,69 @@ final class AppModel {
             }
         }
         connectDaemon()
+    }
+
+    func refreshServiceStatus() {
+        serviceStatus = daemonService.status
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        legacyServiceDetected =
+            FileManager.default.fileExists(
+                atPath: "\(home)/Library/LaunchAgents/uno.kayros.kancerbero.agent.plist")
+            || FileManager.default.fileExists(
+                atPath: "/Library/LaunchDaemons/uno.kayros.kancerbero.daemon.plist")
+    }
+
+    func registerDaemonService() async {
+        serviceError = nil
+        if legacyServiceDetected {
+            serviceError = "Remove the legacy agent first: scripts/uninstall-agent.sh"
+            return
+        }
+        let plistName = Self.daemonServicePlist
+        do {
+            try await Task.detached(priority: .userInitiated) {
+                try SMAppService.daemon(plistName: plistName).register()
+            }.value
+        } catch {
+            let nsError = error as NSError
+            // kSMErrorAlreadyRegistered = 12
+            if nsError.code != 12 {
+                serviceError = nsError.localizedDescription
+            }
+        }
+        refreshServiceStatus()
+        if serviceStatus == .requiresApproval {
+            openLoginItemsSettings()
+        }
+        if serviceStatus == .enabled {
+            lastDaemonAttempt = .distantPast
+            connectDaemon()
+        }
+    }
+
+    func unregisterDaemonService() async {
+        daemonSource?.stop()
+        daemonSource = nil
+        usingDaemon = false
+        daemonIsRoot = false
+        serviceError = nil
+        let plistName = Self.daemonServicePlist
+        do {
+            try await Task.detached(priority: .userInitiated) {
+                try SMAppService.daemon(plistName: plistName).unregister()
+            }.value
+        } catch {
+            let nsError = error as NSError
+            // kSMErrorJobNotFound = 6
+            if nsError.code != 6 {
+                serviceError = nsError.localizedDescription
+            }
+        }
+        refreshServiceStatus()
+    }
+
+    func openLoginItemsSettings() {
+        SMAppService.openSystemSettingsLoginItems()
     }
 
     func stop() {
@@ -225,6 +309,7 @@ final class AppModel {
         daemonConnecting = true
         lastDaemonAttempt = Date()
         let requestedInterval = interval
+        let privileged = serviceStatus == .enabled
         Task { [weak self] in
             let source = DaemonMetricsSource()
             source.onCollection = { [weak self] snapshot in
@@ -243,7 +328,16 @@ final class AppModel {
             }
             do {
                 let hello = try await Task.detached(priority: .utility) {
-                    try source.start(interval: requestedInterval)
+                    do {
+                        return try source.start(interval: requestedInterval,
+                                                privileged: privileged)
+                    } catch {
+                        if privileged {
+                            return try source.start(interval: requestedInterval,
+                                                    privileged: false)
+                        }
+                        throw error
+                    }
                 }.value
                 guard let self else { return }
                 self.daemonSource = source
@@ -316,6 +410,15 @@ final class AppModel {
         interfaceRates = rates
         processes = snapshot.processes
         self.sources = sources
+        socketInventory = snapshot.socketInventory
+        hostMetrics = snapshot.hostMetrics
+        cpuProcessRows = snapshot.processes.map { CPUProcessRow(process: $0) }
+        resolveUserNames(for: snapshot.processes.map(\.uid))
+        processInventory = ProcessInventoryBuilder.build(
+            processes: snapshot.processes,
+            sources: sources,
+            socketInventory: snapshot.socketInventory
+        )
         if !usingDaemon {
             mode = snapshot.mode
         } else if snapshot.mode == .localFullNStat {
@@ -333,9 +436,59 @@ final class AppModel {
         let rates = systemRates
         rxHistory.append(rates.rxBytesPerSecond)
         txHistory.append(rates.txBytesPerSecond)
+
+        if let host = hostMetrics {
+            cpuUsageHistory.append(host.cpu.totalUsagePercent)
+            loadHistory.append(host.cpu.load1)
+            threadHistory.append(Double(host.cpu.threadCount))
+            memoryUsageHistory.append(host.memory.usedFraction * 100)
+        }
+
         let limit = 60
-        if rxHistory.count > limit { rxHistory.removeFirst(rxHistory.count - limit) }
-        if txHistory.count > limit { txHistory.removeFirst(txHistory.count - limit) }
+        trim(&rxHistory, limit: limit)
+        trim(&txHistory, limit: limit)
+        trim(&cpuUsageHistory, limit: limit)
+        trim(&loadHistory, limit: limit)
+        trim(&threadHistory, limit: limit)
+        trim(&memoryUsageHistory, limit: limit)
+    }
+
+    private func trim(_ values: inout [Double], limit: Int) {
+        if values.count > limit {
+            values.removeFirst(values.count - limit)
+        }
+    }
+
+    /// `getpwuid_r` can block on directory-service accounts, so resolve only
+    /// unknown uids on a detached task and cache both hits and misses.
+    private func resolveUserNames(for uids: [UInt32]) {
+        let known = Set(userNames.keys)
+        let missing = Set(uids).subtracting(known).subtracting(resolvingUIDs)
+        guard !missing.isEmpty else { return }
+        let targets = Array(missing)
+        resolvingUIDs.formUnion(targets)
+
+        Task { [weak self] in
+            let resolved = await Task.detached(priority: .utility) {
+                var names: [UInt32: String] = [:]
+                for uid in targets {
+                    if let name = UserCollector.name(for: uid) {
+                        names[uid] = name
+                    }
+                }
+                return names
+            }.value
+
+            guard let self else { return }
+            for uid in targets {
+                self.userNames[uid] = resolved[uid] ?? String(uid)
+            }
+            self.resolvingUIDs.subtract(targets)
+        }
+    }
+
+    func userName(for uid: UInt32) -> String {
+        userNames[uid] ?? String(uid)
     }
 
     private func subtract(_ current: KBCounters, _ previous: KBCounters) -> KBCounters {

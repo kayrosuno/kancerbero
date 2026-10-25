@@ -17,8 +17,10 @@ final class DaemonMetricsSource: NSObject, KancerberoClientXPC, @unchecked Senda
     private var remote: KancerberoDaemonXPC?
     private var active = false
 
-    func start(interval: TimeInterval) throws -> KBHelloResponse {
-        let connection = NSXPCConnection(machServiceName: KancerberoXPCNames.machService, options: [])
+    func start(interval: TimeInterval, privileged: Bool = false) throws -> KBHelloResponse {
+        let options: NSXPCConnection.Options = privileged ? [.privileged] : []
+        let connection = NSXPCConnection(machServiceName: KancerberoXPCNames.machService,
+                                         options: options)
         connection.remoteObjectInterface = NSXPCInterface(with: KancerberoDaemonXPC.self)
         connection.exportedInterface = NSXPCInterface(with: KancerberoClientXPC.self)
         connection.exportedObject = self

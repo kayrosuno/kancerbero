@@ -11,11 +11,18 @@ final class UIState {
     var networking = NetworkingUIState()
     var daemons = DaemonsUIState()
     var disk = DiskUIState()
+    var cpu = CPUUIState()
 
     init(arguments: [String] = CommandLine.arguments) {
         if let focus = Self.value(for: "--networking-focus", in: arguments)
             .flatMap({ NetworkingFocus(rawValue: $0.lowercased()) }) {
             networking.focus = focus
+        }
+        if let raw = Self.value(for: "--networking-transport", in: arguments) {
+            networking.transport = NetworkingTransport(cliValue: raw)
+        }
+        if let raw = Self.value(for: "--networking-ip", in: arguments) {
+            networking.ipVersion = NetworkingIPVersion(cliValue: raw)
         }
 
         if let raw = Self.value(for: "--daemon-type", in: arguments) {
@@ -43,6 +50,10 @@ final class UIState {
             .flatMap { DiskVolumesFocus(rawValue: $0.lowercased()) }
         disk.analyzerFocus = Self.value(for: "--analyzer-focus", in: arguments)
             .flatMap { DiskAnalyzerFocus(rawValue: $0.lowercased()) } ?? .scanned
+
+        cpu.search = Self.value(for: "--cpu-search", in: arguments) ?? ""
+        cpu.pendingSelectionPID = Self.value(for: "--cpu-selected", in: arguments)
+            .flatMap(Int32.init)
     }
 
     private static func value(for flag: String, in arguments: [String]) -> String? {
@@ -54,8 +65,12 @@ final class UIState {
 
 struct NetworkingUIState: Equatable {
     var focus: NetworkingFocus?
+    var transport: NetworkingTransport?
+    var ipVersion: NetworkingIPVersion?
     var selectedConnection: String?
     var selectedProcess: KBProcessKey?
+    var connectionSortOrder: [KeyPathComparator<KBNStatSource>] = []
+    var processSortOrder: [KeyPathComparator<ProcessInventoryRow>] = []
 }
 
 struct DaemonsUIState: Equatable {
@@ -76,4 +91,14 @@ struct DiskUIState: Equatable {
     var analyzerFocus: DiskAnalyzerFocus = .scanned
     /// nil means "use DiskModel.scanRootPath".
     var analyzerPathDraft: String?
+}
+
+struct CPUUIState: Equatable {
+    var search = ""
+    var selectedProcess: KBProcessKey?
+    var processSortOrder: [KeyPathComparator<CPUProcessRow>] = [
+        KeyPathComparator(\CPUProcessRow.cpuSortValue, order: .reverse)
+    ]
+    /// `--cpu-selected`, applied once when the row appears.
+    var pendingSelectionPID: Int32?
 }

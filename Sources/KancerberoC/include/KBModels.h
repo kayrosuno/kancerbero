@@ -18,7 +18,54 @@ typedef struct {
     uint64_t start_time_us;
     char name[KB_NAME_MAX];
     char path[KB_PATH_MAX];
+
+    /* PROC_PIDTASKINFO, mach absolute ticks for CPU times. */
+    uint64_t cpu_user_ticks;
+    uint64_t cpu_system_ticks;
+    uint64_t resident_bytes;
+    uint64_t virtual_bytes;
+    uint32_t threads;
+    uint32_t running_threads;
+    int32_t priority;
+    int32_t nice;
+    uint32_t status;        /* proc_bsdinfo.pbi_status */
+    uint8_t has_task_info;  /* 0 when taskinfo is not readable */
 } kb_process;
+
+typedef struct {
+    uint32_t index;
+    uint64_t user_ticks;
+    uint64_t system_ticks;
+    uint64_t idle_ticks;
+    uint64_t nice_ticks;
+} kb_cpu_core;
+
+#define KB_MAX_CORES 256
+
+typedef struct {
+    uint32_t core_count;
+    kb_cpu_core cores[KB_MAX_CORES];
+    uint64_t page_size;
+    uint64_t mem_total;
+    uint64_t mem_free;
+    uint64_t mem_active;
+    uint64_t mem_inactive;
+    uint64_t mem_wired;
+    uint64_t mem_compressor;
+    uint64_t mem_speculative;
+    uint64_t mem_purgeable;
+    uint64_t mem_internal;
+    uint64_t mem_external;
+    uint64_t swap_total;
+    uint64_t swap_used;
+    uint64_t swap_avail;
+    uint8_t swap_encrypted;
+    uint8_t load_valid;
+    double load1;
+    double load5;
+    double load15;
+    uint64_t boot_time_us;
+} kb_host_stats;
 
 typedef struct {
     uint64_t source_id;
@@ -71,6 +118,27 @@ typedef struct {
     uint32_t local_scope;
     uint32_t remote_scope;
 } kb_socket;
+
+typedef struct {
+    int32_t pid;
+    uint32_t total;       /* unique sockets (deduped by soi_so) */
+    uint32_t fds;         /* socket FDs, duplicates included */
+    uint32_t tcp4;
+    uint32_t tcp6;
+    uint32_t udp4;
+    uint32_t udp6;
+    uint32_t unix_count;
+    uint32_t raw4;
+    uint32_t raw6;
+    uint32_t other;
+    uint32_t stream;
+    uint32_t dgram;
+    uint32_t raw_type;
+    uint32_t seqpacket;
+    uint32_t other_type;
+    uint8_t restricted;   /* PROC_PIDLISTFDS failed (permissions/gone) */
+    uint8_t truncated;    /* per-PID socket cap reached */
+} kb_socket_summary;
 
 typedef struct {
     int32_t fd;

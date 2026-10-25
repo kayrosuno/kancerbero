@@ -1,3 +1,4 @@
+import ServiceManagement
 import SwiftUI
 import KancerberoCore
 
@@ -31,9 +32,9 @@ struct SidebarView: View {
 
                 ForEach(AppSection.allCases) { section in
                     Button {
-                        withAnimation(.snappy(duration: 0.28)) {
-                            selection = section
-                        }
+                        // RootView's binding setter owns the section transaction,
+                        // so the highlight and the detail transition stay in sync.
+                        selection = section
                     } label: {
                         ZStack(alignment: .leading) {
                             if selection == section {
@@ -99,12 +100,54 @@ struct SidebarView: View {
                     .foregroundStyle(.orange)
                     .lineLimit(1)
             }
+            serviceControls
         }
         .font(.system(size: 10))
         .foregroundStyle(.secondary)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var serviceControls: some View {
+        Divider().opacity(0.4)
+        if model.legacyServiceDetected {
+            Text("Legacy background service detected. Run scripts/uninstall-agent.sh before enabling the SMAppService daemon.")
+                .foregroundStyle(.orange)
+                .lineLimit(3)
+        } else {
+            switch model.serviceStatus {
+            case .enabled:
+                Label("Background daemon enabled", systemImage: "checkmark.seal.fill")
+                    .foregroundStyle(.green)
+            case .requiresApproval:
+                Button("Allow in Settings…") {
+                    model.openLoginItemsSettings()
+                }
+                .buttonStyle(.link)
+            case .notRegistered:
+                Button("Enable background daemon") {
+                    Task { await model.registerDaemonService() }
+                }
+                .buttonStyle(.link)
+            case .notFound:
+                Text("Background service unavailable — check bundle and notarization")
+                    .foregroundStyle(.orange)
+                    .lineLimit(3)
+                Button("Retry registration") {
+                    Task { await model.registerDaemonService() }
+                }
+                .buttonStyle(.link)
+            @unknown default:
+                EmptyView()
+            }
+        }
+        if let error = model.serviceError {
+            Text(error)
+                .foregroundStyle(.orange)
+                .lineLimit(2)
+        }
     }
 }
 

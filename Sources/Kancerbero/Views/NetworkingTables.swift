@@ -1,3 +1,4 @@
+import Darwin
 import SwiftUI
 import KancerberoCore
 
@@ -61,6 +62,19 @@ struct ConnectionsView: View {
         )
     }
 
+    private var sortOrder: Binding<[KeyPathComparator<KBNStatSource>]> {
+        Binding(
+            get: { ui.networking.connectionSortOrder },
+            set: { ui.networking.connectionSortOrder = $0 }
+        )
+    }
+
+    private var displayRows: [KBNStatSource] {
+        ui.networking.connectionSortOrder.isEmpty
+            ? rows
+            : rows.sorted(using: ui.networking.connectionSortOrder)
+    }
+
     private var selectedSource: KBNStatSource? {
         guard let id = ui.networking.selectedConnection else { return nil }
         return rows.first { $0.id == id }
@@ -78,43 +92,45 @@ struct ConnectionsView: View {
                 Spacer()
             }
 
-            Table(rows, selection: selection) {
-                TableColumn("Process") { source in
-                    Text(source.processName.isEmpty ? "Unknown" : source.processName)
-                }
-                .width(min: 120, ideal: 180)
-                TableColumn("PID") { source in
-                    Text("\(source.pid)").monospacedDigit()
-                }
-                .width(min: 50, ideal: 70)
-                TableColumn("Proto") { source in
-                    Text(source.connectionProtocol.displayName).monospaced()
-                }
-                .width(min: 50, ideal: 60)
-                TableColumn("Local") { source in
+            Table(displayRows, selection: selection, sortOrder: sortOrder) {
+                TableColumn("Local", value: \.local, comparator: EndpointComparator()) { source in
                     Text(source.local.display).monospaced().help(source.local.display)
                 }
-                .width(min: 160, ideal: 250)
-                TableColumn("Remote") { source in
+                .width(min: 130, ideal: 195)
+                TableColumn("Remote", value: \.remote, comparator: EndpointComparator()) { source in
                     Text(source.remote.display).monospaced().help(source.remote.display)
                 }
-                .width(min: 160, ideal: 250)
-                TableColumn("State") { source in
-                    Text(source.tcpState.isEmpty ? "—" : source.tcpState)
+                .width(min: 130, ideal: 195)
+                TableColumn("Protocol", value: \.protocolSortRank) { source in
+                    Text(source.connectionProtocol.displayName).monospaced()
                 }
-                .width(min: 90, ideal: 110)
-                TableColumn("Iface") { source in
-                    Text(source.interfaceName.isEmpty ? "—" : source.interfaceName).monospaced()
-                }
-                .width(min: 50, ideal: 70)
-                TableColumn("RX") { source in
+                .width(min: 45, ideal: 50)
+                TableColumn("RX", value: \.counters.rxBytes) { source in
                     Text(KBFormat.bytes(source.counters.rxBytes)).monospacedDigit()
                 }
-                .width(min: 80, ideal: 100)
-                TableColumn("TX") { source in
+                .width(min: 75, ideal: 85)
+                TableColumn("TX", value: \.counters.txBytes) { source in
                     Text(KBFormat.bytes(source.counters.txBytes)).monospacedDigit()
                 }
-                .width(min: 80, ideal: 100)
+                .width(min: 75, ideal: 85)
+                TableColumn("State", value: \.tcpState) { source in
+                    Text(source.tcpState.isEmpty ? "—" : source.tcpState)
+                }
+                .width(min: 75, ideal: 85)
+                TableColumn("Iface", value: \.interfaceName) { source in
+                    Text(source.interfaceName.isEmpty ? "—" : source.interfaceName).monospaced()
+                }
+                .width(min: 45, ideal: 55)
+                TableColumn("PID", value: \.pid) { source in
+                    Text("\(source.pid)").monospacedDigit()
+                }
+                .width(min: 45, ideal: 55)
+                TableColumn("Process", value: \.processName) { source in
+                    Text(source.processName.isEmpty ? "Unknown" : source.processName)
+                    .lineLimit(1)
+                    .help(source.processName)
+                }
+                .width(min: 110, ideal: 140)
             }
             .contextMenu(forSelectionType: String.self) { keys in
                 if let id = keys.first, let source = rows.first(where: { $0.id == id }) {
@@ -143,8 +159,95 @@ struct ConnectionsView: View {
     }
 }
 
+private extension KBNStatSource {
+    var protocolSortRank: Int {
+        switch connectionProtocol {
+        case .tcp4: return 0
+        case .tcp6: return 1
+        case .udp4: return 2
+        case .udp6: return 3
+        case .unix: return 4
+        case .other: return 5
+        }
+    }
+}
+
+/// Numeric endpoint ordering (family, address, port) instead of comparing the
+/// rendered "address:port" text, which would sort 10.x before 2.x.
+private struct EndpointComparator: SortComparator {
+    var order: SortOrder = .forward
+
+    func compare(_ lhs: KBEndpoint, _ rhs: KBEndpoint) -> ComparisonResult {
+        oriented(Self.compare(lhs, rhs))
+    }
+
+    private func oriented(_ result: ComparisonResult) -> ComparisonResult {
+        guard order == .reverse else { return result }
+        switch result {
+        case .orderedAscending: return .orderedDescending
+        case .orderedDescending: return .orderedAscending
+        case .orderedSame: return .orderedSame
+        }
+    }
+
+    private static func compare(_ lhs: KBEndpoint, _ rhs: KBEndpoint) -> ComparisonResult {
+        let lhsRank = familyRank(lhs.family)
+        let rhsRank = familyRank(rhs.family)
+        if lhsRank != rhsRank {
+            return lhsRank < rhsRank ? .orderedAscending : .orderedDescending
+        }
+
+        if lhs.family == 4,
+           let left = ipv4Value(lhs.address),
+           let right = ipv4Value(rhs.address),
+           left != right {
+            return left < right ? .orderedAscending : .orderedDescending
+        }
+
+        if lhs.family == 6,
+           let left = ipv6Bytes(lhs.address),
+           let right = ipv6Bytes(rhs.address) {
+            for (a, b) in zip(left, right) where a != b {
+                return a < b ? .orderedAscending : .orderedDescending
+            }
+        }
+
+        let text = lhs.address.localizedStandardCompare(rhs.address)
+        if text != .orderedSame { return text }
+        if lhs.port != rhs.port {
+            return lhs.port < rhs.port ? .orderedAscending : .orderedDescending
+        }
+        if lhs.scopeID != rhs.scopeID {
+            return lhs.scopeID < rhs.scopeID ? .orderedAscending : .orderedDescending
+        }
+        return .orderedSame
+    }
+
+    private static func familyRank(_ family: UInt8) -> Int {
+        switch family {
+        case 4: return 0
+        case 6: return 1
+        default: return 2
+        }
+    }
+
+    private static func ipv4Value(_ address: String) -> UInt32? {
+        var addr = in_addr()
+        guard inet_pton(AF_INET, address, &addr) == 1 else { return nil }
+        return UInt32(bigEndian: addr.s_addr)
+    }
+
+    private static func ipv6Bytes(_ address: String) -> [UInt8]? {
+        let host = address.split(separator: "%", maxSplits: 1).first.map(String.init)
+            ?? address
+        var addr = in6_addr()
+        guard inet_pton(AF_INET6, host, &addr) == 1 else { return nil }
+        return withUnsafeBytes(of: &addr) { Array($0) }
+    }
+}
+
 struct ProcessesView: View {
-    let items: [KBProcessInfo]
+    let rows: [ProcessInventoryRow]
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
     @State private var inspected: KBProcessInfo?
@@ -156,49 +259,91 @@ struct ProcessesView: View {
         )
     }
 
+    private var sortOrder: Binding<[KeyPathComparator<ProcessInventoryRow>]> {
+        Binding(
+            get: { ui.networking.processSortOrder },
+            set: { ui.networking.processSortOrder = $0 }
+        )
+    }
+
+    private var displayRows: [ProcessInventoryRow] {
+        ui.networking.processSortOrder.isEmpty
+            ? rows
+            : rows.sorted(using: ui.networking.processSortOrder)
+    }
+
     var body: some View {
         VStack(spacing: 8) {
             HStack {
                 Button("Inspect Selected") {
-                    inspected = selectedProcess
+                    inspected = selectedRow?.process
                 }
-                .disabled(selectedProcess == nil)
+                .disabled(selectedRow == nil)
                 Spacer()
             }
 
-            Table(items, selection: selection) {
-                TableColumn("PID") { item in
-                    Text("\(item.pid)").monospacedDigit()
+            Table(displayRows, selection: selection, sortOrder: sortOrder) {
+                TableColumn("Process", value: \.process.name) { row in
+                    Text(displayName(row))
+                        .lineLimit(1)
+                        .help(displayName(row))
                 }
-                .width(min: 50, ideal: 70)
-                TableColumn("PPID") { item in
-                    Text("\(item.ppid)").monospacedDigit()
+                .width(min: 120, ideal: 170)
+                TableColumn("PID", value: \.process.pid) { row in
+                    Text("\(row.process.pid)").monospacedDigit()
                 }
-                .width(min: 50, ideal: 70)
-                TableColumn("UID") { item in
-                    Text("\(item.uid)").monospacedDigit()
+                .width(min: 50, ideal: 60)
+                TableColumn("Protocols", value: \.protocolSortRank) { row in
+                    ProcessProtocolBadges(tags: row.protocols)
                 }
-                .width(min: 50, ideal: 70)
-                TableColumn("Name") { item in
-                    Text(item.name)
+                .width(min: 120, ideal: 170)
+                TableColumn("Sockets", value: \.socketCount) { row in
+                    Text(socketText(row))
+                        .font(.system(size: 10))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .foregroundStyle(row.hasSocketData ? .primary : .secondary)
+                        .help(socketHelp(row))
                 }
-                .width(min: 140, ideal: 200)
-                TableColumn("Path") { item in
-                    Text(item.path.isEmpty ? "—" : item.path)
+                .width(min: 120, ideal: 160)
+                TableColumn("Flows", value: \.connectionCount) { row in
+                    Text(row.connectionCount > 0 ? "\(row.connectionCount)" : "—")
+                        .monospacedDigit()
+                        .help(row.listeningCount > 0
+                              ? "\(row.listeningCount) listening" : "")
+                }
+                .width(min: 50, ideal: 60)
+                TableColumn("RX", value: \.counters.rxBytes) { row in
+                    Text(row.connectionCount > 0
+                         ? KBFormat.bytes(row.counters.rxBytes) : "—")
+                        .monospacedDigit()
+                }
+                .width(min: 75, ideal: 90)
+                TableColumn("TX", value: \.counters.txBytes) { row in
+                    Text(row.connectionCount > 0
+                         ? KBFormat.bytes(row.counters.txBytes) : "—")
+                        .monospacedDigit()
+                }
+                .width(min: 75, ideal: 90)
+                TableColumn("Path", value: \.process.path) { row in
+                    Text(row.process.path.isEmpty ? "—" : row.process.path)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
-                        .help(item.path)
+                        .help(row.process.path)
                 }
+                .width(min: 130, ideal: 200)
             }
             .contextMenu(forSelectionType: KBProcessKey.self) { keys in
                 if let key = keys.first,
-                   let process = items.first(where: { $0.id == key }) {
-                    Button("Inspect \(process.name)") { inspected = process }
+                   let row = rows.first(where: { $0.id == key }) {
+                    Button("Inspect \(displayName(row))") {
+                        inspected = row.process
+                    }
                 }
             } primaryAction: { keys in
                 if let key = keys.first,
-                   let process = items.first(where: { $0.id == key }) {
-                    inspected = process
+                   let row = rows.first(where: { $0.id == key }) {
+                    inspected = row.process
                 }
             }
         }
@@ -206,15 +351,84 @@ struct ProcessesView: View {
             ProcessInspectorView(process: process)
                 .environment(model)
         }
-        .onChange(of: items.map(\.id), initial: true) { _, ids in
+        .onChange(of: rows.map(\.id), initial: true) { _, ids in
             guard let selected = ui.networking.selectedProcess,
                   !ids.contains(selected) else { return }
             ui.networking.selectedProcess = nil
         }
     }
 
-    private var selectedProcess: KBProcessInfo? {
+    private var selectedRow: ProcessInventoryRow? {
         guard let selection = ui.networking.selectedProcess else { return nil }
-        return items.first { $0.id == selection }
+        return rows.first { $0.id == selection }
+    }
+
+    private func displayName(_ row: ProcessInventoryRow) -> String {
+        row.process.name.isEmpty ? "Process \(row.process.pid)" : row.process.name
+    }
+
+    private func socketText(_ row: ProcessInventoryRow) -> String {
+        guard let types = row.socketTypes else { return "—" }
+        var parts: [String] = []
+        if types.stream > 0 { parts.append("\(types.stream) stream") }
+        if types.dgram > 0 { parts.append("\(types.dgram) dgram") }
+        if types.raw > 0 { parts.append("\(types.raw) raw") }
+        if types.seqpacket > 0 { parts.append("\(types.seqpacket) seqpacket") }
+        if types.otherType > 0 { parts.append("\(types.otherType) other") }
+        return parts.isEmpty ? "0" : parts.joined(separator: " · ")
+    }
+
+    private func socketHelp(_ row: ProcessInventoryRow) -> String {
+        guard row.hasSocketData else {
+            return row.restricted
+                ? "Socket details unavailable (permissions)"
+                : "Socket scan not available yet"
+        }
+        if row.restricted { return "Partial: some sockets were not readable" }
+        if row.truncated { return "Truncated at the per-process socket cap" }
+        return "\(row.socketCount) unique sockets"
+    }
+}
+
+private struct ProcessProtocolBadges: View {
+    let tags: Set<ProcessProtocolTag>
+
+    var body: some View {
+        let ordered = tags.sorted { $0.sortRank < $1.sortRank }
+        if ordered.isEmpty {
+            Text("—").foregroundStyle(.secondary)
+        } else {
+            HStack(spacing: 3) {
+                ForEach(Array(ordered.prefix(3))) { tag in
+                    Text(tag.title)
+                        .font(.system(size: 8, weight: .semibold))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background {
+                            Capsule().fill(color(tag).opacity(0.15))
+                        }
+                        .foregroundStyle(color(tag))
+                }
+                if ordered.count > 3 {
+                    Text("+\(ordered.count - 3)")
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .help(ordered.map(\.title).joined(separator: ", "))
+        }
+    }
+
+    private func color(_ tag: ProcessProtocolTag) -> Color {
+        switch tag {
+        case .tcp4: return KBTheme.downloadTint
+        case .tcp6: return Color(red: 0.35, green: 0.70, blue: 0.95)
+        case .udp4: return KBTheme.connectionsTint
+        case .udp6: return Color(red: 0.40, green: 0.80, blue: 0.72)
+        case .unix: return KBTheme.uploadTint
+        case .raw4: return KBTheme.processesTint
+        case .raw6: return Color(red: 0.90, green: 0.42, blue: 0.25)
+        case .other: return Color(red: 0.55, green: 0.57, blue: 0.63)
+        }
     }
 }
