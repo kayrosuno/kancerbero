@@ -74,6 +74,13 @@ struct KancerberoApp: App {
             }
         }
 
+        Window("System status", id: SystemStatusWindow.id) {
+            SystemStatusView()
+                .environment(model)
+        }
+        .defaultSize(width: 480, height: 720)
+        .windowResizability(.contentMinSize)
+
         Settings {
             SettingsView()
         }

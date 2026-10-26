@@ -1,6 +1,11 @@
 import ServiceManagement
 import SwiftUI
 
+/// Identifier of the window scene that hosts `SystemStatusView`.
+enum SystemStatusWindow {
+    static let id = "system-status"
+}
+
 /// Status checklist shown from the Local/Daemon indicators in the sidebar and
 /// status bar. Its actions only use public SMAppService/AppKit APIs and the
 /// existing AppModel helpers; it never executes sudo commands.
@@ -27,7 +32,7 @@ struct SystemStatusView: View {
             .padding(16)
         }
         .scrollIndicators(.visible)
-        .frame(width: 460, height: 700)
+        .frame(minWidth: 460, idealWidth: 480, minHeight: 560, maxHeight: .infinity)
         .onAppear { model.refreshServiceStatus() }
         .confirmationDialog("Repair background service?",
                             isPresented: $showRepairConfirmation,

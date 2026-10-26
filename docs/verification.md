@@ -453,9 +453,10 @@ codesign --verify --deep --strict --verbose=2 \
 open /Applications/Kancerbero.app
 ```
 
-- Pulsar **Local mode / Daemon connected** en el footer del sidebar o el pill **Local / Daemon**
-  de la barra inferior; se abre el popover **System status**.
-- El panel muestra el checklist y las acciones. “Enable background service” / “Open Login Items”
+- Pulsar **Local mode / Daemon connected** en el footer del sidebar, el pill **Local / Daemon** de
+  la barra inferior o el icono de Kancerbero en la cabecera del sidebar; se abre la ventana
+  **System status**.
+- La ventana muestra el checklist y las acciones. “Enable background service” / “Open Login Items”
   deben llevar a `requiresApproval` o `enabled`; “Repair / re-register…” pide confirmación y
   desregistra/registra el helper para que macOS pueda volver a pedir aprobación.
 - Aprobar en **Ajustes → General → Login Items & Extensions → Allow in the Background**. El
@@ -467,14 +468,15 @@ open /Applications/Kancerbero.app
 - Sin notarización, Gatekeeper marca la app como “Unnotarized Developer ID” y el registro del
   daemon no es fiable; completar `notarytool store-credentials` + `scripts/notarize.sh`.
 - Antes de registrar, eliminar los plists legacy (`scripts/uninstall-agent.sh`,
-  `sudo scripts/uninstall-daemon.sh`). El panel detecta el agente/daemon legacy, muestra los
+  `sudo scripts/uninstall-daemon.sh`). La ventana detecta el agente/daemon legacy, muestra los
   comandos y los copia; no los ejecuta.
 
-### Verificación visual del panel
+### Verificación visual de la ventana
 
-`ScreenshotMode` captura solo la ventana principal; para el popover se usa `screencapture` desde
-Otty, que tiene permiso de Grabación de pantalla. El hook `--show-status` auto-abre el popover
-del sidebar; con `--sidebar-collapsed` auto-abre el de la barra inferior.
+`ScreenshotMode` captura solo la ventana principal; para la ventana **System status** se usa
+`screencapture` desde Otty, que tiene permiso de Grabación de pantalla. El hook `--show-status`
+auto-abre la ventana System status; `--sidebar-collapsed` solo cambia el layout de la ventana
+principal y ya no elige qué indicador la abre.
 
 ```bash
 APP=./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
@@ -484,17 +486,9 @@ PID=$!
 sleep 3
 osascript -e 'tell application "Kancerbero" to activate'
 sleep 2
-# Capturar solo la ventana del popover: con -w se elige con el ratón;
+# Capturar solo la ventana System status: con -w se elige con el ratón;
 # también se puede usar -l <windowid> obtenido de CGWindowListCopyWindowInfo.
-screencapture -x -w /tmp/kb-status-sidebar.png
-kill "$PID" 2>/dev/null || true
-
-"$APP" --show-status --sidebar-collapsed &
-PID=$!
-sleep 3
-osascript -e 'tell application "Kancerbero" to activate'
-sleep 2
-screencapture -x -w /tmp/kb-status-bar.png
+screencapture -x -w /tmp/kb-status.png
 kill "$PID" 2>/dev/null || true
 ```
 
