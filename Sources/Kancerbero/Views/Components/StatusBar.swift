@@ -6,7 +6,7 @@ struct StatusBar: View {
     let section: AppSection
     @Environment(AppModel.self) private var model
     @Environment(DiskModel.self) private var disk
-    @State private var showStatus = false
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         HStack(spacing: 14) {
@@ -19,17 +19,6 @@ struct StatusBar: View {
         .padding(.vertical, 7)
         .background(.regularMaterial)
         .animation(.snappy(duration: 0.25), value: model.systemRates.rxBytesPerSecond)
-        .onAppear(perform: autoOpenStatusPopoverIfRequested)
-    }
-
-    private func autoOpenStatusPopoverIfRequested() {
-        guard CommandLine.arguments.contains("--show-status"),
-              CommandLine.arguments.contains("--sidebar-collapsed"),
-              !showStatus else { return }
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(800))
-            showStatus = true
-        }
     }
 
     @ViewBuilder
@@ -96,7 +85,7 @@ struct StatusBar: View {
     private var globalStatus: some View {
         HStack(spacing: 14) {
             Button {
-                showStatus.toggle()
+                openWindow(id: SystemStatusWindow.id)
             } label: {
                 HStack(spacing: 4) {
                     Text(model.usingDaemon ? "Daemon" : "Local")
@@ -116,10 +105,7 @@ struct StatusBar: View {
             .accessibilityLabel(model.usingDaemon
                 ? "System status: daemon connected"
                 : "System status: local mode")
-            .popover(isPresented: $showStatus, arrowEdge: .bottom) {
-                SystemStatusView()
-                    .environment(model)
-            }
+            .accessibilityHint("Opens the System status window")
 
             if model.privcheck >= 0 {
                 Text("privcheck \(model.privcheck)")

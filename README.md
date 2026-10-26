@@ -77,8 +77,9 @@ App SwiftUI ──XPC──> KancerberoDaemon (root opcional)
 La barra inferior es contextual: muestra métricas de la sección activa (tráfico, capacidad de
 disco, servicios o CPU/memoria) y, a la derecha, el estado global de la conexión con el daemon,
 la última actualización de la fuente correspondiente y el posible error. Pulsar **Local mode /
-Daemon connected** en el footer del sidebar, o el pill **Local / Daemon** de la barra inferior,
-abre un panel flotante **System status** con un checklist de la app, el helper, la colección, los
+Daemon connected** en el footer del sidebar, el pill **Local / Daemon** de la barra inferior o el
+icono de Kancerbero en la cabecera del sidebar abre la ventana **System status** con un checklist
+de la app, el helper, la colección, los
 privilegios, el registro SMAppService, la aprobación en Login Items, la conexión XPC y los
 servicios legacy. Incluye explicaciones, los pasos para habilitar el acceso completo y acciones
 para activar, abrir Login Items, reintentar, reparar/re-registrar, refrescar o revelar la app.
@@ -156,14 +157,14 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
 
 La app embebe el helper y su plist en
 `Kancerbero.app/Contents/Library/LaunchDaemons/` y los registra con
-`SMAppService.daemon(plistName:)` desde el panel **System status** o el menú **Daemon**. macOS lo
+`SMAppService.daemon(plistName:)` desde la ventana **System status** o el menú **Daemon**. macOS lo
 muestra en **Ajustes → General → Login Items & Extensions → Allow in the Background** con el
 icono de Kancerbero (vía `AssociatedBundleIdentifiers`); el usuario debe aprobarlo. La app usa
 `NSXPCConnection` privilegiado para el daemon de sistema.
 
-El panel **System status** explica el estado y permite **Repair / re-register**: desregistra y
+La ventana **System status** explica el estado y permite **Repair / re-register**: desregistra y
 vuelve a registrar el helper para que macOS pueda pedir la aprobación de nuevo. La aprobación en
-Login Items no se puede automatizar; el panel abre el panel correcto y muestra los pasos. Los
+Login Items no se puede automatizar; la ventana abre el ajuste correcto y muestra los pasos. Los
 comandos legacy se copian al portapapeles, nunca se ejecutan con sudo desde la app.
 
 Requisitos de distribución:

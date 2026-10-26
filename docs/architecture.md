@@ -58,15 +58,17 @@
   `TableColumnBuilder` a 10 columnas, así que PRI/NI y S/THR se muestran combinadas.
 - `StatusBar`: barra inferior contextual; muestra métricas de la sección activa y el estado global
   del daemon/actualización de la fuente correspondiente.
-- `SystemStatusView`: popover abierto desde el indicador Local/Daemon del sidebar o desde el pill
-  Local/Daemon de la barra inferior. Muestra un checklist de aplicación, helper embebido,
+- `SystemStatusView`: ventana “System status” (escena `Window` con id `system-status`, abierta con
+  `openWindow(id:)`) desde el indicador Local/Daemon del sidebar, el pill Local/Daemon de la
+  barra inferior o el icono de la cabecera del sidebar. Muestra un checklist de aplicación,
+  helper embebido,
   colección, privilegios, registro SMAppService, aprobación en Login Items, conexión XPC y
   servicios legacy. `AppModel` expone el estado derivado (`appVersion`, `appBundlePath`,
   `appIsInApplications`, `daemonHelperPresent`, `daemonPlistPresent`, `hasFullDataAccess`,
   `isConnectingToDaemon`, `legacyAgentDetected`, `legacyDaemonDetected`) y las acciones
   `retryDaemonConnection`, `repairDaemonService` (unregister + register para re-lanzar la
-  aprobación), `revealAppInFinder`, `openApplicationsFolder` y `copyLegacyRemovalCommands`. El
-  panel abre Settings/Finder y usa SMAppService; no ejecuta sudo ni scripts.
+  aprobación), `revealAppInFinder`, `openApplicationsFolder` y `copyLegacyRemovalCommands`. La
+  ventana abre Settings/Finder y usa SMAppService; no ejecuta sudo ni scripts.
 - Persistencia: `@AppStorage("selectedSection")`, `@AppStorage("networkingTab")` y
   `@AppStorage("diskTab")`. El estado de UI de cada sección (filtros, tarjeta activa, selección,
   panel de detalle y árbol expandido) vive en `UIState`, un `@Observable` inyectado desde

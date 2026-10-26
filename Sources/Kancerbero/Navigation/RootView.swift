@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
     @AppStorage("selectedSection") private var sectionRaw = AppSection.networking.rawValue
     @AppStorage("networkingTab") private var tabRaw = NetworkingTab.interfaces.rawValue
     @AppStorage("diskTab") private var diskTabRaw = DiskTab.volumes.rawValue
@@ -124,6 +125,7 @@ struct RootView: View {
                 }
             }
         }
+        .task { await autoOpenStatusWindowIfRequested() }
         .onReceive(NotificationCenter.default.publisher(for: .kbSelectSection)) { notification in
             guard let raw = notification.object as? String,
                   let section = AppSection(rawValue: raw) else { return }
@@ -131,5 +133,13 @@ struct RootView: View {
                 sectionRaw = section.rawValue
             }
         }
+    }
+
+    /// Screenshot hook: `--show-status` opens the System status window after
+    /// the first snapshot arrives.
+    private func autoOpenStatusWindowIfRequested() async {
+        guard CommandLine.arguments.contains("--show-status") else { return }
+        try? await Task.sleep(for: .milliseconds(800))
+        openWindow(id: SystemStatusWindow.id)
     }
 }
