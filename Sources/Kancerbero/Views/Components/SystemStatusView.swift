@@ -11,6 +11,7 @@ enum SystemStatusWindow {
 /// existing AppModel helpers; it never executes sudo commands.
 struct SystemStatusView: View {
     @Environment(AppModel.self) private var model
+    @Environment(FilterModel.self) private var filter
     @Environment(\.dismiss) private var dismiss
 
     @State private var copiedLegacyCommands = false
@@ -33,7 +34,17 @@ struct SystemStatusView: View {
         }
         .scrollIndicators(.visible)
         .frame(minWidth: 460, idealWidth: 480, minHeight: 560, maxHeight: .infinity)
-        .onAppear { model.refreshServiceStatus() }
+        .onAppear {
+            model.refreshServiceStatus()
+            // Do not recompute over a transient state: refresh() would erase
+            // the activation error or the approval instruction.
+            switch filter.controller.state {
+            case .activating, .requiresApproval, .failed:
+                break
+            default:
+                Task { await filter.controller.refresh() }
+            }
+        }
         .confirmationDialog("Repair background service?",
                             isPresented: $showRepairConfirmation,
                             titleVisibility: .visible) {
@@ -176,6 +187,10 @@ struct SystemStatusView: View {
             serviceRow
             approvalRow
             connectionRow
+
+            sectionHeader("Network filter")
+            filterExtensionRow
+            filterConfigurationRow
 
             sectionHeader("Compatibility")
             legacyRow
@@ -386,6 +401,81 @@ struct SystemStatusView: View {
                          actionTitle: "Retry",
                          actionDisabled: !canRetry,
                          action: { model.retryDaemonConnection() })
+    }
+
+    private var filterExtensionRow: some View {
+        let state = filter.controller.state
+        let level: StatusLevel
+        switch state {
+        case .enabled:
+            level = .ok
+        case .disabled:
+            level = .info
+        case .requiresApproval, .activating, .notInstalled:
+            level = .warning
+        case .unsupported, .failed:
+            level = .error
+        }
+
+        let detail: String
+        var actionTitle: String?
+        var action: (() -> Void)?
+        switch state {
+        case .unsupported:
+            detail = "This build does not carry the filter system-extension entitlements. Sign with Developer ID and provisioning profiles via Config/Signing.local.xcconfig."
+        case .notInstalled:
+            detail = "Install the filter system extension; macOS will ask for approval in Login Items & Extensions."
+            actionTitle = "Install"
+            action = { Task { await filter.enableFilter() } }
+        case .requiresApproval:
+            detail = "Approve Kancerbero in System Settings → General → Login Items & Extensions → Network Extensions."
+            actionTitle = "Install"
+            action = { Task { await filter.enableFilter() } }
+        case .activating:
+            detail = "Waiting for macOS to activate the system extension."
+        case .disabled:
+            detail = "Not enabled. Enabling installs the system extension and asks for approval in Settings if macOS has not approved it yet."
+            actionTitle = "Enable"
+            action = { Task { await filter.enableFilter() } }
+        case .enabled:
+            detail = filter.controller.isActivating
+                ? "Repairing the system extension. macOS may ask you to approve it again."
+                : "The filter extension is running and reporting flows."
+        case .failed(let message):
+            detail = message
+            actionTitle = "Retry"
+            action = { Task { await filter.enableFilter() } }
+        }
+
+        return statusRow(level,
+                         title: "Filter extension",
+                         value: state.title,
+                         detail: detail,
+                         actionTitle: actionTitle,
+                         actionDisabled: filter.isBusy,
+                         action: action)
+    }
+
+    private var filterConfigurationRow: some View {
+        let enabled = filter.controller.isEnabled
+        let detail = enabled
+            ? "Watched processes ask for approval before each new connection. Other traffic is observed only."
+            : "The filter is disabled; Kancerbero keeps monitoring with NetworkStatistics."
+        return statusRow(enabled ? .ok : .info,
+                         title: "Filter configuration",
+                         value: enabled ? "Enabled" : "Disabled",
+                         detail: detail,
+                         actionTitle: enabled ? "Disable" : "Enable",
+                         actionDisabled: filter.isBusy || !filter.controller.isSupported,
+                         action: {
+                             Task {
+                                 if enabled {
+                                     await filter.disableFilter()
+                                 } else {
+                                     await filter.enableFilter()
+                                 }
+                             }
+                         })
     }
 
     private var legacyRow: some View {

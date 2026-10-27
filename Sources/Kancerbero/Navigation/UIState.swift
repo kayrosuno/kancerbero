@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import KancerberoCore
+import KancerberoFilterContract
 
 /// Session-only UI state shared by the section views. Views are destroyed when
 /// the selected section or sub-tab changes, so anything that must look the same
@@ -12,6 +13,7 @@ final class UIState {
     var daemons = DaemonsUIState()
     var disk = DiskUIState()
     var cpu = CPUUIState()
+    var filter = FilterUIState()
 
     init(arguments: [String] = CommandLine.arguments) {
         if let focus = Self.value(for: "--networking-focus", in: arguments)
@@ -106,4 +108,10 @@ struct CPUUIState: Equatable {
     ]
     /// `--cpu-selected`, applied once when the row appears.
     var pendingSelectionPID: Int32?
+}
+
+struct FilterUIState {
+    var search = ""
+    var selectedFlow: String?
+    var sortOrder: [KeyPathComparator<FlowRecord>] = []
 }

@@ -1,10 +1,12 @@
 import SwiftUI
 import KancerberoCore
+import KancerberoFilterContract
 
 struct NetworkingView: View {
     @Binding var tab: NetworkingTab
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
+    @Environment(FilterModel.self) private var filterModel
     @AppStorage(KBPreferences.tabAnimationsKey)
     private var tabAnimations = KBPreferences.tabAnimationsDefault
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -126,7 +128,7 @@ struct NetworkingView: View {
 
             HStack(spacing: 12) {
                 PillTabBar(selection: $tab, selectionAnimation: pillAnimation)
-                if tab != .interfaces {
+                if tab == .connections || tab == .processes {
                     OptionFilterPicker("Transport",
                                        selection: transportBinding,
                                        optionTitle: { $0.title })
@@ -194,6 +196,8 @@ struct NetworkingView: View {
             return active
                 ? "\(processes.count) of \(total) networked processes"
                 : "\(total) networked processes"
+        case .filter:
+            return "\(filterModel.flows.count) observed flows · \(filterModel.watchedCount) watched"
         }
     }
 
@@ -215,6 +219,8 @@ struct NetworkingView: View {
                     ConnectionsView(rows: sources)
                 case .processes:
                     ProcessesView(rows: processes)
+                case .filter:
+                    FilterView()
                 }
             }
             .id(tab)

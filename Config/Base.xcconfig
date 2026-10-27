@@ -16,3 +16,7 @@ CLANG_WARN_UNREACHABLE_CODE = YES
 GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR
 GCC_WARN_UNUSED_VARIABLE = YES
 GCC_WARN_UNUSED_FUNCTION = YES
+
+// Optional local signing overrides (Developer ID identities and provisioning
+// profile names). The file is git-ignored; see Signing.local.xcconfig.example.
+#include? "Signing.local.xcconfig"

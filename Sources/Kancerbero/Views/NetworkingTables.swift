@@ -1,6 +1,7 @@
 import Darwin
 import SwiftUI
 import KancerberoCore
+import KancerberoFilterContract
 
 struct InterfacesView: View {
     let items: [KBInterfaceInfo]
@@ -266,6 +267,7 @@ struct ProcessesView: View {
     let rows: [ProcessInventoryRow]
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
+    @Environment(FilterModel.self) private var filterModel
     @State private var inspected: KBProcessInfo?
 
     private var selection: Binding<KBProcessKey?> {
@@ -325,6 +327,10 @@ struct ProcessesView: View {
                     Text("\(row.process.pid)").monospacedDigit()
                 }
                 .width(min: 50, ideal: 60)
+                TableColumn("Guard") { row in
+                    guardButton(for: row)
+                }
+                .width(min: 46, ideal: 54)
                 TableColumn("Protocols", value: \.protocolSortRank) { row in
                     ProcessProtocolBadges(tags: row.protocols)
                 }
@@ -371,6 +377,24 @@ struct ProcessesView: View {
                     Button("Inspect \(displayName(row))") {
                         inspected = row.process
                     }
+                    Divider()
+                    if filterModel.isWatched(row.process) {
+                        Button("Stop watching network access") {
+                            filterModel.unwatch(row.process)
+                        }
+                        Menu("Policy") {
+                            ForEach(FilterPolicy.allCases) { policy in
+                                Button(policy.title) {
+                                    filterModel.setPolicy(policy, for: row.process)
+                                }
+                                .disabled(filterModel.policy(for: row.process) == policy)
+                            }
+                        }
+                    } else {
+                        Button("Watch network access") {
+                            filterModel.watch(row.process)
+                        }
+                    }
                 }
             } primaryAction: { keys in
                 if let key = keys.first,
@@ -388,6 +412,28 @@ struct ProcessesView: View {
                   !ids.contains(selected) else { return }
             ui.networking.selectedProcess = nil
         }
+    }
+
+    @ViewBuilder
+    private func guardButton(for row: ProcessInventoryRow) -> some View {
+        let watched = filterModel.isWatched(row.process)
+        let policy = filterModel.policy(for: row.process)
+        Button {
+            if watched {
+                filterModel.unwatch(row.process)
+            } else {
+                filterModel.watch(row.process)
+            }
+        } label: {
+            Image(systemName: watched ? "shield.lefthalf.filled" : "shield")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(watched ? Color.orange : Color.secondary)
+        }
+        .buttonStyle(.plain)
+        .disabled(row.process.path.isEmpty)
+        .help(watched
+              ? "Watching network access (\(policy?.title ?? "Ask"))"
+              : "Watch network access and ask before each connection")
     }
 
     private var selectedRow: ProcessInventoryRow? {

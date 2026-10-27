@@ -5,6 +5,7 @@ struct KancerberoApp: App {
     @State private var model = AppModel()
     @State private var disk = DiskModel()
     @State private var ui = UIState()
+    @State private var filter = FilterModel()
 
     var body: some Scene {
         WindowGroup {
@@ -12,6 +13,7 @@ struct KancerberoApp: App {
                 .environment(model)
                 .environment(disk)
                 .environment(ui)
+                .environment(filter)
                 .frame(minWidth: 1040, minHeight: 640)
                 .task {
                     if CommandLine.arguments.contains("--register-service") {
@@ -22,6 +24,7 @@ struct KancerberoApp: App {
                         print("service status: \(model.serviceStatus)")
                     }
                     model.start()
+                    filter.start()
                     await ScreenshotMode.runIfRequested()
                 }
         }
@@ -77,6 +80,7 @@ struct KancerberoApp: App {
         Window("System status", id: SystemStatusWindow.id) {
             SystemStatusView()
                 .environment(model)
+                .environment(filter)
         }
         .defaultSize(width: 480, height: 720)
         .windowResizability(.contentMinSize)

@@ -90,3 +90,32 @@ Pendiente para producción:
 - No hay ninguna ruta que reciba rutas de fichero del cliente.
 - Los límites de tamaño (32 MB) y de frecuencia aún no están implementados; ver la lista
   pendiente.
+
+## Filtro de red (system extension)
+
+- La system extension corre como **root y sandboxeada**, sin sesión de usuario ni UI. No comparte
+  App Group ni `UserDefaults(suiteName:)` con la app: intentar usarlos daría dos
+  almacenamientos distintos (el del usuario y el de root).
+- El único canal es su Mach service (`NEMachServiceName`), que está en el namespace global. La
+  extensión valida al cliente con `setConnectionCodeSigningRequirement` (identificador de la app
+  + Team ID) antes de aceptar `setRules`/`decide`; cualquier otro proceso queda rechazado.
+- La entrada de reglas y decisiones es pequeño y acotado: payload ≤ 1 MB, reglas y decisiones
+  recordadas por ruta de ejecutable, `pending` máximo 32 flujos pausados, snapshot de flujos
+  acotado (2.000 activos + 200 en historial). Cada mensaje se decodifica con
+  `PropertyListDecoder` desde `Data`; un payload inválido se descarta.
+- La extensión no lee contenido de paquetes: `NEFilterDataProvider` entrega metadatos de flujo y
+  contadores agregados. No hay captura de payloads y el tráfico excluido por Apple no se
+  contabiliza.
+- Datos persistidos por la extensión en su propio container: reglas y decisiones recordadas
+  (ruta de ejecutable, destino opcional, allow/deny). Los flujos y el historial viven solo en
+  memoria y se envían a la app por XPC.
+- Datos persistidos por la app: reglas y decisiones recordadas en `UserDefaults`; son la copia
+  editable y se sincronizan al conectar.
+- Fail-closed: un flujo vigilado sin decisión (app cerrada, cliente XPC desconectado, timeout de
+  60 s TCP / 8 s UDP, o tope de flujos pausados) se **deniega** y se registra el motivo. Los
+  flujos pausados se resuelven con `drop` al pararse el filtro o invalidarse el cliente.
+- Los logs (`subsystem uno.kayros.kancerbero.filter`) no incluyen endpoints completos ni
+  contenido; solo identificadores y motivos.
+- Entitlements restringidos: `content-filter-provider-systemextension` en app y extensión,
+  `system-extension.install` en la app. Requieren Developer ID + provisioning profiles
+  embebidos; una build ad-hoc no puede activar el filtro y la UI lo indica.

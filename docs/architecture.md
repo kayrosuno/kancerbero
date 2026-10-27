@@ -9,6 +9,8 @@
 | `KancerberoDaemon` | tool | `NSXPCListener` en `uno.kayros.kancerbero.daemon`, recolección y push |
 | `Kancerbero` | app | SwiftUI, inspector, cliente XPC y modo local |
 | `KancerberoProbe` | tool | Diagnóstico y comparación con herramientas del sistema |
+| `KancerberoFilterContract` | static lib Swift | Contrato Codable y protocolos XPC compartidos por app y filtro |
+| `KancerberoFilter` | system extension | `NEFilterDataProvider`: flujos, estadísticas y allow/deny por proceso |
 
 ## UI
 
@@ -242,6 +244,37 @@
   `AssociatedBundleIdentifiers`, que asocia el servicio con el icono/nombre de la app. Requiere
   Developer ID + notarización. Los scripts `install-agent.sh`/`install-daemon.sh` son el modo
   legacy de desarrollo y no pueden convivir con el daemon SMAppService.
+
+## Filtro de red (Network Extension)
+
+- `KancerberoFilter` es una **system extension** (`Contents/Library/SystemExtensions`) con un
+  `NEFilterDataProvider` (extension point `com.apple.networkextension.filter-data`). Corre como
+  root, en sandbox y en contexto global: no comparte App Group con la app y no tiene UI.
+- La app la instala/actualiza con `OSSystemExtensionManager` y configura el filtro con
+  `NEFilterManager` (`filterSockets = true`, grade `.firewall`). Requiere aprobar la extensión y
+  el aviso de filtrado de contenido; el filtro sigue activo con la app cerrada.
+- Canal app↔extensión: la extensión publica **un** endpoint XPC (`NEMachServiceName =
+  AK37TK8X2Y.uno.kayros.kancerbero.filter`) y la app conecta con
+  `NSXPCConnection(machServiceName:options:.privileged)`. Los protocolos
+  `KancerberoFilterXPC`/`KancerberoFilterClientXPC` transportan `FilterEnvelope` con payloads
+  `PropertyListEncoder` binario (`FilterWire`). El listener exige un requisito de firma del
+  Team ID para aceptar clientes.
+- La extensión es la fuente de verdad en ejecución: reglas (`executablePath`) y decisiones
+  recordadas se cachean en su propio container para seguir aplicándose tras un reinicio sin la
+  app. La app guarda su copia editable en `UserDefaults` y sincroniza al conectar y al cambiar.
+- Flujos: `handleNewFlow` resuelve el proceso con `sourceAppAuditToken`/`sourceProcessAuditToken`
+  → `audit_token_to_pid` → `proc_pidpath` (en macOS `sourceAppIdentifier` no existe). Un proceso
+  vigilado con política `ask` se **pausa**, se envía `FilterRequest` a la app y se reanuda con
+  `resumeFlow(_:with:)` al recibir la decisión; TCP puede esperar 60 s, UDP se deniega a los 8 s
+  (el sistema descarta UDP a los 10 s). Sin cliente XPC o sin decisión: **deny** (fail-closed).
+- Volumen: los veredictos llevan `shouldReport = true` y `statisticsReportFrequency = .medium`;
+  `handle(_ report:)` acumula `bytesInboundCount/bytesOutboundCount` por flujo. Son contadores
+  agregados del kernel y el tráfico excluido por Apple no se ve.
+- UI: pestaña **Filter** (flujos con RX/TX y estado), escudo por fila en **Processes**, hoja de
+  aprobación en `RootView` y filas de estado en **System status**.
+- Entitlements: `content-filter-provider-systemextension` en app y extensión,
+  `system-extension.install` en la app y `app-sandbox` en la extensión; ambos se firman con
+  Developer ID + provisioning profile (ver `docs/verification.md`).
 
 ## Modos
 

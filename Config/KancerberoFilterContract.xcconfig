@@ -1,0 +1,7 @@
+#include "Base.xcconfig"
+
+PRODUCT_NAME = KancerberoFilterContract
+SKIP_INSTALL = YES
+DEFINES_MODULE = YES
+PRODUCT_MODULE_NAME = KancerberoFilterContract
+MACOSX_DEPLOYMENT_TARGET = 15.6

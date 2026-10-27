@@ -9,7 +9,7 @@ for scheme in Kancerbero KancerberoProbe KancerberoDaemon; do
     echo "==> building $scheme ($CONFIG)"
     xcodebuild -project Kancerbero.xcodeproj -scheme "$scheme" \
         -configuration "$CONFIG" -derivedDataPath build build \
-        CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO >/dev/null
+        CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS= >/dev/null
 done
 
 echo "products:"

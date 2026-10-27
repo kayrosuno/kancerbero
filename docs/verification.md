@@ -497,6 +497,89 @@ restante (pasos y troubleshooting) está en el ScrollView. Probar los estados
 `unregister`/`register` y la confirmación de Repair; no se puede automatizar la aprobación de
 macOS. Evitar capturas de pantalla completa: pueden incluir ventanas ajenas.
 
+## Filtro de red (Network Extension)
+
+### Prerrequisitos
+
+- App ID `uno.kayros.kancerbero` con **System Extension** y Network Extensions
+  (`content-filter-provider-systemextension` para Developer ID).
+- App ID `uno.kayros.kancerbero.filter` con Network Extensions
+  (`content-filter-provider-systemextension` para Developer ID).
+- Dos provisioning profiles Developer ID (app y extensión), instalados en el Mac.
+- `Config/Signing.local.xcconfig` (ver el `.example`) con `KANCERBERO_APP_PROFILE` y
+  `KANCERBERO_FILTER_PROFILE`, solo para Release.
+- En Debug la firma es automática con **Apple Development** y los perfiles Mac Team conceden solo
+  los valores de Network Extension **sin** sufijo: por eso la app usa
+  `Resources/App/Kancerbero-Development.entitlements` (`content-filter-provider`); la extensión usa
+  `Resources/Filter/KancerberoFilter.entitlements`, que ya lleva ese valor. En Release ambos
+  deben llevar los valores `-systemextension`.
+- Para desarrollo sin `/Applications`: `systemextensionsctl developer on`.
+
+### Build y firma
+
+```bash
+CONFIG=Release ./scripts/build.sh
+codesign -d --entitlements :- build/Build/Products/Release/Kancerbero.app
+codesign -d --entitlements :- \
+  build/Build/Products/Release/Kancerbero.app/Contents/Library/SystemExtensions/KancerberoFilter.systemextension
+./scripts/install-app.sh
+open /Applications/Kancerbero.app
+```
+
+Comprobar que el `.systemextension` está embebido y que ambas firmas llevan
+`com.apple.developer.networking.networkextension`; la app además
+`com.apple.developer.system-extension.install`. Si una actualización de Xcode degrada los valores
+`-systemextension`, re-firmar inside-out (extensión antes que app) como indica Apple.
+
+### Activación y canal XPC
+
+1. Abrir **Filter** (`--section networking --tab filter`) y pulsar **Install filter extension**.
+2. Aprobar la system extension en **Ajustes → General → Login Items & Extensions**.
+3. Aprobar el aviso “quiere filtrar el contenido de red” al habilitar el filtro.
+4. `systemextensionsctl list | grep kancerbero` debe mostrar `[activated enabled]`.
+5. La cabecera de Filter muestra estado y `1 app client`; `log stream --predicate
+   'subsystem == "uno.kayros.kancerbero.filter"'` sin errores de XPC.
+
+### Fase 0 (validar antes de confiar en la contabilidad)
+
+- Identidad: vigilar `/usr/bin/curl`, lanzar `curl https://example.com` y comprobar que la
+  petición muestra pid/path correctos (audit token → `proc_pidpath` funciona en el sandbox).
+- Estadísticas: comprobar que llegan eventos `.statistics` y si los bytes son acumulados o
+  delta; el modelo ya calcula deltas y toma `.flowClosed` como total final. Si `.statistics` no
+  llega en esta versión de macOS, la tabla mostrará 0 hasta el cierre del flujo.
+
+### Pruebas funcionales
+
+1. **Aprobación**: vigilar `/usr/bin/curl` con el escudo de **Processes**. Cada conexión nueva
+   abre la hoja (y notificación si la app está en segundo plano):
+   - *Allow once* → la conexión funciona.
+   - *Deny once* → `curl` falla de inmediato.
+   - *Always allow this app* / *app + destination* → no vuelve a preguntar según la opción.
+2. **Fail-closed**: cerrar Kancerbero y repetir `curl` desde el proceso vigilado sin decisión
+   recordada → conexión bloqueada; al reabrir la app aparece en **Recent blocks** como
+   `no app`. Con una decisión recordada de allow → permitida.
+3. **UDP**: pausa de más de 10 s → el sistema descarta el flujo; la app debe haber denegado a
+   los ~8 s.
+4. **Contabilidad**: `curl -o /dev/null https://…/10MB` desde un proceso vigilado y permitido;
+   comparar RX/TX de la pestaña Filter con la variación de `netstat -ib` y con nstat (margen por
+   intervalo y tráfico excluido).
+5. **Regresión**: con el filtro desactivado, Interfaces/Connections/Processes siguen funcionando
+   con nstat; `scripts/verify.sh` sin cambios.
+
+### Desinstalación
+
+- **Disable** desactiva `NEFilterManager` y elimina su configuración.
+- **Remove filter extension** (System status) desactiva la system extension.
+- Tras borrar la app, comprobar que no quede el filtro habilitado en Ajustes del Sistema.
+
+### Problemas conocidos
+
+- macOS 26 ha reportado filtros que dejan de recibir flujos tras sleep/wake; si ocurre,
+  desactivar y reactivar el filtro o reiniciar.
+- Hasta 4 filtros del mismo grade pueden convivir; otras herramientas (Little Snitch, LuLu)
+  pueden alterar el orden.
+- El tráfico de procesos Apple excluidos no se observa ni se cuenta.
+
 ## Rendimiento
 
 ```bash
