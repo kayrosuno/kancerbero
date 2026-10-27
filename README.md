@@ -84,6 +84,13 @@ privilegios, el registro SMAppService, la aprobación en Login Items, la conexi�
 servicios legacy. Incluye explicaciones, los pasos para habilitar el acceso completo y acciones
 para activar, abrir Login Items, reintentar, reparar/re-registrar, refrescar o revelar la app.
 
+La pestaña **Filter** muestra los flujos que ve la Network Extension (proceso, endpoints,
+protocolo, RX/TX por flujo y estado). En **Processes**, el escudo de cada fila marca un proceso
+como vigilado: cada conexión nueva de un proceso vigilado pide aprobación (allow/deny, una vez o
+recordada por app o app+destino). Si Kancerbero está cerrado o nadie responde, la conexión se
+deniega (fail-closed). Requiere una build firmada con Developer ID, los entitlements de Network
+Extension y aprobar la system extension; ver `docs/verification.md`.
+
 Las selecciones y configuraciones de cada sección (filtros, tarjeta activa, fila seleccionada,
 panel de detalle y árbol expandido) se conservan al cambiar de pestaña o sección durante la
 sesión; al reiniciar la app se vuelven a los valores iniciales. La preferencia de animaciones es
@@ -105,6 +112,17 @@ xcodebuild -project Kancerbero.xcodeproj -scheme Kancerbero \
 ```
 
 Productos en `build/Build/Products/Debug/`.
+
+La build Debug desde Xcode se firma con la identidad automática **Apple Development**, y la
+system extension se firma con la misma identidad para que `ValidateEmbeddedBinary` pase; la app
+usa `Resources/App/Kancerbero-Development.entitlements` en Debug y
+`Resources/App/Kancerbero.entitlements` en Release.
+
+Para el filtro de red en Release hacen falta los entitlements restringidos y provisioning profiles
+Developer ID: copiar `Config/Signing.local.xcconfig.example` a
+`Config/Signing.local.xcconfig` (ignorado por git) y rellenar los nombres de los perfiles. Los
+builds ad-hoc (`./scripts/build.sh`, que pasa `CODE_SIGN_IDENTITY=-` y `CODE_SIGN_ENTITLEMENTS=`)
+siguen compilando y ejecutando el resto de la app, pero muestran el filtro como no disponible.
 
 ## Icono
 
@@ -249,6 +267,9 @@ Compara con `netstat -ibI`, `lsof -nP -i`, `nettop` y Activity Monitor. Detalle 
 
 - APIs privadas (`NetworkStatistics.framework`): no apto para App Store.
 - Sin firma Developer ID, el daemon se instala en modo desarrollo (ad-hoc + launchd manual).
+- El filtro de red es una system extension: solo funciona firmada con Developer ID +
+  entitlements aprobados; el tráfico de procesos excluidos por Apple no se observa y los
+  contadores son agregados del kernel, no byte-exactos.
 - `NStatSourceIdentifier` no es fiable en macOS 27; se usa el puntero de fuente y las claves
   `PID`/`UUID`.
 - La atribución por proceso usa `epid` cuando existe (como Activity Monitor); los flujos sin

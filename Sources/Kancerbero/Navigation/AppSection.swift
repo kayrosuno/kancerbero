@@ -81,6 +81,7 @@ enum NetworkingTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
     case interfaces
     case connections
     case processes
+    case filter
 
     var id: String { rawValue }
 
@@ -89,6 +90,7 @@ enum NetworkingTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
         case .interfaces: return "Interfaces"
         case .connections: return "Connections"
         case .processes: return "Processes"
+        case .filter: return "Filter"
         }
     }
 
@@ -97,6 +99,7 @@ enum NetworkingTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
         case .interfaces: return "network"
         case .connections: return "point.3.connected.trianglepath.dotted"
         case .processes: return "list.bullet"
+        case .filter: return "shield.lefthalf.filled"
         }
     }
 
@@ -105,6 +108,7 @@ enum NetworkingTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
         case .interfaces: return Color(red: 0.16, green: 0.62, blue: 0.94)
         case .connections: return Color(red: 0.20, green: 0.70, blue: 0.62)
         case .processes: return Color(red: 0.55, green: 0.45, blue: 0.92)
+        case .filter: return Color(red: 0.86, green: 0.42, blue: 0.20)
         }
     }
 
@@ -120,6 +124,7 @@ enum NetworkingTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
         case "0": return .interfaces
         case "1": return .connections
         case "2": return .processes
+        case "3": return .filter
         default: return nil
         }
     }

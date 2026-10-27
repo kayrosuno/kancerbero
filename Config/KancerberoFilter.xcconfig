@@ -1,0 +1,20 @@
+#include "Base.xcconfig"
+
+PRODUCT_NAME = KancerberoFilter
+PRODUCT_BUNDLE_IDENTIFIER = uno.kayros.kancerbero.filter
+PRODUCT_MODULE_NAME = KancerberoFilter
+GENERATE_INFOPLIST_FILE = NO
+INFOPLIST_FILE = $(SRCROOT)/Resources/Filter/Info.plist
+CODE_SIGN_ENTITLEMENTS = $(SRCROOT)/Resources/Filter/KancerberoFilter.entitlements
+CODE_SIGN_STYLE = Manual
+// Debug signing follows the target's automatic Apple Development identity so
+// the embedded extension always matches the host app (ValidateEmbeddedBinary).
+// Ad-hoc builds pass CODE_SIGN_IDENTITY=- for both targets; see scripts/build.sh.
+PROVISIONING_PROFILE_SPECIFIER[config=Release] = $(KANCERBERO_FILTER_PROFILE)
+PROVISIONING_PROFILE_SPECIFIER[config=Debug] = $(KANCERBERO_FILTER_PROFILE)
+SKIP_INSTALL = YES
+ENABLE_HARDENED_RUNTIME = YES
+SWIFT_OBJC_BRIDGING_HEADER = $(SRCROOT)/Sources/KancerberoFilter/KancerberoFilter-Bridging-Header.h
+SWIFT_INCLUDE_PATHS = $(BUILT_PRODUCTS_DIR) $(inherited)
+OTHER_LDFLAGS = $(inherited) -framework NetworkExtension -framework Network -lbsm
+MACOSX_DEPLOYMENT_TARGET = 15.6

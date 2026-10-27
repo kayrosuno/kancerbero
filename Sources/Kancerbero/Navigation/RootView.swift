@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @Environment(FilterModel.self) private var filter
     @Environment(\.openWindow) private var openWindow
     @AppStorage("selectedSection") private var sectionRaw = AppSection.networking.rawValue
     @AppStorage("networkingTab") private var tabRaw = NetworkingTab.interfaces.rawValue
@@ -126,6 +127,13 @@ struct RootView: View {
             }
         }
         .task { await autoOpenStatusWindowIfRequested() }
+        .sheet(item: Binding(
+            get: { filter.pending.first },
+            set: { _ in }
+        )) { request in
+            FilterApprovalSheet(request: request)
+                .environment(filter)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .kbSelectSection)) { notification in
             guard let raw = notification.object as? String,
                   let section = AppSection(rawValue: raw) else { return }

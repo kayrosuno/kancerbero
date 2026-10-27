@@ -26,10 +26,14 @@
 	<string>1</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
+	<key>KBFilterMachService</key>
+	<string>AK37TK8X2Y.uno.kayros.kancerbero.filter</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSSystemExtensionUsageDescription</key>
+	<string>Kancerbero observes network flows and lets you allow or deny connections per process.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>kancerbero</string>
 </dict>

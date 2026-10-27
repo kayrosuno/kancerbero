@@ -1,0 +1,15 @@
+// Copy this file to Config/Signing.local.xcconfig (git-ignored) and fill in the
+// Developer ID provisioning profile names/UUIDs for the app and the filter
+// system extension. Both profiles must carry the Network Extension and System
+// Extension capabilities (see docs/verification.md).
+//
+// These profiles are only used by Release/Developer ID builds. Debug builds use
+// automatic Apple Development signing, so the app and its embedded extension
+// share the same certificate (see Config/KancerberoFilter.xcconfig).
+
+// DEVELOPMENT_TEAM = AK37TK8X2Y
+// CODE_SIGN_STYLE = Manual
+// CODE_SIGN_IDENTITY = Developer ID Application
+
+KANCERBERO_APP_PROFILE = Kancerbero Developer ID
+KANCERBERO_FILTER_PROFILE = Kancerbero Filter Developer ID
