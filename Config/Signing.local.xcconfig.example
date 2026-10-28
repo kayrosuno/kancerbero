@@ -1,15 +1,22 @@
 // Copy this file to Config/Signing.local.xcconfig (git-ignored) and fill in the
-// Developer ID provisioning profile names/UUIDs for the app and the filter
-// system extension. Both profiles must carry the Network Extension and System
-// Extension capabilities (see docs/verification.md).
+// Developer ID provisioning profile names or UUIDs for the app and the filter
+// system extension.
 //
-// These profiles are only used by Release/Developer ID builds. Debug builds use
-// automatic Apple Development signing, so the app and its embedded extension
-// share the same certificate (see Config/KancerberoFilter.xcconfig).
+// Both profiles must be *Developer ID* profiles (not Apple Development) and
+// carry the Network Extension and System Extension capabilities. Developer ID
+// profiles automatically use the `-systemextension` entitlement values, which is
+// what Resources/Filter/KancerberoFilter.entitlements expects in Release.
+// See docs/verification.md.
+//
+// The signing style and hardened runtime flags come from Config/Release.xcconfig.
+// If the keychain holds more than one "Developer ID Application" identity,
+// pin the one the profiles belong to by certificate SHA-1; otherwise Xcode picks
+// the newest and rejects the profiles:
+//
+// CODE_SIGN_IDENTITY = 0123456789ABCDEF0123456789ABCDEF01234567
+//
+// scripts/build-release.sh fails early when this file or these variables are
+// missing, or when the resolved settings are not Developer ID + manual signing.
 
-// DEVELOPMENT_TEAM = AK37TK8X2Y
-// CODE_SIGN_STYLE = Manual
-// CODE_SIGN_IDENTITY = Developer ID Application
-
-KANCERBERO_APP_PROFILE = Kancerbero Developer ID
-KANCERBERO_FILTER_PROFILE = Kancerbero Filter Developer ID
+KANCERBERO_APP_PROFILE = <Developer ID profile name or UUID for uno.kayros.kancerbero>
+KANCERBERO_FILTER_PROFILE = <Developer ID profile name or UUID for uno.kayros.kancerbero.filter>

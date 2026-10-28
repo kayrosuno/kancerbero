@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import NetworkExtension
 import Observation
@@ -40,6 +41,9 @@ final class FilterController: NSObject {
 
     private(set) var state: State = .unsupported
     private(set) var lastError: String?
+    /// Raw `OSSystemExtensionError` details for the last failure, shown as
+    /// technical details and included in the copied diagnostics.
+    private(set) var lastErrorDetail: String?
     /// True while an activation request is in flight, including background repair.
     private(set) var isActivating = false
 
@@ -57,13 +61,55 @@ final class FilterController: NSObject {
     private var extensionURL: URL {
         Bundle.main.bundleURL
             .appendingPathComponent("Contents/Library/SystemExtensions", isDirectory: true)
-            .appendingPathComponent("KancerberoFilter.systemextension", isDirectory: true)
+            .appendingPathComponent("\(FilterXPCNames.extensionBundleIdentifier).systemextension",
+                                    isDirectory: true)
     }
 
     /// True when this build carries the restricted entitlements and embeds the
     /// system extension, i.e. it can actually host the filter.
     var isSupported: Bool {
         FileManager.default.fileExists(atPath: extensionURL.path) && hasSystemExtensionEntitlement
+    }
+
+    /// True for Apple Development/ad-hoc builds. macOS refuses to activate a
+    /// system extension from those unless developer mode is on, and on current
+    /// macOS `systemextensionsctl developer on` requires SIP to be disabled.
+    var isDevelopmentSigned: Bool {
+        (copyEntitlement("com.apple.security.get-task-allow") as? Bool) == true
+    }
+
+    /// Extra explanation rendered next to a failed activation.
+    var failureGuidance: String? {
+        guard case .failed = state, isDevelopmentSigned else { return nil }
+        return Self.developmentBuildGuidance
+    }
+
+    private static let developmentBuildGuidance = """
+        This is a development-signed build (get-task-allow). With SIP enabled macOS only \
+        activates network system extensions from a Developer ID-signed, notarized app in \
+        /Applications. Build with scripts/build-release.sh, notarize with scripts/notarize.sh \
+        and install with scripts/install-app.sh. `systemextensionsctl developer on` requires \
+        SIP to be disabled.
+        """
+
+    var diagnostics: String {
+        [
+            "app: \(Bundle.main.bundleURL.path)",
+            "extension: \(extensionURL.path) (exists: \(FileManager.default.fileExists(atPath: extensionURL.path)))",
+            "identifier: \(FilterXPCNames.extensionBundleIdentifier)",
+            "state: \(state.title)",
+            "supported: \(isSupported)",
+            "developmentSigned: \(isDevelopmentSigned)",
+            "systemExtensionEntitlement: \(hasSystemExtensionEntitlement)",
+            "lastError: \(lastError ?? "—")",
+            "lastErrorDetail: \(lastErrorDetail ?? "—")",
+            #"hint: log show --last 5m --predicate 'process == "sysextd"' --info --debug"#
+        ].joined(separator: "\n")
+    }
+
+    func copyDiagnostics() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(diagnostics, forType: .string)
     }
 
     func refresh() async {
@@ -76,6 +122,7 @@ final class FilterController: NSObject {
             try await load(manager)
             state = manager.isEnabled ? .enabled : .disabled
             lastError = nil
+            lastErrorDetail = nil
         } catch {
             lastError = error.localizedDescription
             state = .failed(error.localizedDescription)
@@ -137,12 +184,13 @@ final class FilterController: NSObject {
                 configuration.filterSockets = true
                 manager.providerConfiguration = configuration
             }
-            manager.localizedDescription = "Kancerbero network filter"
+            manager.localizedDescription = "Kancerbero Network Filter"
             manager.grade = .firewall
             manager.isEnabled = true
             try await save(manager)
             state = .enabled
             lastError = nil
+            lastErrorDetail = nil
         } catch {
             lastError = error.localizedDescription
             state = .failed(error.localizedDescription)
@@ -159,6 +207,7 @@ final class FilterController: NSObject {
             try? await remove(manager)
             state = .disabled
             lastError = nil
+            lastErrorDetail = nil
         } catch {
             lastError = error.localizedDescription
             state = .failed(error.localizedDescription)
@@ -207,26 +256,27 @@ final class FilterController: NSObject {
         }
     }
 
-    fileprivate func handleFailure(_ message: String) {
+    fileprivate func handleFailure(_ failure: FilterFailure) {
         requests.removeAll()
         activationPending = false
         isActivating = false
         enableAfterActivation = false
+        let message = failure.userMessage()
         lastError = message
+        lastErrorDetail = failure.rawDescription
         state = .failed(message)
-        filterLog.error("system extension request failed: \(message, privacy: .public)")
+        filterLog.error("system extension request failed: \(failure.rawDescription, privacy: .public)")
     }
 
     // MARK: - Entitlements
 
+    private func copyEntitlement(_ name: String) -> Any? {
+        guard let task = SecTaskCreateFromSelf(nil) else { return nil }
+        return SecTaskCopyValueForEntitlement(task, name as CFString, nil)
+    }
+
     private var hasSystemExtensionEntitlement: Bool {
-        guard let task = SecTaskCreateFromSelf(nil) else { return false }
-        let value = SecTaskCopyValueForEntitlement(
-            task,
-            "com.apple.developer.system-extension.install" as CFString,
-            nil
-        )
-        return (value as? Bool) == true
+        (copyEntitlement("com.apple.developer.system-extension.install") as? Bool) == true
     }
 
     // MARK: - Async wrappers
@@ -296,43 +346,85 @@ private final class FilterExtensionDelegate: NSObject,
     }
 
     func request(_ request: OSSystemExtensionRequest, didFailWithError error: Error) {
-        let message = Self.message(for: error)
+        let failure = FilterFailure(error)
         Task { @MainActor in
-            controller?.handleFailure(message)
+            controller?.handleFailure(failure)
         }
+    }
+}
+
+/// Snapshot of an `OSSystemExtensionRequest` failure. `Error`/`NSError` are not
+/// `Sendable`, so the delegate captures the fields it needs before hopping to
+/// the main actor, and logs the raw values for `log show`.
+private struct FilterFailure: Sendable {
+    let domain: String
+    let code: Int
+    let systemExtensionCode: Int?
+    let localizedDescription: String
+    let failureReason: String?
+    let underlyingDescription: String?
+
+    init(_ error: Error) {
+        let nsError = error as NSError
+        domain = nsError.domain
+        code = nsError.code
+        systemExtensionCode = (error as? OSSystemExtensionError)?.code.rawValue
+        localizedDescription = nsError.localizedDescription
+        failureReason = nsError.userInfo[NSLocalizedFailureReasonErrorKey] as? String
+        underlyingDescription = (nsError.userInfo[NSUnderlyingErrorKey] as? NSError)?
+            .localizedDescription
+    }
+
+    var rawDescription: String {
+        var parts = ["domain=\(domain)", "code=\(code)"]
+        if let systemExtensionCode {
+            parts.append("sysextCode=\(systemExtensionCode)")
+        }
+        parts.append("description=\(localizedDescription)")
+        if let failureReason {
+            parts.append("reason=\(failureReason)")
+        }
+        if let underlyingDescription {
+            parts.append("underlying=\(underlyingDescription)")
+        }
+        return parts.joined(separator: " ")
     }
 
     /// Maps `OSSystemExtensionError.Code` to an actionable message. Runs
     /// nonisolated; only the resulting String crosses to the main actor.
-    private static func message(for error: Error) -> String {
-        guard let extensionError = error as? OSSystemExtensionError else {
-            return error.localizedDescription
+    func userMessage() -> String {
+        guard let systemExtensionCode,
+              let code = OSSystemExtensionError.Code(rawValue: systemExtensionCode) else {
+            return localizedDescription
         }
-        switch extensionError.code {
+
+        let message: String
+        switch code {
         case .missingEntitlement:
-            return "Kancerbero is missing the system-extension entitlement. Rebuild it with a signed Apple Development or Developer ID build."
+            message = "Kancerbero is missing the system-extension entitlement. Sign it with a Developer ID provisioning profile that grants com.apple.developer.system-extension.install."
         case .unsupportedParentBundleLocation:
-            return "Move Kancerbero.app to /Applications and try again; macOS only activates system extensions from an application in /Applications."
+            message = "macOS only activates system extensions from an application in /Applications. Move Kancerbero.app there and try again."
         case .extensionNotFound:
-            return "macOS could not find KancerberoFilter.systemextension inside the app bundle. Reinstall a complete signed build."
+            message = "macOS could not realize the filter system extension. The bundle is embedded, so check that it is named <bundle identifier>.systemextension, signed with Developer ID and notarized; sysextd logs the precise reason (`log show --last 5m --predicate 'process == \"sysextd\"'`)."
         case .codeSignatureInvalid:
-            return "The filter extension signature is invalid. Rebuild and sign the app and the extension with the same team."
+            message = "The filter extension signature is invalid. Sign the app and the extension with the same Developer ID certificate and provisioning profiles."
         case .validationFailed:
-            return "macOS rejected the filter extension during validation. Check its entitlements and provisioning profile."
+            message = "macOS rejected the filter extension during validation. Check that the Developer ID profile grants content-filter-provider-systemextension, and that NEMachServiceName starts with an App Group listed in com.apple.security.application-groups."
         case .forbiddenBySystemPolicy:
-            return "A system policy is blocking the filter extension."
+            message = "A system policy is blocking the filter extension. Developer ID builds must also be notarized."
         case .authorizationRequired:
-            return "Approve Kancerbero in System Settings → General → Login Items & Extensions → Network Extensions, then try again."
+            message = "Open System Settings → General → Login Items & Extensions → Network Extensions and turn on Kancerbero Filter, then try again."
         case .requestCanceled:
-            return "The system-extension request was canceled. Try again."
+            message = "The system-extension request was canceled. Try again."
         case .requestSuperseded:
-            return "Another system-extension request replaced this one. Try again."
+            message = "Another system-extension request replaced this one. Try again."
         case .extensionMissingIdentifier, .duplicateExtensionIdentifer, .unknownExtensionCategory:
-            return "The embedded filter extension is invalid: \(error.localizedDescription)"
+            message = "The embedded filter extension is invalid: \(localizedDescription)"
         case .unknown:
-            return error.localizedDescription
+            message = localizedDescription
         @unknown default:
-            return error.localizedDescription
+            message = localizedDescription
         }
+        return message
     }
 }

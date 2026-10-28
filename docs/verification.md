@@ -501,35 +501,61 @@ macOS. Evitar capturas de pantalla completa: pueden incluir ventanas ajenas.
 
 ### Prerrequisitos
 
-- App ID `uno.kayros.kancerbero` con **System Extension** y Network Extensions
-  (`content-filter-provider-systemextension` para Developer ID).
-- App ID `uno.kayros.kancerbero.filter` con Network Extensions
-  (`content-filter-provider-systemextension` para Developer ID).
-- Dos provisioning profiles Developer ID (app y extensión), instalados en el Mac.
+- Certificado **Developer ID Application** instalado en el llavero
+  (`security find-identity -v -p codesigning | grep "Developer ID Application"`). Una identidad
+  Apple Distribution no sirve para system extensions.
+- App ID `uno.kayros.kancerbero` con **System Extension** y Network Extensions; App ID
+  `uno.kayros.kancerbero.filter` con Network Extensions. El entitlement es de autoservicio: no
+  hay que pedir aprobación a Apple.
+- Dos provisioning profiles **Developer ID** (app y extensión), instalados en el Mac. Los perfiles
+  Developer ID añaden automáticamente el sufijo `-systemextension` a los valores de Network
+  Extension; los de desarrollo no.
 - `Config/Signing.local.xcconfig` (ver el `.example`) con `KANCERBERO_APP_PROFILE` y
-  `KANCERBERO_FILTER_PROFILE`, solo para Release.
-- En Debug la firma es automática con **Apple Development** y los perfiles Mac Team conceden solo
-  los valores de Network Extension **sin** sufijo: por eso la app usa
-  `Resources/App/Kancerbero-Development.entitlements` (`content-filter-provider`); la extensión usa
-  `Resources/Filter/KancerberoFilter.entitlements`, que ya lleva ese valor. En Release ambos
-  deben llevar los valores `-systemextension`.
-- Para desarrollo sin `/Applications`: `systemextensionsctl developer on`.
+  `KANCERBERO_FILTER_PROFILE`. `scripts/build-release.sh` falla si el archivo o las variables
+  faltan, o si no hay identidad Developer ID.
+- Debug firma automático con **Apple Development**: usa
+  `Resources/App/Kancerbero-Development.entitlements` y
+  `Resources/Filter/KancerberoFilter-Development.entitlements` (valor `content-filter-provider`,
+  sin sufijo). Release usa `Resources/App/Kancerbero.entitlements` y
+  `Resources/Filter/KancerberoFilter.entitlements` (valor `-systemextension`).
+- `systemextensionsctl developer on` (para activar builds fuera de `/Applications`) solo está
+  disponible con **SIP desactivado**; con SIP activo un build Debug no puede activar la extensión.
 
 ### Build y firma
 
 ```bash
-CONFIG=Release ./scripts/build.sh
-codesign -d --entitlements :- build/Build/Products/Release/Kancerbero.app
-codesign -d --entitlements :- \
-  build/Build/Products/Release/Kancerbero.app/Contents/Library/SystemExtensions/KancerberoFilter.systemextension
+./scripts/build-release.sh
+APP=build/Build/Products/Release/Kancerbero.app
+EXT="$APP/Contents/Library/SystemExtensions/uno.kayros.kancerbero.filter.systemextension"
+codesign -dv --entitlements :- "$APP"
+codesign -dv --entitlements :- "$EXT"
+security cms -D -i "$APP/Contents/embedded.provisionprofile" | plutil -p - | grep -A6 Entitlements
+codesign --verify --deep --strict --verbose=2 "$APP"
+./scripts/notarize.sh
 ./scripts/install-app.sh
 open /Applications/Kancerbero.app
 ```
 
-Comprobar que el `.systemextension` está embebido y que ambas firmas llevan
-`com.apple.developer.networking.networkextension`; la app además
-`com.apple.developer.system-extension.install`. Si una actualización de Xcode degrada los valores
-`-systemextension`, re-firmar inside-out (extensión antes que app) como indica Apple.
+Comprobar que app, extensión y daemon tienen `Authority=Developer ID Application`, hardened
+runtime y timestamp; que la app no lleva `get-task-allow`; que ambas firmas llevan
+`com.apple.developer.networking.networkextension` con el valor `-systemextension` (la app además
+`com.apple.developer.system-extension.install`); y que app y extensión tienen
+`Contents/embedded.provisionprofile`. `spctl -a -vvv -t exec` debe aceptar la app como
+`Notarized Developer ID`.
+
+### Problemas conocidos: sysextd rechaza la activación
+
+- `no policy, cannot allow apps outside /Applications`: el build no está firmado con Developer ID
+  (aunque el bundle esté en `/Applications`); los builds Apple Development/ad-hoc no tienen
+  policy de activación.
+- `Failing to realize … developer/groundhog mode isn't on`: developer mode desactivado.
+  `csrutil status` debe informar de SIP desactivado para poder activarlo.
+- Ambos casos son rechazos de firma/política, no un bundle mal formado. La app traduce ese error
+  a `.extensionNotFound`; la pestaña Filter muestra el detalle técnico y **Copy diagnostics**.
+- Leer el registro crudo:
+  `log show --last 10m --predicate 'process == "sysextd"' --info --debug | grep -i kancerbero`.
+- Si hubiera una versión antigua registrada:
+  `sudo systemextensionsctl uninstall AK37TK8X2Y uno.kayros.kancerbero.filter`.
 
 ### Activación y canal XPC
 

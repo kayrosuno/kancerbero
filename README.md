@@ -114,15 +114,23 @@ xcodebuild -project Kancerbero.xcodeproj -scheme Kancerbero \
 Productos en `build/Build/Products/Debug/`.
 
 La build Debug desde Xcode se firma con la identidad automática **Apple Development**, y la
-system extension se firma con la misma identidad para que `ValidateEmbeddedBinary` pase; la app
-usa `Resources/App/Kancerbero-Development.entitlements` en Debug y
-`Resources/App/Kancerbero.entitlements` en Release.
+system extension se firma con la misma identidad para que `ValidateEmbeddedBinary` pase. En Debug
+se usan `Resources/App/Kancerbero-Development.entitlements` y
+`Resources/Filter/KancerberoFilter-Development.entitlements`, con el valor
+`content-filter-provider` sin sufijo, que es el único que conceden los perfiles Mac Team.
 
-Para el filtro de red en Release hacen falta los entitlements restringidos y provisioning profiles
-Developer ID: copiar `Config/Signing.local.xcconfig.example` a
-`Config/Signing.local.xcconfig` (ignorado por git) y rellenar los nombres de los perfiles. Los
-builds ad-hoc (`./scripts/build.sh`, que pasa `CODE_SIGN_IDENTITY=-` y `CODE_SIGN_ENTITLEMENTS=`)
-siguen compilando y ejecutando el resto de la app, pero muestran el filtro como no disponible.
+**Un build Debug no puede activar el filtro** en un Mac con SIP activado: `sysextd` lo rechaza con
+`no policy, cannot allow apps outside /Applications` o `developer/groundhog mode isn't on`, y
+`systemextensionsctl developer on` exige SIP deshabilitado.
+
+Para el filtro de red en Release hacen falta un certificado **Developer ID Application** y dos
+provisioning profiles Developer ID (app y extensión) con la capability Network Extensions; en
+Release la extensión usa `Resources/Filter/KancerberoFilter.entitlements` con el valor
+`content-filter-provider-systemextension`. Copiar `Config/Signing.local.xcconfig.example` a
+`Config/Signing.local.xcconfig` (ignorado por git), rellenar los nombres o UUID de los perfiles y
+usar `./scripts/build-release.sh` (falla a propósito si falta esa configuración). Los builds
+ad-hoc (`./scripts/build.sh`, que pasa `CODE_SIGN_IDENTITY=-` y `CODE_SIGN_ENTITLEMENTS=`) siguen
+compilando y ejecutando el resto de la app, pero muestran el filtro como no disponible.
 
 ## Icono
 
@@ -267,9 +275,11 @@ Compara con `netstat -ibI`, `lsof -nP -i`, `nettop` y Activity Monitor. Detalle 
 
 - APIs privadas (`NetworkStatistics.framework`): no apto para App Store.
 - Sin firma Developer ID, el daemon se instala en modo desarrollo (ad-hoc + launchd manual).
-- El filtro de red es una system extension: solo funciona firmada con Developer ID +
-  entitlements aprobados; el tráfico de procesos excluidos por Apple no se observa y los
-  contadores son agregados del kernel, no byte-exactos.
+- El filtro de red es una system extension: macOS solo la activa desde una app Developer ID
+  **notarizada** (o con developer mode, que exige SIP desactivado). Con un build Apple
+  Development `sysextd` responde `no policy, cannot allow apps outside /Applications` o
+  `developer/groundhog mode isn't on`. El tráfico de procesos excluidos por Apple no se observa y
+  los contadores son agregados del kernel, no byte-exactos.
 - `NStatSourceIdentifier` no es fiable en macOS 27; se usa el puntero de fuente y las claves
   `PID`/`UUID`.
 - La atribución por proceso usa `epid` cuando existe (como Activity Monitor); los flujos sin

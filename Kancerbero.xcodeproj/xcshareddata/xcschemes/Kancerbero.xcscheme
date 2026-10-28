@@ -29,7 +29,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "ABCDEF000000000000000016"
-               BuildableName = "KancerberoFilter.systemextension"
+               BuildableName = "uno.kayros.kancerbero.filter.systemextension"
                ReferencedContainer = "container:Kancerbero.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>

@@ -4,6 +4,8 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Kancerbero Filter</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -21,11 +23,11 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSSystemExtensionUsageDescription</key>
-	<string>Kancerbero observes network flows and lets you allow or deny connections per process.</string>
+	<string>Kancerbero installs a network filter that observes connections and asks you before watched processes connect out. macOS will ask you to allow it in Login Items &amp; Extensions.</string>
 	<key>NetworkExtension</key>
 	<dict>
 		<key>NEMachServiceName</key>
-		<string>AK37TK8X2Y.uno.kayros.kancerbero.filter</string>
+		<string>group.uno.kayros.kancerbero.filter</string>
 		<key>NEProviderClasses</key>
 		<dict>
 			<key>com.apple.networkextension.filter-data</key>

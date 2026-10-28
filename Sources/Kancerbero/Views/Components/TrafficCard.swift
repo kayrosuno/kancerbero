@@ -5,6 +5,7 @@ struct TrafficCard: View {
     let uploadBytesPerSecond: Double
     let downloadHistory: [Double]
     let uploadHistory: [Double]
+    var sampleDates: [Date] = []
     let focus: NetworkingFocus?
     var sampleInterval: TimeInterval = 1
     let onToggle: (NetworkingFocus) -> Void
@@ -84,7 +85,8 @@ struct TrafficCard: View {
             TrafficChart(download: downloadHistory,
                          upload: uploadHistory,
                          focus: focus,
-                         sampleInterval: sampleInterval)
+                         sampleInterval: sampleInterval,
+                         sampleDates: sampleDates)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(10)

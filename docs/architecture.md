@@ -272,9 +272,11 @@
   agregados del kernel y el tráfico excluido por Apple no se ve.
 - UI: pestaña **Filter** (flujos con RX/TX y estado), escudo por fila en **Processes**, hoja de
   aprobación en `RootView` y filas de estado en **System status**.
-- Entitlements: `content-filter-provider-systemextension` en app y extensión,
+- Entitlements: en Release, `content-filter-provider-systemextension` en app y extensión,
   `system-extension.install` en la app y `app-sandbox` en la extensión; ambos se firman con
-  Developer ID + provisioning profile (ver `docs/verification.md`).
+  Developer ID + provisioning profile. En Debug se usan los archivos `-Development.entitlements`
+  con el valor sin sufijo (`content-filter-provider`), que es lo que conceden los perfiles Mac
+  Team (ver `docs/verification.md`).
 
 ## Modos
 
