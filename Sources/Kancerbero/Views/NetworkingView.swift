@@ -101,6 +101,7 @@ struct NetworkingView: View {
                     uploadBytesPerSecond: rates.txBytesPerSecond,
                     downloadHistory: model.rxHistory,
                     uploadHistory: model.txHistory,
+                    sampleDates: model.sampleDates,
                     focus: ui.networking.focus,
                     sampleInterval: model.interval,
                     onToggle: toggleFocus

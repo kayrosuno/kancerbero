@@ -7,6 +7,10 @@ struct TrafficChart: View {
     let upload: [Double]
     let focus: NetworkingFocus?
     var sampleInterval: TimeInterval = 1
+    /// Timestamps of each sample, parallel to `download`/`upload`. When present
+    /// the X axis is laid out in real time, so history can survive an interval
+    /// change without lying about the time span.
+    var sampleDates: [Date] = []
     var downloadTint: Color = KBTheme.downloadTint
     var uploadTint: Color = KBTheme.uploadTint
 
@@ -29,10 +33,19 @@ struct TrafficChart: View {
         .accessibilityValue(accessibilityValue)
     }
 
+    /// Time covered by the retained samples. Falls back to the nominal window
+    /// when the samples do not carry timestamps yet.
+    private var span: TimeInterval {
+        if sampleDates.count >= 2, let first = sampleDates.first, let last = sampleDates.last {
+            return max(last.timeIntervalSince(first), max(sampleInterval, 0.1))
+        }
+        return max(sampleInterval, 0.1) * Double(Self.window)
+    }
+
     private var accessibilityValue: String {
         let peak = max(max(download.max() ?? 0, upload.max() ?? 0), 0)
-        let span = KBFormat.shortDuration(max(sampleInterval, 0.1) * Double(Self.window))
-        return "Peak \(KBFormat.bitRate(peak)) over the last \(span). " +
+        let windowText = KBFormat.shortDuration(span)
+        return "Peak \(KBFormat.bitRate(peak)) over the last \(windowText). " +
             "Download \(KBFormat.bitRate(download.last ?? 0)), " +
             "upload \(KBFormat.bitRate(upload.last ?? 0))"
     }
@@ -61,11 +74,11 @@ struct TrafficChart: View {
         let ceilingBytes = ceilingBits / 8
 
         drawGrid(context: &context, plot: plot, midY: midY, half: half)
-        drawSeries(values: rx, peakBytes: ceilingBytes, plot: plot, midY: midY,
-                   half: half, tint: downloadTint, upward: true,
+        drawSeries(values: rx, dates: sampleDates, peakBytes: ceilingBytes, plot: plot,
+                   midY: midY, half: half, tint: downloadTint, upward: true,
                    opacity: focus == .upload ? 0.25 : 1, context: &context)
-        drawSeries(values: tx, peakBytes: ceilingBytes, plot: plot, midY: midY,
-                   half: half, tint: uploadTint, upward: false,
+        drawSeries(values: tx, dates: sampleDates, peakBytes: ceilingBytes, plot: plot,
+                   midY: midY, half: half, tint: uploadTint, upward: false,
                    opacity: focus == .download ? 0.25 : 1, context: &context)
         drawBaseline(context: &context, plot: plot, midY: midY)
         drawLevelLabels(context: &context, midY: midY, half: half,
@@ -135,12 +148,12 @@ struct TrafficChart: View {
     }
 
     private func drawTimeAxis(context: inout GraphicsContext, plot: CGRect) {
-        let span = max(sampleInterval, 0.1) * Double(Self.window)
+        let window = span
         let y = plot.maxY + Self.axisHeight / 2
         let color = Color.secondary.opacity(colorScheme == .dark ? 0.7 : 0.6)
         let entries: [(String, CGFloat, UnitPoint)] = [
-            ("-" + KBFormat.shortDuration(span), plot.minX, .leading),
-            ("-" + KBFormat.shortDuration(span / 2), plot.midX, .center),
+            ("-" + KBFormat.shortDuration(window), plot.minX, .leading),
+            ("-" + KBFormat.shortDuration(window / 2), plot.midX, .center),
             ("now", plot.maxX, .trailing)
         ]
 
@@ -156,7 +169,7 @@ struct TrafficChart: View {
 
     // MARK: - Series
 
-    private func drawSeries(values: [Double], peakBytes: Double, plot: CGRect,
+    private func drawSeries(values: [Double], dates: [Date], peakBytes: Double, plot: CGRect,
                             midY: CGFloat, half: CGFloat, tint: Color,
                             upward: Bool, opacity: Double,
                             context: inout GraphicsContext) {
@@ -165,14 +178,26 @@ struct TrafficChart: View {
         let usable = max(plot.width - 2 * Self.seriesInset, 0)
         let step = usable / CGFloat(Self.window - 1)
         let startX = plot.maxX - Self.seriesInset - CGFloat(values.count - 1) * step
+        // Position samples by their timestamp when available so a cadence
+        // change keeps the retained history honest on the time axis.
+        let useTime = dates.count == values.count && dates.count >= 2
+        let lastDate = dates.last
+        let window = max(span, 0.1)
 
         var points: [CGPoint] = []
         points.reserveCapacity(values.count)
         for (index, value) in values.enumerated() {
             let normalized = min(max(value / peakBytes, 0), 1)
             let offset = CGFloat(normalized) * half
+            let x: CGFloat
+            if useTime, let lastDate {
+                let age = lastDate.timeIntervalSince(dates[index])
+                x = plot.maxX - Self.seriesInset - CGFloat(age / window) * usable
+            } else {
+                x = startX + CGFloat(index) * step
+            }
             points.append(CGPoint(
-                x: startX + CGFloat(index) * step,
+                x: x,
                 y: upward ? midY - offset : midY + offset
             ))
         }

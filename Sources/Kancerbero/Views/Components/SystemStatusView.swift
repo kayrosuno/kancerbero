@@ -424,11 +424,11 @@ struct SystemStatusView: View {
         case .unsupported:
             detail = "This build does not carry the filter system-extension entitlements. Sign with Developer ID and provisioning profiles via Config/Signing.local.xcconfig."
         case .notInstalled:
-            detail = "Install the filter system extension; macOS will ask for approval in Login Items & Extensions."
+            detail = "Install the filter system extension, then turn it on in System Settings → General → Login Items & Extensions → Network Extensions."
             actionTitle = "Install"
             action = { Task { await filter.enableFilter() } }
         case .requiresApproval:
-            detail = "Approve Kancerbero in System Settings → General → Login Items & Extensions → Network Extensions."
+            detail = "Open System Settings → General → Login Items & Extensions → Network Extensions and turn on Kancerbero Filter."
             actionTitle = "Install"
             action = { Task { await filter.enableFilter() } }
         case .activating:
@@ -442,7 +442,9 @@ struct SystemStatusView: View {
                 ? "Repairing the system extension. macOS may ask you to approve it again."
                 : "The filter extension is running and reporting flows."
         case .failed(let message):
-            detail = message
+            detail = [message, filter.controller.failureGuidance]
+                .compactMap { $0 }
+                .joined(separator: " ")
             actionTitle = "Retry"
             action = { Task { await filter.enableFilter() } }
         }

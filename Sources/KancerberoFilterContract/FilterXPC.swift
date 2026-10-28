@@ -15,10 +15,12 @@ import Foundation
 }
 
 public enum FilterXPCNames {
-    /// Team-ID prefixed because the container app is not sandboxed. Must match
-    /// `NEMachServiceName` in the extension's Info.plist and `KBFilterMachService`
-    /// in the app's Info.plist.
-    public static let machService = "AK37TK8X2Y.uno.kayros.kancerbero.filter"
+    /// `NEMachServiceName` of a sandboxed network system extension must be
+    /// prefixed with one of its App Groups, or the Network Extension category
+    /// validation rejects the extension. Must match `NEMachServiceName` in the
+    /// extension's Info.plist and `KBFilterMachService` in the app's Info.plist.
+    public static let appGroup = "group.uno.kayros.kancerbero"
+    public static let machService = "group.uno.kayros.kancerbero.filter"
     public static let extensionBundleIdentifier = "uno.kayros.kancerbero.filter"
     public static let teamIdentifier = "AK37TK8X2Y"
 

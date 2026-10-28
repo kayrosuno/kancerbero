@@ -27,7 +27,8 @@ final class AppModel {
     var interval: TimeInterval = 1.0 {
         didSet {
             guard oldValue != interval else { return }
-            resetHistory()
+            // Keep the collected history: samples carry their own timestamps,
+            // so the chart's time axis stays correct across cadence changes.
             daemonSource?.updateInterval(interval)
             if !usingDaemon {
                 wakeRefreshLoop()
@@ -38,6 +39,8 @@ final class AppModel {
     var daemonVersion: String?
     var rxHistory: [Double] = []
     var txHistory: [Double] = []
+    /// Timestamps of the traffic samples, parallel to `rxHistory`/`txHistory`.
+    var sampleDates: [Date] = []
     var systemDaemons: [KBDaemonService] = []
     var localDaemons: [KBDaemonService] = []
     var daemonServicesError: String?
@@ -594,21 +597,11 @@ final class AppModel {
         recordHistory()
     }
 
-    /// The chart window is expressed in samples, so mixing cadences would lie
-    /// about the time axis. Start a fresh window when the interval changes.
-    private func resetHistory() {
-        rxHistory.removeAll()
-        txHistory.removeAll()
-        cpuUsageHistory.removeAll()
-        loadHistory.removeAll()
-        threadHistory.removeAll()
-        memoryUsageHistory.removeAll()
-    }
-
     private func recordHistory() {
         let rates = systemRates
         rxHistory.append(rates.rxBytesPerSecond)
         txHistory.append(rates.txBytesPerSecond)
+        sampleDates.append(lastUpdate ?? Date())
 
         if let host = hostMetrics {
             cpuUsageHistory.append(host.cpu.totalUsagePercent)
@@ -620,13 +613,14 @@ final class AppModel {
         let limit = 60
         trim(&rxHistory, limit: limit)
         trim(&txHistory, limit: limit)
+        trim(&sampleDates, limit: limit)
         trim(&cpuUsageHistory, limit: limit)
         trim(&loadHistory, limit: limit)
         trim(&threadHistory, limit: limit)
         trim(&memoryUsageHistory, limit: limit)
     }
 
-    private func trim(_ values: inout [Double], limit: Int) {
+    private func trim<Element>(_ values: inout [Element], limit: Int) {
         if values.count > limit {
             values.removeFirst(values.count - limit)
         }

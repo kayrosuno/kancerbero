@@ -1,17 +1,23 @@
 #include "Base.xcconfig"
 
-PRODUCT_NAME = KancerberoFilter
+// macOS requires the system extension bundle to be named exactly
+// <CFBundleIdentifier>.systemextension; sysextd rejects it otherwise
+// ("bundle identifier and service path did not match").
+PRODUCT_NAME = $(PRODUCT_BUNDLE_IDENTIFIER)
 PRODUCT_BUNDLE_IDENTIFIER = uno.kayros.kancerbero.filter
 PRODUCT_MODULE_NAME = KancerberoFilter
 GENERATE_INFOPLIST_FILE = NO
 INFOPLIST_FILE = $(SRCROOT)/Resources/Filter/Info.plist
+// Release uses the entitlement values macOS expects from a network system
+// extension (`-systemextension`). Debug keeps the plain values because the Mac
+// Team development profiles only grant those; Debug signing stays automatic
+// with the same Apple Development identity as the host app so
+// ValidateEmbeddedBinary passes. Ad-hoc builds pass CODE_SIGN_IDENTITY=- for
+// both targets; see scripts/build.sh.
 CODE_SIGN_ENTITLEMENTS = $(SRCROOT)/Resources/Filter/KancerberoFilter.entitlements
-CODE_SIGN_STYLE = Manual
-// Debug signing follows the target's automatic Apple Development identity so
-// the embedded extension always matches the host app (ValidateEmbeddedBinary).
-// Ad-hoc builds pass CODE_SIGN_IDENTITY=- for both targets; see scripts/build.sh.
+CODE_SIGN_ENTITLEMENTS[config=Debug] = $(SRCROOT)/Resources/Filter/KancerberoFilter-Development.entitlements
+CODE_SIGN_STYLE[config=Release] = Manual
 PROVISIONING_PROFILE_SPECIFIER[config=Release] = $(KANCERBERO_FILTER_PROFILE)
-PROVISIONING_PROFILE_SPECIFIER[config=Debug] = $(KANCERBERO_FILTER_PROFILE)
 SKIP_INSTALL = YES
 ENABLE_HARDENED_RUNTIME = YES
 SWIFT_OBJC_BRIDGING_HEADER = $(SRCROOT)/Sources/KancerberoFilter/KancerberoFilter-Bridging-Header.h

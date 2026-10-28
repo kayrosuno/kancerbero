@@ -235,8 +235,34 @@ struct FilterView: View {
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 440)
             }
+            if let guidance = filter.controller.failureGuidance {
+                Text(guidance)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 440)
+            } else if filter.controller.isDevelopmentSigned, filter.controller.state != .enabled {
+                Text("Development-signed build: with SIP enabled macOS will reject the system extension. Use a Developer ID + notarized build (scripts/build-release.sh, scripts/notarize.sh, scripts/install-app.sh).")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 440)
+            }
+            if let detail = filter.controller.lastErrorDetail {
+                DisclosureGroup("Technical details") {
+                    Text(detail)
+                        .font(.system(size: 9, design: .monospaced))
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.system(size: 10))
+                .frame(maxWidth: 440)
+                Button("Copy diagnostics") { filter.controller.copyDiagnostics() }
+                    .buttonStyle(.link)
+                    .font(.system(size: 10))
+            }
             if filter.controller.state == .requiresApproval {
-                Text("Approve Kancerbero in System Settings → General → Login Items & Extensions → Network Extensions.")
+                Text("Open System Settings → General → Login Items & Extensions → Network Extensions and turn on Kancerbero Filter, then try again.")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
