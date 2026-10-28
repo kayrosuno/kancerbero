@@ -68,7 +68,6 @@ final class FilterCore: NSObject, @unchecked Sendable, KancerberoFilterXPC {
             let flowID = flow.identifier
             let identity = FilterProcessIdentity.resolve(flow)
             let endpoints = FilterFlowEndpoints.describe(flow)
-            let destinationKey = endpoints.remote?.destinationKey
             let rule = identity.path.isEmpty
                 ? nil
                 : rules.first(where: { $0.executablePath == identity.path })
@@ -97,8 +96,9 @@ final class FilterCore: NSObject, @unchecked Sendable, KancerberoFilterXPC {
                     reason = "rule"
                     verdict = .drop()
                 case .ask:
+                    let destinationKeys = endpoints.remote?.destinationKeys ?? []
                     if let decision = rememberedDecisionLocked(path: identity.path,
-                                                                destination: destinationKey) {
+                                                                keys: destinationKeys) {
                         state = decision.allow ? .allowed : .denied
                         reason = decision.allow ? nil : "remembered"
                         verdict = decision.allow ? .allow() : .drop()
@@ -279,7 +279,10 @@ final class FilterCore: NSObject, @unchecked Sendable, KancerberoFilterXPC {
             case .app:
                 addRememberedLocked(path: path, destination: nil, allow: message.allow)
             case .destination:
-                addRememberedLocked(path: path, destination: message.destinationKey, allow: message.allow)
+                let keys = message.destinationKeys ?? [message.destinationKey].compactMap { $0 }
+                for key in keys {
+                    addRememberedLocked(path: path, destination: key, allow: message.allow)
+                }
             }
         }
 
@@ -297,10 +300,15 @@ final class FilterCore: NSObject, @unchecked Sendable, KancerberoFilterXPC {
         saveCacheLocked()
     }
 
-    private func rememberedDecisionLocked(path: String, destination: String?) -> RememberedDecision? {
-        remembered
-            .filter { $0.executablePath == path }
-            .first { $0.destination == nil || $0.destination == destination }
+    private func rememberedDecisionLocked(path: String, keys: [String]) -> RememberedDecision? {
+        let candidates = remembered.filter { $0.executablePath == path }
+        if let specific = candidates.first(where: { decision in
+            guard let destination = decision.destination else { return false }
+            return keys.contains(destination)
+        }) {
+            return specific
+        }
+        return candidates.first { $0.destination == nil }
     }
 
     private func scheduleExpiryLocked(_ id: UUID, after seconds: TimeInterval) {

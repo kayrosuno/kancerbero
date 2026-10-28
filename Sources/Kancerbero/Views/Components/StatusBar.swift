@@ -106,24 +106,27 @@ struct StatusBar: View {
 
     private var globalStatus: some View {
         HStack(spacing: 14) {
-            chip(label: filterLabel,
+            chip(label: filter.filterStatusLabel,
                  textWidth: 64,
                  icon: "shield.lefthalf.filled",
-                 tint: filterTint,
-                 help: filterHelp,
+                 tint: filter.filterStatusTint,
+                 help: filter.filterStatusHelp,
                  accessibilityLabel: "Network filter: \(filter.controller.state.title)")
 
-            chip(label: model.usingDaemon ? "Daemon" : "Local",
-                 textWidth: 52,
+            chip(label: daemonLabel,
+                 textWidth: 74,
                  icon: "info.circle",
                  tint: statusTint,
-                 help: "System status and background service setup",
-                 accessibilityLabel: model.usingDaemon
-                     ? "System status: daemon connected"
-                     : "System status: local mode")
+                 help: daemonHelp,
+                 accessibilityLabel: daemonHelp)
 
             if model.privcheck >= 0 {
-                slot("privcheck \(model.privcheck)", width: 85)
+                chip(label: model.trafficAccessShortLabel,
+                     textWidth: nil,
+                     icon: "network",
+                     tint: model.trafficAccessTint,
+                     help: model.trafficAccessHelp,
+                     accessibilityLabel: model.trafficAccessLabel)
             }
             if let error = model.lastError {
                 Text(error)
@@ -138,7 +141,7 @@ struct StatusBar: View {
     /// Capsule chip with a fixed text width so state changes do not shift the
     /// rest of the bar. Opens the System status window.
     private func chip(label: String,
-                      textWidth: CGFloat,
+                      textWidth: CGFloat?,
                       icon: String,
                       tint: Color,
                       help: String,
@@ -149,6 +152,7 @@ struct StatusBar: View {
             HStack(spacing: 4) {
                 Text(label)
                     .lineLimit(1)
+                    .fixedSize(horizontal: textWidth == nil, vertical: false)
                     .frame(width: textWidth, alignment: .leading)
                 Image(systemName: icon)
                     .font(.system(size: 9, weight: .semibold))
@@ -167,36 +171,18 @@ struct StatusBar: View {
         .accessibilityHint("Opens the System status window")
     }
 
-    private var filterLabel: String {
-        switch filter.controller.state {
-        case .enabled: return "Filter"
-        case .disabled: return "Filter off"
-        case .requiresApproval: return "Approval"
-        case .activating: return "Filter…"
-        case .notInstalled, .unsupported: return "No filter"
-        case .failed: return "Error"
-        }
+    private var daemonLabel: String {
+        guard model.usingDaemon else { return "Local" }
+        return model.daemonIsRoot ? "Daemon root" : "Daemon user"
     }
 
-    private var filterTint: Color {
-        switch filter.controller.state {
-        case .enabled:
-            return filter.isConnected ? .green : .orange
-        case .failed:
-            return .red
-        case .unsupported:
-            return .gray
-        case .disabled, .notInstalled, .requiresApproval, .activating:
-            return .orange
+    private var daemonHelp: String {
+        guard model.usingDaemon else {
+            return "System status: local mode"
         }
-    }
-
-    private var filterHelp: String {
-        var text = "Network filter: \(filter.controller.state.title)"
-        if case .failed(let message) = filter.controller.state {
-            text += " — \(message)"
-        }
-        return text
+        return model.daemonIsRoot
+            ? "System status: daemon connected as root"
+            : "System status: daemon connected without root"
     }
 
     private var statusTint: Color {

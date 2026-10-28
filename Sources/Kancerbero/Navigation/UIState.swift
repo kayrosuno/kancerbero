@@ -113,5 +113,7 @@ struct CPUUIState: Equatable {
 struct FilterUIState {
     var search = ""
     var selectedFlow: String?
-    var sortOrder: [KeyPathComparator<FlowRecord>] = []
+    var sortOrder: [KeyPathComparator<FlowRecord>] = [
+        KeyPathComparator(\.startedAt, order: .reverse)
+    ]
 }

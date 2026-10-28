@@ -1,4 +1,5 @@
 import SwiftUI
+import KancerberoFilterContract
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
@@ -11,6 +12,9 @@ struct RootView: View {
     private var tabAnimations = KBPreferences.tabAnimationsDefault
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var columnVisibility: NavigationSplitViewVisibility
+    /// Request currently on screen. A real state binding (unlike a read-only
+    /// Binding over `filter.pending`) so `dismiss()` always closes the sheet.
+    @State private var approvalRequest: FilterRequest?
 
     init() {
         let collapsed = CommandLine.arguments.contains("--sidebar-collapsed")
@@ -126,13 +130,16 @@ struct RootView: View {
                 }
             }
         }
-        .task { await autoOpenStatusWindowIfRequested() }
-        .sheet(item: Binding(
-            get: { filter.pending.first },
-            set: { _ in }
-        )) { request in
+        .task {
+            syncApproval(filter.pending)
+            await autoOpenStatusWindowIfRequested()
+        }
+        .sheet(item: $approvalRequest) { request in
             FilterApprovalSheet(request: request)
                 .environment(filter)
+        }
+        .onChange(of: filter.pending) { _, pending in
+            syncApproval(pending)
         }
         .onReceive(NotificationCenter.default.publisher(for: .kbSelectSection)) { notification in
             guard let raw = notification.object as? String,
@@ -141,6 +148,18 @@ struct RootView: View {
                 sectionRaw = section.rawValue
             }
         }
+    }
+
+    /// Keeps the presented request in step with the extension's pending list:
+    /// close it as soon as it is resolved, and show the next one if any.
+    private func syncApproval(_ pending: [FilterRequest]) {
+        if let presented = approvalRequest,
+           pending.contains(where: { $0.id == presented.id }) {
+            return
+        }
+        // Nothing on screen, or the presented request was just resolved:
+        // show the next one (or close the sheet when there is none).
+        approvalRequest = pending.first
     }
 
     /// Screenshot hook: `--show-status` opens the System status window after

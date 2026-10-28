@@ -104,6 +104,8 @@ struct DaemonsView: View {
 
             Spacer()
 
+            daemonModePill
+
             TextField("Search label, program, arguments or plist", text: bind(\.search))
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 250)
@@ -116,6 +118,32 @@ struct DaemonsView: View {
             .buttonStyle(.bordered)
             .help("Refresh services")
         }
+    }
+
+    private var daemonModePill: some View {
+        let tint: Color = model.usingDaemon
+            ? (model.daemonIsRoot ? .green : .orange)
+            : .gray
+        let label = model.usingDaemon
+            ? (model.daemonIsRoot ? "Daemon · root" : "Daemon · user")
+            : "Local mode"
+        return Text(label)
+            .font(.system(size: 10, weight: .medium))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(tint.opacity(0.14)))
+            .foregroundStyle(tint)
+            .help(daemonModeHelp)
+            .accessibilityLabel(daemonModeHelp)
+    }
+
+    private var daemonModeHelp: String {
+        guard model.usingDaemon else {
+            return "Local mode: no background daemon; system services cannot be controlled."
+        }
+        return model.daemonIsRoot
+            ? "The background daemon runs as root; system services can be controlled."
+            : "The daemon is connected without root; system services cannot be controlled."
     }
 
     private var cards: some View {
