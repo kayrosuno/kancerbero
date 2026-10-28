@@ -8,6 +8,9 @@ struct StatusBar: View {
     @Environment(DiskModel.self) private var disk
     @Environment(FilterModel.self) private var filter
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(KBPreferences.statusBarTextAnimationsKey)
+    private var statusBarTextAnimations = KBPreferences.statusBarTextAnimationsDefault
 
     var body: some View {
         HStack(spacing: 14) {
@@ -29,7 +32,13 @@ struct StatusBar: View {
             .monospacedDigit()
             .lineLimit(1)
             .frame(width: width, alignment: .leading)
-            .contentTransition(.numericText())
+            .contentTransition(textTransition)
+    }
+
+    private var textTransition: ContentTransition {
+        KBPreferences.enabled(stored: statusBarTextAnimations, reduceMotion: reduceMotion)
+            ? .numericText()
+            : .identity
     }
 
     @ViewBuilder
