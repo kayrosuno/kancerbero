@@ -99,8 +99,24 @@ struct FilterApprovalSheet: View {
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+
+            Button("Disable filter") {
+                disableFilter()
+            }
+            .buttonStyle(.bordered)
+            .help("Turns off the network filter and stops asking for approvals.")
         }
         .disabled(deciding)
+    }
+
+    private func disableFilter() {
+        deciding = true
+        Task {
+            await filter.disableFilter()
+            dismiss()
+        }
     }
 
     private func decide(allow: Bool, remember: FilterRemember) {

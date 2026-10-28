@@ -15,6 +15,11 @@ struct MetricTile: View {
     var hint: String = ""
     var isSelected = false
     var valueSize: CGFloat = 18
+    /// Reserved width for the value so it does not resize (and rescale) when
+    /// the text length changes.
+    var valueMinWidth: CGFloat? = nil
+    /// Set to false to keep the value at `valueSize` instead of shrinking it.
+    var valueScales = true
     var iconSize: CGFloat = 11
     var verticalPadding: CGFloat = 4
     let action: () -> Void
@@ -98,7 +103,8 @@ struct MetricTile: View {
             .monospacedDigit()
             .contentTransition(.numericText())
             .lineLimit(1)
-            .minimumScaleFactor(0.65)
+            .frame(minWidth: valueMinWidth ?? 0, alignment: .leading)
+            .minimumScaleFactor(valueScales ? 0.65 : 1)
     }
 
     private var accessibilityText: String {

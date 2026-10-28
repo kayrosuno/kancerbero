@@ -23,6 +23,9 @@ final class FilterModel {
     let controller = FilterController()
 
     private var client: FilterXPCClient?
+    /// Requests decided locally whose confirmation from the extension has not
+    /// arrived yet. Pushes generated before the decision must not resurrect them.
+    private var locallyResolved: Set<UUID> = []
     private var connecting = false
     private var reconnectTask: Task<Void, Never>?
     private var notificationAuthorized = false
@@ -169,15 +172,27 @@ final class FilterModel {
                 allow: Bool,
                 remember: FilterRemember) async {
         pending.removeAll { $0.id == request.id }
+        locallyResolved.insert(request.id)
 
         if remember != .none, !request.executablePath.isEmpty {
-            let destination = remember == .destination ? request.remote?.destinationKey : nil
-            remembered.removeAll {
-                $0.executablePath == request.executablePath && $0.destination == destination
+            // Remember an "app + destination" decision under every key the
+            // endpoint can be reported with (`host:port` and `address:port`),
+            // otherwise the next flow may not match and asks again.
+            let keys: [String?]
+            if remember == .destination {
+                let destinations = request.remote?.destinationKeys ?? []
+                keys = destinations.isEmpty ? [nil] : destinations.map { Optional($0) }
+            } else {
+                keys = [nil]
             }
-            remembered.append(RememberedDecision(executablePath: request.executablePath,
-                                                 destination: destination,
-                                                 allow: allow))
+            for key in keys {
+                remembered.removeAll {
+                    $0.executablePath == request.executablePath && $0.destination == key
+                }
+                remembered.append(RememberedDecision(executablePath: request.executablePath,
+                                                     destination: key,
+                                                     allow: allow))
+            }
             persistRemembered()
         }
 
@@ -185,6 +200,7 @@ final class FilterModel {
                                             allow: allow,
                                             remember: remember,
                                             destinationKey: request.remote?.destinationKey,
+                                            destinationKeys: request.remote?.destinationKeys,
                                             executablePath: request.executablePath)
         _ = await client?.request(FilterCodec.envelope(.decide, value: message))
         if remember != .none {
@@ -242,6 +258,9 @@ final class FilterModel {
             persistRemembered()
         }
         flows = snapshot.flows
+        // The snapshot is authoritative: if the extension still lists a request,
+        // the decision never reached it and it must be shown again.
+        locallyResolved.removeAll()
         pending = snapshot.pending
         history = snapshot.history
         announcePendingIfNeeded()
@@ -253,6 +272,9 @@ final class FilterModel {
         }
 
         for request in push.pending {
+            // Ignore stale pushes that still list requests already decided here;
+            // the extension confirms them through `resolved`.
+            guard !locallyResolved.contains(request.id) else { continue }
             if let index = pending.firstIndex(where: { $0.id == request.id }) {
                 pending[index] = request
             } else {
@@ -262,6 +284,7 @@ final class FilterModel {
         let resolved = Set(push.resolved)
         if !resolved.isEmpty {
             pending.removeAll { resolved.contains($0.id) }
+            locallyResolved.subtract(resolved)
         }
 
         for flow in push.flows {

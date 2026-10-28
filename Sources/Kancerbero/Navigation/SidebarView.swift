@@ -5,6 +5,7 @@ import KancerberoCore
 struct SidebarView: View {
     @Binding var selection: AppSection?
     @Environment(AppModel.self) private var model
+    @Environment(FilterModel.self) private var filter
     @Environment(\.openWindow) private var openWindow
     @Namespace private var namespace
 
@@ -101,9 +102,29 @@ struct SidebarView: View {
             } label: {
                 HStack(spacing: 6) {
                     Circle()
+                        .fill(filter.filterStatusTint)
+                        .frame(width: 6, height: 6)
+                    Text(filter.filterSidebarLabel)
+                        .font(.system(size: 10, weight: .medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        .frame(width: 190, alignment: .leading)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(filter.filterStatusHelp)
+            .accessibilityLabel("Network filter: \(filter.controller.state.title)")
+            .accessibilityHint("Opens the System status window")
+
+            Button {
+                openWindow(id: SystemStatusWindow.id)
+            } label: {
+                HStack(spacing: 6) {
+                    Circle()
                         .fill(statusTint)
                         .frame(width: 6, height: 6)
-                    Text(model.usingDaemon ? "Daemon connected" : "Local mode")
+                    Text(daemonStatusText)
                         .font(.system(size: 10, weight: .medium))
                     Image(systemName: "info.circle")
                         .font(.system(size: 9))
@@ -113,14 +134,20 @@ struct SidebarView: View {
             }
             .buttonStyle(.plain)
             .help("System status and background service setup")
-            .accessibilityLabel(model.usingDaemon
-                ? "System status: daemon connected"
-                : "System status: local mode")
+            .accessibilityLabel(daemonAccessibilityLabel)
             .accessibilityHint("Opens the System status window with the background service and permission checklist")
 
-            Text("Updated \(KBFormat.time(model.lastUpdate))")
             if model.privcheck >= 0 {
-                Text("privcheck \(model.privcheck)")
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(model.trafficAccessTint)
+                        .frame(width: 6, height: 6)
+                    Text(model.trafficAccessLabel)
+                        .font(.system(size: 10, weight: .medium))
+                        .frame(width: 130, alignment: .leading)
+                }
+                .help(model.trafficAccessHelp)
+                .accessibilityLabel(model.trafficAccessHelp)
             }
             if let error = model.lastError {
                 Text(error)
@@ -132,12 +159,25 @@ struct SidebarView: View {
                     .foregroundStyle(.orange)
                     .lineLimit(1)
             }
+            Text("Updated \(KBFormat.time(model.lastUpdate))")
         }
         .font(.system(size: 10))
         .foregroundStyle(.secondary)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var daemonStatusText: String {
+        guard model.usingDaemon else { return "Local mode" }
+        return model.daemonIsRoot ? "Daemon connected (root)" : "Daemon connected (user)"
+    }
+
+    private var daemonAccessibilityLabel: String {
+        guard model.usingDaemon else { return "System status: local mode" }
+        return model.daemonIsRoot
+            ? "System status: daemon connected as root"
+            : "System status: daemon connected without root"
     }
 
     private var statusTint: Color {

@@ -181,6 +181,7 @@ struct SystemStatusView: View {
 
             sectionHeader("Data access")
             dataCollectionRow
+            trafficAttributionRow
             privilegedRow
 
             sectionHeader("Background service")
@@ -254,14 +255,24 @@ struct SystemStatusView: View {
             level = .info
             detail = "Waiting for the first collection sample."
         }
-        if model.privcheck >= 0 {
-            detail += " privcheck \(model.privcheck)."
-        }
         if let error = model.lastError {
             detail += "\n\(error)"
         }
         return statusRow(level, title: "Data collection",
                          value: model.modeDescription, detail: detail)
+    }
+
+    private var trafficAttributionRow: some View {
+        let level: StatusLevel
+        switch model.privcheck {
+        case 0: level = .ok
+        case 1...: level = .warning
+        default: level = .info
+        }
+        return statusRow(level,
+                         title: "Per-process traffic",
+                         value: model.trafficAccessValue,
+                         detail: model.trafficAccessDetail)
     }
 
     private var privilegedRow: some View {

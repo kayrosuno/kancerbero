@@ -107,6 +107,18 @@ public struct FilterEndpoint: Codable, Sendable, Hashable {
         let host = hostname ?? address
         return "\(host):\(port)"
     }
+
+    /// Every key this endpoint can be matched by. macOS only reports
+    /// `remoteHostname` for some flows, so a remembered "app + destination"
+    /// decision must match either `host:port` or `address:port`.
+    public var destinationKeys: [String] {
+        var keys: [String] = []
+        if let hostname, !hostname.isEmpty, hostname != address {
+            keys.append("\(hostname):\(port)")
+        }
+        keys.append("\(address):\(port)")
+        return keys
+    }
 }
 
 public enum FilterFlowState: String, Codable, Sendable {
@@ -275,17 +287,21 @@ public struct FilterDecisionMessage: Codable, Sendable {
     public var allow: Bool
     public var remember: FilterRemember
     public var destinationKey: String?
+    /// All keys of the decided destination (`host:port` and `address:port`).
+    public var destinationKeys: [String]?
     public var executablePath: String?
 
     public init(flowID: UUID,
                 allow: Bool,
                 remember: FilterRemember = .none,
                 destinationKey: String? = nil,
+                destinationKeys: [String]? = nil,
                 executablePath: String? = nil) {
         self.flowID = flowID
         self.allow = allow
         self.remember = remember
         self.destinationKey = destinationKey
+        self.destinationKeys = destinationKeys
         self.executablePath = executablePath
     }
 }

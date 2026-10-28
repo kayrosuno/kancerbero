@@ -12,7 +12,7 @@ struct TrafficCard: View {
 
     static let cardHeight: CGFloat = 208
     private static let headerHeight: CGFloat = 38
-    private static let metricWidth: CGFloat = 116
+    private static let metricWidth: CGFloat = 140
 
     private var downloadValue: String {
         KBFormat.bitRate(downloadBytesPerSecond)
@@ -58,6 +58,8 @@ struct TrafficCard: View {
                     hint: "Show rows with receive traffic",
                     isSelected: focus == .download,
                     valueSize: 16,
+                    valueMinWidth: 104,
+                    valueScales: false,
                     verticalPadding: 3
                 ) {
                     onToggle(.download)
@@ -74,6 +76,8 @@ struct TrafficCard: View {
                     hint: "Show rows with send traffic",
                     isSelected: focus == .upload,
                     valueSize: 16,
+                    valueMinWidth: 104,
+                    valueScales: false,
                     verticalPadding: 3
                 ) {
                     onToggle(.upload)
