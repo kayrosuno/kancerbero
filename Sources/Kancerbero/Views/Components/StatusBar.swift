@@ -111,7 +111,7 @@ struct StatusBar: View {
                  icon: "shield.lefthalf.filled",
                  tint: filter.filterStatusTint,
                  help: filter.filterStatusHelp,
-                 accessibilityLabel: "Network filter: \(filter.controller.state.title)")
+                 accessibilityLabel: "Network filter: \(filter.filterHealth.systemValue)")
 
             chip(label: daemonLabel,
                  textWidth: 74,

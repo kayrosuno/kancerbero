@@ -1,3 +1,4 @@
+import AppKit
 import ServiceManagement
 import SwiftUI
 
@@ -16,24 +17,31 @@ struct SystemStatusView: View {
 
     @State private var copiedLegacyCommands = false
     @State private var showRepairConfirmation = false
+    @State private var guide: ActivationGuide?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                header
-                overallBanner
-                primaryActions
-                if let error = model.serviceError {
-                    errorText(error)
+        HStack(alignment: .top, spacing: 18) {
+            rail
+                .frame(width: 190, alignment: .topLeading)
+                .padding(.leading, 18)
+                .padding(.top, 18)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    contentHeader
+                    overallBanner
+                    primaryActions
+                    if let error = model.serviceError {
+                        errorText(error)
+                    }
+                    checklist
+                    footerColumns
                 }
-                checklist
-                if showsSetupSteps { setupSteps }
-                actions
+                .padding(18)
             }
-            .padding(16)
+            .scrollIndicators(.visible)
         }
-        .scrollIndicators(.visible)
-        .frame(minWidth: 460, idealWidth: 480, minHeight: 560, maxHeight: .infinity)
+        .frame(minWidth: 1080, idealWidth: 1180, minHeight: 620, maxHeight: .infinity)
         .onAppear {
             model.refreshServiceStatus()
             // Do not recompute over a transient state: refresh() would erase
@@ -42,8 +50,21 @@ struct SystemStatusView: View {
             case .activating, .requiresApproval, .failed:
                 break
             default:
-                Task { await filter.controller.refresh() }
+                Task {
+                    await filter.controller.refresh()
+                    // NEFilterManager.isEnabled only proves a saved
+                    // configuration. Probe the extension so a stale "Enabled"
+                    // cannot paint the checklist green.
+                    if filter.controller.state.isEnabled && !filter.isConnected {
+                        await filter.connect()
+                    }
+                }
             }
+        }
+        .sheet(item: $guide) { guide in
+            ActivationGuideView(guide: guide)
+                .environment(model)
+                .environment(filter)
         }
         .confirmationDialog("Repair background service?",
                             isPresented: $showRepairConfirmation,
@@ -59,8 +80,10 @@ struct SystemStatusView: View {
 
     // MARK: - Header and overview
 
-    private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
+    /// Left rail: logo, identity and the two component indicators.
+    private var rail: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            AppLogoView(size: 128)
             VStack(alignment: .leading, spacing: 2) {
                 Text("System status")
                     .font(.system(size: 20, weight: .semibold, design: .rounded))
@@ -68,6 +91,46 @@ struct SystemStatusView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            VStack(alignment: .leading, spacing: 6) {
+                railChip(railDaemonLabel, tint: railDaemonTint)
+                railChip(filter.filterHealth.shortLabel,
+                         tint: filter.filterHealth.tint)
+            }
+            .padding(.top, 4)
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func railChip(_ text: String, tint: Color) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(tint)
+                .frame(width: 6, height: 6)
+            Text(text)
+                .font(.system(size: 10, weight: .medium))
+                .lineLimit(1)
+        }
+        .help(text)
+    }
+
+    private var railDaemonLabel: String {
+        guard model.usingDaemon else { return "Local mode" }
+        return model.daemonIsRoot ? "Daemon root" : "Daemon user"
+    }
+
+    private var railDaemonTint: Color {
+        if model.legacyServiceDetected { return .orange }
+        if model.usingDaemon {
+            return model.daemonIsRoot ? .green : .orange
+        }
+        return .orange
+    }
+
+    private var contentHeader: some View {
+        HStack(spacing: 8) {
+            sectionHeader("Overview")
             Spacer()
             Button {
                 dismiss()
@@ -95,6 +158,11 @@ struct SystemStatusView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 6)
+            if let actionTitle = state.actionTitle, let action = state.action {
+                Button(actionTitle, action: action)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
             if model.serviceActionInFlight || model.isConnectingToDaemon {
                 ProgressView().controlSize(.small)
             }
@@ -153,6 +221,12 @@ struct SystemStatusView: View {
                 title: "Service registered, daemon not running",
                 message: "macOS has the service registered but is not launching the daemon. This usually means its code signature was rejected (AMFI launch constraint). Install the signed, notarized build and use Repair.")
         }
+        // A healthy daemon is not the whole story: a missing or inactive
+        // network extension is a degraded system, so it must not be reported as
+        // a green "Full access".
+        if let filterProblem = filterComponentState {
+            return filterProblem
+        }
         if model.usingDaemon && model.daemonIsRoot {
             return OverallState(
                 level: .ok,
@@ -177,31 +251,117 @@ struct SystemStatusView: View {
             message: "Kancerbero can only see your user's processes and sockets. Enable and approve the background service for full access.")
     }
 
+    /// Overall state contributed by the network filter. Returns `nil` when the
+    /// filter is running or was deliberately disabled, so the daemon's access
+    /// state stays visible.
+    private var filterComponentState: OverallState? {
+        switch filter.filterHealth {
+        case .configuredNotRunning:
+            return OverallState(
+                level: .warning,
+                title: "Network extension not active",
+                message: "The filter is configured in macOS, but the network extension is not running. Turn on Kancerbero Filter in System Settings → General → Login Items & Extensions → Network Extensions.",
+                actionTitle: "How to activate…",
+                action: { guide = .networkExtension })
+        case .requiresApproval, .notInstalled:
+            return OverallState(
+                level: .warning,
+                title: "Network extension not active",
+                message: "Install and approve the network extension in System Settings → General → Login Items & Extensions → Network Extensions.",
+                actionTitle: "How to activate…",
+                action: { guide = .networkExtension })
+        case .failed(let message):
+            return OverallState(
+                level: .warning,
+                title: "Network extension unavailable",
+                message: [message, filter.controller.failureGuidance]
+                    .compactMap { $0 }
+                    .joined(separator: " "),
+                actionTitle: "How to activate…",
+                action: { guide = .networkExtension })
+        case .unsupported:
+            return OverallState(
+                level: .warning,
+                title: "Network extension unavailable",
+                message: "This build cannot host the filter system extension. Use a signed, notarized build installed in /Applications.",
+                actionTitle: "How to activate…",
+                action: { guide = .networkExtension })
+        case .activating:
+            return OverallState(
+                level: .info,
+                title: "Activating network extension",
+                message: "Waiting for macOS to activate the system extension.")
+        case .running, .disabled:
+            return nil
+        }
+    }
+
     // MARK: - Checklist
 
     private var checklist: some View {
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 14) {
+                card("Application") {
+                    applicationRow
+                    helperRow
+                }
+                card("Data access") {
+                    dataCollectionRow
+                    trafficAttributionRow
+                    privilegedRow
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .top)
+
+            VStack(alignment: .leading, spacing: 14) {
+                card("Background service") {
+                    serviceRow
+                    approvalRow
+                    connectionRow
+                    daemonProcessRow
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .top)
+
+            VStack(alignment: .leading, spacing: 14) {
+                card("Network filter") {
+                    filterExtensionRow
+                    filterConfigurationRow
+                }
+                card("Compatibility") {
+                    legacyRow
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .top)
+        }
+    }
+
+    private func card<Content: View>(_ title: String,
+                                     @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 9) {
-            sectionHeader("Application")
-            applicationRow
-            helperRow
+            sectionHeader(title)
+            content()
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background {
+            RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.55))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
+                .strokeBorder(Color.secondary.opacity(0.14), lineWidth: 1)
+        }
+    }
 
-            sectionHeader("Data access")
-            dataCollectionRow
-            trafficAttributionRow
-            privilegedRow
-
-            sectionHeader("Background service")
-            serviceRow
-            approvalRow
-            connectionRow
-            daemonProcessRow
-
-            sectionHeader("Network filter")
-            filterExtensionRow
-            filterConfigurationRow
-
-            sectionHeader("Compatibility")
-            legacyRow
+    private var footerColumns: some View {
+        HStack(alignment: .top, spacing: 14) {
+            if showsSetupSteps {
+                setupSteps
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            actions
+                .frame(maxWidth: .infinity, alignment: .topLeading)
         }
     }
 
@@ -318,18 +478,16 @@ struct SystemStatusView: View {
             level = .warning
             value = "Needs approval"
             detail = "Approve Kancerbero in Login Items → Allow in the Background."
-            actionTitle = "Open Login Items"
-            action = { model.openLoginItemsSettings() }
+            actionTitle = "How to activate…"
+            action = { guide = .backgroundService }
+            actionDisabled = model.serviceActionInFlight
         case .notRegistered:
             level = .warning
             value = "Not registered"
             detail = "Enable it to collect other users and control system services."
-            actionTitle = "Enable"
-            action = { Task { await model.registerDaemonService() } }
-            actionDisabled = actionDisabled
-                || model.legacyServiceDetected
-                || !model.daemonHelperPresent
-                || !model.daemonPlistPresent
+            actionTitle = "How to activate…"
+            action = { guide = .backgroundService }
+            actionDisabled = model.serviceActionInFlight
         case .notFound:
             level = .error
             value = "Unavailable"
@@ -453,68 +611,75 @@ struct SystemStatusView: View {
     }
 
     private var filterExtensionRow: some View {
-        let state = filter.controller.state
-        let level: StatusLevel
-        switch state {
-        case .enabled:
-            level = .ok
-        case .disabled:
-            level = .info
-        case .requiresApproval, .activating, .notInstalled:
-            level = .warning
-        case .unsupported, .failed:
-            level = .error
+        let health = filter.filterHealth
+        let detail: String
+        if filter.controller.isActivating,
+           health == .running || health == .configuredNotRunning {
+            detail = "Repairing the system extension. macOS may ask you to approve it again."
+        } else {
+            detail = health.systemDetail(failureGuidance: filter.controller.failureGuidance)
         }
 
-        let detail: String
-        var actionTitle: String?
-        var action: (() -> Void)?
-        switch state {
-        case .unsupported:
-            detail = "This build does not carry the filter system-extension entitlements. Sign with Developer ID and provisioning profiles via Config/Signing.local.xcconfig."
-        case .notInstalled:
-            detail = "Install the filter system extension, then turn it on in System Settings → General → Login Items & Extensions → Network Extensions."
-            actionTitle = "Install"
-            action = { Task { await filter.enableFilter() } }
-        case .requiresApproval:
-            detail = "Open System Settings → General → Login Items & Extensions → Network Extensions and turn on Kancerbero Filter."
-            actionTitle = "Install"
-            action = { Task { await filter.enableFilter() } }
-        case .activating:
-            detail = "Waiting for macOS to activate the system extension."
+        let actionTitle: String?
+        let action: (() -> Void)?
+        switch health {
+        case .notInstalled, .requiresApproval, .configuredNotRunning:
+            actionTitle = "How to activate…"
+            action = { guide = .networkExtension }
         case .disabled:
-            detail = "Not enabled. Enabling installs the system extension and asks for approval in Settings if macOS has not approved it yet."
             actionTitle = "Enable"
             action = { Task { await filter.enableFilter() } }
-        case .enabled:
-            detail = filter.controller.isActivating
-                ? "Repairing the system extension. macOS may ask you to approve it again."
-                : "The filter extension is running and reporting flows."
-        case .failed(let message):
-            detail = [message, filter.controller.failureGuidance]
-                .compactMap { $0 }
-                .joined(separator: " ")
+        case .failed:
             actionTitle = "Retry"
             action = { Task { await filter.enableFilter() } }
+        case .running, .activating, .unsupported:
+            actionTitle = nil
+            action = nil
         }
 
-        return statusRow(level,
+        return statusRow(StatusLevel(health.severity),
                          title: "Filter extension",
-                         value: state.title,
+                         value: health.systemValue,
                          detail: detail,
                          actionTitle: actionTitle,
-                         actionDisabled: filter.isBusy,
+                         actionDisabled: filter.isBusy
+                            || filter.isConnecting
+                            || filter.controller.isActivating,
                          action: action)
     }
 
     private var filterConfigurationRow: some View {
+        let health = filter.filterHealth
         let enabled = filter.controller.isEnabled
-        let detail = enabled
-            ? "Watched processes ask for approval before each new connection. Other traffic is observed only."
-            : "The filter is disabled; Kancerbero keeps monitoring with NetworkStatistics."
-        return statusRow(enabled ? .ok : .info,
+        let level: StatusLevel
+        let value: String
+        let detail: String
+        switch health {
+        case .running:
+            level = .ok
+            value = "Enabled"
+            detail = "Watched processes ask for approval before each new connection. Other traffic is observed only."
+        case .configuredNotRunning:
+            // Do not paint the saved configuration green while the extension
+            // it belongs to is dead.
+            level = .info
+            value = "Enabled (saved)"
+            detail = "The filter configuration is saved in macOS. This does not prove the extension was approved; see Filter extension above."
+        case .disabled:
+            level = .info
+            value = "Disabled"
+            detail = "The filter is disabled; Kancerbero keeps monitoring with NetworkStatistics."
+        default:
+            level = .info
+            value = enabled ? "Enabled" : "Disabled"
+            detail = enabled
+                ? "Watched processes ask for approval before each new connection. Other traffic is observed only."
+                : "The filter is disabled; Kancerbero keeps monitoring with NetworkStatistics."
+        }
+
+        return statusRow(level,
                          title: "Filter configuration",
-                         value: enabled ? "Enabled" : "Disabled",
+                         value: value,
                          detail: detail,
                          actionTitle: enabled ? "Disable" : "Enable",
                          actionDisabled: filter.isBusy || !filter.controller.isSupported,
@@ -807,6 +972,8 @@ private struct OverallState {
     let level: StatusLevel
     let title: String
     let message: String
+    var actionTitle: String? = nil
+    var action: (() -> Void)? = nil
 }
 
 private enum StatusLevel {
@@ -830,6 +997,17 @@ private enum StatusLevel {
         case .info: return "info.circle.fill"
         case .warning: return "exclamationmark.triangle.fill"
         case .error: return "xmark.octagon.fill"
+        }
+    }
+}
+
+private extension StatusLevel {
+    init(_ severity: FilterHealth.Severity) {
+        switch severity {
+        case .ok: self = .ok
+        case .info: self = .info
+        case .warning: self = .warning
+        case .error: self = .error
         }
     }
 }
@@ -863,18 +1041,20 @@ private struct StatusRow: View {
                 .frame(width: 18)
 
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(title)
-                        .font(.system(size: 11, weight: .semibold))
-                    Text(value)
+                // A single wrapping paragraph so a long title or value wraps
+                // instead of being truncated in a narrow column.
+                (Text(title).font(.system(size: 11, weight: .semibold))
+                    + Text("   ")
+                    + Text(value)
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(level.color)
-                }
+                        .foregroundColor(level.color))
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(detail)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            .layoutPriority(1)
 
             Spacer(minLength: 6)
 
@@ -882,6 +1062,8 @@ private struct StatusRow: View {
                 Button(actionTitle, action: action)
                     .buttonStyle(.link)
                     .font(.system(size: 10))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
                     .disabled(actionDisabled)
             }
         }

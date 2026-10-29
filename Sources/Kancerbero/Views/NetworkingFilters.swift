@@ -85,9 +85,9 @@ enum ProcessProtocolKind: String, CaseIterable, Identifiable, Hashable, Sendable
         switch self {
         case .tcp: return "TCP"
         case .udp: return "UDP"
-        case .raw: return "RAW"
-        case .unix: return "UNIX"
-        case .other: return "OTHER"
+        case .raw: return "Raw"
+        case .unix: return "Unix"
+        case .other: return "Other"
         }
     }
 

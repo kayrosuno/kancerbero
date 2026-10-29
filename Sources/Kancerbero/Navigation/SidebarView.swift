@@ -114,7 +114,7 @@ struct SidebarView: View {
             }
             .buttonStyle(.plain)
             .help(filter.filterStatusHelp)
-            .accessibilityLabel("Network filter: \(filter.controller.state.title)")
+            .accessibilityLabel("Network filter: \(filter.filterHealth.systemValue)")
             .accessibilityHint("Opens the System status window")
 
             Button {

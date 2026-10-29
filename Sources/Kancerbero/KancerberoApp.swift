@@ -82,7 +82,7 @@ struct KancerberoApp: App {
                 .environment(model)
                 .environment(filter)
         }
-        .defaultSize(width: 480, height: 720)
+        .defaultSize(width: 1180, height: 760)
         .windowResizability(.contentMinSize)
 
         Settings {
