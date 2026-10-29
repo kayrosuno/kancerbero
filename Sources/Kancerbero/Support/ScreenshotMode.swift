@@ -21,11 +21,16 @@ enum ScreenshotMode {
 
         NSApp.activate(ignoringOtherApps: true)
 
+        // `--show-status` opens the System status window; capture that one
+        // instead of the main window when both flags are present.
+        let wantsStatus = arguments.contains("--show-status")
         var window: NSWindow?
         for _ in 0..<50 {
             try? await Task.sleep(for: .milliseconds(100))
             window = NSApp.windows.first {
-                $0.isVisible && ($0.contentView?.bounds.width ?? 0) > 100
+                $0.isVisible
+                    && ($0.contentView?.bounds.width ?? 0) > 100
+                    && (!wantsStatus || $0.title == "System status")
             }
             if window != nil { break }
         }
@@ -33,8 +38,13 @@ enum ScreenshotMode {
             fail("no visible window after 5s")
         }
         window.makeKeyAndOrderFront(nil)
-        window.setContentSize(NSSize(width: 1320, height: 820))
-        window.center()
+        if wantsStatus {
+            // Wide enough for the logo rail and the three status columns.
+            window.setContentSize(NSSize(width: 1180, height: 820))
+        } else {
+            window.setContentSize(NSSize(width: 1320, height: 820))
+            window.center()
+        }
 
         // Let the first daemon/local snapshot arrive and the table lay out.
         let delay: TimeInterval

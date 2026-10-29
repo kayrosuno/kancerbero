@@ -489,7 +489,7 @@ private struct ProcessProtocolBadges: View {
                 : rawLabels)
             : []
         let others = tags.contains(.other)
-            ? (otherLabels.isEmpty ? ["OTHER"] : otherLabels)
+            ? (otherLabels.isEmpty ? ["Other"] : otherLabels)
             : []
         if fixed.isEmpty && raw.isEmpty && others.isEmpty {
             Text("—").foregroundStyle(.secondary)

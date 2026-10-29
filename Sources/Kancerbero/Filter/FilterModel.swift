@@ -17,6 +17,9 @@ final class FilterModel {
     private(set) var history: [FlowRecord] = []
     private(set) var status: FilterStatus?
     private(set) var isConnected = false
+    /// True while the XPC `hello` handshake is in flight, so views can disable
+    /// Retry and avoid duplicate probes.
+    var isConnecting: Bool { connecting }
     private(set) var isBusy = false
     var lastError: String?
 
