@@ -58,12 +58,102 @@ enum NetworkingIPVersion: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    static let all = Set(allCases)
+
     /// Accepts 4/v4/ipv4 and 6/v6/ipv6; nil for "all" or an unknown value.
     init?(cliValue: String) {
         switch cliValue.lowercased() {
         case "4", "v4", "ipv4": self = .ipv4
         case "6", "v6", "ipv6": self = .ipv6
         default: return nil
+        }
+    }
+}
+
+/// Processes facet: protocol family/kind. TCP/UDP/RAW group their v4 and v6
+/// badges; UNIX and OTHER are single buckets.
+enum ProcessProtocolKind: String, CaseIterable, Identifiable, Hashable, Sendable {
+    case tcp
+    case udp
+    case raw
+    case unix
+    case other
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .tcp: return "TCP"
+        case .udp: return "UDP"
+        case .raw: return "RAW"
+        case .unix: return "UNIX"
+        case .other: return "OTHER"
+        }
+    }
+
+    static let all = Set(allCases)
+
+    /// Accepts the kind or any of its family variants (tcp4, udp6, raw4…).
+    init?(cliValue: String) {
+        switch cliValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "tcp", "tcp4", "tcp6": self = .tcp
+        case "udp", "udp4", "udp6": self = .udp
+        case "raw", "raw4", "raw6": self = .raw
+        case "unix": self = .unix
+        case "other": self = .other
+        default: return nil
+        }
+    }
+
+    var tags: Set<ProcessProtocolTag> {
+        switch self {
+        case .tcp: return [.tcp4, .tcp6]
+        case .udp: return [.udp4, .udp6]
+        case .raw: return [.raw4, .raw6]
+        case .unix: return [.unix]
+        case .other: return [.other]
+        }
+    }
+}
+
+/// Processes facet: socket type from the libproc inventory.
+enum ProcessSocketType: String, CaseIterable, Identifiable, Hashable, Sendable {
+    case stream
+    case dgram
+    case raw
+    case seqpacket
+    case other
+
+    var id: String { rawValue }
+
+    /// Lowercase, matching the Sockets column text.
+    var title: String { rawValue }
+
+    static let all = Set(allCases)
+
+    init?(cliValue: String) {
+        self.init(rawValue: cliValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased())
+    }
+
+    func count(in types: KBSocketTypeCounts) -> Int {
+        switch self {
+        case .stream: return types.stream
+        case .dgram: return types.dgram
+        case .raw: return types.raw
+        case .seqpacket: return types.seqpacket
+        case .other: return types.otherType
+        }
+    }
+
+    var checkboxHelp: String {
+        switch self {
+        case .stream: return "SOCK_STREAM sockets (TCP, UNIX stream)"
+        case .dgram: return "SOCK_DGRAM sockets (UDP, UNIX datagram)"
+        case .raw: return "SOCK_RAW sockets"
+        case .seqpacket: return "SOCK_SEQPACKET sockets"
+        case .other:
+            return "Sockets whose type is not stream, dgram, raw or seqpacket"
         }
     }
 }
@@ -285,11 +375,29 @@ extension AppModel {
     }
 
     func filteredProcessRows(_ focus: NetworkingFocus?,
-                             matching filter: NetworkingProtocolFilter = .none,
+                             ipVersions: Set<NetworkingIPVersion> = NetworkingIPVersion.all,
+                             protocolKinds: Set<ProcessProtocolKind> = ProcessProtocolKind.all,
+                             socketTypes: Set<ProcessSocketType> = ProcessSocketType.all,
                              search: String = "")
         -> [ProcessInventoryRow] {
         processInventory.filter { row in
-            guard filter.matches(row) else { return false }
+            if ipVersions != NetworkingIPVersion.all {
+                let wanted = ipVersions.reduce(into: Set<ProcessProtocolTag>()) {
+                    $0.formUnion($1.processTags)
+                }
+                guard !row.protocols.isDisjoint(with: wanted) else { return false }
+            }
+            if protocolKinds != ProcessProtocolKind.all {
+                let wanted = protocolKinds.reduce(into: Set<ProcessProtocolTag>()) {
+                    $0.formUnion($1.tags)
+                }
+                guard !row.protocols.isDisjoint(with: wanted) else { return false }
+            }
+            if socketTypes != ProcessSocketType.all {
+                guard let types = row.socketTypes,
+                      socketTypes.contains(where: { $0.count(in: types) > 0 })
+                else { return false }
+            }
             guard row.process.matchesSearch(search, userNames: userNames) else { return false }
             switch focus {
             case .download:
@@ -302,23 +410,5 @@ extension AppModel {
                 return true
             }
         }
-    }
-}
-
-extension NetworkingProtocolFilter {
-    func matches(_ row: ProcessInventoryRow) -> Bool {
-        if isTransportFiltered {
-            let wanted = transports.reduce(into: Set<ProcessProtocolTag>()) {
-                $0.formUnion($1.processTags)
-            }
-            guard !row.protocols.isDisjoint(with: wanted) else { return false }
-        }
-        if isIPFiltered {
-            let wanted = ipVersions.reduce(into: Set<ProcessProtocolTag>()) {
-                $0.formUnion($1.processTags)
-            }
-            guard !row.protocols.isDisjoint(with: wanted) else { return false }
-        }
-        return true
     }
 }

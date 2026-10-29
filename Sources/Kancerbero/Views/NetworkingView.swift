@@ -31,10 +31,19 @@ struct NetworkingView: View {
                                                    : NetworkingConnectionState.all
         let connectionSearch = tab == .connections ? ui.networking.connectionSearch : ""
         let processSearch = tab == .processes ? ui.networking.processSearch : ""
+        let processIPs = tab == .processes ? ui.networking.processIPVersions
+                                           : NetworkingIPVersion.all
+        let processKinds = tab == .processes ? ui.networking.processProtocolKinds
+                                             : ProcessProtocolKind.all
+        let processSockets = tab == .processes ? ui.networking.processSocketTypes
+                                               : ProcessSocketType.all
         let activityConnections = model.filteredSources(nil, matching: protocolFilter,
                                                         states: connectionStates,
                                                         search: connectionSearch).count
-        let activityProcesses = model.filteredProcessRows(nil, matching: protocolFilter,
+        let activityProcesses = model.filteredProcessRows(nil,
+                                                          ipVersions: processIPs,
+                                                          protocolKinds: processKinds,
+                                                          socketTypes: processSockets,
                                                           search: processSearch).count
         let ipOnly = NetworkingProtocolFilter(ipVersions: ui.networking.ipVersions)
         let protocolCounts = Dictionary(
@@ -48,7 +57,9 @@ struct NetworkingView: View {
                                                     states: connectionStates,
                                                     search: connectionSearch)
         let matchingProcesses = model.filteredProcessRows(ui.networking.focus,
-                                                          matching: protocolFilter,
+                                                          ipVersions: processIPs,
+                                                          protocolKinds: processKinds,
+                                                          socketTypes: processSockets,
                                                           search: processSearch)
 
         VStack(spacing: 14) {
@@ -120,8 +131,10 @@ struct NetworkingView: View {
                             || connectionStates != NetworkingConnectionState.all
                             || !connectionSearch
                                 .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                        processesFiltered: protocolFilter.isActive
-                            || !processSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                        processesFiltered: tab == .processes
+                            && (ui.networking.processFacetsFiltered
+                                || !processSearch
+                                    .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
                         focus: ui.networking.focus,
                         onToggle: toggleFocus
                     )
@@ -178,7 +191,7 @@ struct NetworkingView: View {
         case .processes:
             let total = model.processInventory.count
             let active = ui.networking.focus != nil
-                || ui.networking.protocolFilter.isActive
+                || ui.networking.processFacetsFiltered
                 || !ui.networking.processSearch
                     .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             return active

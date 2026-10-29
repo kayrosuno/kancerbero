@@ -349,6 +349,48 @@ struct ProcessesView: View {
         )
     }
 
+    private var processIPs: Binding<Set<NetworkingIPVersion>> {
+        Binding(
+            get: { ui.networking.processIPVersions },
+            set: { ui.networking.processIPVersions = $0 }
+        )
+    }
+
+    private var processKinds: Binding<Set<ProcessProtocolKind>> {
+        Binding(
+            get: { ui.networking.processProtocolKinds },
+            set: { ui.networking.processProtocolKinds = $0 }
+        )
+    }
+
+    private var processSockets: Binding<Set<ProcessSocketType>> {
+        Binding(
+            get: { ui.networking.processSocketTypes },
+            set: { ui.networking.processSocketTypes = $0 }
+        )
+    }
+
+    private var processIPGroup: some View {
+        CheckboxFilterGroup("IP",
+                            selection: processIPs,
+                            optionTitle: { $0.title })
+    }
+
+    private var processProtocolGroup: some View {
+        CheckboxFilterGroup("Protocols",
+                            selection: processKinds,
+                            options: [.tcp, .udp, .raw, .unix, .other],
+                            optionTitle: { $0.title })
+    }
+
+    private var processSocketGroup: some View {
+        CheckboxFilterGroup("Socket type",
+                            selection: processSockets,
+                            options: [.stream, .dgram, .raw, .seqpacket, .other],
+                            optionTitle: { $0.title },
+                            optionHelp: { $0.checkboxHelp })
+    }
+
     private var displayRows: [ProcessInventoryRow] {
         ui.networking.processSortOrder.isEmpty
             ? rows
@@ -372,6 +414,21 @@ struct ProcessesView: View {
                     inspected = selectedRow?.process
                 }
                 .disabled(selectedRow == nil)
+            }
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    processIPGroup
+                    processProtocolGroup
+                    processSocketGroup
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 12) {
+                        processIPGroup
+                        processProtocolGroup
+                    }
+                    processSocketGroup
+                }
             }
 
             Table(displayRows, selection: selection, sortOrder: sortOrder) {

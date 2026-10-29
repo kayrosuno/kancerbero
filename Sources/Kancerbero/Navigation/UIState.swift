@@ -38,6 +38,21 @@ final class UIState {
         networking.connectionSearch = Self.value(for: "--networking-connection-search",
                                                  in: arguments) ?? ""
         networking.processSearch = Self.value(for: "--networking-search", in: arguments) ?? ""
+        if let ipVersions = Self.filterSelection(
+            for: "--networking-process-ip", in: arguments,
+            parse: { NetworkingIPVersion(cliValue: $0) }) {
+            networking.processIPVersions = ipVersions
+        }
+        if let kinds = Self.filterSelection(
+            for: "--networking-process-protocol", in: arguments,
+            parse: { ProcessProtocolKind(cliValue: $0) }) {
+            networking.processProtocolKinds = kinds
+        }
+        if let socketTypes = Self.filterSelection(
+            for: "--networking-process-socket", in: arguments,
+            parse: { ProcessSocketType(cliValue: $0) }) {
+            networking.processSocketTypes = socketTypes
+        }
 
         if let raw = Self.value(for: "--daemon-type", in: arguments) {
             var selected = Set<DaemonServiceType>()
@@ -133,10 +148,20 @@ struct NetworkingUIState: Equatable {
     var connectionStates: Set<NetworkingConnectionState> = NetworkingConnectionState.all
     var connectionSearch = ""
     var processSearch = ""
+    var processIPVersions: Set<NetworkingIPVersion> = NetworkingIPVersion.all
+    var processProtocolKinds: Set<ProcessProtocolKind> = ProcessProtocolKind.all
+    var processSocketTypes: Set<ProcessSocketType> = ProcessSocketType.all
     var selectedConnection: String?
     var selectedProcess: KBProcessKey?
     var connectionSortOrder: [KeyPathComparator<KBNStatSource>] = []
     var processSortOrder: [KeyPathComparator<ProcessInventoryRow>] = []
+
+    var processIPFiltered: Bool { processIPVersions != NetworkingIPVersion.all }
+    var processProtocolKindFiltered: Bool { processProtocolKinds != ProcessProtocolKind.all }
+    var processSocketTypeFiltered: Bool { processSocketTypes != ProcessSocketType.all }
+    var processFacetsFiltered: Bool {
+        processIPFiltered || processProtocolKindFiltered || processSocketTypeFiltered
+    }
 }
 
 struct DaemonsUIState: Equatable {
