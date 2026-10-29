@@ -36,20 +36,20 @@ El detalle de binarios, permisos, instalación y librerías está en
 - **Networking** — tarjeta **Traffic** ancha con Download/Upload en la cabecera y un gráfico
   espejado (download arriba, upload abajo) con cuadrícula, niveles y eje temporal. Al lado, una
   tarjeta **Activity** que agrupa Connections y Processes, y una tarjeta **Protocols** con el
-  desglose TCP4/TCP6/UDP4/UDP6/UNIX/OTHER. La cabecera de Connections agrupa tres controles de
-  checkboxes multiselección en cápsulas —**IP** (IPv4/IPv6), **Transport** (TCP/UDP/Other) y
-  **State** (Established, Listening, Connecting (SYN), Closing (Close/Fin/Time Wait), Other)— más
-  un campo **Filter process** (nombre o PID). Todos los valores están marcados por defecto;
-  desmarcar excluye y un grupo sin nada marcado no muestra filas. Con el grupo State completo las
-  filas UDP (sin estado) siguen visibles; con un subconjunto se ocultan. La tabla de Connections
-  muestra Process, PID, Local, Remote, Proto, RX, TX, State e Iface, y permite ordenar por
-  cualquier columna.
+  desglose TCP4/TCP6/UDP4/UDP6/UNIX/OTHER. Una **barra de filtros** entre las pills y la tarjeta
+  de la tabla reúne los grupos de checkboxes multiselección en cápsulas. En Connections:
+  **IP** (IPv4/IPv6), **Transport** (TCP/UDP/Other) y **State** (Established, Listening,
+  Connecting (SYN), Closing (Close/Fin/Time Wait), Other); en Processes: **IP**,
+  **Protocols** (TCP/UDP/RAW/UNIX/OTHER) y **Socket type** (stream/dgram/raw/seqpacket/other).
+  Todos los valores están marcados por defecto; desmarcar excluye y un grupo sin nada marcado no
+  muestra filas. Con el grupo State completo las filas UDP (sin estado) siguen visibles; con un
+  subconjunto se ocultan. La cabecera de la tarjeta conserva solo el título, **Filter process**
+  en Connections / **Filter processes** en Processes (nombre o PID; en Processes también ruta y
+  usuario) e **Inspect**. La tabla de Connections muestra Process, PID, Local, Remote, Proto, RX,
+  TX, State e Iface, y permite ordenar por cualquier columna.
   La tabla de Processes lista solo procesos con flujos TCP/UDP o sockets (incluye UNIX y RAW vía
   libproc), con todos los badges de protocolo (sin `+N`), tipos de socket (stream/dgram/raw),
-  número de flujos, RX/TX acumulados y Path; su cabecera añade **Filter processes** (nombre,
-  ruta, PID o usuario) y sus propios grupos en cápsula: **IP** (IPv4/IPv6), **Protocols**
-  (TCP/UDP/RAW/UNIX/OTHER) y **Socket type** (stream/dgram/raw/seqpacket/other). Los filtros de
-  cada subpestaña son independientes. Ambas
+  número de flujos, RX/TX acumulados y Path. Los filtros de cada subpestaña son independientes. Ambas
   tablas se pueden ordenar por cualquier columna. Sin root solo se leen sockets del propio
   usuario; el daemon root cubre el resto. Las **velocidades** se muestran en bits con unidades
   humanas (`bps`, `Kbps`, `Mbps`, `Gbps`); los **totales acumulados** siguen en Bytes (`KB`, `MB`,

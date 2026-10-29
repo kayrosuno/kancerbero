@@ -351,6 +351,10 @@ $APP --screenshot /tmp/kb-net-process-independent.png --section networking \
   grupo vacío no muestra filas.
 - Los filtros son **independientes por subpestaña**: marcar/desmarcar en Connections no altera la
   tabla ni el contador de Processes (ni al revés). Se conservan al cambiar de pestaña.
+- Los grupos aparecen en una **barra a todo el ancho entre las pills y la tarjeta** de la tabla;
+  la tarjeta ya no los contiene y su cabecera solo muestra título, búsqueda e Inspect. Interfaces
+  y Filter no muestran barra (sin hueco extra). A 1040×640 la barra cae a dos líneas sin
+  recortarse.
 - Processes muestra en su cabecera `Filter processes` y filtra por nombre, ruta, PID o usuario,
   igual que CPU. El contador “N of M” refleja sus facetas y la búsqueda. La columna Protocols
   muestra todos los badges (sin `+N`) y Sockets todos sus tipos.
