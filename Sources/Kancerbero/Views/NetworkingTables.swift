@@ -70,11 +70,52 @@ struct ConnectionsView: View {
         )
     }
 
-    private var stateSelection: Binding<NetworkingConnectionState?> {
+    private var stateSelection: Binding<Set<NetworkingConnectionState>> {
         Binding(
-            get: { ui.networking.connectionState },
-            set: { ui.networking.connectionState = $0 }
+            get: { ui.networking.connectionStates },
+            set: { ui.networking.connectionStates = $0 }
         )
+    }
+
+    private var connectionSearch: Binding<String> {
+        Binding(
+            get: { ui.networking.connectionSearch },
+            set: { ui.networking.connectionSearch = $0 }
+        )
+    }
+
+    private var transports: Binding<Set<NetworkingTransport>> {
+        Binding(
+            get: { ui.networking.transports },
+            set: { ui.networking.transports = $0 }
+        )
+    }
+
+    private var ipVersions: Binding<Set<NetworkingIPVersion>> {
+        Binding(
+            get: { ui.networking.ipVersions },
+            set: { ui.networking.ipVersions = $0 }
+        )
+    }
+
+    private var ipGroup: some View {
+        CheckboxFilterGroup("IP",
+                            selection: ipVersions,
+                            optionTitle: { $0.title })
+    }
+
+    private var transportGroup: some View {
+        CheckboxFilterGroup("Transport",
+                            selection: transports,
+                            optionTitle: { $0.title })
+    }
+
+    private var stateGroup: some View {
+        CheckboxFilterGroup("State",
+                            selection: stateSelection,
+                            options: [.established, .listening, .connecting, .closing, .other],
+                            optionTitle: { $0.title },
+                            optionHelp: { $0.checkboxHelp })
     }
 
     private var displayRows: [KBNStatSource] {
@@ -90,64 +131,81 @@ struct ConnectionsView: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            HStack(spacing: 10) {
-                Text("Connections")
-                    .font(.system(size: 12, weight: .semibold))
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) {
+                    Text("Connections")
+                        .font(.system(size: 12, weight: .semibold))
 
-                OptionFilterPicker("State",
-                                   selection: stateSelection,
-                                   optionTitle: { $0.title })
-                    .help("TCP connection state; UDP flows have no state")
+                    TextField("Filter process", text: connectionSearch)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 180)
+                        .help("Filter by process name or PID")
 
-                Spacer()
+                    Spacer(minLength: 8)
 
-                Button("Inspect Process") {
-                    if let source = selectedSource {
-                        inspected = process(for: source)
+                    Button("Inspect Process") {
+                        if let source = selectedSource {
+                            inspected = process(for: source)
+                        }
+                    }
+                    .disabled(selectedSource == nil)
+                }
+
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        ipGroup
+                        transportGroup
+                        stateGroup
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 12) {
+                            ipGroup
+                            transportGroup
+                        }
+                        stateGroup
                     }
                 }
-                .disabled(selectedSource == nil)
             }
 
             Table(displayRows, selection: selection, sortOrder: sortOrder) {
-                TableColumn("Local", value: \.local, comparator: EndpointComparator()) { source in
-                    Text(source.local.display).monospaced().help(source.local.display)
-                }
-                .width(min: 130, ideal: 195)
-                TableColumn("Remote", value: \.remote, comparator: EndpointComparator()) { source in
-                    Text(source.remote.display).monospaced().help(source.remote.display)
-                }
-                .width(min: 130, ideal: 195)
-                TableColumn("Protocol", value: \.protocolSortRank) { source in
-                    Text(source.connectionProtocol.displayName).monospaced()
-                }
-                .width(min: 45, ideal: 50)
-                TableColumn("RX", value: \.counters.rxBytes) { source in
-                    Text(KBFormat.bytes(source.counters.rxBytes)).monospacedDigit()
-                }
-                .width(min: 75, ideal: 85)
-                TableColumn("TX", value: \.counters.txBytes) { source in
-                    Text(KBFormat.bytes(source.counters.txBytes)).monospacedDigit()
-                }
-                .width(min: 75, ideal: 85)
-                TableColumn("State", value: \.tcpState) { source in
-                    Text(source.tcpState.isEmpty ? "—" : source.tcpState)
-                }
-                .width(min: 75, ideal: 85)
-                TableColumn("Iface", value: \.interfaceName) { source in
-                    Text(source.interfaceName.isEmpty ? "—" : source.interfaceName).monospaced()
-                }
-                .width(min: 45, ideal: 55)
-                TableColumn("PID", value: \.pid) { source in
-                    Text("\(source.pid)").monospacedDigit()
-                }
-                .width(min: 45, ideal: 55)
                 TableColumn("Process", value: \.processName) { source in
                     Text(source.processName.isEmpty ? "Unknown" : source.processName)
                     .lineLimit(1)
                     .help(source.processName)
                 }
                 .width(min: 110, ideal: 140)
+                TableColumn("PID", value: \.pid) { source in
+                    Text("\(source.pid)").monospacedDigit()
+                }
+                .width(min: 45, ideal: 55)
+                TableColumn("Local", value: \.local, comparator: EndpointComparator()) { source in
+                    Text(source.local.display).monospaced().help(source.local.display)
+                }
+                .width(min: 120, ideal: 170)
+                TableColumn("Remote", value: \.remote, comparator: EndpointComparator()) { source in
+                    Text(source.remote.display).monospaced().help(source.remote.display)
+                }
+                .width(min: 120, ideal: 170)
+                TableColumn("Proto", value: \.protocolSortRank) { source in
+                    Text(source.connectionProtocol.displayName).monospaced()
+                }
+                .width(min: 45, ideal: 50)
+                TableColumn("RX", value: \.counters.rxBytes) { source in
+                    Text(KBFormat.bytes(source.counters.rxBytes)).monospacedDigit()
+                }
+                .width(min: 75, ideal: 80)
+                TableColumn("TX", value: \.counters.txBytes) { source in
+                    Text(KBFormat.bytes(source.counters.txBytes)).monospacedDigit()
+                }
+                .width(min: 75, ideal: 80)
+                TableColumn("State", value: \.tcpState) { source in
+                    Text(source.tcpState.isEmpty ? "—" : source.tcpState)
+                }
+                .width(min: 75, ideal: 80)
+                TableColumn("Iface", value: \.interfaceName) { source in
+                    Text(source.interfaceName.isEmpty ? "—" : source.interfaceName).monospaced()
+                }
+                .width(min: 45, ideal: 55)
             }
             .contextMenu(forSelectionType: String.self) { keys in
                 if let id = keys.first, let source = rows.first(where: { $0.id == id }) {
@@ -322,7 +380,7 @@ struct ProcessesView: View {
                         .lineLimit(1)
                         .help(displayName(row))
                 }
-                .width(min: 120, ideal: 170)
+                .width(min: 110, ideal: 150)
                 TableColumn("PID", value: \.process.pid) { row in
                     Text("\(row.process.pid)").monospacedDigit()
                 }
@@ -334,7 +392,7 @@ struct ProcessesView: View {
                 TableColumn("Protocols", value: \.protocolSortRank) { row in
                     ProcessProtocolBadges(tags: row.protocols)
                 }
-                .width(min: 120, ideal: 170)
+                .width(min: 150, ideal: 230)
                 TableColumn("Sockets", value: \.socketCount) { row in
                     Text(socketText(row))
                         .font(.system(size: 10))
@@ -343,7 +401,7 @@ struct ProcessesView: View {
                         .foregroundStyle(row.hasSocketData ? .primary : .secondary)
                         .help(socketHelp(row))
                 }
-                .width(min: 120, ideal: 160)
+                .width(min: 140, ideal: 175)
                 TableColumn("Flows", value: \.connectionCount) { row in
                     Text(row.connectionCount > 0 ? "\(row.connectionCount)" : "—")
                         .monospacedDigit()
@@ -369,7 +427,7 @@ struct ProcessesView: View {
                         .lineLimit(1)
                         .help(row.process.path)
                 }
-                .width(min: 130, ideal: 200)
+                .width(min: 120, ideal: 160)
             }
             .contextMenu(forSelectionType: KBProcessKey.self) { keys in
                 if let key = keys.first,
@@ -477,7 +535,7 @@ private struct ProcessProtocolBadges: View {
             Text("—").foregroundStyle(.secondary)
         } else {
             HStack(spacing: 3) {
-                ForEach(Array(ordered.prefix(3))) { tag in
+                ForEach(ordered) { tag in
                     Text(tag.title)
                         .font(.system(size: 8, weight: .semibold))
                         .padding(.horizontal, 4)
@@ -486,11 +544,6 @@ private struct ProcessProtocolBadges: View {
                             Capsule().fill(color(tag).opacity(0.15))
                         }
                         .foregroundStyle(color(tag))
-                }
-                if ordered.count > 3 {
-                    Text("+\(ordered.count - 3)")
-                        .font(.system(size: 8, weight: .medium))
-                        .foregroundStyle(.secondary)
                 }
             }
             .help(ordered.map(\.title).joined(separator: ", "))

@@ -3,7 +3,12 @@ import KancerberoCore
 
 struct ProtocolCard: View {
     let counts: [KBConnectionProtocol: Int]
-    let ipVersion: NetworkingIPVersion?
+    let ipVersions: Set<NetworkingIPVersion>
+
+    /// Only a single selected family is worth labelling; "all" means no filter.
+    private var highlightedVersion: NetworkingIPVersion? {
+        ipVersions.count == 1 ? ipVersions.first : nil
+    }
 
     static let cardHeight: CGFloat = 94
 
@@ -74,8 +79,8 @@ struct ProtocolCard: View {
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
             Spacer(minLength: 2)
-            if let ipVersion {
-                Text(ipVersion.title)
+            if let highlightedVersion {
+                Text(highlightedVersion.title)
                     .font(.system(size: 8))
                     .foregroundStyle(.tertiary)
             }
