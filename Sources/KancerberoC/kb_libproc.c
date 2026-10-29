@@ -400,6 +400,13 @@ static void kb_classify_socket(const struct socket_fdinfo *info,
             } else {
                 summary->raw4++;
             }
+            /* Keep the real protocol so the UI can show ICMP, SCTP… instead of
+             * the generic RAW bucket. TCP/UDP raw sockets stay in the fallback. */
+            if (protocol != IPPROTO_TCP && protocol != IPPROTO_UDP
+                && protocol >= 0 && protocol < 256) {
+                summary->inet_protocols[protocol >> 6] |=
+                    (uint64_t)1 << (protocol & 63);
+            }
         } else if (protocol == IPPROTO_TCP) {
             if (family == 6) {
                 summary->tcp6++;
@@ -417,6 +424,9 @@ static void kb_classify_socket(const struct socket_fdinfo *info,
         }
     } else {
         summary->other++;
+        if (family >= 0 && family < 64) {
+            summary->other_families |= (uint64_t)1 << family;
+        }
     }
     summary->total++;
 }

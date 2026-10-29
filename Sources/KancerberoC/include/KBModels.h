@@ -131,6 +131,8 @@ typedef struct {
     uint32_t raw4;
     uint32_t raw6;
     uint32_t other;
+    uint64_t other_families; /* bitset of address families counted in `other` (AF_MAX < 64) */
+    uint64_t inet_protocols[4]; /* bitset of IPPROTO 0..255 for INET sockets outside TCP/UDP */
     uint32_t stream;
     uint32_t dgram;
     uint32_t raw_type;

@@ -400,6 +400,24 @@ $APP --screenshot /tmp/kb-processes.png --section networking --tab processes \
 - Probar los tres grupos de la cabecera en cápsula: IP, Protocols y Socket type. Desmarcar todo un
   grupo deja “0 of M networked processes”; desmarcar `UNIX`/`RAW` oculta los procesos que solo
   tienen esos badges; con IP parcial desaparecen los solo-UNIX/OTHER.
+- En Protocols, un proceso con sockets de familia especial debe mostrar el valor real en gris
+  (`AF_SYSTEM`, `AF_NDRV`, `AF_VSOCK`…) en vez de `OTHER`; un provider NStat no TCP/UDP debe
+  mostrarse tal cual. Ninguna familia definida en `sys/socket.h` (3–25, 27–38, 40) debe salir como
+  `AF_<n>`; solo 26 y 39, que no existen en Darwin. Un flujo TCP/UDP cuya versión IP no se conoce
+  se etiqueta `TCP`/`UDP`, no `AF_UNSPEC`. OTHER queda solo como reserva sin detalle.
+- Los badges `RAW4`/`RAW6` deben ceder su sitio al protocolo real: un `ping` en marcha muestra
+  `ICMP`, y SCTP/GRE/ESP/… muestran su nombre; `RAW` queda para `SOCK_RAW`. La columna Proto del
+  inspector (doble clic en la fila) debe coincidir. Se puede comprobar sin GUI:
+
+  ```bash
+  build/Build/Products/Debug/KancerberoProbe sockets $(pgrep -n -x ping)        # ICMP
+  build/Build/Products/Debug/KancerberoProbe sockets <pid de un proceso TCP>     # TCP4/TCP6
+  build/Build/Products/Debug/KancerberoProbe sockets-summary $(pgrep -n -x ping) # inet-protos=[ICMP]
+  ```
+
+  En modo local funciona directamente; en modo daemon hace falta que el daemon en marcha lleve el
+  código nuevo (tras instalar, usar **Repair** en System status o reiniciar el servicio), porque un
+  daemon antiguo no envía `otherFamilies` ni `otherProtocols`.
 - Cambiar el filtro Transport/IP en Connections y volver a Processes: la tabla y el contador de
   Processes no cambian (filtros independientes).
 - Ordenar por cada cabecera y comprobar que el criterio se conserva al cambiar de pestaña/sección.

@@ -65,7 +65,9 @@ public enum SocketSummaryCollector {
                 socketFDs: Int(raw.fds),
                 uniqueSockets: Int(raw.total),
                 restricted: raw.restricted != 0,
-                truncated: raw.truncated != 0
+                truncated: raw.truncated != 0,
+                otherFamilies: otherFamilies(from: raw.other_families),
+                otherProtocols: otherProtocols(from: raw.inet_protocols)
             ))
         }
 
@@ -76,5 +78,30 @@ public enum SocketSummaryCollector {
             restrictedProcesses: restrictedProcesses,
             truncated: truncated
         )
+    }
+
+    /// Expands the AF-number bitmask into the families that fell into `other`.
+    private static func otherFamilies(from mask: UInt64) -> [UInt32]? {
+        guard mask != 0 else { return nil }
+        return (0..<64).compactMap { bit in
+            mask & (UInt64(1) << UInt64(bit)) != 0 ? UInt32(bit) : nil
+        }
+    }
+
+    /// Expands the 256-bit IPPROTO mask (`uint64_t[4]`, imported as a tuple)
+    /// into the protocols counted in the RAW buckets.
+    private static func otherProtocols<T>(from words: T) -> [UInt8]? {
+        var result: [UInt8] = []
+        withUnsafeBytes(of: words) { buffer in
+            let bits = buffer.bindMemory(to: UInt64.self)
+            for wordIndex in 0..<bits.count {
+                let word = bits[wordIndex]
+                guard word != 0 else { continue }
+                for bit in 0..<64 where word & (UInt64(1) << UInt64(bit)) != 0 {
+                    result.append(UInt8(wordIndex * 64 + bit))
+                }
+            }
+        }
+        return result.isEmpty ? nil : result
     }
 }

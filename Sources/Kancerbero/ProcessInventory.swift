@@ -79,6 +79,12 @@ struct ProcessInventoryRow: Identifiable, Equatable, Sendable {
     var rates: KBRates
     var restricted: Bool
     var truncated: Bool
+    /// Unmasked values behind the OTHER protocol badge: socket families
+    /// (AF_SYSTEM, AF_NDRV…) and NStat providers that are not TCP/UDP.
+    var otherProtocolLabels: [String]
+    /// Real protocols behind the RAW badges (ICMP, SCTP, GRE…). Empty when the
+    /// scanner did not report them, in which case the RAW4/RAW6 badges stay.
+    var rawProtocolLabels: [String]
 
     var id: KBProcessKey { process.id }
 
@@ -101,6 +107,7 @@ enum ProcessInventoryBuilder {
         var connections = 0
         var listeners = 0
         var protocols: Set<ProcessProtocolTag> = []
+        var otherLabels: Set<String> = []
     }
 
     static func build(processes: [KBProcessInfo],
@@ -120,6 +127,9 @@ enum ProcessInventoryBuilder {
             }
             if let tag = ProcessProtocolTag(bucket: source.protocolBucket) {
                 aggregate.protocols.insert(tag)
+            }
+            if source.protocolBucket == .other {
+                aggregate.otherLabels.insert(otherLabel(for: source))
             }
             if aggregate.processName.isEmpty {
                 aggregate.processName = source.processName
@@ -172,6 +182,20 @@ enum ProcessInventoryBuilder {
                 protocols.formUnion(ProcessProtocolTag.tags(from: buckets))
             }
 
+            var otherLabels = networkAggregate?.otherLabels ?? []
+            if let families = socketSummary?.otherFamilies {
+                for family in families {
+                    otherLabels.insert(KBSocketFamily.name(for: family))
+                }
+            }
+            if protocols.contains(.other) && otherLabels.isEmpty {
+                otherLabels.insert("OTHER")
+            }
+
+            let rawLabels = (socketSummary?.otherProtocols ?? [])
+                .map { KBIPProtocol.name(for: Int32($0)) }
+                .sorted()
+
             rows.append(ProcessInventoryRow(
                 process: process,
                 protocols: protocols,
@@ -183,7 +207,9 @@ enum ProcessInventoryBuilder {
                 counters: networkAggregate?.counters ?? .zero,
                 rates: networkAggregate?.rates ?? .zero,
                 restricted: socketSummary?.restricted ?? false,
-                truncated: socketSummary?.truncated ?? false
+                truncated: socketSummary?.truncated ?? false,
+                otherProtocolLabels: otherLabels.sorted(),
+                rawProtocolLabels: rawLabels
             ))
         }
 
@@ -202,6 +228,24 @@ enum ProcessInventoryBuilder {
             return lhs.process.pid < rhs.process.pid
         }
         return rows
+    }
+
+    /// Unmasked label for a flow that falls into the OTHER protocol bucket:
+    /// the transport when the flow is TCP/UDP but its IP version is unknown,
+    /// otherwise the raw NStat provider, otherwise the address family that kept
+    /// it out of IPv4/IPv6.
+    private static func otherLabel(for source: KBNStatSource) -> String {
+        let provider = source.provider.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch source.transport {
+        case .tcp, .udp:
+            // Sin familia 4/6 el flujo no entra en TCP4/TCP6, pero el transporte
+            // sí se conoce: AF_UNSPEC no aportaría nada.
+            return source.transport.title
+        case .other:
+            if !provider.isEmpty { return provider }
+            let family = source.local.family != 0 ? source.local.family : source.remote.family
+            return family == 0 ? "OTHER" : KBSocketFamily.name(for: UInt32(family))
+        }
     }
 }
 

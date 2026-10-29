@@ -45,7 +45,15 @@
   Local/Remote usan un comparador numérico de endpoints y el criterio se guarda en
   `connectionSortOrder` dentro de `NetworkingUIState`. La tabla de Processes usa
   `ProcessInventoryRow` (agregado de flujos NStat + inventario de sockets libproc) y ordena con
-  `processSortOrder`. `ActivityCard` recibe flags separados por pestaña: Connections refleja sus
+  `processSortOrder`. La columna Protocols muestra todos los badges; el cajón RAW se abre con los
+  protocolos reales del inventario (`otherProtocols`, un bitset de IPPROTO que rellena
+  `kb_classify_socket` y traduce `KBIPProtocol`) en `ProcessInventoryRow.rawProtocolLabels`, y el
+  genérico OTHER con las familias reales (`otherFamilies`, bitset de AF traducido por
+  `KBSocketFamily` con la tabla completa de `sys/socket.h`) y los providers NStat no TCP/UDP
+  (`ProcessInventoryRow.otherProtocolLabels`); un flujo TCP/UDP sin familia 4/6 se etiqueta
+  `TCP`/`UDP` (`ProcessInventoryBuilder.otherLabel`). Sin detalle (daemon antiguo, sockets
+  restringidos) se mantienen RAW4/RAW6 y OTHER. El inspector de proceso aplica la misma
+  clasificación por socket vía `KBSocketInfo.protocolLabel`. `ActivityCard` recibe flags separados por pestaña: Connections refleja sus
   filtros de protocolo/estado/búsqueda y Processes sus facetas (IP, protocolo, socket) y búsqueda;
   `ProtocolCard` sigue siendo global y recibe el conjunto `ipVersions` de Connections (solo
   etiqueta una familia cuando queda aislada). `SocketSummaryCollector`

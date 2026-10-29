@@ -168,7 +168,7 @@ private func printSockets(pid: Int32) {
         for item in sockets {
             write(String(format: "  fd=%-4d %-6@ %-22@ -> %-22@ %@\n",
                          item.fd,
-                         item.connectionProtocol.displayName as NSString,
+                         item.protocolLabel as NSString,
                          item.local.display as NSString,
                          item.remote.display as NSString,
                          item.stateName as NSString))
@@ -183,10 +183,14 @@ private func printSocketSummary(_ inventory: KBSocketInventory) {
     for item in inventory.summaries where item.uniqueSockets > 0 || item.restricted {
         let b = item.buckets
         let t = item.types
-        write(String(format: "  pid=%-7d sockets=%-4d tcp4=%d tcp6=%d udp4=%d udp6=%d unix=%d raw4=%d raw6=%d other=%d types=[stream=%d dgram=%d raw=%d seq=%d other=%d] restricted=%d truncated=%d\n",
+        let protos = (item.otherProtocols ?? [])
+            .map { KBIPProtocol.name(for: Int32($0)) }
+            .sorted()
+        write(String(format: "  pid=%-7d sockets=%-4d tcp4=%d tcp6=%d udp4=%d udp6=%d unix=%d raw4=%d raw6=%d other=%d types=[stream=%d dgram=%d raw=%d seq=%d other=%d] inet-protos=[%@] restricted=%d truncated=%d\n",
                      item.key.pid, item.uniqueSockets,
                      b.tcp4, b.tcp6, b.udp4, b.udp6, b.unix, b.raw4, b.raw6, b.other,
                      t.stream, t.dgram, t.raw, t.seqpacket, t.otherType,
+                     (protos.isEmpty ? "-" : protos.joined(separator: ",")) as NSString,
                      item.restricted ? 1 : 0, item.truncated ? 1 : 0))
     }
 }
