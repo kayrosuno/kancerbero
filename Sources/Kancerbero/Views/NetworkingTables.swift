@@ -70,52 +70,11 @@ struct ConnectionsView: View {
         )
     }
 
-    private var stateSelection: Binding<Set<NetworkingConnectionState>> {
-        Binding(
-            get: { ui.networking.connectionStates },
-            set: { ui.networking.connectionStates = $0 }
-        )
-    }
-
     private var connectionSearch: Binding<String> {
         Binding(
             get: { ui.networking.connectionSearch },
             set: { ui.networking.connectionSearch = $0 }
         )
-    }
-
-    private var transports: Binding<Set<NetworkingTransport>> {
-        Binding(
-            get: { ui.networking.transports },
-            set: { ui.networking.transports = $0 }
-        )
-    }
-
-    private var ipVersions: Binding<Set<NetworkingIPVersion>> {
-        Binding(
-            get: { ui.networking.ipVersions },
-            set: { ui.networking.ipVersions = $0 }
-        )
-    }
-
-    private var ipGroup: some View {
-        CheckboxFilterGroup("IP",
-                            selection: ipVersions,
-                            optionTitle: { $0.title })
-    }
-
-    private var transportGroup: some View {
-        CheckboxFilterGroup("Transport",
-                            selection: transports,
-                            optionTitle: { $0.title })
-    }
-
-    private var stateGroup: some View {
-        CheckboxFilterGroup("State",
-                            selection: stateSelection,
-                            options: [.established, .listening, .connecting, .closing, .other],
-                            optionTitle: { $0.title },
-                            optionHelp: { $0.checkboxHelp })
     }
 
     private var displayRows: [KBNStatSource] {
@@ -131,40 +90,23 @@ struct ConnectionsView: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 10) {
-                    Text("Connections")
-                        .font(.system(size: 12, weight: .semibold))
+            HStack(spacing: 10) {
+                Text("Connections")
+                    .font(.system(size: 12, weight: .semibold))
 
-                    TextField("Filter process", text: connectionSearch)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 180)
-                        .help("Filter by process name or PID")
+                TextField("Filter process", text: connectionSearch)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 180)
+                    .help("Filter by process name or PID")
 
-                    Spacer(minLength: 8)
+                Spacer(minLength: 8)
 
-                    Button("Inspect Process") {
-                        if let source = selectedSource {
-                            inspected = process(for: source)
-                        }
-                    }
-                    .disabled(selectedSource == nil)
-                }
-
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 12) {
-                        ipGroup
-                        transportGroup
-                        stateGroup
-                    }
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 12) {
-                            ipGroup
-                            transportGroup
-                        }
-                        stateGroup
+                Button("Inspect Process") {
+                    if let source = selectedSource {
+                        inspected = process(for: source)
                     }
                 }
+                .disabled(selectedSource == nil)
             }
 
             Table(displayRows, selection: selection, sortOrder: sortOrder) {
@@ -349,48 +291,6 @@ struct ProcessesView: View {
         )
     }
 
-    private var processIPs: Binding<Set<NetworkingIPVersion>> {
-        Binding(
-            get: { ui.networking.processIPVersions },
-            set: { ui.networking.processIPVersions = $0 }
-        )
-    }
-
-    private var processKinds: Binding<Set<ProcessProtocolKind>> {
-        Binding(
-            get: { ui.networking.processProtocolKinds },
-            set: { ui.networking.processProtocolKinds = $0 }
-        )
-    }
-
-    private var processSockets: Binding<Set<ProcessSocketType>> {
-        Binding(
-            get: { ui.networking.processSocketTypes },
-            set: { ui.networking.processSocketTypes = $0 }
-        )
-    }
-
-    private var processIPGroup: some View {
-        CheckboxFilterGroup("IP",
-                            selection: processIPs,
-                            optionTitle: { $0.title })
-    }
-
-    private var processProtocolGroup: some View {
-        CheckboxFilterGroup("Protocols",
-                            selection: processKinds,
-                            options: [.tcp, .udp, .raw, .unix, .other],
-                            optionTitle: { $0.title })
-    }
-
-    private var processSocketGroup: some View {
-        CheckboxFilterGroup("Socket type",
-                            selection: processSockets,
-                            options: [.stream, .dgram, .raw, .seqpacket, .other],
-                            optionTitle: { $0.title },
-                            optionHelp: { $0.checkboxHelp })
-    }
-
     private var displayRows: [ProcessInventoryRow] {
         ui.networking.processSortOrder.isEmpty
             ? rows
@@ -414,21 +314,6 @@ struct ProcessesView: View {
                     inspected = selectedRow?.process
                 }
                 .disabled(selectedRow == nil)
-            }
-
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) {
-                    processIPGroup
-                    processProtocolGroup
-                    processSocketGroup
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 12) {
-                        processIPGroup
-                        processProtocolGroup
-                    }
-                    processSocketGroup
-                }
             }
 
             Table(displayRows, selection: selection, sortOrder: sortOrder) {

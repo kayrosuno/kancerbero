@@ -31,9 +31,10 @@
   marcados por defecto. `NetworkingProtocolFilter` combina transport/IP y `filteredSources` los
   aplica solo a Connections; `filteredProcessRows` recibe sus propios facetas
   (`ipVersions:protocolKinds:socketTypes:`) y es independiente de los de Connections. Los grupos
-  se dibujan con `CheckboxFilterGroup` (nativo `.toggleStyle(.checkbox)`) dentro de una cápsula
-  neutra: todo marcado equivale a sin filtro, desmarcar excluye y un grupo vacío no coincide con
-  ninguna fila. El filtro State usa `NetworkingConnectionState.category(for:)` sobre el
+  viven en `NetworkingFilterBar`, una barra a todo el ancho entre `PillTabBar` y la tarjeta de la
+  tabla (la tarjeta conserva solo título, búsqueda e Inspect), y se dibujan con
+  `CheckboxFilterGroup` (nativo `.toggleStyle(.checkbox)`) dentro de una cápsula neutra: todo
+  marcado equivale a sin filtro, desmarcar excluye y un grupo vacío no coincide con ninguna fila. El filtro State usa `NetworkingConnectionState.category(for:)` sobre el
   `tcpState` crudo de NStat: con el grupo completo las filas UDP (estado vacío, sin categoría)
   siguen visibles; con un subconjunto se ocultan. En Processes, un IP parcial exige algún badge
   de la familia marcada (UNIX/OTHER quedan fuera), el filtro de protocolo cruza los `tags` del

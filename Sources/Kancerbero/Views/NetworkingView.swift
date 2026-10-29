@@ -159,6 +159,10 @@ struct NetworkingView: View {
                     .contentTransition(.numericText())
             }
 
+            if tab == .connections || tab == .processes {
+                NetworkingFilterBar(tab: tab)
+            }
+
             tableCard(interfaces: matchingInterfaces,
                       sources: matchingSources,
                       processes: matchingProcesses)
