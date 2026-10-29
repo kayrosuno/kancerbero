@@ -86,16 +86,20 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--disk-tab volumes|analyzer] \
   [--disk-path=<carpeta>] [--disk-scan] [--disk-item <diskXsY>] \
   [--cpu-search <texto>] [--cpu-selected <pid>] \
-  [--networking-state established|listening|connecting|closing|other] \
-  [--networking-search <texto>] \
+  [--networking-transport tcp|udp|other[,..]|all] \
+  [--networking-ip ipv4|ipv6[,..]|all] \
+  [--networking-state established|listening|connecting|closing|other[,..]|all] \
+  [--networking-connection-search <texto>] [--networking-search <texto>] \
   [--sidebar-collapsed]
 ```
 
 `--section` selecciona la sección de primer nivel, `--tab` la subpestaña de Networking,
 `--disk-tab` la de Disk, `--disk-path`/`--disk-scan` lanzan el analizador sobre una ruta y
 `--disk-item` preselecciona un dispositivo en Volumes. `--cpu-search` aplica el filtro inicial de
-la tabla de CPU, `--cpu-selected` preselecciona un PID, `--networking-state` aplica la categoría
-de estado TCP y `--networking-search` el filtro de la tabla de procesos. `--sidebar-collapsed`
+la tabla de CPU, `--cpu-selected` preselecciona un PID, `--networking-transport`/`--networking-ip`
+marcan solo esos checkboxes (lista con comas; `all` equivale a todos), `--networking-state` marca
+solo esas categorías de estado TCP, `--networking-connection-search` el filtro de proceso de
+Connections y `--networking-search` el de la tabla de procesos. `--sidebar-collapsed`
 captura el panel lateral oculto. El PNG se escribe a escala de backing (2x en Retina) y la app
 termina con código 0.
 
@@ -292,7 +296,11 @@ $APP --screenshot /tmp/kb-net-tcp.png --section networking --tab connections \
   --networking-transport tcp --screenshot-delay 5
 $APP --screenshot /tmp/kb-net-ipv6.png --section networking --tab connections \
   --networking-ip ipv6 --screenshot-delay 5
-$APP --screenshot /tmp/kb-net-combined.png --section networking --tab processes \
+$APP --screenshot /tmp/kb-net-tcp-udp.png --section networking --tab connections \
+  --networking-transport tcp,udp --screenshot-delay 5
+$APP --screenshot /tmp/kb-net-connection-search.png --section networking --tab connections \
+  --networking-connection-search rapportd --networking-transport tcp --screenshot-delay 5
+$APP --screenshot /tmp/kb-net-combined.png --section networking --tab connections \
   --networking-focus connections --networking-transport udp --networking-ip ipv4 \
   --screenshot-delay 5
 $APP --screenshot /tmp/kb-net-download.png --section networking --tab connections \
@@ -301,6 +309,8 @@ $APP --screenshot /tmp/kb-net-state-listening.png --section networking \
   --tab connections --networking-state listening --screenshot-delay 5
 $APP --screenshot /tmp/kb-net-state-established.png --section networking \
   --tab connections --networking-state established --screenshot-delay 5
+$APP --screenshot /tmp/kb-net-state-multi.png --section networking \
+  --tab connections --networking-state established,listening --screenshot-delay 5
 $APP --screenshot /tmp/kb-net-state-combined.png --section networking \
   --tab connections --networking-state established \
   --networking-transport tcp --networking-ip ipv4 --screenshot-delay 5
@@ -312,21 +322,32 @@ $APP --screenshot /tmp/kb-net-process-search.png --section networking \
   `bps/Kbps/Mbps/Gbps` y eje temporal `-60s/-30s/now` (con el intervalo de 1 s). Sin salto de
   layout entre 0,3 s y 5 s.
 - Activity: agrupa Connections y Processes; los números aplican el filtro de protocolo e ignoran
-  el foco. Mientras Connections está activo, Connections cuenta también el filtro State;
-  mientras Processes está activo, Processes cuenta también la búsqueda. Protocols muestra la
-  barra y la leyenda de los seis tipos; el filtro IP reduce el desglose, el filtro Transport no.
-- Los selectores Transport/IP aparecen solo en Connections/Processes; el contador muestra
-  “N of M” y la tabla respeta ambos filtros combinados con el foco.
-- Connections muestra en su cabecera el selector State (All, Established, Listening, Connecting
-  (SYN), Closing (Close/Fin/Time Wait), Other); la columna State sigue mostrando el valor exacto.
-  La normalización cubre `Listen`, `Established`, `SynSent`, `TimeWait`, `TSI_*`, etc. UDP no
-  tiene estado, así que cualquier categoría seleccionada oculta sus filas.
+  el foco. Mientras Connections está activo, Connections cuenta también el filtro State y la
+  búsqueda de proceso; mientras Processes está activo, Processes cuenta también su búsqueda.
+  Protocols muestra la barra y la leyenda de los seis tipos; el filtro IP reduce el desglose, el
+  filtro Transport no.
+- La cabecera de Connections agrupa los checkboxes IP (IPv4/IPv6), Transport (TCP/UDP/Other) y
+  State, todos marcados por defecto, más `Filter process`. Desmarcar un valor excluye sus filas;
+  desmarcar todo un grupo deja “0 of M connections” (Activity muestra 0). La familia de dirección
+  desconocida se excluye cuando el grupo IP no está completo.
+- El filtro de protocolo solo se puede cambiar en Connections, pero se conserva al cambiar de
+  subpestaña: Processes sigue mostrando “N of M networked processes” con ese filtro aunque allí no
+  haya checkboxes. `Filter process` solo afecta a Connections.
+- Connections muestra en su cabecera tres grupos de checkboxes: **IP** (IPv4/IPv6), **Transport**
+  (TCP/UDP/Other) y **State** (Established, Listening, Connecting (SYN), Closing
+  (Close/Fin/Time Wait), Other); la columna State sigue mostrando el valor exacto. Solo se
+  aplican en esa subpestaña y se conservan al cambiar de pestaña. Todo marcado = sin filtro; un
+  subconjunto excluye el resto; un grupo vacío deja «0 of M connections». La normalización cubre
+  `Listen`, `Established`, `SynSent`, `TimeWait`, `TSI_*`, etc. UDP no tiene estado: con el grupo
+  State completo sus filas siguen visibles y con un subconjunto se ocultan.
 - Processes muestra en su cabecera `Filter processes` y filtra por nombre, ruta, PID o usuario,
-  igual que CPU. El contador “N of M” refleja la búsqueda.
-- State solo se aplica en Connections y la búsqueda solo en Processes; al cambiar de subpestaña
-  se conservan, pero no afectan a la otra tabla.
-- `--networking-transport all` y `--networking-ip all` equivalen a “All”;
-  `--networking-state all` y un valor desconocido equivalen a sin filtro de estado.
+  igual que CPU. El contador “N of M” refleja la búsqueda. La columna Protocols muestra todos los
+  badges (sin `+N`) y Sockets todos sus tipos.
+- State y `Filter process` solo se aplican en Connections y la búsqueda solo en Processes; al
+  cambiar de subpestaña se conservan, pero no afectan a la otra tabla.
+- `--networking-transport all` y `--networking-ip all` marcan todos los checkboxes (sin filtro);
+  una lista (`tcp,udp`, `4,6`) marca solo esos; `--networking-state all` y un valor desconocido
+  equivalen a sin filtro de estado.
 
 Tabla de Connections (orden y columnas):
 
@@ -335,10 +356,10 @@ $APP --screenshot /tmp/kb-connections-columns.png --section networking \
   --tab connections --screenshot-delay 5
 ```
 
-- Orden de columnas: Local, Remote, Protocol, RX, TX, State, Iface, PID y Process (última).
+- Orden de columnas: Process, PID, Local, Remote, Proto, RX, TX, State e Iface.
 - Pulsar cada cabecera: debe mostrarse el indicador de orden y alternar ascendente/descendente.
   Local/Remote ordenan numéricamente (no `10.x` antes que `2.x`); RX/TX/PID numéricamente; el
-  resto por texto.
+  resto por texto. Process ordena por nombre (con Unknown para PID sin nombre).
 - Seleccionar una fila, ordenar y cambiar de subpestaña/sección: la selección y el criterio de
   orden se conservan (estado de sesión en `UIState`). Si el filtro hace desaparecer la fila, la
   selección se limpia.
@@ -355,8 +376,10 @@ $APP --screenshot /tmp/kb-processes.png --section networking --tab processes \
 
 - La tabla solo lista procesos con flujos TCP/UDP o sockets (UNIX/RAW incluidos). Comparar los
   tipos y conteos con `lsof -nP -i`/`netstat` y con el inspector del proceso.
-- Comprobar badges de protocolo (TCP4/TCP6/UDP4/UDP6/UNIX/RAW4/RAW6/OTHER), tipos de socket
-  (stream/dgram/raw/seqpacket/other), Flows, RX/TX (Bytes) y “—” en procesos solo-locales.
+- Comprobar todos los badges de protocolo (TCP4/TCP6/UDP4/UDP6/UNIX/RAW4/RAW6/OTHER) sin `+N`,
+  los tipos de socket (stream/dgram/raw/seqpacket/other), Flows, RX/TX (Bytes) y “—” en procesos
+  solo-locales. Con 8 badges la columna Protocols llega a su ancho ideal y la tabla puede requerir
+  scroll horizontal en ventanas estrechas.
 - En modo local, los procesos de otros uid pueden mostrar Protocols/Flows/RX/TX pero Sockets
   “—” (restringido); con el daemon root deben mostrar también sus sockets.
 - Ordenar por cada cabecera y comprobar que el criterio se conserva al cambiar de pestaña/sección.

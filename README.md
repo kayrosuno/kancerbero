@@ -36,14 +36,19 @@ El detalle de binarios, permisos, instalación y librerías está en
 - **Networking** — tarjeta **Traffic** ancha con Download/Upload en la cabecera y un gráfico
   espejado (download arriba, upload abajo) con cuadrícula, niveles y eje temporal. Al lado, una
   tarjeta **Activity** que agrupa Connections y Processes, y una tarjeta **Protocols** con el
-  desglose TCP4/TCP6/UDP4/UDP6/UNIX/OTHER. Los selectores **Transport** (TCP/UDP/Other) e **IP**
-  (IPv4/IPv6) filtran las tablas de Connections/Processes y se combinan con el foco de las
-  tarjetas. La tabla de Connections muestra Local, Remote, Protocol, RX, TX, State, Iface, PID y
-  Process (última), y permite ordenar por cualquier columna; su cabecera añade un selector
-  **State** (All, Established, Listening, Connecting (SYN), Closing (Close/Fin/Time Wait), Other).
+  desglose TCP4/TCP6/UDP4/UDP6/UNIX/OTHER. La cabecera de Connections agrupa tres controles de
+  checkboxes multiselección —**IP** (IPv4/IPv6), **Transport** (TCP/UDP/Other) y **State**
+  (Established, Listening, Connecting (SYN), Closing (Close/Fin/Time Wait), Other)— más un campo
+  **Filter process** (nombre o PID). Todos los valores están marcados por defecto; desmarcar
+  excluye y un grupo sin nada marcado no muestra filas. Con el grupo State completo las filas UDP
+  (sin estado) siguen visibles; con un subconjunto se ocultan. El filtro de protocolo se conserva
+  al cambiar de subpestaña y sigue afectando a Processes y a las tarjetas. La tabla de Connections
+  muestra Process, PID, Local, Remote, Proto, RX, TX, State e Iface, y permite ordenar por
+  cualquier columna.
   La tabla de Processes lista solo procesos con flujos TCP/UDP o sockets (incluye UNIX y RAW vía
-  libproc), con badges de protocolo, tipos de socket (stream/dgram/raw), número de flujos, RX/TX
-  acumulados y Path; su cabecera añade **Filter processes** (nombre, ruta, PID o usuario). Ambas
+  libproc), con todos los badges de protocolo (sin `+N`), tipos de socket (stream/dgram/raw),
+  número de flujos, RX/TX acumulados y Path; su cabecera añade **Filter processes** (nombre,
+  ruta, PID o usuario). Ambas
   tablas se pueden ordenar por cualquier columna. Sin root solo se leen sockets del propio
   usuario; el daemon root cubre el resto. Las **velocidades** se muestran en bits con unidades
   humanas (`bps`, `Kbps`, `Mbps`, `Gbps`); los **totales acumulados** siguen en Bytes (`KB`, `MB`,
@@ -175,9 +180,10 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--disk-path=<carpeta>] [--disk-scan] [--disk-item <diskXsY>] \
   [--cpu-search <texto>] [--cpu-selected <pid>] \
   [--networking-focus download|upload|connections|processes] \
-  [--networking-transport tcp|udp|other] [--networking-ip ipv4|ipv6] \
-  [--networking-state established|listening|connecting|closing|other] \
-  [--networking-search <texto>] \
+  [--networking-transport tcp|udp|other[,..]|all] \
+  [--networking-ip ipv4|ipv6[,..]|all] \
+  [--networking-state established|listening|connecting|closing|other[,..]|all] \
+  [--networking-connection-search <texto>] [--networking-search <texto>] \
   [--volumes-focus disks|volumes|capacity|free] \
   [--analyzer-focus scanned|files|folders|denied] \
   [--daemon-type all|agent|daemon[,..]] \

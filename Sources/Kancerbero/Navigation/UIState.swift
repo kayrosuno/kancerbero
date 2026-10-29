@@ -20,14 +20,23 @@ final class UIState {
             .flatMap({ NetworkingFocus(rawValue: $0.lowercased()) }) {
             networking.focus = focus
         }
-        if let raw = Self.value(for: "--networking-transport", in: arguments) {
-            networking.transport = NetworkingTransport(cliValue: raw)
+        if let transports = Self.filterSelection(
+            for: "--networking-transport", in: arguments,
+            parse: { NetworkingTransport(cliValue: $0) }) {
+            networking.transports = transports
         }
-        if let raw = Self.value(for: "--networking-ip", in: arguments) {
-            networking.ipVersion = NetworkingIPVersion(cliValue: raw)
+        if let ipVersions = Self.filterSelection(
+            for: "--networking-ip", in: arguments,
+            parse: { NetworkingIPVersion(cliValue: $0) }) {
+            networking.ipVersions = ipVersions
         }
-        networking.connectionState = Self.value(for: "--networking-state", in: arguments)
-            .flatMap { NetworkingConnectionState(cliValue: $0) }
+        if let states = Self.filterSelection(
+            for: "--networking-state", in: arguments,
+            parse: { NetworkingConnectionState(cliValue: $0) }) {
+            networking.connectionStates = states
+        }
+        networking.connectionSearch = Self.value(for: "--networking-connection-search",
+                                                 in: arguments) ?? ""
         networking.processSearch = Self.value(for: "--networking-search", in: arguments) ?? ""
 
         if let raw = Self.value(for: "--daemon-type", in: arguments) {
@@ -82,6 +91,27 @@ final class UIState {
         return arguments[index + 1]
     }
 
+    /// Parses a comma-separated list through `parse`, which understands the
+    /// per-flag aliases (e.g. `4` and `v4` for IPv4). "all" or an entirely
+    /// unrecognized list means "no override", leaving the full set in place.
+    private static func filterSelection<T: Hashable>(
+        for flag: String, in arguments: [String], parse: (String) -> T?
+    ) -> Set<T>? {
+        guard let raw = value(for: flag, in: arguments) else { return nil }
+        var result = Set<T>()
+        var sawAll = false
+        for token in raw.split(separator: ",") {
+            let value = String(token).trimmingCharacters(in: .whitespacesAndNewlines)
+            if value.lowercased() == "all" {
+                sawAll = true
+            } else if let parsed = parse(value) {
+                result.insert(parsed)
+            }
+        }
+        if sawAll { return nil }
+        return result.isEmpty ? nil : result
+    }
+
     /// Parses a comma-separated list of raw values (e.g. `system,user`).
     /// Unknown values are ignored; an entirely invalid list means "no override".
     private static func valueSet<T: RawRepresentable & Hashable>(
@@ -97,9 +127,11 @@ final class UIState {
 
 struct NetworkingUIState: Equatable {
     var focus: NetworkingFocus?
-    var transport: NetworkingTransport?
-    var ipVersion: NetworkingIPVersion?
-    var connectionState: NetworkingConnectionState?
+    /// Every case pressed means "no filter"; an empty group matches nothing.
+    var transports: Set<NetworkingTransport> = Set(NetworkingTransport.allCases)
+    var ipVersions: Set<NetworkingIPVersion> = Set(NetworkingIPVersion.allCases)
+    var connectionStates: Set<NetworkingConnectionState> = NetworkingConnectionState.all
+    var connectionSearch = ""
     var processSearch = ""
     var selectedConnection: String?
     var selectedProcess: KBProcessKey?

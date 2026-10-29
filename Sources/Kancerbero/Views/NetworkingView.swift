@@ -27,13 +27,16 @@ struct NetworkingView: View {
         @Bindable var model = model
         let rates = model.systemRates
         let protocolFilter = ui.networking.protocolFilter
-        let connectionState = tab == .connections ? ui.networking.connectionState : nil
+        let connectionStates = tab == .connections ? ui.networking.connectionStates
+                                                   : NetworkingConnectionState.all
+        let connectionSearch = tab == .connections ? ui.networking.connectionSearch : ""
         let processSearch = tab == .processes ? ui.networking.processSearch : ""
         let activityConnections = model.filteredSources(nil, matching: protocolFilter,
-                                                        state: connectionState).count
+                                                        states: connectionStates,
+                                                        search: connectionSearch).count
         let activityProcesses = model.filteredProcessRows(nil, matching: protocolFilter,
                                                           search: processSearch).count
-        let ipOnly = NetworkingProtocolFilter(ipVersion: ui.networking.ipVersion)
+        let ipOnly = NetworkingProtocolFilter(ipVersions: ui.networking.ipVersions)
         let protocolCounts = Dictionary(
             grouping: model.sources.filter(ipOnly.matches),
             by: \.protocolBucket
@@ -42,7 +45,8 @@ struct NetworkingView: View {
         let matchingInterfaces = model.filteredInterfaces(ui.networking.focus)
         let matchingSources = model.filteredSources(ui.networking.focus,
                                                     matching: protocolFilter,
-                                                    state: connectionState)
+                                                    states: connectionStates,
+                                                    search: connectionSearch)
         let matchingProcesses = model.filteredProcessRows(ui.networking.focus,
                                                           matching: protocolFilter,
                                                           search: processSearch)
@@ -112,7 +116,10 @@ struct NetworkingView: View {
                     ActivityCard(
                         connectionsCount: activityConnections,
                         processesCount: activityProcesses,
-                        connectionsFiltered: protocolFilter.isActive || connectionState != nil,
+                        connectionsFiltered: protocolFilter.isActive
+                            || connectionStates != NetworkingConnectionState.all
+                            || !connectionSearch
+                                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                         processesFiltered: protocolFilter.isActive
                             || !processSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                         focus: ui.networking.focus,
@@ -121,7 +128,7 @@ struct NetworkingView: View {
 
                     ProtocolCard(
                         counts: protocolCounts,
-                        ipVersion: ui.networking.ipVersion
+                        ipVersions: ui.networking.ipVersions
                     )
                 }
                 .frame(minWidth: 232, idealWidth: 248, maxWidth: 256)
@@ -129,14 +136,6 @@ struct NetworkingView: View {
 
             HStack(spacing: 12) {
                 PillTabBar(selection: $tab, selectionAnimation: pillAnimation)
-                if tab == .connections || tab == .processes {
-                    OptionFilterPicker("Transport",
-                                       selection: transportBinding,
-                                       optionTitle: { $0.title })
-                    OptionFilterPicker("IP",
-                                       selection: ipVersionBinding,
-                                       optionTitle: { $0.title })
-                }
                 Spacer(minLength: 8)
                 Text(contextLabel(interfaces: matchingInterfaces,
                                   sources: matchingSources,
@@ -157,20 +156,6 @@ struct NetworkingView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    private var transportBinding: Binding<NetworkingTransport?> {
-        Binding(
-            get: { ui.networking.transport },
-            set: { ui.networking.transport = $0 }
-        )
-    }
-
-    private var ipVersionBinding: Binding<NetworkingIPVersion?> {
-        Binding(
-            get: { ui.networking.ipVersion },
-            set: { ui.networking.ipVersion = $0 }
-        )
-    }
-
     private func contextLabel(interfaces: [KBInterfaceInfo],
                               sources: [KBNStatSource],
                               processes: [ProcessInventoryRow]) -> String {
@@ -184,7 +169,9 @@ struct NetworkingView: View {
             let total = model.sources.count
             let active = ui.networking.focus != nil
                 || ui.networking.protocolFilter.isActive
-                || ui.networking.connectionState != nil
+                || ui.networking.connectionStates != NetworkingConnectionState.all
+                || !ui.networking.connectionSearch
+                    .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             return active
                 ? "\(sources.count) of \(total) connections"
                 : "\(total) connections"

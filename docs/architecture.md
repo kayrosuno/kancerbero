@@ -22,21 +22,30 @@
   (gráfico espejado, escala compartida con techo 1/2/5×10^n, cuadrícula, niveles y eje temporal;
   ventana de 60 muestras anclada a la derecha). Debajo, `PillTabBar` y las tablas
   (`NetworkingTables.swift`). La columna derecha agrupa `ActivityCard` (Connections+Processes) y
-  `ProtocolCard` (desglose por `protocolBucket`). Los filtros `NetworkingTransport` (TCP/UDP/Other)
-  y `NetworkingIPVersion` (IPv4/IPv6) viven en `NetworkingUIState`, se combinan con
-  `NetworkingFocus` y se aplican en `filteredSources`/`filteredProcessRows`. La tabla de
-  Connections añade en su cabecera `NetworkingConnectionState` (All, Established, Listening,
-  Connecting (SYN), Closing, Other), normaliza el `tcpState` crudo de NStat y solo aplica el
-  filtro en esa subpestaña; los estados vacíos (UDP) no coinciden con ninguna categoría. La tabla
+  `ProtocolCard` (desglose por `protocolBucket`). `NetworkingUIState` guarda
+  `transports: Set<NetworkingTransport>`, `ipVersions: Set<NetworkingIPVersion>` y
+  `connectionStates: Set<NetworkingConnectionState>` (todos los valores por defecto);
+  `NetworkingProtocolFilter` combina los dos primeros y `filteredSources` /
+  `filteredProcessRows` los aplican junto con `NetworkingFocus`. La cabecera de Connections los
+  muestra como tres grupos de checkboxes (`CheckboxFilterGroup`, nativo
+  `.toggleStyle(.checkbox)`): IP, Transport y State, más `Filter process` (nombre o PID, vía el
+  parámetro `search:` de `filteredSources`). Todo marcado equivale a sin filtro, desmarcar
+  excluye y un grupo vacío no coincide con ninguna fila; el estado se conserva al cambiar de
+  subpestaña, así que Processes sigue filtrándose aunque allí no se vean los controles. El filtro
+  State usa `NetworkingConnectionState.category(for:)` sobre el `tcpState` crudo de NStat y solo
+  se aplica en Connections: con el grupo completo las filas UDP (estado vacío, sin categoría)
+  siguen visibles; con un subconjunto se ocultan. La tabla
   de Processes añade `Filter processes` en su cabecera, reutilizando
   `KBProcessInfo.matchesSearch` (nombre, ruta, PID o usuario) y aplicando la búsqueda solo en esa
-  subpestaña. Connections ordena por cualquier columna (`Table` + `KeyPathComparator`);
+  subpestaña. Connections ordena por cualquier columna (`Table` + `KeyPathComparator`) y muestra
+  Process, PID, Local, Remote, Proto, RX, TX, State e Iface;
   Local/Remote usan un comparador numérico de endpoints y el criterio se guarda en
   `connectionSortOrder` dentro de `NetworkingUIState`. La tabla de Processes usa
   `ProcessInventoryRow` (agregado de flujos NStat + inventario de sockets libproc) y ordena con
-  `processSortOrder`. `ActivityCard` recibe flags separados para reflejar el estado mientras
-  Connections está activo y la búsqueda mientras Processes está activo; `ProtocolCard` sigue
-  siendo global. `SocketSummaryCollector`
+  `processSortOrder`. `ActivityCard` recibe flags separados para reflejar el estado TCP y la
+  búsqueda de proceso mientras Connections está activo y la búsqueda mientras Processes está
+  activo; `ProtocolCard` sigue siendo global y recibe el conjunto `ipVersions` (solo etiqueta una
+  familia cuando queda aislada). `SocketSummaryCollector`
   enumera sockets por PID (TCP4/6, UDP4/6, UNIX, RAW4/6, OTHER y tipos stream/dgram/raw),
   deduplica FDs por `soi_so` dentro de cada PID y corre en `CollectionActor` cada ~10 s en
   background, sin bloquear NStat. El resultado viaja como campo **opcional**
@@ -83,9 +92,10 @@
   panel de detalle y árbol expandido) vive en `UIState`, un `@Observable` inyectado desde
   `KancerberoApp`. Es **solo de sesión**: sobrevive a la destrucción de las vistas al cambiar de
   sección/subpestaña, pero no se guarda en disco. Los overrides `--networking-focus`,
-  `--networking-transport`, `--networking-ip`, `--networking-state`, `--networking-search`,
-  `--daemon-*`, `--volumes-focus`, `--analyzer-focus`, `--cpu-search` y `--cpu-selected` se
-  aplican una sola vez al crear `UIState`.
+  `--networking-transport`, `--networking-ip` y `--networking-state` (listas separadas por comas;
+  `all` o un valor desconocido no filtran), `--networking-connection-search`,
+  `--networking-search`, `--daemon-*`, `--volumes-focus`, `--analyzer-focus`, `--cpu-search` y
+  `--cpu-selected` se aplican una sola vez al crear `UIState`.
 - Settings: `KancerberoApp` añade una escena nativa `Settings` con `SettingsView`. El toggle
   “Animate tab changes” persiste en `@AppStorage("tabAnimationsEnabled")` (por defecto `true`) y
   condiciona únicamente las transiciones de cambio de pestaña: `RootView` (secciones),
@@ -98,7 +108,8 @@
   completo.
 - Captura interna para verificación: `--screenshot`, `--section`, `--tab`, `--disk-tab`,
   `--networking-focus`, `--networking-transport`, `--networking-ip`, `--networking-state`,
-  `--networking-search`, `--volumes-focus`, `--analyzer-focus`, `--cpu-search`, `--cpu-selected`,
+  `--networking-connection-search`, `--networking-search`, `--volumes-focus`,
+  `--analyzer-focus`, `--cpu-search`, `--cpu-selected`,
   filtros `--daemon-*` y `--sidebar-collapsed` (ver `docs/verification.md`).
 
 ## Flujo de datos

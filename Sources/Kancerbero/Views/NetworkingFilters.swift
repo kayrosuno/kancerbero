@@ -87,6 +87,9 @@ enum NetworkingConnectionState: String, CaseIterable, Identifiable, Hashable, Se
         }
     }
 
+    /// Every case pressed means "no filter"; an empty group matches nothing.
+    static let all = Set(allCases)
+
     /// "all" and unknown values return nil (no filter), matching Transport/IP.
     init?(cliValue: String) {
         switch cliValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
@@ -118,10 +121,6 @@ enum NetworkingConnectionState: String, CaseIterable, Identifiable, Hashable, Se
         }
     }
 
-    func matches(_ rawState: String) -> Bool {
-        Self.category(for: rawState) == self
-    }
-
     /// "TSI_SYN_SENT", "SynSent", "syn sent" → "SYNSENT".
     private static func normalized(_ rawState: String) -> String {
         var value = rawState
@@ -133,24 +132,73 @@ enum NetworkingConnectionState: String, CaseIterable, Identifiable, Hashable, Se
     }
 }
 
+extension NetworkingConnectionState {
+    /// Checkbox tooltip; the titles alone do not explain the categories.
+    var checkboxHelp: String {
+        switch self {
+        case .established:
+            return "TCP connections that completed the handshake"
+        case .listening:
+            return "Sockets waiting for incoming connections"
+        case .connecting:
+            return "Handshake in progress (SYN sent or received)"
+        case .closing:
+            return "Close wait, FIN wait, closing, time wait and last ack"
+        case .other:
+            return "Any other TCP state not classified above"
+        }
+    }
+}
+
+/// Facet filter over Transport and IP. Every case pressed means "no filter";
+/// an empty group matches nothing (same semantics as the Daemons chips).
 struct NetworkingProtocolFilter: Equatable, Sendable {
-    var transport: NetworkingTransport?
-    var ipVersion: NetworkingIPVersion?
+    static let allTransports = Set(NetworkingTransport.allCases)
+    static let allIPVersions = Set(NetworkingIPVersion.allCases)
+
+    var transports: Set<NetworkingTransport> = NetworkingProtocolFilter.allTransports
+    var ipVersions: Set<NetworkingIPVersion> = NetworkingProtocolFilter.allIPVersions
 
     static let none = NetworkingProtocolFilter()
 
-    var isActive: Bool { transport != nil || ipVersion != nil }
+    var isTransportFiltered: Bool { transports != Self.allTransports }
+    var isIPFiltered: Bool { ipVersions != Self.allIPVersions }
+    var isActive: Bool { isTransportFiltered || isIPFiltered }
 
     func matches(_ source: KBNStatSource) -> Bool {
-        if let transport, source.transport != transport { return false }
-        if let ipVersion, source.ipVersion != ipVersion { return false }
+        if isTransportFiltered, !transports.contains(source.transport) { return false }
+        if isIPFiltered {
+            guard let version = source.ipVersion,
+                  ipVersions.contains(version) else { return false }
+        }
         return true
     }
 }
 
 extension NetworkingUIState {
     var protocolFilter: NetworkingProtocolFilter {
-        NetworkingProtocolFilter(transport: transport, ipVersion: ipVersion)
+        NetworkingProtocolFilter(transports: transports, ipVersions: ipVersions)
+    }
+}
+
+extension NetworkingTransport {
+    /// Protocol badges a process must carry to be included by this transport.
+    var processTags: Set<ProcessProtocolTag> {
+        switch self {
+        case .tcp: return [.tcp4, .tcp6]
+        case .udp: return [.udp4, .udp6]
+        case .other: return [.unix, .raw4, .raw6, .other]
+        }
+    }
+}
+
+extension NetworkingIPVersion {
+    /// Protocol badges a process must carry to be included by this family.
+    var processTags: Set<ProcessProtocolTag> {
+        switch self {
+        case .ipv4: return [.tcp4, .udp4, .raw4]
+        case .ipv6: return [.tcp6, .udp6, .raw6]
+        }
     }
 }
 
@@ -205,11 +253,23 @@ extension AppModel {
 
     func filteredSources(_ focus: NetworkingFocus?,
                          matching filter: NetworkingProtocolFilter = .none,
-                         state: NetworkingConnectionState? = nil)
+                         states: Set<NetworkingConnectionState> = NetworkingConnectionState.all,
+                         search: String = "")
         -> [KBNStatSource] {
         var base = filter.isActive ? sources.filter(filter.matches) : sources
-        if let state {
-            base = base.filter { state.matches($0.tcpState) }
+        let needle = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !needle.isEmpty {
+            base = base.filter {
+                $0.processName.localizedCaseInsensitiveContains(needle)
+                    || String($0.pid).contains(needle)
+            }
+        }
+        if states != NetworkingConnectionState.all {
+            base = base.filter {
+                guard let category = NetworkingConnectionState.category(for: $0.tcpState)
+                else { return false }
+                return states.contains(category)
+            }
         }
         guard let focus else { return base }
         switch focus {
@@ -247,40 +307,17 @@ extension AppModel {
 
 extension NetworkingProtocolFilter {
     func matches(_ row: ProcessInventoryRow) -> Bool {
-        if let transport {
-            switch transport {
-            case .tcp:
-                guard row.protocols.contains(.tcp4) || row.protocols.contains(.tcp6) else {
-                    return false
-                }
-            case .udp:
-                guard row.protocols.contains(.udp4) || row.protocols.contains(.udp6) else {
-                    return false
-                }
-            case .other:
-                guard row.protocols.contains(.unix)
-                        || row.protocols.contains(.raw4)
-                        || row.protocols.contains(.raw6)
-                        || row.protocols.contains(.other) else {
-                    return false
-                }
+        if isTransportFiltered {
+            let wanted = transports.reduce(into: Set<ProcessProtocolTag>()) {
+                $0.formUnion($1.processTags)
             }
+            guard !row.protocols.isDisjoint(with: wanted) else { return false }
         }
-        if let ipVersion {
-            switch ipVersion {
-            case .ipv4:
-                guard row.protocols.contains(.tcp4)
-                        || row.protocols.contains(.udp4)
-                        || row.protocols.contains(.raw4) else {
-                    return false
-                }
-            case .ipv6:
-                guard row.protocols.contains(.tcp6)
-                        || row.protocols.contains(.udp6)
-                        || row.protocols.contains(.raw6) else {
-                    return false
-                }
+        if isIPFiltered {
+            let wanted = ipVersions.reduce(into: Set<ProcessProtocolTag>()) {
+                $0.formUnion($1.processTags)
             }
+            guard !row.protocols.isDisjoint(with: wanted) else { return false }
         }
         return true
     }
