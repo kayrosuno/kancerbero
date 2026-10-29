@@ -42,6 +42,14 @@ struct CheckboxFilterGroup<Option: CaseIterable & Identifiable & Hashable>: View
                     .fixedSize()
             }
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background {
+            Capsule().fill(.quaternary.opacity(0.35))
+        }
+        .overlay {
+            Capsule().strokeBorder(.quaternary.opacity(0.5), lineWidth: 1)
+        }
         .fixedSize()
     }
 
