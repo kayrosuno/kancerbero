@@ -76,8 +76,8 @@ struct ProcessInspectorView: View {
         Table(sockets) {
             TableColumn("FD") { item in Text("\(item.fd)").monospacedDigit() }
                 .width(min: 40, ideal: 55)
-            TableColumn("Proto") { item in Text(item.connectionProtocol.displayName).monospaced() }
-                .width(min: 50, ideal: 60)
+            TableColumn("Proto") { item in Text(item.protocolLabel).monospaced() }
+                .width(min: 60, ideal: 90)
             TableColumn("Local") { item in Text(item.local.display).monospaced() }
             TableColumn("Remote") { item in Text(item.remote.display).monospaced() }
             TableColumn("State") { item in Text(item.stateName.isEmpty ? "—" : item.stateName) }

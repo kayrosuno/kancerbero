@@ -332,7 +332,9 @@ struct ProcessesView: View {
                 }
                 .width(min: 46, ideal: 54)
                 TableColumn("Protocols", value: \.protocolSortRank) { row in
-                    ProcessProtocolBadges(tags: row.protocols)
+                    ProcessProtocolBadges(tags: row.protocols,
+                                          otherLabels: row.otherProtocolLabels,
+                                          rawLabels: row.rawProtocolLabels)
                 }
                 .width(min: 150, ideal: 230)
                 TableColumn("Sockets", value: \.socketCount) { row in
@@ -470,26 +472,53 @@ struct ProcessesView: View {
 
 private struct ProcessProtocolBadges: View {
     let tags: Set<ProcessProtocolTag>
+    /// Unmasked values behind OTHER (socket families and NStat providers).
+    var otherLabels: [String] = []
+    /// Real protocols behind the RAW badges (ICMP, SCTP, GRE…).
+    var rawLabels: [String] = []
+
+    private static let otherColor = Color(red: 0.55, green: 0.57, blue: 0.63)
+    private static let rawColor = KBTheme.processesTint
 
     var body: some View {
-        let ordered = tags.sorted { $0.sortRank < $1.sortRank }
-        if ordered.isEmpty {
+        let fixed = tags.filter { $0 != .other && $0 != .raw4 && $0 != .raw6 }
+            .sorted { $0.sortRank < $1.sortRank }
+        let raw = tags.contains(.raw4) || tags.contains(.raw6)
+            ? (rawLabels.isEmpty
+                ? [ProcessProtocolTag.raw4, .raw6].filter(tags.contains).map(\.title)
+                : rawLabels)
+            : []
+        let others = tags.contains(.other)
+            ? (otherLabels.isEmpty ? ["OTHER"] : otherLabels)
+            : []
+        if fixed.isEmpty && raw.isEmpty && others.isEmpty {
             Text("—").foregroundStyle(.secondary)
         } else {
             HStack(spacing: 3) {
-                ForEach(ordered) { tag in
-                    Text(tag.title)
-                        .font(.system(size: 8, weight: .semibold))
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background {
-                            Capsule().fill(color(tag).opacity(0.15))
-                        }
-                        .foregroundStyle(color(tag))
+                ForEach(fixed) { tag in
+                    badge(tag.title, color: color(tag))
+                }
+                ForEach(raw, id: \.self) { label in
+                    badge(label, color: Self.rawColor)
+                }
+                ForEach(others, id: \.self) { label in
+                    badge(label, color: Self.otherColor)
                 }
             }
-            .help(ordered.map(\.title).joined(separator: ", "))
+            .help((fixed.map(\.title) + raw + others).joined(separator: ", "))
         }
+    }
+
+    private func badge(_ title: String, color: Color) -> some View {
+        Text(title)
+            .font(.system(size: 8, weight: .semibold))
+            .padding(.horizontal, 4)
+            .padding(.vertical, 1)
+            .lineLimit(1)
+            .background {
+                Capsule().fill(color.opacity(0.15))
+            }
+            .foregroundStyle(color)
     }
 
     private func color(_ tag: ProcessProtocolTag) -> Color {
@@ -501,7 +530,7 @@ private struct ProcessProtocolBadges: View {
         case .unix: return KBTheme.uploadTint
         case .raw4: return KBTheme.processesTint
         case .raw6: return Color(red: 0.90, green: 0.42, blue: 0.25)
-        case .other: return Color(red: 0.55, green: 0.57, blue: 0.63)
+        case .other: return Self.otherColor
         }
     }
 }

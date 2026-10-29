@@ -444,6 +444,82 @@ public enum KBTCPState {
     }
 }
 
+/// Darwin address family names, from <sys/socket.h>. 26 and 39 are unassigned
+/// and fall through to the numeric label.
+public enum KBSocketFamily {
+    public static func name(for family: UInt32) -> String {
+        switch family {
+        case 0: return "AF_UNSPEC"
+        case 1: return "AF_UNIX"
+        case 2: return "AF_INET"
+        case 3: return "AF_IMPLINK"
+        case 4: return "AF_PUP"
+        case 5: return "AF_CHAOS"
+        case 6: return "AF_NS"
+        case 7: return "AF_ISO"
+        case 8: return "AF_ECMA"
+        case 9: return "AF_DATAKIT"
+        case 10: return "AF_CCITT"
+        case 11: return "AF_SNA"
+        case 12: return "AF_DECnet"
+        case 13: return "AF_DLI"
+        case 14: return "AF_LAT"
+        case 15: return "AF_HYLINK"
+        case 16: return "AF_APPLETALK"
+        case 17: return "AF_ROUTE"
+        case 18: return "AF_LINK"
+        case 19: return "AF_XTP"
+        case 20: return "AF_COIP"
+        case 21: return "AF_CNT"
+        case 22: return "AF_RTIP"
+        case 23: return "AF_IPX"
+        case 24: return "AF_SIP"
+        case 25: return "AF_PIP"
+        case 27: return "AF_NDRV"
+        case 28: return "AF_ISDN"
+        case 29: return "AF_KEY"
+        case 30: return "AF_INET6"
+        case 31: return "AF_NATM"
+        case 32: return "AF_SYSTEM"
+        case 33: return "AF_NETBIOS"
+        case 34: return "AF_PPP"
+        case 35: return "AF_HDRCMPLT"
+        case 36: return "AF_RESERVED_36"
+        case 37: return "AF_IEEE80211"
+        case 38: return "AF_UTUN"
+        case 40: return "AF_VSOCK"
+        default: return "AF_\(family)"
+        }
+    }
+}
+
+/// IP protocol names for sockets that are neither TCP nor UDP.
+public enum KBIPProtocol {
+    public static func name(for number: Int32) -> String {
+        switch number {
+        case 0: return "RAW"
+        case 1: return "ICMP"
+        case 2: return "IGMP"
+        case 4: return "IPIP"
+        case 6: return "TCP"
+        case 17: return "UDP"
+        case 33: return "DCCP"
+        case 41: return "IPv6"
+        case 47: return "GRE"
+        case 50: return "ESP"
+        case 51: return "AH"
+        case 58: return "ICMPv6"
+        case 89: return "OSPF"
+        case 103: return "PIM"
+        case 112: return "VRRP"
+        case 132: return "SCTP"
+        case 136: return "UDPLite"
+        case 255: return "RAW"
+        default: return "IPPROTO_\(number)"
+        }
+    }
+}
+
 public struct KBSocketInfo: Codable, Sendable, Identifiable, Hashable {
     public var fd: Int32
     public var family: Int32
@@ -456,15 +532,19 @@ public struct KBSocketInfo: Codable, Sendable, Identifiable, Hashable {
     public var id: Int32 { fd }
 
     /// `family` is normalized by the C layer to 4, 6, or left as AF_UNIX/other.
-    public var connectionProtocol: KBConnectionProtocol {
-        if family == AF_UNIX { return .unix }
-        if protocolNumber == IPPROTO_TCP {
-            return family == 6 ? .tcp6 : .tcp4
+    /// Mirrors `kb_classify_socket`: TCP/UDP keep the family suffix, any other
+    /// IPv4/IPv6 protocol shows its real name (ICMP, SCTP, GRE…) and sockets
+    /// outside INET/UNIX show their address family.
+    public var protocolLabel: String {
+        if family == AF_UNIX { return "UNIX" }
+        if family == 4 || family == 6 {
+            switch protocolNumber {
+            case Int32(IPPROTO_TCP): return family == 6 ? "TCP6" : "TCP4"
+            case Int32(IPPROTO_UDP): return family == 6 ? "UDP6" : "UDP4"
+            default: return KBIPProtocol.name(for: protocolNumber)
+            }
         }
-        if protocolNumber == IPPROTO_UDP {
-            return family == 6 ? .udp6 : .udp4
-        }
-        return .other
+        return KBSocketFamily.name(for: UInt32(max(family, 0)))
     }
 
     public var stateName: String {
@@ -537,12 +617,21 @@ public struct KBProcessSocketSummary: Codable, Sendable, Identifiable, Hashable 
     public var uniqueSockets: Int
     public var restricted: Bool
     public var truncated: Bool
+    /// Address families (AF numbers) of the sockets counted in `buckets.other`.
+    /// nil when the scanner (or an older daemon) did not report them.
+    public var otherFamilies: [UInt32]?
+    /// IP protocol numbers of the sockets counted in `buckets.raw4`/`raw6`, so
+    /// the UI can show ICMP, SCTP… instead of the generic RAW badge. nil when
+    /// the scanner (or an older daemon) did not report them.
+    public var otherProtocols: [UInt8]?
 
     public var id: KBProcessKey { key }
 
     public init(key: KBProcessKey, buckets: KBSocketBucketCounts,
                 types: KBSocketTypeCounts, socketFDs: Int, uniqueSockets: Int,
-                restricted: Bool, truncated: Bool) {
+                restricted: Bool, truncated: Bool,
+                otherFamilies: [UInt32]? = nil,
+                otherProtocols: [UInt8]? = nil) {
         self.key = key
         self.buckets = buckets
         self.types = types
@@ -550,6 +639,8 @@ public struct KBProcessSocketSummary: Codable, Sendable, Identifiable, Hashable 
         self.uniqueSockets = uniqueSockets
         self.restricted = restricted
         self.truncated = truncated
+        self.otherFamilies = otherFamilies
+        self.otherProtocols = otherProtocols
     }
 }
 

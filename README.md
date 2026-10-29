@@ -49,7 +49,13 @@ El detalle de binarios, permisos, instalación y librerías está en
   TX, State e Iface, y permite ordenar por cualquier columna.
   La tabla de Processes lista solo procesos con flujos TCP/UDP o sockets (incluye UNIX y RAW vía
   libproc), con todos los badges de protocolo (sin `+N`), tipos de socket (stream/dgram/raw),
-  número de flujos, RX/TX acumulados y Path. Los filtros de cada subpestaña son independientes. Ambas
+  número de flujos, RX/TX acumulados y Path. Los badges `RAW4`/`RAW6` se sustituyen por el
+  protocolo real de cada socket (`ICMP`, `ICMPv6`, `SCTP`, `GRE`, `ESP`, `RAW`…), y el genérico
+  **OTHER** por la familia real (`AF_SYSTEM`, `AF_NDRV`, `AF_VSOCK`…, con la tabla de
+  `sys/socket.h` completa) o por el provider de NStat cuando no es TCP/UDP (o `TCP`/`UDP` si el
+  flujo lo es pero se desconoce la versión IP). RAW4/RAW6 y OTHER solo quedan si no hay detalle
+  (p. ej. daemon antiguo o sockets restringidos). El inspector de proceso muestra la misma etiqueta
+  en su columna Proto. Los filtros de cada subpestaña son independientes. Ambas
   tablas se pueden ordenar por cualquier columna. Sin root solo se leen sockets del propio
   usuario; el daemon root cubre el resto. Las **velocidades** se muestran en bits con unidades
   humanas (`bps`, `Kbps`, `Mbps`, `Gbps`); los **totales acumulados** siguen en Bytes (`KB`, `MB`,
