@@ -19,6 +19,9 @@ App SwiftUI ──XPC──> KancerberoDaemon (root opcional)
                                   └── modelos + contabilidad de deltas/tasas
 ```
 
+El detalle de binarios, permisos, instalación y librerías está en
+`docs/daemons-and-libraries.md`.
+
 - **Modo local** (sin daemon): procesos y sockets del mismo uid; tráfico por proceso vía
   NetworkStatistics (`net.statistics_privcheck = 0`).
 - **Modo daemon**: todas las interfaces, todos los procesos y sockets de cualquier uid (si el
@@ -60,11 +63,15 @@ App SwiftUI ──XPC──> KancerberoDaemon (root opcional)
     escaneo; las tablas de contenidos y mayores archivos aparecen al terminar. Las etiquetas del
     mapa muestran el nombre y el tamaño en formato humano. Las tarjetas filtran el panel derecho
     (todo, solo ficheros, solo carpetas o rutas denegadas); no se lee contenido de ficheros.
-- **Daemons** — inventario de servicios launchd con filtros combinables por tipo (agentes /
+- **Daemons** — inventario de servicios launchd con chips multiselección por tipo (agentes /
   daemons), ámbito (sistema / global / usuario / runtime), origen (Apple / custom / desconocido)
-  y estado (running / stopped / disabled / not loaded), además de búsqueda. Los agentes
-  duplicados entre los dominios GUI y User se deduplican por label, conservando ambos dominios en
-  el detalle. Inspector con Start / Stop / Restart / Enable·Disable / Load·Unload / Reveal.
+  y estado (running / stopped / disabled / not loaded). Todos los valores están pulsados al
+  arrancar; solo se muestran las filas de los valores pulsados y un grupo sin nada pulsado no
+  muestra filas. La búsqueda vive en la cabecera de la tarjeta Services y las tarjetas Running /
+  Stopped / Disabled alternan ese estado en el filtro. La tabla es ordenable por cualquiera de sus
+  columnas. Los agentes duplicados entre los dominios
+  GUI y User se deduplican por label, conservando ambos dominios en el detalle. Inspector con
+  Start / Stop / Restart / Enable·Disable / Load·Unload / Reveal.
   Las acciones de sistema requieren el daemon root y confirmación; GUI/User funcionan en local.
   Los login items quedan para una iteración posterior.
 - **CPU** — dashboard tipo `htop`: tarjetas de CPU, load average, tareas/hilos y memoria con
@@ -89,7 +96,8 @@ protocolo, RX/TX por flujo y estado). En **Processes**, el escudo de cada fila m
 como vigilado: cada conexión nueva de un proceso vigilado pide aprobación (allow/deny, una vez o
 recordada por app o app+destino). Si Kancerbero está cerrado o nadie responde, la conexión se
 deniega (fail-closed). Requiere una build firmada con Developer ID, los entitlements de Network
-Extension y aprobar la system extension; ver `docs/verification.md`.
+Extension y aprobar la system extension; el detalle de binario y permisos está en
+`docs/daemons-and-libraries.md` y las pruebas en `docs/verification.md`.
 
 Las selecciones y configuraciones de cada sección (filtros, tarjeta activa, fila seleccionada,
 panel de detalle y árbol expandido) se conservan al cambiar de pestaña o sección durante la
@@ -154,6 +162,8 @@ open build/Build/Products/Debug/Kancerbero.app
 ./build/Build/Products/Debug/KancerberoProbe procs --cpu --limit 20
 ```
 
+Comandos y permisos de `KancerberoProbe` en `docs/daemons-and-libraries.md`.
+
 Captura de la UI sin permisos de Grabación de pantalla (la app se dibuja a sí misma y termina):
 
 ```bash
@@ -170,28 +180,43 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--networking-search <texto>] \
   [--volumes-focus disks|volumes|capacity|free] \
   [--analyzer-focus scanned|files|folders|denied] \
-  [--daemon-type agent|daemon] [--daemon-scope system|global|user|runtime] \
-  [--daemon-origin apple|custom|unknown] \
-  [--daemon-state running|stopped|disabled|unloaded] \
+  [--daemon-type all|agent|daemon[,..]] \
+  [--daemon-scope system|global|user|runtime[,..]] \
+  [--daemon-origin apple|custom|unknown[,..]] \
+  [--daemon-state running|stopped|disabled|unloaded[,..]] \
   [--daemon-domain system|gui|user] [--daemon-selected <label>] \
   [--sidebar-collapsed]
 ```
 
 ## Daemon
 
+Detalle de binarios, permisos, instalación y desinstalación en `docs/daemons-and-libraries.md`.
+
 ### Servicio en background (SMAppService)
 
 La app embebe el helper y su plist en
 `Kancerbero.app/Contents/Library/LaunchDaemons/` y los registra con
-`SMAppService.daemon(plistName:)` desde la ventana **System status** o el menú **Daemon**. macOS lo
-muestra en **Ajustes → General → Login Items & Extensions → Allow in the Background** con el
-icono de Kancerbero (vía `AssociatedBundleIdentifiers`); el usuario debe aprobarlo. La app usa
+`SMAppService.daemon(plistName:)` al arrancar (una sola vez, salvo que el usuario lo haya
+desactivado) o desde la ventana **System status** / el menú **Daemon**. macOS lo muestra en
+**Ajustes → General → Login Items & Extensions → Allow in the Background** con el icono de
+Kancerbero (vía `AssociatedBundleIdentifiers`); el usuario debe aprobarlo. La app usa
 `NSXPCConnection` privilegiado para el daemon de sistema.
 
-La ventana **System status** explica el estado y permite **Repair / re-register**: desregistra y
-vuelve a registrar el helper para que macOS pueda pedir la aprobación de nuevo. La aprobación en
-Login Items no se puede automatizar; la ventana abre el ajuste correcto y muestra los pasos. Los
-comandos legacy se copian al portapapeles, nunca se ejecutan con sudo desde la app.
+El servicio usa el identificador `uno.kayros.kancerbero.daemon.v2` (label, plist y Mach service).
+El sufijo evita registros de ServiceManagement obsoletos de versiones anteriores: una vez que
+macOS guarda un *launch constraint* que ya no coincide, volver a registrar el mismo label no lo
+refresca y launchd mata el job con `Launch Constraint Violation`.
+
+El daemon se firma con el **mismo identificador de code signing que la app**
+(`-i uno.kayros.kancerbero`) y sin ningún entitlement. ServiceManagement construye el launch
+constraint del job a partir del requisito de la app; un tool firmado con su propio nombre no lo
+satisface y muere al arrancar aunque Login Items lo muestre habilitado.
+
+La ventana **System status** muestra el estado real (proceso vivo, PID, último error de conexión)
+y permite **Repair / re-register**: desregistra y vuelve a registrar el helper para que macOS
+pueda pedir la aprobación de nuevo. La aprobación en Login Items no se puede automatizar; la
+ventana abre el ajuste correcto y muestra los pasos. Los comandos legacy se copian al
+portapapeles, nunca se ejecutan con sudo desde la app.
 
 Requisitos de distribución:
 
@@ -207,7 +232,8 @@ xcrun notarytool store-credentials kancerbero-notary \
 Un daemon registrado con `SMAppService` exige app firmada con Developer ID y **notarizada**.
 La build Debug ad-hoc puede mostrar la UI y el estado, pero no se espera que `register()` funcione.
 
-Antes de registrar, elimina cualquier registro legacy: comparte label y Mach service.
+La app se niega a registrar el servicio moderno mientras exista un registro legacy; elimínalo
+antes con los scripts siguientes.
 
 ```bash
 ./scripts/uninstall-agent.sh

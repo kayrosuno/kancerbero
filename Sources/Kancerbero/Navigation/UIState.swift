@@ -31,23 +31,38 @@ final class UIState {
         networking.processSearch = Self.value(for: "--networking-search", in: arguments) ?? ""
 
         if let raw = Self.value(for: "--daemon-type", in: arguments) {
-            switch raw.lowercased() {
-            case "all": daemons.type = .all
-            case "agent", "agents": daemons.type = .agents
-            case "daemon", "daemons": daemons.type = .daemons
-            default: break
+            var selected = Set<DaemonServiceType>()
+            var includesAll = false
+            for token in raw.lowercased().split(separator: ",") {
+                switch String(token).trimmingCharacters(in: .whitespacesAndNewlines) {
+                case "all": includesAll = true
+                case "agent", "agents": selected.insert(.agent)
+                case "daemon", "daemons": selected.insert(.daemon)
+                default: break
+                }
+            }
+            if includesAll {
+                daemons.types = DaemonFilter.allTypes
+            } else if !selected.isEmpty {
+                daemons.types = selected
             }
         } else if let raw = Self.value(for: "--daemon-domain", in: arguments),
                   let domain = KBDaemonDomain(rawValue: raw.lowercased()) {
-            daemons.type = domain == .system ? .daemons : .agents
+            daemons.types = domain == .system ? [.daemon] : [.agent]
         }
 
-        daemons.scope = Self.value(for: "--daemon-scope", in: arguments)
-            .flatMap { DaemonScope(rawValue: $0.lowercased()) }
-        daemons.origin = Self.value(for: "--daemon-origin", in: arguments)
-            .flatMap { DaemonOrigin(rawValue: $0.lowercased()) }
-        daemons.state = Self.value(for: "--daemon-state", in: arguments)
-            .flatMap { KBDaemonState(rawValue: $0.lowercased()) }
+        if let scopes = Self.valueSet(for: "--daemon-scope", in: arguments,
+                                      as: DaemonScope.self) {
+            daemons.scopes = scopes
+        }
+        if let origins = Self.valueSet(for: "--daemon-origin", in: arguments,
+                                       as: DaemonOrigin.self) {
+            daemons.origins = origins
+        }
+        if let states = Self.valueSet(for: "--daemon-state", in: arguments,
+                                      as: KBDaemonState.self) {
+            daemons.states = states
+        }
         daemons.pendingSelectionLabel = Self.value(for: "--daemon-selected",
                                                    in: arguments)
 
@@ -66,6 +81,18 @@ final class UIState {
               index + 1 < arguments.count else { return nil }
         return arguments[index + 1]
     }
+
+    /// Parses a comma-separated list of raw values (e.g. `system,user`).
+    /// Unknown values are ignored; an entirely invalid list means "no override".
+    private static func valueSet<T: RawRepresentable & Hashable>(
+        for flag: String, in arguments: [String], as type: T.Type
+    ) -> Set<T>? where T.RawValue == String {
+        guard let raw = value(for: flag, in: arguments) else { return nil }
+        let parsed = raw.split(separator: ",")
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .compactMap { T(rawValue: $0) }
+        return parsed.isEmpty ? nil : Set(parsed)
+    }
 }
 
 struct NetworkingUIState: Equatable {
@@ -82,10 +109,12 @@ struct NetworkingUIState: Equatable {
 
 struct DaemonsUIState: Equatable {
     var search = ""
-    var type: DaemonTypeFilter = .all
-    var scope: DaemonScope?
-    var origin: DaemonOrigin?
-    var state: KBDaemonState?
+    var types: Set<DaemonServiceType> = DaemonFilter.allTypes
+    var scopes: Set<DaemonScope> = DaemonFilter.allScopes
+    var origins: Set<DaemonOrigin> = DaemonFilter.allOrigins
+    var states: Set<KBDaemonState> = DaemonFilter.allStates
+    /// Empty keeps the deduplicator order; header clicks fill this in.
+    var sortOrder: [KeyPathComparator<DaemonListEntry>] = []
     var selection: String?
     /// `--daemon-selected`, applied once on the first refresh with entries.
     var pendingSelectionLabel: String?

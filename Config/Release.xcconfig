@@ -6,7 +6,9 @@ DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
 ENABLE_NS_ASSERTIONS = NO
 CODE_SIGN_STYLE = Manual
 CODE_SIGN_IDENTITY = Developer ID Application
-DEVELOPMENT_TEAM = AK37TK8X2Y
+// DEVELOPMENT_TEAM is intentionally not set here: it is declared by the app,
+// filter and probe targets, but the daemon must stay without a team so Xcode
+// cannot derive a restricted com.apple.application-identifier entitlement.
 CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO
 ENABLE_HARDENED_RUNTIME = YES
 OTHER_CODE_SIGN_FLAGS = --options runtime --timestamp

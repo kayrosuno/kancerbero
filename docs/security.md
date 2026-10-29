@@ -61,7 +61,11 @@ Pendiente para producción:
   `SecCodeCheckValidity`.
 - Allowlist de desarrollo por `proc_pidpath`/cdhash (el instalador puede escribirla en el plist).
 - Límites: 4 clientes, 1 inspector en vuelo por cliente, 10 peticiones/min, payload ≤ 32 MB.
-- Firma Developer ID del daemon y de la app, hardened runtime, notarización.
+- Firma Developer ID del daemon y de la app, hardened runtime, notarización. El daemon se firma
+  con el **mismo identificador de code signing que la app** (`-i uno.kayros.kancerbero`) y **sin
+  entitlements**: ServiceManagement deriva el launch constraint del job del requisito de la app,
+  y un tool con identificador propio o un entitlement restringido sin profile embebido muere al
+  arrancar (`Launch Constraint Violation`).
 - Despliegue con `SMAppService.daemon(plistName:)`: el helper y el plist van dentro de
   `Kancerbero.app/Contents/Library/LaunchDaemons/`; la app los registra y el usuario aprueba en
   Ajustes → Login Items → Allow in the Background. El icono y el nombre se resuelven mediante
@@ -69,7 +73,9 @@ Pendiente para producción:
 - El daemon registrado exige app **notarizada**; una build ad-hoc puede mostrar el estado pero
   `register()` no es fiable. El cliente XPC usa `NSXPCConnection` con `.privileged`.
 - Antes de registrar hay que eliminar los plists legacy (`install-agent.sh`/`install-daemon.sh`):
-  comparten label/Mach service con el daemon SMAppService.
+  la app se niega a registrar el servicio moderno mientras detecte un registro legacy. El
+  servicio SMAppService usa la identidad `uno.kayros.kancerbero.daemon.v2`; los legacy conservan
+  la antigua `uno.kayros.kancerbero.daemon`.
 
 ## Acciones sobre servicios launchd
 
