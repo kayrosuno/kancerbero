@@ -4,3 +4,20 @@ PRODUCT_NAME = KancerberoDaemon
 SKIP_INSTALL = YES
 OTHER_LDFLAGS = $(inherited) -framework CoreFoundation -framework Security -framework IOKit -framework DiskArbitration
 SWIFT_INCLUDE_PATHS = $(BUILT_PRODUCTS_DIR) $(inherited)
+
+// The daemon is a bare tool: no App ID, no provisioning profile and no
+// entitlements. A standalone executable cannot claim a restricted entitlement
+// such as com.apple.application-identifier without an embedded profile
+// (TN3125), so keep DEVELOPMENT_TEAM empty and the entitlements file empty;
+// otherwise Xcode derives that entitlement and AMFI rejects the job.
+//
+// ServiceManagement also attaches a launch constraint to the daemon job built
+// from the host app's designated requirement. The executable must satisfy it,
+// so sign the daemon with the same code signing identifier as the app. A bare
+// tool otherwise gets its target name as identifier and launchd kills the job
+// at spawn with "Launch Constraint Violation".
+DEVELOPMENT_TEAM =
+CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_ENTITLEMENTS = $(SRCROOT)/Resources/Daemon/KancerberoDaemon.entitlements
+OTHER_CODE_SIGN_FLAGS = $(inherited) -i uno.kayros.kancerbero

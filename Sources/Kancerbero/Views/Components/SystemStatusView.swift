@@ -142,10 +142,16 @@ struct SystemStatusView: View {
                 message: "The service is registered. Waiting for the daemon to answer.")
         }
         if model.serviceStatus == .enabled && !model.usingDaemon {
+            if model.daemonProcessRunning {
+                return OverallState(
+                    level: .warning,
+                    title: "Daemon not answering",
+                    message: "The background helper process is running but the XPC handshake failed. \(model.daemonConnectionError ?? "Try Retry connection.")")
+            }
             return OverallState(
-                level: .warning,
-                title: "Service registered, not connected",
-                message: "The background service is registered but the app is not receiving daemon data. Try Retry connection.")
+                level: .error,
+                title: "Service registered, daemon not running",
+                message: "macOS has the service registered but is not launching the daemon. This usually means its code signature was rejected (AMFI launch constraint). Install the signed, notarized build and use Repair.")
         }
         if model.usingDaemon && model.daemonIsRoot {
             return OverallState(
@@ -188,6 +194,7 @@ struct SystemStatusView: View {
             serviceRow
             approvalRow
             connectionRow
+            daemonProcessRow
 
             sectionHeader("Network filter")
             filterExtensionRow
@@ -300,9 +307,11 @@ struct SystemStatusView: View {
         var actionDisabled = model.serviceActionInFlight
         switch model.serviceStatus {
         case .enabled:
-            level = .ok
+            level = model.daemonProcessRunning ? .ok : .warning
             value = "Registered"
-            detail = "macOS has the background helper registered."
+            detail = model.daemonProcessRunning
+                ? "macOS has the background helper registered and its process is running."
+                : "macOS has the background helper registered, but no daemon process is running."
             actionTitle = "Open Login Items"
             action = { model.openLoginItemsSettings() }
         case .requiresApproval:
@@ -399,7 +408,12 @@ struct SystemStatusView: View {
         } else if model.serviceStatus == .enabled {
             level = .warning
             value = "Not connected"
-            detail = "The service is registered but the app is not receiving data. Try Retry connection."
+            if model.daemonProcessRunning {
+                detail = model.daemonConnectionError
+                    ?? "The daemon process is running but the app is not receiving data. Try Retry connection."
+            } else {
+                detail = "The service is registered but no daemon process is running. Repair the registration after installing a signed build."
+            }
         } else {
             level = .info
             value = "Not connected"
@@ -412,6 +426,30 @@ struct SystemStatusView: View {
                          actionTitle: "Retry",
                          actionDisabled: !canRetry,
                          action: { model.retryDaemonConnection() })
+    }
+
+    private var daemonProcessRow: some View {
+        let enabled = model.serviceStatus == .enabled
+        let running = model.daemonProcessRunning
+        let level: StatusLevel = running ? .ok : (enabled ? .error : .info)
+        let value: String
+        let detail: String
+        if running {
+            value = model.daemonProcessPID.map { "Running (pid \($0))" } ?? "Running"
+            detail = "The background helper process is visible in the process table."
+        } else if enabled {
+            value = "Not running"
+            detail = "Registered but no KancerberoDaemon process was found. launchd or AMFI may have rejected the executable; reinstall the signed, notarized build and repair the registration."
+        } else {
+            value = "Unknown"
+            detail = "Register the background service first."
+        }
+        let actionTitle = enabled && !running ? "Repair…" : nil
+        return statusRow(level, title: "Daemon process",
+                         value: value, detail: detail,
+                         actionTitle: actionTitle,
+                         actionDisabled: model.serviceActionInFlight,
+                         action: enabled && !running ? { showRepairConfirmation = true } : nil)
     }
 
     private var filterExtensionRow: some View {
@@ -694,6 +732,12 @@ struct SystemStatusView: View {
             case .enabled:
                 if model.usingDaemon {
                     EmptyView()
+                } else if !model.daemonProcessRunning {
+                    Button("Repair / re-register…") {
+                        showRepairConfirmation = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!canRepair)
                 } else {
                     Button("Retry connection") {
                         model.retryDaemonConnection()

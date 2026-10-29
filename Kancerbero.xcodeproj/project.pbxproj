@@ -107,6 +107,7 @@
 
 /* Begin PBXFileReference section */
 		A9C68BDB3091523B00171609 /* architecture.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = architecture.md; sourceTree = "<group>"; };
+		A9C68BE03091523B00171609 /* daemons-and-libraries.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "daemons-and-libraries.md"; sourceTree = "<group>"; };
 		A9C68BDC3091523B00171609 /* private-apis.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "private-apis.md"; sourceTree = "<group>"; };
 		A9C68BDD3091523B00171609 /* security.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = security.md; sourceTree = "<group>"; };
 		A9C68BDE3091523B00171609 /* verification.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = verification.md; sourceTree = "<group>"; };
@@ -135,6 +136,7 @@
 		ABCDEF0000000000000000A1 /* Kancerbero.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Kancerbero.entitlements; sourceTree = "<group>"; };
 		ABCDEF0000000000000000A2 /* Kancerbero-Development.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Kancerbero-Development.entitlements"; sourceTree = "<group>"; };
 		ABCDEF0000000000000000C1 /* KancerberoFilter-Development.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "KancerberoFilter-Development.entitlements"; sourceTree = "<group>"; };
+		ABCDEF0000000000000000C2 /* KancerberoDaemon.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = KancerberoDaemon.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -240,6 +242,7 @@
 			isa = PBXGroup;
 			children = (
 				A9C68BDB3091523B00171609 /* architecture.md */,
+				A9C68BE03091523B00171609 /* daemons-and-libraries.md */,
 				A9C68BDC3091523B00171609 /* private-apis.md */,
 				A9C68BDD3091523B00171609 /* security.md */,
 				A9C68BDE3091523B00171609 /* verification.md */,
@@ -297,9 +300,18 @@
 			children = (
 				ABCDEF000000000000000009 /* App */,
 				ABCDEF00000000000000000A /* LaunchDaemons */,
+				ABCDEF0000000000000000C3 /* Daemon */,
 				ABCDEF0000000000000000C0 /* Filter */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		ABCDEF0000000000000000C3 /* Daemon */ = {
+			isa = PBXGroup;
+			children = (
+				ABCDEF0000000000000000C2 /* KancerberoDaemon.entitlements */,
+			);
+			path = Daemon;
 			sourceTree = "<group>";
 		};
 		ABCDEF000000000000000009 /* App */ = {
@@ -763,13 +775,8 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = ABCDEF000000000000000095 /* KancerberoDaemon.xcconfig */;
 			buildSettings = {
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = AK37TK8X2Y;
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
-				PRODUCT_BUNDLE_IDENTIFIER = uno.kayros.kancerberodaemon;
-				PROVISIONING_PROFILE_SPECIFIER = "";
 			};
 			name = Debug;
 		};
@@ -778,9 +785,7 @@
 			baseConfigurationReference = ABCDEF000000000000000095 /* KancerberoDaemon.xcconfig */;
 			buildSettings = {
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = AK37TK8X2Y;
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
-				PRODUCT_BUNDLE_IDENTIFIER = uno.kayros.kancerberodaemon;
 			};
 			name = Release;
 		};

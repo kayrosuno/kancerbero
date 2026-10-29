@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>uno.kayros.kancerbero.daemon</string>
+	<string>uno.kayros.kancerbero.daemon.v2</string>
 	<key>BundleProgram</key>
 	<string>Contents/Library/LaunchDaemons/KancerberoDaemon</string>
 	<key>ProgramArguments</key>
@@ -13,7 +13,7 @@
 	</array>
 	<key>MachServices</key>
 	<dict>
-		<key>uno.kayros.kancerbero.daemon</key>
+		<key>uno.kayros.kancerbero.daemon.v2</key>
 		<true/>
 	</dict>
 	<key>RunAtLoad</key>

@@ -27,6 +27,9 @@ enum DaemonServiceType: String, CaseIterable, Identifiable, Sendable {
         case .agent: return "person.crop.circle.fill"
         }
     }
+
+    /// Daemons before agents, matching the deduplicator's default grouping.
+    var sortRank: Int { self == .daemon ? 0 : 1 }
 }
 
 enum DaemonScope: String, CaseIterable, Identifiable, Sendable {
@@ -45,6 +48,16 @@ enum DaemonScope: String, CaseIterable, Identifiable, Sendable {
         case .runtime: return "Runtime"
         }
     }
+
+    /// Declaration order, matching the chip order in the filter bar.
+    var sortRank: Int {
+        switch self {
+        case .system: return 0
+        case .global: return 1
+        case .user: return 2
+        case .runtime: return 3
+        }
+    }
 }
 
 enum DaemonOrigin: String, CaseIterable, Identifiable, Sendable {
@@ -59,6 +72,18 @@ enum DaemonOrigin: String, CaseIterable, Identifiable, Sendable {
         case .apple: return "Apple"
         case .custom: return "Custom"
         case .unknown: return "Unknown"
+        }
+    }
+}
+
+extension KBDaemonState {
+    /// Card/chip order: Running, Stopped, Disabled, Not loaded.
+    var sortRank: Int {
+        switch self {
+        case .running: return 0
+        case .stopped: return 1
+        case .disabled: return 2
+        case .unloaded: return 3
         }
     }
 }
@@ -126,6 +151,26 @@ struct DaemonListEntry: Identifiable, Hashable {
     }
 }
 
+extension DaemonListEntry {
+    /// Non-optional sort keys keep rows without a value at the end instead of
+    /// producing nil comparators (same approach as `CPUProcessRow`).
+    private static let missingSortValue = "\u{10FFFF}"
+
+    var labelSortValue: String { service.label.lowercased() }
+    var typeSortRank: Int { service.serviceType.sortRank }
+    var scopeSortRank: Int { service.scope.sortRank }
+    var pidSortValue: Int32 { service.pid ?? .max }
+    var stateSortRank: Int { service.state.sortRank }
+    var programSortValue: String {
+        service.program.isEmpty ? Self.missingSortValue : service.program.lowercased()
+    }
+    var plistSortValue: String {
+        service.plistPath.isEmpty
+            ? Self.missingSortValue
+            : (service.plistPath as NSString).lastPathComponent.lowercased()
+    }
+}
+
 enum DaemonDeduplicator {
     static func entries(system: [KBDaemonService],
                         local: [KBDaemonService]) -> [DaemonListEntry] {
@@ -165,14 +210,24 @@ enum DaemonDeduplicator {
 }
 
 struct DaemonFilter: Equatable {
-    var search = ""
-    var type: DaemonServiceType?
-    var scope: DaemonScope?
-    var origin: DaemonOrigin?
-    var state: KBDaemonState?
+    static let allTypes = Set(DaemonServiceType.allCases)
+    static let allScopes = Set(DaemonScope.allCases)
+    static let allOrigins = Set(DaemonOrigin.allCases)
+    static let allStates = Set(KBDaemonState.allCases)
 
+    var search = ""
+    var types: Set<DaemonServiceType> = Set(DaemonServiceType.allCases)
+    var scopes: Set<DaemonScope> = Set(DaemonScope.allCases)
+    var origins: Set<DaemonOrigin> = Set(DaemonOrigin.allCases)
+    var states: Set<KBDaemonState> = Set(KBDaemonState.allCases)
+
+    /// Every group is a set of pressed values: a service matches only the
+    /// facets that are on, and an empty group matches nothing.
     var hasFacets: Bool {
-        type != nil || scope != nil || origin != nil || state != nil
+        types != Self.allTypes
+            || scopes != Self.allScopes
+            || origins != Self.allOrigins
+            || states != Self.allStates
     }
 
     var hasSearch: Bool {
@@ -180,16 +235,18 @@ struct DaemonFilter: Equatable {
     }
 
     func matches(_ service: KBDaemonService) -> Bool {
-        if let type, service.serviceType != type { return false }
-        if let scope, service.scope != scope { return false }
-        if let origin, service.origin != origin { return false }
-        if let state, service.state != state { return false }
+        guard types.contains(service.serviceType),
+              scopes.contains(service.scope),
+              origins.contains(service.origin),
+              states.contains(service.state) else { return false }
         return service.matchesSearch(search)
     }
 
+    /// Cards count over every state, so each number matches the rows shown
+    /// after pressing it, even when the state group is partly or fully off.
     func clearingState() -> DaemonFilter {
         var copy = self
-        copy.state = nil
+        copy.states = Self.allStates
         return copy
     }
 }

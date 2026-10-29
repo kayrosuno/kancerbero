@@ -56,6 +56,18 @@ require_setting() {
     fi
 }
 
+require_empty_setting() {
+    local target="$1" key="$2" value
+    value="$(setting_value "$(target_settings "$target")" "$key")"
+    value="${value%\"}"
+    value="${value#\"}"
+    if [[ -n "$value" ]]; then
+        echo "$target Release: $key is '$value', expected empty" >&2
+        echo "the daemon must not have an App ID or team; see docs/verification.md" >&2
+        exit 1
+    fi
+}
+
 # The identity may be the literal "Developer ID Application" or a certificate
 # fingerprint pinned in Signing.local when several Developer ID identities exist.
 require_developer_id_identity() {
@@ -72,6 +84,9 @@ require_developer_id_identity KancerberoFilter
 require_developer_id_identity KancerberoDaemon
 require_setting Kancerbero CODE_SIGN_STYLE Manual
 require_setting KancerberoFilter CODE_SIGN_STYLE Manual
+require_setting Kancerbero DEVELOPMENT_TEAM "$TEAM"
+require_setting KancerberoFilter DEVELOPMENT_TEAM "$TEAM"
+require_empty_setting KancerberoDaemon DEVELOPMENT_TEAM
 
 for target in Kancerbero KancerberoFilter; do
     value="$(setting_value "$(target_settings "$target")" PROVISIONING_PROFILE_SPECIFIER)"
@@ -83,27 +98,79 @@ for target in Kancerbero KancerberoFilter; do
 done
 
 # Signing identity, style and hardened runtime come from the xcconfigs.
+# Do not pass DEVELOPMENT_TEAM on the command line: command-line settings
+# override every target and would make Xcode derive an App ID (and therefore a
+# restricted application-identifier entitlement) for the daemon tool.
 xcodebuild -project Kancerbero.xcodeproj -scheme Kancerbero \
     -configuration Release -derivedDataPath build \
-    DEVELOPMENT_TEAM="$TEAM" \
     build
 
 APP="$ROOT/build/Build/Products/Release/Kancerbero.app"
 EXT="$APP/Contents/Library/SystemExtensions/uno.kayros.kancerbero.filter.systemextension"
+DAEMON="$APP/Contents/Library/LaunchDaemons/KancerberoDaemon"
+PRODUCT_DAEMON="$ROOT/build/Build/Products/Release/KancerberoDaemon"
 
 codesign --verify --deep --strict --verbose=2 "$APP"
 
 signature_info() { codesign -dvvv "$1" 2>&1 || true; }
-entitlements_of() { codesign -d --entitlements - "$1" 2>/dev/null || true; }
+entitlements_of() { codesign -d --entitlements - --xml "$1" 2>/dev/null || true; }
 
 if [[ ! -d "$EXT" ]]; then
     echo "missing system extension at $EXT" >&2
     exit 1
 fi
 
-for binary in "$APP" "$EXT" "$APP/Contents/Library/LaunchDaemons/KancerberoDaemon"; do
+for binary in "$APP" "$EXT" "$DAEMON"; do
     if [[ "$(signature_info "$binary")" != *"Authority=Developer ID Application"* ]]; then
         echo "$binary is not signed with a Developer ID Application certificate" >&2
+        exit 1
+    fi
+done
+
+# The daemon is a bare tool, so it cannot claim a restricted entitlement
+# without an embedded provisioning profile (TN3125). If it does, AMFI kills the
+# launchd job at spawn with "Launch Constraint Violation" while BTM/Login Items
+# still reports the item as enabled. It must be signed with no entitlements at
+# all: keep Resources/Daemon/KancerberoDaemon.entitlements empty and keep
+# PRODUCT_BUNDLE_IDENTIFIER/DEVELOPMENT_TEAM off the KancerberoDaemon target.
+for daemon in "$PRODUCT_DAEMON" "$DAEMON"; do
+    if [[ ! -f "$daemon" ]]; then
+        echo "missing daemon binary at $daemon" >&2
+        exit 1
+    fi
+    if [[ "$(signature_info "$daemon")" != *"runtime"* ]]; then
+        echo "$daemon is not built with the hardened runtime" >&2
+        exit 1
+    fi
+    daemon_entitlements="$(entitlements_of "$daemon")"
+    daemon_entitlements_json=""
+    if [[ -n "${daemon_entitlements//[[:space:]]/}" ]]; then
+        daemon_entitlements_json="$(
+            printf '%s' "$daemon_entitlements" | plutil -convert json -o - -- - 2>/dev/null || true
+        )"
+    fi
+    if [[ -n "$daemon_entitlements_json" && "$daemon_entitlements_json" != "{}" ]]; then
+        echo "$daemon has entitlements; the daemon must be signed with none:" >&2
+        printf '%s\n' "$daemon_entitlements" >&2
+        echo "keep Resources/Daemon/KancerberoDaemon.entitlements empty and remove" >&2
+        echo "PRODUCT_BUNDLE_IDENTIFIER/DEVELOPMENT_TEAM from the daemon target" >&2
+        exit 1
+    fi
+    if [[ -f "$daemon/Contents/embedded.provisionprofile" ]]; then
+        echo "$daemon carries a provisioning profile; a bare tool cannot use one" >&2
+        exit 1
+    fi
+done
+
+# The launch constraint that ServiceManagement attaches to the job comes from
+# the host app's designated requirement. Sign the daemon with the app's signing
+# identifier (Config/KancerberoDaemon.xcconfig sets -i), otherwise launchd
+# kills it at spawn with "Launch Constraint Violation".
+for daemon in "$PRODUCT_DAEMON" "$DAEMON"; do
+    daemon_identifier="$(signature_info "$daemon" | sed -n 's/^Identifier=//p' | head -1)"
+    if [[ "$daemon_identifier" != "uno.kayros.kancerbero" ]]; then
+        echo "$daemon signing identifier is '${daemon_identifier:-<unset>}', expected 'uno.kayros.kancerbero'" >&2
+        echo "check OTHER_CODE_SIGN_FLAGS = -i uno.kayros.kancerbero on the daemon target" >&2
         exit 1
     fi
 done
@@ -113,9 +180,28 @@ if [[ "$(entitlements_of "$APP")" == *"get-task-allow"* ]]; then
     exit 1
 fi
 
-if [[ "$(entitlements_of "$EXT")" != *"content-filter-provider-systemextension"* ]]; then
-    echo "embedded filter extension lacks content-filter-provider-systemextension" >&2
-    echo "check Resources/Filter/KancerberoFilter.entitlements and the Developer ID profile" >&2
+for key in com.apple.application-identifier \
+           com.apple.developer.networking.networkextension \
+           com.apple.developer.system-extension.install \
+           com.apple.security.application-groups; do
+    if [[ "$(entitlements_of "$APP")" != *"$key"* ]]; then
+        echo "release app is missing expected entitlement $key" >&2
+        exit 1
+    fi
+done
+
+for key in content-filter-provider-systemextension \
+           com.apple.security.app-sandbox \
+           com.apple.application-identifier; do
+    if [[ "$(entitlements_of "$EXT")" != *"$key"* ]]; then
+        echo "embedded filter extension is missing expected entitlement $key" >&2
+        echo "check Resources/Filter/KancerberoFilter.entitlements and the Developer ID profile" >&2
+        exit 1
+    fi
+done
+
+if [[ "$(entitlements_of "$EXT")" == *"get-task-allow"* ]]; then
+    echo "release extension still carries get-task-allow; it is a development build" >&2
     exit 1
 fi
 

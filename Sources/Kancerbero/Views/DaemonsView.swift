@@ -22,10 +22,10 @@ struct DaemonsView: View {
     private var filter: DaemonFilter {
         DaemonFilter(
             search: ui.daemons.search,
-            type: ui.daemons.type.serviceType,
-            scope: ui.daemons.scope,
-            origin: ui.daemons.origin,
-            state: ui.daemons.state
+            types: ui.daemons.types,
+            scopes: ui.daemons.scopes,
+            origins: ui.daemons.origins,
+            states: ui.daemons.states
         )
     }
 
@@ -41,6 +41,12 @@ struct DaemonsView: View {
 
     private var filteredEntries: [DaemonListEntry] {
         entries.filter { filter.matches($0.service) }
+    }
+
+    private var displayedEntries: [DaemonListEntry] {
+        ui.daemons.sortOrder.isEmpty
+            ? filteredEntries
+            : filteredEntries.sorted(using: ui.daemons.sortOrder)
     }
 
     private var selectedEntry: DaemonListEntry? {
@@ -106,10 +112,6 @@ struct DaemonsView: View {
 
             daemonModePill
 
-            TextField("Search label, program, arguments or plist", text: bind(\.search))
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 250)
-
             Button {
                 Task { await model.refreshDaemons() }
             } label: {
@@ -172,8 +174,8 @@ struct DaemonsView: View {
                 systemImage: "bolt.fill",
                 tint: Color(red: 0.20, green: 0.70, blue: 0.42),
                 action: { toggleState(.running) },
-                isSelected: ui.daemons.state == .running,
-                filterHint: "Show running services"
+                isSelected: ui.daemons.states.contains(.running),
+                filterHint: "Toggle running services"
             )
             SummaryCard(
                 title: "Stopped",
@@ -182,8 +184,8 @@ struct DaemonsView: View {
                 systemImage: "pause.circle.fill",
                 tint: Color(red: 0.94, green: 0.56, blue: 0.18),
                 action: { toggleState(.stopped) },
-                isSelected: ui.daemons.state == .stopped,
-                filterHint: "Show stopped services"
+                isSelected: ui.daemons.states.contains(.stopped),
+                filterHint: "Toggle stopped services"
             )
             SummaryCard(
                 title: "Disabled",
@@ -192,100 +194,85 @@ struct DaemonsView: View {
                 systemImage: "slash.circle.fill",
                 tint: Color(red: 0.62, green: 0.42, blue: 0.95),
                 action: { toggleState(.disabled) },
-                isSelected: ui.daemons.state == .disabled,
-                filterHint: "Show disabled services"
+                isSelected: ui.daemons.states.contains(.disabled),
+                filterHint: "Toggle disabled services"
             )
         }
     }
 
     private var controls: some View {
-        HStack(spacing: 12) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    PillTabBar(selection: bind(\.type))
-
-                    filterPicker("Scope", selection: bind(\.scope),
-                                 title: { $0.title })
-                    filterPicker("Origin", selection: bind(\.origin),
-                                 title: { $0.title })
-                    filterPicker("State", selection: bind(\.state),
-                                 title: { $0.displayName })
-                }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                MultiSelectChipBar(
+                    selection: bind(\.types),
+                    label: "Type",
+                    options: [.agent, .daemon],
+                    title: { $0.title },
+                    systemImage: { $0.systemImage }
+                )
+                MultiSelectChipBar(
+                    selection: bind(\.scopes),
+                    label: "Scope",
+                    title: { $0.title }
+                )
+                MultiSelectChipBar(
+                    selection: bind(\.origins),
+                    label: "Origin",
+                    title: { $0.title }
+                )
+                MultiSelectChipBar(
+                    selection: bind(\.states),
+                    label: "State",
+                    title: { $0.displayName }
+                )
             }
-
-            Spacer(minLength: 8)
-
-            if model.daemonActionInFlight {
-                ProgressView().controlSize(.small)
-            }
-            Text("\(filteredEntries.count) of \(entries.count) services")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-                .contentTransition(.numericText())
-            if let error = model.daemonServicesError {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .lineLimit(1)
-                    .help(error)
-            }
+            .padding(.vertical, 2)
         }
-    }
-
-    private func filterPicker<Option: CaseIterable & Identifiable & Hashable>(
-        _ label: String,
-        selection: Binding<Option?>,
-        title: @escaping (Option) -> String
-    ) -> some View {
-        Picker(label, selection: selection) {
-            Text("All").tag(Optional<Option>.none)
-            ForEach(Array(Option.allCases)) { option in
-                Text(title(option)).tag(Optional(option))
-            }
-        }
-        .pickerStyle(.menu)
-        .fixedSize()
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var tableCard: some View {
-        VStack(spacing: 0) {
-            Table(filteredEntries, selection: bind(\.selection)) {
-                TableColumn("Label") { entry in
+        VStack(spacing: 8) {
+            tableFilterHeader
+
+            Table(displayedEntries,
+                  selection: bind(\.selection),
+                  sortOrder: bind(\.sortOrder)) {
+                TableColumn("Label", value: \.labelSortValue) { entry in
                     Text(entry.service.label)
                         .lineLimit(1)
                         .help(entry.service.label)
                 }
                 .width(min: 180, ideal: 280)
 
-                TableColumn("Type") { entry in
+                TableColumn("Type", value: \.typeSortRank) { entry in
                     Text(entry.service.serviceType.singularTitle)
                 }
                 .width(min: 60, ideal: 70)
 
-                TableColumn("Scope") { entry in
+                TableColumn("Scope", value: \.scopeSortRank) { entry in
                     Text(entry.service.scope.title)
                 }
                 .width(min: 55, ideal: 70)
 
-                TableColumn("PID") { entry in
+                TableColumn("PID", value: \.pidSortValue) { entry in
                     Text(entry.service.pid.map { String($0) } ?? "—").monospacedDigit()
                 }
                 .width(min: 45, ideal: 60)
 
-                TableColumn("State") { entry in
+                TableColumn("State", value: \.stateSortRank) { entry in
                     DaemonStateBadge(state: entry.service.state)
                 }
                 .width(min: 75, ideal: 95)
 
-                TableColumn("Program") { entry in
+                TableColumn("Program", value: \.programSortValue) { entry in
                     Text(entry.service.program.isEmpty ? "—" : entry.service.program)
                         .lineLimit(1)
                         .help(entry.service.program)
                 }
                 .width(min: 140, ideal: 220)
 
-                TableColumn("Plist") { entry in
+                TableColumn("Plist", value: \.plistSortValue) { entry in
                     Text(entry.service.plistPath.isEmpty
                          ? "—"
                          : (entry.service.plistPath as NSString).lastPathComponent)
@@ -310,8 +297,21 @@ struct DaemonsView: View {
             } primaryAction: { keys in
                 if let id = keys.first { ui.daemons.selection = id }
             }
-            .padding(8)
+            .overlay {
+                if filteredEntries.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "gearshape.2")
+                            .font(.system(size: 26, weight: .light))
+                            .foregroundStyle(.secondary)
+                        Text("No services match the current filters")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    .allowsHitTesting(false)
+                }
+            }
         }
+        .padding(8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
             RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
@@ -321,19 +321,37 @@ struct DaemonsView: View {
             RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
                 .strokeBorder(.quaternary.opacity(0.5), lineWidth: 1)
         }
-        .overlay {
-            if filteredEntries.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "gearshape.2")
-                        .font(.system(size: 26, weight: .light))
-                        .foregroundStyle(.secondary)
-                    Text("No services match the current filters")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
         .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
+    }
+
+    private var tableFilterHeader: some View {
+        HStack(spacing: 10) {
+            Text("Services")
+                .font(.system(size: 12, weight: .semibold))
+
+            TextField("Filter label, program or plist", text: bind(\.search))
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 240)
+                .help("Search label, program, arguments or plist")
+
+            Spacer(minLength: 8)
+
+            if model.daemonActionInFlight {
+                ProgressView().controlSize(.small)
+            }
+            if let error = model.daemonServicesError {
+                Text(error)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.orange)
+                    .lineLimit(1)
+                    .help(error)
+            }
+            Text("\(filteredEntries.count) of \(entries.count) services")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .contentTransition(.numericText())
+        }
     }
 
     private var actionTitle: String {
@@ -342,17 +360,23 @@ struct DaemonsView: View {
 
     private func toggleState(_ state: KBDaemonState) {
         withAnimation(.snappy(duration: 0.2)) {
-            ui.daemons.state = ui.daemons.state == state ? nil : state
+            var states = ui.daemons.states
+            if states.contains(state) {
+                states.remove(state)
+            } else {
+                states.insert(state)
+            }
+            ui.daemons.states = states
         }
     }
 
     private func clearFilters() {
         withAnimation(.snappy(duration: 0.2)) {
             ui.daemons.search = ""
-            ui.daemons.type = .all
-            ui.daemons.scope = nil
-            ui.daemons.origin = nil
-            ui.daemons.state = nil
+            ui.daemons.types = DaemonFilter.allTypes
+            ui.daemons.scopes = DaemonFilter.allScopes
+            ui.daemons.origins = DaemonFilter.allOrigins
+            ui.daemons.states = DaemonFilter.allStates
         }
     }
 

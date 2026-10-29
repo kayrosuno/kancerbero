@@ -170,10 +170,20 @@ Comprobar además:
 
 - Cada label de agente aparece una sola vez (el dominio canónico es GUI si está cargado; si no,
   User). El panel de detalle muestra `Domains` con ambos dominios cuando existen.
-- Los filtros se combinan con AND y las tarjetas Running / Stopped / Disabled reflejan el
-  subconjunto filtrado; volver a pulsar la tarjeta activa limpia el filtro.
+- Los filtros de tipo, ámbito, origen y estado se combinan con AND entre grupos; dentro de un
+  grupo, se muestran las filas de la unión de los valores pulsados. Todos los valores están
+  pulsados al arrancar; si un grupo se queda sin pulsar, no se muestra ninguna fila. Las tarjetas
+  Running / Stopped / Disabled reflejan el subconjunto filtrado y alternan ese estado en el
+  conjunto; la tarjeta Services restablece todos los grupos y limpia la búsqueda.
 - `--daemon-domain system|gui|user` sigue funcionando como atajo: system selecciona daemons y
-  gui/user seleccionan agentes.
+  gui/user seleccionan agentes. Los flags `--daemon-type`, `--daemon-scope`, `--daemon-origin` y
+  `--daemon-state` aceptan listas separadas por comas (p. ej. `--daemon-scope system,user`).
+- La tabla se ordena pulsando cualquier cabecera (ascendente/descendente). Label, Program y Plist
+  comparan sin distinguir mayúsculas y dejan los valores ausentes («—») al final en ascendente;
+  PID usa un centinela para los servicios sin proceso; State sigue Running → Stopped → Disabled →
+  Not loaded y Type/Scope usan rangos enteros. El orden se conserva al refrescar (5 s) y al
+  cambiar de pestaña; sin orden elegido se mantiene el del deduplicador. Las capturas no pueden
+  pulsar cabeceras, así que esta comprobación es manual.
 - Sin daemon root, los servicios de sistema aparecen como `Not loaded`; no se reinterpretan como
   `Stopped`.
 - Tras el refresco de 5 s, la selección y el panel de detalle se mantienen si el servicio sigue
@@ -461,8 +471,17 @@ open /Applications/Kancerbero.app
   desregistra/registra el helper para que macOS pueda volver a pedir aprobación.
 - Aprobar en **Ajustes → General → Login Items & Extensions → Allow in the Background**. El
   ítem debe mostrar **Kancerbero con el icono de la app**.
-- `launchctl print system/uno.kayros.kancerbero.daemon` y
+- `launchctl print system/uno.kayros.kancerbero.daemon.v2` y
   `log show --predicate 'subsystem == "uno.kayros.kancerbero"' --last 5m --info`.
+- Comprobar la firma del daemon embebido antes y después de instalar:
+  `codesign -dvvv .../KancerberoDaemon` debe mostrar `Identifier=uno.kayros.kancerbero` (el mismo
+  que la app) y `codesign -d --entitlements - --xml` un diccionario vacío. Si launchd lo mata,
+  el log del kernel muestra `AMFI: Launch Constraint Violation ... c[5]p[1]m[1]e[0]` y Login
+  Items sigue diciendo “enabled”. Un registro BTM antiguo que no coincide no se arregla
+  re-registrando el mismo label: `sudo sfltool resetbtm` + reinicio, o usar la identidad `.v2`.
+- La app registra el servicio sola al arrancar si está en `/Applications` y el usuario no lo ha
+  desactivado; un cambio de ejecutable/plist la re-registra una vez por ejecución. System status
+  muestra el proceso real (`Daemon process`), su PID y el último error de conexión.
 - La app debe pasar a “Daemon connected” y usar XPC privilegiado. Desregistrar debe detenerlo y
   volver a modo local.
 - Sin notarización, Gatekeeper marca la app como “Unnotarized Developer ID” y el registro del
@@ -492,7 +511,7 @@ screencapture -x -w /tmp/kb-status.png
 kill "$PID" 2>/dev/null || true
 ```
 
-Revisar que se ven el banner general, las ocho filas, el botón Repair y las acciones. El contenido
+Revisar que se ven el banner general, las filas del checklist, el botón Repair y las acciones. El contenido
 restante (pasos y troubleshooting) está en el ScrollView. Probar los estados
 `unregister`/`register` y la confirmación de Repair; no se puede automatizar la aprobación de
 macOS. Evitar capturas de pantalla completa: pueden incluir ventanas ajenas.

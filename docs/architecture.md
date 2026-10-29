@@ -6,7 +6,7 @@
 |---|---|---|
 | `KancerberoC` | static lib C | `dlopen` de NetworkStatistics, tabla de fuentes, parsers de libproc y sysctl |
 | `KancerberoCore` | static lib Swift | Modelos, wire codec, collectors, contabilidad, capacidades y diagnóstico |
-| `KancerberoDaemon` | tool | `NSXPCListener` en `uno.kayros.kancerbero.daemon`, recolección y push |
+| `KancerberoDaemon` | tool | `NSXPCListener` en `uno.kayros.kancerbero.daemon.v2`, recolección y push |
 | `Kancerbero` | app | SwiftUI, inspector, cliente XPC y modo local |
 | `KancerberoProbe` | tool | Diagnóstico y comparación con herramientas del sistema |
 | `KancerberoFilterContract` | static lib Swift | Contrato Codable y protocolos XPC compartidos por app y filtro |
@@ -49,8 +49,15 @@
   controles de escaneo, progreso, `RadialDiskMap` y las tablas de contenidos y mayores archivos.
   Las tarjetas de ambas subpestañas filtran el contenido (medios/volúmenes/orden por tamaño o
   espacio libre; todo/ficheros/carpetas/denegados).
-- `DaemonsView`: inventario launchd deduplicado por label (`DaemonDeduplicator`), filtros
-  combinables de tipo, ámbito, origen y estado, tarjetas accionables e inspector de acciones.
+- `DaemonsView`: inventario launchd deduplicado por label (`DaemonDeduplicator`). Los filtros de
+  tipo, ámbito, origen y estado son chips multiselección (`MultiSelectChipBar`): todos los valores
+  están pulsados al arrancar, se muestran las filas de los valores pulsados y un grupo sin nada
+  pulsado no coincide con ninguna fila. La búsqueda vive en la cabecera de la tarjeta sobre la
+  tabla (patrón de `CPUProcessTable`), y las tarjetas Running/Stopped/Disabled alternan ese estado
+  dentro del conjunto; la tarjeta Services restablece todos los grupos y la búsqueda. La tabla es
+  ordenable por cualquiera de sus columnas mediante claves no opcionales de `DaemonListEntry`
+  (rangos enteros para los enums y centinelas para valores ausentes); el criterio vive en
+  `DaemonsUIState.sortOrder` y, sin orden elegido, se conserva el del deduplicador.
 - `CPUView`: dashboard tipo `htop`. Cuatro `SummaryCard` (CPU, load, tareas/hilos, memoria) con
   `Sparkline`; tarjeta de núcleos con `SegmentedMeter` (user/system/nice/idle) y uptime; tarjeta
   de memoria/swap con segmentos Active/Wired/Compressed/Cached/Free y `CapacityBar`; tabla de
@@ -225,7 +232,7 @@
 
 ## XPC
 
-- Mach service: `uno.kayros.kancerbero.daemon`.
+- Mach service: `uno.kayros.kancerbero.daemon.v2` (label del job y plist: el mismo nombre).
 - Protocolo: `handshake`, `subscribe`, `request`, `unsubscribe`; callback `push`.
 - Envelopes `KBWireEnvelope` con `schemaVersion`, `kind`, `sequence` y payload
   `PropertyListEncoder` binario.
@@ -254,7 +261,7 @@
   `NEFilterManager` (`filterSockets = true`, grade `.firewall`). Requiere aprobar la extensión y
   el aviso de filtrado de contenido; el filtro sigue activo con la app cerrada.
 - Canal app↔extensión: la extensión publica **un** endpoint XPC (`NEMachServiceName =
-  AK37TK8X2Y.uno.kayros.kancerbero.filter`) y la app conecta con
+  group.uno.kayros.kancerbero.filter`) y la app conecta con
   `NSXPCConnection(machServiceName:options:.privileged)`. Los protocolos
   `KancerberoFilterXPC`/`KancerberoFilterClientXPC` transportan `FilterEnvelope` con payloads
   `PropertyListEncoder` binario (`FilterWire`). El listener exige un requisito de firma del

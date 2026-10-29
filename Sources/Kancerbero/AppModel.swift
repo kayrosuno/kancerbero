@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Observation
+import os
 import ServiceManagement
 import SwiftUI
 import KancerberoCore
@@ -62,6 +63,14 @@ final class AppModel {
     var serviceActionInFlight = false
     var legacyAgentDetected = false
     var legacyDaemonDetected = false
+    /// Whether a `KancerberoDaemon` process is visible in the process table.
+    /// `SMAppService.Status.enabled` only means "registered and eligible to
+    /// run"; a job whose signature is rejected never becomes a process.
+    var daemonProcessRunning = false
+    var daemonProcessPID: Int32?
+    /// Last XPC connection failure, surfaced in System status instead of being
+    /// silently swallowed by the retry loop.
+    var daemonConnectionError: String?
 
     var legacyServiceDetected: Bool {
         legacyAgentDetected || legacyDaemonDetected
@@ -97,6 +106,12 @@ final class AppModel {
     private var daemonConnecting = false
     private var lastDaemonAttempt = Date.distantPast
     private var resolvingUIDs: Set<UInt32> = []
+    private var registrationCheckTask: Task<Void, Never>?
+    private static let daemonFingerprintKey = "daemon.registrationFingerprint"
+    /// Set when the user explicitly disables the background service, so the
+    /// automatic recovery on launch does not override that decision.
+    private static let autoRegisterDisabledKey = "daemon.autoRegisterDisabled"
+    private let logger = Logger(subsystem: "uno.kayros.kancerbero", category: "daemon.lifecycle")
 
     var isRoot: Bool { geteuid() == 0 }
 
@@ -118,6 +133,26 @@ final class AppModel {
     private var daemonBundleDirectory: URL {
         Bundle.main.bundleURL
             .appendingPathComponent("Contents/Library/LaunchDaemons", isDirectory: true)
+    }
+
+    private var daemonExecutableURL: URL {
+        daemonBundleDirectory.appendingPathComponent("KancerberoDaemon")
+    }
+
+    /// Identity of the registration inputs: the daemon executable and its
+    /// launchd plist. SMAppService must be re-registered when either changes,
+    /// so the app stores this value after registering and compares it later.
+    private var daemonFingerprint: String {
+        func stamp(_ url: URL) -> String {
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+            else { return "0:0:0" }
+            let size = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+            let inode = (attributes[.systemFileNumber] as? NSNumber)?.int64Value ?? 0
+            let mtime = Int((attributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0)
+            return "\(size):\(inode):\(mtime)"
+        }
+        let plist = daemonBundleDirectory.appendingPathComponent(Self.daemonServicePlist)
+        return "\(stamp(daemonExecutableURL))|\(stamp(plist))"
     }
 
     var daemonHelperPresent: Bool {
@@ -201,6 +236,7 @@ final class AppModel {
             }
         }
         connectDaemon()
+        scheduleRegistrationHealthCheck()
     }
 
     /// Sleeps in an unstructured task so an interval or pause change can cancel
@@ -229,12 +265,26 @@ final class AppModel {
             atPath: "\(home)/Library/LaunchAgents/uno.kayros.kancerbero.agent.plist")
         legacyDaemonDetected = FileManager.default.fileExists(
             atPath: "/Library/LaunchDaemons/uno.kayros.kancerbero.daemon.plist")
+        updateDaemonProcessState()
+    }
+
+    /// The daemon runs as root, so `launchctl print system/<label>` is not
+    /// available to an unprivileged app. The process table is: libproc exposes
+    /// the name of every process without privileges.
+    private func updateDaemonProcessState() {
+        let executablePath = daemonExecutableURL.path
+        let match = processes.first {
+            $0.name == "KancerberoDaemon" || (!executablePath.isEmpty && $0.path == executablePath)
+        }
+        daemonProcessPID = match?.pid
+        daemonProcessRunning = match != nil
     }
 
     func registerDaemonService() async {
         guard !serviceActionInFlight else { return }
         serviceActionInFlight = true
         defer { serviceActionInFlight = false }
+        UserDefaults.standard.set(false, forKey: Self.autoRegisterDisabledKey)
         await registerDaemonServiceInternal()
     }
 
@@ -249,16 +299,26 @@ final class AppModel {
             return
         }
         let plistName = Self.daemonServicePlist
+        var alreadyRegistered = false
         do {
             try await Task.detached(priority: .userInitiated) {
                 try SMAppService.daemon(plistName: plistName).register()
             }.value
         } catch {
             let nsError = error as NSError
-            // kSMErrorAlreadyRegistered = 12
-            if nsError.code != 12 {
+            // kSMErrorAlreadyRegistered = 12: the existing registration may be
+            // stale, so don't record this bundle as registered; the health
+            // check will re-register if the daemon is not running.
+            if nsError.code == 12 {
+                alreadyRegistered = true
+            } else {
                 serviceError = nsError.localizedDescription
+                logger.error("register failed: \(nsError.localizedDescription, privacy: .public)")
             }
+        }
+        if !alreadyRegistered && serviceError == nil {
+            UserDefaults.standard.set(daemonFingerprint, forKey: Self.daemonFingerprintKey)
+            UserDefaults.standard.set(false, forKey: Self.autoRegisterDisabledKey)
         }
         refreshServiceStatus()
         if serviceStatus == .requiresApproval {
@@ -274,6 +334,8 @@ final class AppModel {
         guard !serviceActionInFlight else { return }
         serviceActionInFlight = true
         defer { serviceActionInFlight = false }
+        // Explicit user action: don't let the launch-time recovery re-enable it.
+        UserDefaults.standard.set(true, forKey: Self.autoRegisterDisabledKey)
         await unregisterDaemonServiceInternal()
     }
 
@@ -293,8 +355,10 @@ final class AppModel {
             // kSMErrorJobNotFound = 6
             if nsError.code != 6 {
                 serviceError = nsError.localizedDescription
+                logger.error("unregister failed: \(nsError.localizedDescription, privacy: .public)")
             }
         }
+        UserDefaults.standard.removeObject(forKey: Self.daemonFingerprintKey)
         refreshServiceStatus()
     }
 
@@ -314,6 +378,65 @@ final class AppModel {
         }
         await unregisterDaemonServiceInternal()
         await registerDaemonServiceInternal()
+    }
+
+    /// SMAppService requires the registration to be refreshed when the daemon
+    /// executable or its plist changes. After an in-place app update the old
+    /// registration can stay "enabled" in Login Items while launchd refuses to
+    /// spawn the new binary. Check once per launch, after the first connection
+    /// attempt, and repair without user action when the daemon is not running.
+    private func scheduleRegistrationHealthCheck() {
+        registrationCheckTask?.cancel()
+        registrationCheckTask = Task { [weak self] in
+            // Wait for the first connection attempt to settle: when the
+            // registered daemon is missing or was rejected, the XPC handshake
+            // can block for ~20 s.
+            for _ in 0..<30 {
+                try? await Task.sleep(for: .seconds(2))
+                guard let self, !Task.isCancelled else { return }
+                if !self.daemonConnecting { break }
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.evaluateDaemonRegistration()
+        }
+    }
+
+    private func evaluateDaemonRegistration() async {
+        #if !DEBUG
+        guard appIsInApplications,
+              !serviceActionInFlight,
+              !legacyServiceDetected,
+              daemonHelperPresent,
+              daemonPlistPresent,
+              !daemonConnecting,
+              !usingDaemon else { return }
+        refreshServiceStatus()
+
+        // The service identity changed in this version (and a user may install
+        // over an older registration), so register it once on launch unless the
+        // user explicitly disabled it.
+        if serviceStatus == .notRegistered,
+           !UserDefaults.standard.bool(forKey: Self.autoRegisterDisabledKey) {
+            logger.notice("background service not registered; registering")
+            await registerDaemonService()
+            return
+        }
+
+        guard serviceStatus == .enabled, !usingDaemon else { return }
+        let stored = UserDefaults.standard.string(forKey: Self.daemonFingerprintKey)
+        let current = daemonFingerprint
+        guard stored != current else { return }
+        // If the daemon is already running and answering, keep the existing
+        // registration and only record the new fingerprint.
+        guard !daemonProcessRunning || daemonConnectionError != nil else {
+            UserDefaults.standard.set(current, forKey: Self.daemonFingerprintKey)
+            return
+        }
+        // Record first: a failed repair must not loop on every launch.
+        UserDefaults.standard.set(current, forKey: Self.daemonFingerprintKey)
+        logger.notice("daemon registration is stale; re-registering")
+        await repairDaemonService()
+        #endif
     }
 
     func retryDaemonConnection() {
@@ -486,6 +609,7 @@ final class AppModel {
                     self?.usingDaemon = false
                     self?.daemonVersion = nil
                     self?.daemonIsRoot = false
+                    self?.daemonConnectionError = "Daemon connection closed."
                 }
             }
             do {
@@ -507,12 +631,16 @@ final class AppModel {
                 self.daemonIsRoot = hello.capabilities.root
                 self.usingDaemon = true
                 self.daemonConnecting = false
+                self.daemonConnectionError = nil
                 if self.interval != requestedInterval {
                     source.updateInterval(self.interval)
                 }
             } catch {
                 source.stop()
+                let message = error.localizedDescription
                 self?.daemonConnecting = false
+                self?.daemonConnectionError = message
+                self?.logger.error("daemon connection failed: \(message, privacy: .public)")
             }
         }
     }
@@ -574,6 +702,7 @@ final class AppModel {
         interfaces = snapshot.interfaces
         interfaceRates = rates
         processes = snapshot.processes
+        updateDaemonProcessState()
         self.sources = sources
         socketInventory = snapshot.socketInventory
         hostMetrics = snapshot.hostMetrics
