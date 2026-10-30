@@ -38,14 +38,20 @@ final class DaemonService: NSObject, KancerberoDaemonXPC, @unchecked Sendable {
     private var task: Task<Void, Never>?
     private var sequence: UInt64 = 0
     private var subscribedAt: Date?
-    private var canControl = false
+    private let canControl: Bool
+    private let canTrash: Bool
+    private let peer: PeerIdentity
     private var actionTimestamps: [Date] = []
+    private var trashTimestamps: [Date] = []
+    private var trashInFlight = false
 
-    func configure(connection: NSXPCConnection, canControl: Bool) {
-        lock.lock()
-        self.connection = connection
+    init(peer: PeerIdentity, canControl: Bool, canTrash: Bool,
+         connection: NSXPCConnection) {
+        self.peer = peer
         self.canControl = canControl
-        lock.unlock()
+        self.canTrash = canTrash
+        self.connection = connection
+        super.init()
     }
 
     func connectionInvalidated() {
@@ -212,6 +218,41 @@ final class DaemonService: NSObject, KancerberoDaemonXPC, @unchecked Sendable {
                 }.value
                 box.send(try? KBWireCodec.encode(KBDaemonActionResultPayload(result: result)))
             }
+        case .trashItems:
+            guard let trashRequest = request.trashRequest else {
+                reply(nil, NSError(domain: "kancerbero", code: 10,
+                                   userInfo: [NSLocalizedDescriptionKey: "missing trash request"]))
+                return
+            }
+            guard isTrashAllowed() else {
+                logger.warning("rejected trash request from unauthorized client")
+                reply(nil, NSError(domain: "kancerbero", code: 11,
+                                   userInfo: [NSLocalizedDescriptionKey: "client is not authorized to remove files"]))
+                return
+            }
+            guard geteuid() == 0 else {
+                reply(nil, NSError(domain: "kancerbero", code: 12,
+                                   userInfo: [NSLocalizedDescriptionKey: "the root daemon is required"]))
+                return
+            }
+            guard !trashRequest.items.isEmpty, trashRequest.items.count <= 256 else {
+                reply(nil, NSError(domain: "kancerbero", code: 13,
+                                   userInfo: [NSLocalizedDescriptionKey: "invalid number of items"]))
+                return
+            }
+            guard allowTrashRate() else {
+                reply(nil, NSError(domain: "kancerbero", code: 14,
+                                   userInfo: [NSLocalizedDescriptionKey: "too many removal requests, wait a minute"]))
+                return
+            }
+            let box = ReplyBox(reply)
+            let peer = self.peer
+            Task.detached(priority: .userInitiated) { [weak self] in
+                let results = PrivilegedTrasher.trash(items: trashRequest.items,
+                                                      peer: peer)
+                self?.finishTrashRequest()
+                box.send(try? KBWireCodec.encode(KBTrashResponsePayload(results: results)))
+            }
         }
     }
 
@@ -224,9 +265,11 @@ final class DaemonService: NSObject, KancerberoDaemonXPC, @unchecked Sendable {
     }
 
     private func isControlAllowed() -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return canControl
+        canControl
+    }
+
+    private func isTrashAllowed() -> Bool {
+        canTrash
     }
 
     private func allowActionRate() -> Bool {
@@ -237,6 +280,26 @@ final class DaemonService: NSObject, KancerberoDaemonXPC, @unchecked Sendable {
         guard actionTimestamps.count < 10 else { return false }
         actionTimestamps.append(Date())
         return true
+    }
+
+    /// Destructive requests are slower and rarer: one in flight and a handful
+    /// per minute, so a misbehaving client cannot thrash the disk.
+    private func allowTrashRate() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !trashInFlight else { return false }
+        let cutoff = Date().addingTimeInterval(-60)
+        trashTimestamps.removeAll { $0 < cutoff }
+        guard trashTimestamps.count < 6 else { return false }
+        trashTimestamps.append(Date())
+        trashInFlight = true
+        return true
+    }
+
+    private func finishTrashRequest() {
+        lock.lock()
+        trashInFlight = false
+        lock.unlock()
     }
 
     private static func processDetail(pid: Int32) async -> KBProcessDetail {

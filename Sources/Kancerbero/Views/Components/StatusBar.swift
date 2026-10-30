@@ -6,6 +6,7 @@ struct StatusBar: View {
     let section: AppSection
     @Environment(AppModel.self) private var model
     @Environment(DiskModel.self) private var disk
+    @Environment(ApplicationsModel.self) private var applications
     @Environment(FilterModel.self) private var filter
     @Environment(\.openWindow) private var openWindow
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -139,6 +140,17 @@ struct StatusBar: View {
             }
             slot(String(format: "Energy %.1f W", energyWatts), width: 100)
             slot(String(format: "Wakeups %.0f/s", wakeupsPerSecond), width: 105)
+
+        case .applications:
+            slot("\(applications.applicationCount) apps", width: 80)
+            slot("\(applications.extensionCount) widgets/plugins", width: 145)
+            if applications.selectedBundle != nil {
+                slot("Selected \(KBFormat.bytes(applications.selectedBytes))", width: 130)
+            }
+            if applications.isScanning || applications.isTrashing ||
+                applications.isScanningLeftovers {
+                ProgressView().controlSize(.mini)
+            }
         }
     }
 
@@ -256,6 +268,8 @@ struct StatusBar: View {
             return model.lastUpdate.map { "Updated \(KBFormat.time($0))" } ?? "Waiting…"
         case .energy:
             return model.lastUpdate.map { "Updated \(KBFormat.time($0))" } ?? "Waiting…"
+        case .applications:
+            return applications.generatedAt.map { "Updated \(KBFormat.time($0))" } ?? "Waiting…"
         }
     }
 

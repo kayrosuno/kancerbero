@@ -20,16 +20,13 @@ struct EnergyView: View {
             SectionHeader(title: "Energy",
                           subtitle: "Battery, energy and wake-ups")
 
-            GeometryReader { proxy in
-                let topHeight = max(210, (proxy.size.height - 14) / 3)
-                VStack(spacing: 14) {
-                    topGroups
-                        .frame(height: topHeight)
-                    processCard
-                        .frame(maxHeight: .infinity)
-                }
-                .frame(maxHeight: .infinity, alignment: .top)
+            VStack(spacing: 14) {
+                topGroups
+                    .frame(height: KBTheme.cardStripHeight)
+                processCard
+                    .frame(maxHeight: .infinity)
             }
+            .frame(maxHeight: .infinity, alignment: .top)
         }
         .padding(.horizontal, KBTheme.contentPadding)
         .padding(.top, 14)
@@ -55,6 +52,7 @@ struct EnergyView: View {
     private var batteryCard: some View {
         Button {
             showBatteryDetails = true
+            model.refreshBatteryChargeGraph(force: true)
         } label: {
             batteryCardContent
         }
@@ -87,14 +85,26 @@ struct EnergyView: View {
             }
 
             if let power, power.hasBattery {
-                Text(power.chargePercent.map { "\($0)%" } ?? "—")
-                    .font(.system(size: 28, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .lineLimit(1)
+                HStack(alignment: .center, spacing: 8) {
+                    Text(power.chargePercent.map { "\($0)%" } ?? "—")
+                        .font(.system(size: 28, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .lineLimit(1)
 
-                CapacityBar(fraction: power.chargeFraction,
-                            tint: batteryTintFor(power),
-                            height: 10)
+                    timeOnPowerLine(power)
+                    Spacer(minLength: 0)
+                }
+
+                if let graph = model.batteryChargeGraph,
+                   graph.chargeLevels.count > 1 {
+                    BatteryChargeChart(graph: graph)
+                        .frame(maxHeight: .infinity)
+                        .layoutPriority(1)
+                } else {
+                    CapacityBar(fraction: power.chargeFraction,
+                                tint: batteryTintFor(power),
+                                height: 10)
+                }
 
                 HStack(alignment: .top, spacing: 12) {
                     metric("Power source", power.source ?? "—")
@@ -102,8 +112,6 @@ struct EnergyView: View {
                     metric("Time remaining", timeRemainingText(power))
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-
-                Spacer(minLength: 0)
             } else {
                 Text("No battery")
                     .font(.system(size: 22, weight: .semibold, design: .rounded))
@@ -363,6 +371,39 @@ struct EnergyView: View {
         return "\(minutes / 60)h \(minutes % 60)m left"
     }
 
+    /// How long the Mac has been on its current power source, as Activity
+    /// Monitor reports it from the same charge graph.
+    private var timeOnPower: (label: String, value: String)? {
+        guard let graph = model.batteryChargeGraph,
+              !graph.onAC.isEmpty,
+              graph.onAC.count == graph.stateTimes.count else { return nil }
+        let entries = zip(graph.stateTimes, graph.onAC).sorted { $0.0 > $1.0 }
+        guard let current = entries.last else { return nil }
+        var start = current.0
+        for entry in entries.reversed() {
+            guard entry.1 == current.1 else { break }
+            start = entry.0
+        }
+        let total = Int(max(0, start))
+        return (current.1 ? "Time on AC" : "Time on Battery",
+                "\(total / 3600)h \((total % 3600) / 60)m")
+    }
+
+    private func timeOnPowerLine(_ power: KBPowerStats) -> some View {
+        let info = timeOnPower
+        let label = info?.label ?? (power.isPluggedIn ? "Time on AC" : "Time on Battery")
+        let value = info?.value ?? "—"
+        return HStack(spacing: 4) {
+            Text(label)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .fontWeight(.semibold)
+                .monospacedDigit()
+        }
+        .font(.system(size: 9))
+        .lineLimit(1)
+    }
+
     private func batteryTintFor(_ power: KBPowerStats) -> Color {
         if power.isCharging || power.isCharged { return batteryTint }
         guard let charge = power.chargePercent else { return .secondary }
@@ -397,9 +438,17 @@ struct EnergyView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                CapacityBar(fraction: power.chargeFraction,
-                            tint: batteryTintFor(power),
-                            height: 14)
+                timeOnPowerLine(power)
+
+                if let graph = model.batteryChargeGraph,
+                   graph.chargeLevels.count > 1 {
+                    BatteryChargeChart(graph: graph)
+                        .frame(height: 180)
+                } else {
+                    CapacityBar(fraction: power.chargeFraction,
+                                tint: batteryTintFor(power),
+                                height: 14)
+                }
 
                 HStack(alignment: .top, spacing: 28) {
                     metric("Power source", power.source ?? "—")

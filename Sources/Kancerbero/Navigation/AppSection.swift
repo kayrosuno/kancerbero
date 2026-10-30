@@ -7,6 +7,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     case cpu
     case memory
     case energy
+    case applications
 
     var id: String { rawValue }
 
@@ -18,6 +19,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .cpu: return "CPU"
         case .memory: return "Memory"
         case .energy: return "Energy"
+        case .applications: return "Applications"
         }
     }
 
@@ -29,6 +31,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .cpu: return "Cores & processes"
         case .memory: return "Usage & pressure"
         case .energy: return "Battery & power"
+        case .applications: return "Apps, widgets & plugins"
         }
     }
 
@@ -40,6 +43,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .cpu: return "cpu"
         case .memory: return "memorychip"
         case .energy: return "bolt.fill"
+        case .applications: return "square.grid.2x2"
         }
     }
 
@@ -51,6 +55,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .cpu: return Color(red: 0.20, green: 0.72, blue: 0.52)
         case .memory: return Color(red: 0.20, green: 0.70, blue: 0.62)
         case .energy: return Color(red: 0.95, green: 0.72, blue: 0.20)
+        case .applications: return Color(red: 0.20, green: 0.70, blue: 0.62)
         }
     }
 
@@ -62,6 +67,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .cpu: return "4"
         case .memory: return "5"
         case .energy: return "6"
+        case .applications: return "7"
         }
     }
 
@@ -80,6 +86,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case "3": return .cpu
         case "4": return .memory
         case "5": return .energy
+        case "6": return .applications
         default: return nil
         }
     }

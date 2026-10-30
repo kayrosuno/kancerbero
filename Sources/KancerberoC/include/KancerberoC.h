@@ -59,6 +59,10 @@ int kb_memory_pressure_read(int32_t *percent, int32_t *level);
 int kb_gpu_stats_read(kb_gpu_stats *out);
 /* Battery charge, time remaining and power source. */
 int kb_power_stats_read(kb_power_stats *out);
+/* 12-hour charge graph from libsystemstats (private), loaded with dlopen.
+   Returns 1 on success; caller frees with kb_battery_charge_graph_free. */
+int kb_battery_charge_graph_read(kb_battery_charge_graph *out);
+void kb_battery_charge_graph_free(kb_battery_charge_graph *graph);
 /* Per-process energy and wake-up counters from rusage_info_v6. */
 int kb_process_energy_read(int32_t pid, uint64_t *energy_nj,
                            uint64_t *interrupt_wkups, uint64_t *pkg_idle_wkups);

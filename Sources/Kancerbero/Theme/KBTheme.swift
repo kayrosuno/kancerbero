@@ -6,6 +6,10 @@ enum KBTheme {
     static let cardRadius: CGFloat = 16
     static let smallRadius: CGFloat = 12
 
+    /// Fixed height of the dashboard card strip. Keeps the cards the same size
+    /// while the window is resized; the process table absorbs the extra space.
+    static let cardStripHeight: CGFloat = 210
+
     static let summaryCardMinWidth: CGFloat = 170
     static let summaryGridSpacing: CGFloat = 10
     static let summaryColumns = [GridItem(.adaptive(minimum: 170), spacing: 10)]

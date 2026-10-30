@@ -323,6 +323,9 @@ $K --screenshot /tmp/kb-cpu-selected.png --section cpu \
 - Para fugas: dejar la pestaña abierta varios minutos con intervalo de 0,5 s y comprobar que el
   RSS de Kancerbero se mantiene estable (`ps -o rss`, `leaks`). El sampler libera el array de
   `host_processor_info` y el puerto Mach en cada tick.
+- Altura de las cards: al maximizar o estirar la ventana, la franja superior de CPU, Memory,
+  Energy y Disk → I/O se mantiene en 210 pt (`KBTheme.cardStripHeight`) y todo el espacio extra
+  lo absorbe la tabla de procesos. Comparar una captura a 1440×860 con otra de ventana más alta.
 
 Pestaña Memory:
 
@@ -367,6 +370,12 @@ $K --screenshot /tmp/kb-energy-filter.png --section energy \
   la GPU no se muestran.
 - Sin daemon root la tabla solo enumera procesos del uid actual; el fallback local rellena
   energía/batería cuando el daemon conectado es antiguo.
+- La card Battery muestra el gráfico de 12 h al estilo Activity Monitor → Energy: línea cian del
+  nivel, bandas verdes del periodo en AC y rejilla discontinua. Comparar la forma y la ventana con
+  Activity Monitor y la fuente con `pmset -g batt`. Al enchufar/desenchufar, la banda verde cambia
+  en el siguiente refresco (≤60 s) o al abrir el popover.
+- Sin batería, o si `systemstats_get_battery_charge_graph` no está disponible en el sistema, la
+  card vuelve a la barra de capacidad sin errores ni avisos (ver `docs/private-apis.md`).
 
 Icono del Dock:
 
@@ -799,3 +808,31 @@ leaks <pid-daemon>
 ```
 
 Objetivo: CPU <3% y RSS <150 MB con miles de conexiones; sin crecimiento de memoria en una hora.
+
+## Applications
+
+```bash
+K=./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
+P=./build/Build/Products/Debug/KancerberoProbe
+$P apps
+KB_APPS_LEFTOVERS=com.anthropic.claudefordesktop $P apps
+$K --screenshot /tmp/kb-apps.png --section applications --screenshot-delay 10
+$K --screenshot /tmp/kb-apps-claude.png --section applications \
+  --applications-selected Claude --screenshot-delay 10
+```
+
+- `apps` debe coincidir con `find /Applications -maxdepth 2 -name '*.app'` (más `~/Applications`,
+  widgets y plugins) y `KB_APPS_LEFTOVERS` debe listar preferencias, Application Support, caches,
+  contenedores, saved state, launch items y logs reales de esa app.
+- La tabla muestra icono, nombre, bundle id, tipo y tamaño del seleccionado; el panel derecho
+  agrupa los leftovers con su tamaño y marca `admin` en las rutas de `/Library`.
+- Mover a la papelera una app de prueba en `~/Applications` con un plist y una carpeta en
+  `~/Library`: todo debe acabar en `~/.Trash` y la lista refrescarse.
+- Rutas privilegiadas (`/Library/Application Support/...`, apps de `/Applications` propiedad de
+  root): requieren el daemon instalado y actualizado; comprobar que acaban en el `~/.Trash` del
+  usuario con `stat -f "%Su %Sg %Sp"` y revisar
+  `log show --predicate 'subsystem == "uno.kayros.kancerbero"' --last 5m`.
+- LaunchAgents/Daemons: el plist se descarga (`launchctl print ...` falla) antes de moverse.
+- Negativos: cliente no autorizado, ruta fuera de la lista blanca, symlink a `/System`, >256 rutas
+  y >1 MiB deben rechazarse; sin daemon, los ítems privilegiados fallan con un mensaje claro y
+  los del usuario siguen funcionando.

@@ -15,7 +15,6 @@ struct MemoryView: View {
     private let idleColor = Color.gray.opacity(0.28)
     private let swapColor = Color(red: 0.62, green: 0.42, blue: 0.95)
 
-    @State private var showPhysicalMemoryDetails = false
     @State private var showPressureDetails = false
     @State private var showCompositionDetails = false
     @State private var showSwapDetails = false
@@ -25,16 +24,13 @@ struct MemoryView: View {
             SectionHeader(title: "Memory",
                           subtitle: "Pressure, breakdown and processes")
 
-            GeometryReader { proxy in
-                let topHeight = max(210, (proxy.size.height - 14) / 3)
-                VStack(spacing: 14) {
-                    topGroups
-                        .frame(height: topHeight)
-                    processCard
-                        .frame(maxHeight: .infinity)
-                }
-                .frame(maxHeight: .infinity, alignment: .top)
+            VStack(spacing: 14) {
+                topGroups
+                    .frame(height: KBTheme.cardStripHeight)
+                processCard
+                    .frame(maxHeight: .infinity)
             }
+            .frame(maxHeight: .infinity, alignment: .top)
         }
         .padding(.horizontal, KBTheme.contentPadding)
         .padding(.top, 14)
@@ -50,7 +46,7 @@ struct MemoryView: View {
                 .frame(width: 280)
 
             HStack(spacing: 10) {
-                activityMonitorCard
+                PhysicalMemoryCard()
                     .frame(minWidth: 210, idealWidth: 250, maxWidth: 250)
                 compositionCard
                     .frame(maxWidth: .infinity)
@@ -136,76 +132,6 @@ struct MemoryView: View {
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    private var activityMonitorCard: some View {
-        Button {
-            showPhysicalMemoryDetails = true
-        } label: {
-            activityMonitorCardContent
-        }
-        .buttonStyle(.plain)
-        .help("Memory used history and breakdown")
-        .popover(isPresented: $showPhysicalMemoryDetails, arrowEdge: .bottom) {
-            physicalMemoryDetails
-                .padding(16)
-                .frame(width: 460)
-        }
-    }
-
-    private var activityMonitorCardContent: some View {
-        let memory = model.hostMetrics?.memory
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center, spacing: 6) {
-                cardIcon("memorychip", tint: KBTheme.downloadTint)
-                Text("Physical Memory")
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                Spacer(minLength: 4)
-                if let memory {
-                    Text(KBFormat.bytes(memory.totalBytes))
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                }
-            }
-
-            if let memory {
-                headlineMetric("Memory Used",
-                               KBFormat.bytes(memory.activityMonitorUsedBytes),
-                               detail: "· \(KBFormat.percent(memory.activityMonitorUsedFraction))")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                if model.memoryUsageHistory.count > 1 {
-                    Sparkline(values: model.memoryUsageHistory,
-                              tint: memoryTint,
-                              scale: 100)
-                        .frame(maxHeight: .infinity)
-                } else {
-                    Text("Collecting…")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.tertiary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                }
-            } else {
-                Text("Waiting for metrics…")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(.regularMaterial)
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(memoryTint.opacity(0.22), lineWidth: 1)
-        }
-        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
     private var compositionCard: some View {
         Button {
             showCompositionDetails = true
@@ -266,7 +192,7 @@ struct MemoryView: View {
                                     color: cachedColor),
                     MeterLegendItem("Free", value: KBFormat.bytes(memory.activityMonitorFreeBytes),
                                     color: idleColor)
-                ], minItemWidth: 120)
+                ], minItemWidth: 120, inlineValues: true)
             } else {
                 Text("Waiting for metrics…")
                     .font(.system(size: 11))
@@ -397,35 +323,6 @@ struct MemoryView: View {
             .accessibilityHidden(true)
     }
 
-    /// Prominent figure for the Activity Monitor detail card.
-    private func headlineMetric(_ label: String,
-                                _ value: String,
-                                detail: String? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(label)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            HStack(alignment: .firstTextBaseline, spacing: 5) {
-                Text(value)
-                    .font(.system(size: 19, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .layoutPriority(1)
-                if let detail {
-                    Text(detail)
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(memoryTint)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-            }
-        }
-    }
-
     private func pressureColor(_ band: KBMemoryStats.PressureBand) -> Color {
         switch band {
         case .low: return .green
@@ -436,66 +333,6 @@ struct MemoryView: View {
     }
 
     // MARK: - Popover details
-
-    private var physicalMemoryDetails: some View {
-        let memory = model.hostMetrics?.memory
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Physical Memory")
-                    .font(.system(size: 14, weight: .semibold))
-                Spacer()
-                if let memory {
-                    Text(KBFormat.bytes(memory.totalBytes))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if let memory {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("\(KBFormat.bytes(memory.activityMonitorUsedBytes)) used")
-                        .font(.system(size: 26, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                    Text(KBFormat.percent(memory.activityMonitorUsedFraction))
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(memoryTint)
-                }
-
-                if model.memoryUsageHistory.count > 1 {
-                    Sparkline(values: model.memoryUsageHistory,
-                              tint: memoryTint,
-                              scale: 100)
-                        .frame(height: 200)
-                } else {
-                    Text("Collecting…")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 200)
-                }
-
-                Divider().opacity(0.4)
-
-                HStack(alignment: .top, spacing: 24) {
-                    metric("App Memory", KBFormat.bytes(memory.appMemoryBytes))
-                    metric("Wired Memory", KBFormat.bytes(memory.wiredBytes))
-                    metric("Compressed", KBFormat.bytes(memory.compressedBytes))
-                    metric("Cached Files", KBFormat.bytes(memory.cachedFileBytes))
-                    Spacer(minLength: 0)
-                }
-
-                Text("Activity Monitor’s memory used: app, wired and compressed pages.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                Text("Waiting for metrics…")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
 
     private var pressureDetails: some View {
         let memory = model.hostMetrics?.memory

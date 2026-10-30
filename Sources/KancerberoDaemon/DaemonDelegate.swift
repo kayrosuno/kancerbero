@@ -6,29 +6,39 @@ import os
 private let logger = Logger(subsystem: "uno.kayros.kancerbero", category: "daemon.listener")
 
 final class DaemonDelegate: NSObject, NSXPCListenerDelegate {
-    private let service = DaemonService()
-
     func listener(_ listener: NSXPCListener,
                   shouldAcceptNewConnection newConnection: NSXPCConnection) -> Bool {
         let pid = newConnection.processIdentifier
         let uid = newConnection.effectiveUserIdentifier
         let path = ProcessCollector.path(for: pid) ?? "unknown"
 
-        // Development policy: the app bundle and same-uid clients may control
-        // services. Production must set `setCodeSigningRequirement` plus a
-        // Team ID check instead of relying on the path.
-        let isApp = path.contains("/Kancerbero.app/Contents/MacOS/")
-        let sameUser = uid == geteuid()
-        let canControl = isApp || sameUser
+        #if DEBUG
+        // Development builds are unsigned, so Release-style signature checks
+        // would reject the app. This path check is a convenience, not a
+        // security boundary; Release enforces the Developer ID requirement.
+        let isApp = uid != 0 && path.contains("/Kancerbero.app/Contents/MacOS/")
+        let canControl = isApp || uid == geteuid()
+        let canTrash = isApp
+        #else
+        newConnection.setCodeSigningRequirement(DaemonClientPolicy.requirement)
+        let canControl = uid != 0
+        let canTrash = DaemonClientPolicy.isTrusted(pid: pid)
+        #endif
 
-        logger.notice("incoming pid=\(pid) uid=\(uid) canControl=\(canControl) path=\(path, privacy: .public)")
+        guard let peer = PeerIdentity(pid: pid, uid: uid) else {
+            logger.error("rejected connection pid=\(pid) uid=\(uid) path=\(path, privacy: .public)")
+            return false
+        }
 
-        service.configure(connection: newConnection, canControl: canControl)
+        logger.notice("incoming pid=\(pid) uid=\(uid) canControl=\(canControl) canTrash=\(canTrash) path=\(path, privacy: .public)")
+
+        let service = DaemonService(peer: peer,
+                                    canControl: canControl,
+                                    canTrash: canTrash,
+                                    connection: newConnection)
         newConnection.exportedInterface = NSXPCInterface(with: KancerberoDaemonXPC.self)
         newConnection.exportedObject = service
         newConnection.remoteObjectInterface = NSXPCInterface(with: KancerberoClientXPC.self)
-
-        let service = self.service
         newConnection.invalidationHandler = {
             logger.notice("connection invalidated pid=\(pid)")
             service.connectionInvalidated()

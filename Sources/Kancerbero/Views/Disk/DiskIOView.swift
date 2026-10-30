@@ -10,22 +10,19 @@ struct DiskIOView: View {
     private let writeTint = KBTheme.uploadTint
 
     var body: some View {
-        GeometryReader { proxy in
-            let topHeight = max(210, (proxy.size.height - 14) / 3)
-            VStack(spacing: 14) {
-                HStack(alignment: .top, spacing: 14) {
-                    activityCard
-                        .frame(maxWidth: .infinity)
-                    statsCard
-                        .frame(width: 300)
-                }
-                .frame(height: topHeight)
-
-                processCard
-                    .frame(maxHeight: .infinity)
+        VStack(spacing: 14) {
+            HStack(alignment: .top, spacing: 14) {
+                activityCard
+                    .frame(maxWidth: .infinity)
+                statsCard
+                    .frame(width: 300)
             }
-            .frame(maxHeight: .infinity, alignment: .top)
+            .frame(height: KBTheme.cardStripHeight)
+
+            processCard
+                .frame(maxHeight: .infinity)
         }
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private var graphMode: Binding<DiskIOGraphMode> {

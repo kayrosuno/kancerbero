@@ -125,3 +125,21 @@ Pendiente para producción:
 - Entitlements restringidos: `content-filter-provider-systemextension` en app y extensión,
   `system-extension.install` en la app. Requieren Developer ID + provisioning profiles
   embebidos; una build ad-hoc no puede activar el filtro y la UI lo indica.
+
+## Desinstalador (pestaña Applications)
+
+- El daemon acepta la petición `trashItems` solo para clientes autorizados. En Release el listener
+  exige `setCodeSigningRequirement` con el identificador `uno.kayros.kancerbero` y el Team ID, y
+  revalida cada petición con `SecCodeCopyGuestWithAttributes` + `SecCodeCheckValidity`. En Debug
+  (build sin firma) se usa la ruta del ejecutable dentro de `Kancerbero.app`; es una comodidad de
+  desarrollo, no una frontera de seguridad.
+- Cada ruta se revalida en el daemon: absoluta, padre resuelto con `realpath`, componente final
+  verbatim (un symlink se mueve, nunca se sigue su destino), dentro de `KBPathPolicy` y fuera de
+  sus raíces protegidas. El bundle id se re-deriva del `Info.plist`/firma y se rechazan bundles
+  Apple/SIP; el `bundleIdentifier` del payload no se usa para autorizar.
+- El movimiento va a `~usuario/.Trash` con el uid tomado de la conexión XPC (nunca del payload),
+  nombre único, `chown` recursivo al usuario, limpieza de `UF_IMMUTABLE` y `launchctl bootout` de
+  LaunchAgents/Daemons antes de mover.
+- Límites: 32 ítems por lote, 256 por petición, 6 peticiones/minuto con una en vuelo y resultado
+  por ruta. Las rutas escribibles del usuario no pasan por el daemon: la app usa
+  `FileManager.trashItem`.
