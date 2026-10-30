@@ -251,10 +251,13 @@ refleje; el toggle de Settings se actualiza en vivo.
 - Tras reiniciar la app, el valor del toggle se conserva.
 - Con Reduce Motion activo en Ajustes del Sistema → Accesibilidad → Pantalla, no debe animarse
   ninguna pestaña aunque el toggle esté encendido; Settings muestra el aviso y conserva el valor.
+- El toggle “Animate status bar values” se guarda en `statusBarTextAnimationsEnabled` y por
+  defecto está **apagado**: las cifras de la barra inferior cambian de golpe y el `numericText`
+  no rueda. Al encenderlo vuelven esas animaciones; con Reduce Motion activo no se animan.
 - El filtro All/Agents/Daemons sigue animando su píldora con el toggle apagado, porque es un
   filtro y no una pestaña.
-- Confirmar que siguen animándose sparklines, valores de la barra de estado, hover de tarjetas,
-  `numericText`, paneles de detalle, filtros/foco y LiveDot.
+- Confirmar que siguen animándose sparklines, hover de tarjetas, paneles de detalle, filtros/foco
+  y LiveDot; los valores de la barra de estado solo con su toggle encendido.
 
 ## Intervalo de actualización
 
@@ -264,17 +267,27 @@ refleje; el toggle de Settings se actualiza en vivo.
 log stream --predicate 'subsystem == "uno.kayros.kancerbero"' --info --debug
 ```
 
-  y cambiar el selector 5 → 0,5 → 2 s en Networking o CPU. Debe aparecer un
-  `resubscribed interval=…` en el cliente y un nuevo `subscribed interval=…` en el daemon por
-  cada valor distinto. Volver a seleccionar el mismo valor no debe reenviar la suscripción.
+  y cambiar el selector 5 → 0,5 → 2 s desde el toolbar (visible en todas las pestañas). Debe
+  aparecer un `resubscribed interval=…` en el cliente y un nuevo `subscribed interval=…` en el
+  daemon por cada valor distinto. Volver a seleccionar el mismo valor no debe reenviar la
+  suscripción.
 - Comprobar la cadencia real por la hora de “Updated” y el avance de los sparklines: a 0,5 s la
-  ventana de 60 muestras abarca ~30 s; a 5 s, ~5 min. Al cambiar el intervalo los historiales se
-  reinician, así que el eje temporal no mezcla cadencias.
+  ventana de 60 muestras abarca ~30 s; a 5 s, ~5 min. Los historiales se conservan al cambiar el
+  intervalo y el eje temporal usa las marcas de `sampleDates`, así que no mezcla cadencias.
+- Regresión de cadencia lenta: con **5 s**, las gráficas y cifras basadas en tasas (tráfico de
+  red, Disk → I/O y columnas de CPU%, energía, wakeups e I/O por proceso) deben seguir avanzando
+  cada ~5 s, no quedarse a 0. Pausar más que `max(5 s, 2,5 × cadencia)` y reanudar debe producir
+  una muestra a 0 y la siguiente normal.
 - Sin daemon, cambiar de 5 s a 0,5 s y verificar que la siguiente actualización llega en ~0,5 s,
   no tras el sueño anterior. Pausa/Play debe seguir funcionando y el refresh manual debe
   actualizar aunque esté pausado.
-- Daemons mantiene su refresco de 5 s y Disk su caché de inventario; el selector no está visible
-  en esas pestañas.
+- El selector está en el toolbar de todas las pestañas. Daemons mantiene su refresco de 5 s y Disk
+  su caché de inventario, así que el selector no cambia la cadencia de esas dos vistas.
+- El intervalo de arranque se ajusta en **Settings → Sampling** (`startupSamplingInterval`, por
+  defecto 2 s). Cambiar el selector del toolbar y reiniciar la app debe volver al valor de
+  Settings, no al último elegido. Para probar sin la UI:
+  `defaults write uno.kayros.kancerbero startupSamplingInterval -float 5` (y
+  `defaults delete uno.kayros.kancerbero startupSamplingInterval` para volver a 2 s).
 
 ## CPU y memoria
 

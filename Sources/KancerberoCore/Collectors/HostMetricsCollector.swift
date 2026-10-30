@@ -168,8 +168,11 @@ public struct ProcessCPUTracker {
     public mutating func annotate(_ processes: inout [KBProcessInfo],
                                   elapsed: Double,
                                   totalMemoryBytes: UInt64,
-                                  coreCount: Int) {
-        let validInterval = elapsed > 0 && elapsed < 5 && elapsed.isFinite
+                                  coreCount: Int,
+                                  cadence: Double? = nil) {
+        // `CollectionActor` ya pasa `elapsed: 0` cuando la ventana no vale; se
+        // repite el criterio para las llamadas directas (KancerberoProbe).
+        let validInterval = RateTiming.isValidGap(elapsed, cadence: cadence)
         let maxPercent = Double(max(1, coreCount)) * 100
         var baseline: [KBProcessKey: Counters] = [:]
         baseline.reserveCapacity(processes.count)

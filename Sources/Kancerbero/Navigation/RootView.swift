@@ -3,6 +3,7 @@ import KancerberoFilterContract
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @Environment(DiskModel.self) private var disk
     @Environment(FilterModel.self) private var filter
     @Environment(\.openWindow) private var openWindow
     @AppStorage("selectedSection") private var sectionRaw = AppSection.networking.rawValue
@@ -80,6 +81,8 @@ struct RootView: View {
     }
 
     var body: some View {
+        @Bindable var model = model
+
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(selection: selection)
                 .navigationSplitViewColumnWidth(min: 220,
@@ -115,24 +118,36 @@ struct RootView: View {
         .navigationSplitViewStyle(.balanced)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                if currentSection == .networking || currentSection == .cpu
-            || currentSection == .memory || currentSection == .energy {
-                    Button {
-                        model.refreshNow()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .help("Refresh now")
-
-                    Button {
-                        withAnimation(.snappy(duration: 0.2)) {
-                            model.isPaused.toggle()
-                        }
-                    } label: {
-                        Image(systemName: model.isPaused ? "play.fill" : "pause.fill")
-                    }
-                    .help(model.isPaused ? "Resume" : "Pause")
+                Picker("Interval", selection: $model.interval) {
+                    Text("0.5 s").tag(0.5)
+                    Text("1 s").tag(1.0)
+                    Text("2 s").tag(2.0)
+                    Text("5 s").tag(5.0)
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 210)
+                .accessibilityLabel("Interval")
+                .help("Sampling interval")
+
+                Button {
+                    withAnimation(.snappy(duration: 0.2)) {
+                        model.isPaused.toggle()
+                    }
+                } label: {
+                    Image(systemName: model.isPaused ? "play.fill" : "pause.fill")
+                }
+                .help(model.isPaused ? "Resume" : "Pause")
+
+                if currentSection == .disk && disk.isLoadingInventory {
+                    ProgressView().controlSize(.small)
+                }
+
+                Button(action: refreshCurrentSection) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .help(refreshHelp)
+                .accessibilityIdentifier("toolbar.refresh")
             }
         }
         .task {
@@ -152,6 +167,25 @@ struct RootView: View {
             withAnimation(sectionAnimation) {
                 sectionRaw = section.rawValue
             }
+        }
+    }
+
+    private func refreshCurrentSection() {
+        switch currentSection {
+        case .disk:
+            Task { await disk.refreshInventory(force: true) }
+        case .daemons:
+            Task { await model.refreshDaemons() }
+        case .networking, .cpu, .memory, .energy:
+            model.refreshNow()
+        }
+    }
+
+    private var refreshHelp: String {
+        switch currentSection {
+        case .disk: return "Refresh volumes"
+        case .daemons: return "Refresh services"
+        default: return "Refresh now"
         }
     }
 

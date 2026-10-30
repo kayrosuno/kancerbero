@@ -24,7 +24,6 @@ struct NetworkingView: View {
     }
 
     var body: some View {
-        @Bindable var model = model
         let rates = model.systemRates
         let protocolFilter = ui.networking.protocolFilter
         let connectionStates = tab == .connections ? ui.networking.connectionStates
@@ -63,52 +62,8 @@ struct NetworkingView: View {
                                                           search: processSearch)
 
         VStack(spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Networking")
-                        .font(.system(size: 26, weight: .semibold, design: .rounded))
-                    Text("Live traffic, sockets and process inventory")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer()
-
-                HStack(spacing: 8) {
-                    Text("Interval")
-                        .font(.body)
-                        .lineLimit(1)
-                        .fixedSize()
-
-                    Picker("Interval", selection: $model.interval) {
-                        Text("0.5 s").tag(0.5)
-                        Text("1 s").tag(1.0)
-                        Text("2 s").tag(2.0)
-                        Text("5 s").tag(5.0)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .frame(width: 250)
-                    .accessibilityLabel("Interval")
-                }
-                .fixedSize(horizontal: true, vertical: false)
-
-                Toggle(isOn: $model.isPaused) {
-                    Image(systemName: model.isPaused ? "play.fill" : "pause.fill")
-                }
-                .toggleStyle(.button)
-                .buttonStyle(.bordered)
-                .help(model.isPaused ? "Resume" : "Pause")
-
-                Button {
-                    model.refreshNow()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .buttonStyle(.bordered)
-                .help("Refresh now")
-            }
+            SectionHeader(title: "Networking",
+                          subtitle: "Live traffic, sockets and process inventory")
 
             HStack(alignment: .top, spacing: KBTheme.summaryGridSpacing) {
                 TrafficCard(

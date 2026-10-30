@@ -135,10 +135,12 @@ Extension y aprobar la system extension; el detalle de binario y permisos está 
 
 Las selecciones y configuraciones de cada sección (filtros, tarjeta activa, fila seleccionada,
 panel de detalle y árbol expandido) se conservan al cambiar de pestaña o sección durante la
-sesión; al reiniciar la app se vuelven a los valores iniciales. La preferencia de animaciones es
-la excepción: **Kancerbero → Settings… (⌘,)** permite activar o desactivar las animaciones de
-cambio de sección/subpestaña y del resaltado del sidebar y las píldoras. Se guarda en
-`UserDefaults` y respeta Reduce Motion de macOS.
+sesión; al reiniciar la app se vuelven a los valores iniciales. **Kancerbero → Settings… (⌘,)**
+permite ajustar las animaciones de cambio de sección/subpestaña y del resaltado del sidebar y las
+píldoras, las animaciones de los valores de la barra de estado (desactivadas por defecto), el
+intervalo de muestreo con el que arranca la app (2 s por defecto) y el icono del Dock. Todo se
+guarda en `UserDefaults` y las animaciones respetan Reduce Motion de macOS. El selector del
+toolbar cambia el intervalo solo durante la sesión y no modifica la preferencia de arranque.
 
 El panel se oculta con el toggle de la toolbar o `Cmd+Ctrl+S`; `Cmd+1/2/3/4/5/6` cambia de sección
 (Networking, Disk, Daemons, CPU, Memory, Energy).

@@ -23,7 +23,8 @@ struct DiskView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            header
+            SectionHeader(title: "Disk",
+                          subtitle: "Volumes, analysis and disk I/O")
 
             HStack(spacing: 12) {
                 PillTabBar(selection: $tab, selectionAnimation: pillAnimation)
@@ -61,32 +62,6 @@ struct DiskView: View {
             if disk.consumeAutoScan() {
                 await disk.startScan()
             }
-        }
-    }
-
-    private var header: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Disk")
-                    .font(.system(size: 26, weight: .semibold, design: .rounded))
-                Text("Volumes, analysis and disk I/O")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            if disk.isLoadingInventory {
-                ProgressView().controlSize(.small)
-            }
-
-            Button {
-                Task { await disk.refreshInventory(force: true) }
-            } label: {
-                Image(systemName: "arrow.clockwise")
-            }
-            .buttonStyle(.bordered)
-            .help("Refresh volumes")
         }
     }
 
