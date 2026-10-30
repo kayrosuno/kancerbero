@@ -7,11 +7,45 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/proc.h>
 #include <sys/proc_info.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
+#include <sys/sysctl.h>
 
-int kb_process_list(kb_process **out, size_t *count)
+static void kb_fill_identity(kb_process *item, const struct kinfo_proc *entry)
+{
+    pid_t pid = entry->kp_proc.p_pid;
+    item->pid = (int32_t)pid;
+    item->ppid = (int32_t)entry->kp_eproc.e_ppid;
+    item->uid = (uint32_t)entry->kp_eproc.e_ucred.cr_uid;
+    item->start_time_us =
+        (uint64_t)entry->kp_proc.p_starttime.tv_sec * 1000000ULL +
+        (uint64_t)entry->kp_proc.p_starttime.tv_usec;
+    item->nice = (int32_t)entry->kp_proc.p_nice;
+    item->status = (uint32_t)entry->kp_proc.p_stat;
+    item->has_task_info = 0;
+
+    int name_length = proc_name(pid, item->name,
+                                (uint32_t)sizeof(item->name));
+    if (name_length <= 0) {
+        strncpy(item->name, entry->kp_proc.p_comm,
+                sizeof(item->name) - 1);
+        item->name[sizeof(item->name) - 1] = '\0';
+    }
+    if (pid == 0 && item->name[0] == '\0') {
+        strncpy(item->name, "kernel_task", sizeof(item->name) - 1);
+        item->name[sizeof(item->name) - 1] = '\0';
+    }
+}
+
+/*
+ * Lists every process the kernel exposes, including kernel_task (PID 0), using
+ * KERN_PROC_ALL. Unlike proc_listallpids + proc_pidinfo, this never drops a
+ * process whose task/BSD info is unreadable without root; identity comes from
+ * kinfo_proc and only the counters fall back to has_task_info = 0.
+ */
+int kb_process_metadata_list(kb_process **out, size_t *count)
 {
     if (!out || !count) {
         return -1;
@@ -19,91 +53,78 @@ int kb_process_list(kb_process **out, size_t *count)
     *out = NULL;
     *count = 0;
 
-    int needed = proc_listallpids(NULL, 0);
-    if (needed <= 0) {
+    int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0};
+    size_t size = 0;
+    if (sysctl(mib, 4, NULL, &size, NULL, 0) != 0 || size == 0) {
         return -1;
     }
-    /* proc_listallpids returns a count of PIDs, never bytes. */
-    size_t capacity = (size_t)needed + 32;
-    pid_t *pids = NULL;
-    int written = 0;
 
+    struct kinfo_proc *procs = NULL;
+    size_t capacity = size;
+    int filled = 0;
     for (int attempt = 0; attempt < 5; attempt++) {
-        pid_t *grown = (pid_t *)realloc(pids, capacity * sizeof(pid_t));
+        capacity += capacity / 4 + 64 * sizeof(struct kinfo_proc);
+        struct kinfo_proc *grown = (struct kinfo_proc *)realloc(procs, capacity);
         if (!grown) {
-            free(pids);
+            free(procs);
             return -1;
         }
-        pids = grown;
-        written = proc_listallpids(pids, (int)(capacity * sizeof(pid_t)));
-        if (written < 0) {
-            free(pids);
-            return -1;
-        }
-        size_t found = (size_t)written;
-        if (found < capacity) {
+        procs = grown;
+        size = capacity;
+        if (sysctl(mib, 4, procs, &size, NULL, 0) == 0) {
+            filled = 1;
             break;
         }
-        capacity *= 2;
-    }
-    if (written <= 0) {
-        free(pids);
-        return -1;
-    }
-
-    size_t found = (size_t)written;
-    kb_process *items = (kb_process *)calloc(found ? found : 1, sizeof(kb_process));
-    if (!items) {
-        free(pids);
-        return -1;
-    }
-
-    size_t cursor = 0;
-    for (size_t i = 0; i < found; i++) {
-        pid_t pid = pids[i];
-        if (pid <= 0) {
-            continue;
+        if (errno != ENOMEM) {
+            free(procs);
+            return -1;
         }
-        struct proc_taskallinfo all;
-        struct proc_bsdinfo bsd;
-        memset(&all, 0, sizeof(all));
-        memset(&bsd, 0, sizeof(bsd));
+    }
+    if (!filled) {
+        free(procs);
+        return -1;
+    }
 
+    size_t found = size / sizeof(struct kinfo_proc);
+    kb_process *items = (kb_process *)calloc(found ? found : 1,
+                                             sizeof(kb_process));
+    if (!items) {
+        free(procs);
+        return -1;
+    }
+    for (size_t index = 0; index < found; index++) {
+        kb_fill_identity(&items[index], &procs[index]);
+    }
+    free(procs);
+    *out = items;
+    *count = found;
+    return 0;
+}
+
+int kb_process_list(kb_process **out, size_t *count)
+{
+    if (kb_process_metadata_list(out, count) != 0) {
+        return -1;
+    }
+    kb_process *items = *out;
+    for (size_t index = 0; index < *count; index++) {
+        kb_process *item = &items[index];
+        pid_t pid = (pid_t)item->pid;
+        proc_pidpath(pid, item->path, (uint32_t)sizeof(item->path));
+
+        struct proc_taskallinfo all;
+        memset(&all, 0, sizeof(all));
         /*
-         * PROC_PIDTASKALLINFO combines the BSD identity and the task CPU/memory
-         * counters in one syscall. For another uid without root the kernel
-         * returns success with a zeroed structure, so require a real thread
-         * count before trusting it. Fall back to PROC_PIDTBSDINFO, which is
-         * readable for every process and still provides state and nice.
+         * Task counters require privileges for other users' processes. When
+         * they are unreadable we keep the process (identity from kinfo_proc)
+         * and leave has_task_info = 0; the root daemon reads all of them.
          */
-        int has_task_info = 0;
-        int rc = proc_pidinfo(pid, PROC_PIDTASKALLINFO, 0, &all, (int)sizeof(all));
+        int rc = proc_pidinfo(pid, PROC_PIDTASKALLINFO, 0,
+                              &all, (int)sizeof(all));
         if (rc == (int)sizeof(all) &&
             (all.ptinfo.pti_threadnum > 0 ||
              all.ptinfo.pti_total_user > 0 ||
              all.ptinfo.pti_total_system > 0)) {
-            bsd = all.pbsd;
-            has_task_info = 1;
-        } else {
-            rc = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &bsd, (int)sizeof(bsd));
-            if (rc <= 0) {
-                continue;
-            }
-        }
-
-        kb_process *item = &items[cursor++];
-        item->pid = (int32_t)pid;
-        item->ppid = (int32_t)bsd.pbi_ppid;
-        item->uid = (uint32_t)bsd.pbi_uid;
-        item->start_time_us = ((uint64_t)bsd.pbi_start_tvsec * 1000000ULL) +
-                              (uint64_t)bsd.pbi_start_tvusec;
-        item->nice = (int32_t)bsd.pbi_nice;
-        item->status = (uint32_t)bsd.pbi_status;
-        const char *name = bsd.pbi_name[0] ? bsd.pbi_name : bsd.pbi_comm;
-        strncpy(item->name, name, sizeof(item->name) - 1);
-        proc_pidpath(pid, item->path, (uint32_t)sizeof(item->path));
-
-        if (has_task_info) {
             item->cpu_user_ticks = all.ptinfo.pti_total_user;
             item->cpu_system_ticks = all.ptinfo.pti_total_system;
             item->resident_bytes = all.ptinfo.pti_resident_size;
@@ -124,10 +145,6 @@ int kb_process_list(kb_process **out, size_t *count)
             item->pkg_idle_wkups = usage.ri_pkg_idle_wkups;
         }
     }
-
-    free(pids);
-    *out = items;
-    *count = cursor;
     return 0;
 }
 

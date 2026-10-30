@@ -267,9 +267,17 @@ struct CPUView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("\(cpu.taskCount.formatted()) tasks")
                         .font(.system(size: 16, weight: .semibold))
-                    Text("\(cpu.threadCount.formatted()) threads")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        Text("\(cpu.threadCount.formatted()) threads")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                        if cpu.threadsRestricted > 0 {
+                            Text("partial")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.orange)
+                                .help("\(cpu.threadsRestricted) processes belong to other users or come from a daemon that predates the full process enumeration. Their CPU, memory and thread counters are unavailable; installing the current build and repairing the background service restores them.")
+                        }
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             } else {

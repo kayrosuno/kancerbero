@@ -25,6 +25,8 @@ size_t kb_nstat_source_count(void);
 
 /* libproc-based inventory (same uid unless root). */
 int kb_process_list(kb_process **out, size_t *count);
+/* Identity-only KERN_PROC_ALL list (no task/energy counters). */
+int kb_process_metadata_list(kb_process **out, size_t *count);
 void kb_process_list_free(kb_process *items);
 /* Returns the path length, or -1 when unavailable. */
 int kb_process_path(int32_t pid, char *buffer, size_t size);

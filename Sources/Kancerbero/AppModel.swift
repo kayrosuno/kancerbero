@@ -82,6 +82,11 @@ final class AppModel {
     /// Last XPC connection failure, surfaced in System status instead of being
     /// silently swallowed by the retry loop.
     var daemonConnectionError: String?
+    /// True when the daemon snapshot is missing processes that macOS sees
+    /// (typically because an older daemon truncated the list).
+    var daemonProcessesIncomplete = false
+    var daemonReportedProcessCount = 0
+    var daemonLocalProcessCount = 0
 
     var legacyServiceDetected: Bool {
         legacyAgentDetected || legacyDaemonDetected
@@ -751,6 +756,27 @@ final class AppModel {
                 patchedProcesses[index].usage = usage
             }
         }
+
+        // A daemon built before the full KERN_PROC_ALL enumeration can report
+        // far fewer processes. Merge the identities macOS sees so every table
+        // matches Activity Monitor/btop; missing counters stay restricted.
+        if usingDaemon {
+            let reported = patchedProcesses.count
+            let metadata = ProcessCollector.metadataSnapshot()
+            let existing = Set(patchedProcesses.map(\.pid))
+            let missing = metadata.filter { !existing.contains($0.pid) }
+            daemonReportedProcessCount = reported
+            daemonLocalProcessCount = metadata.count
+            daemonProcessesIncomplete = !missing.isEmpty && !metadata.isEmpty
+            if !missing.isEmpty {
+                patchedProcesses.append(contentsOf: missing)
+                patchedProcesses.sort { $0.pid < $1.pid }
+            }
+        } else {
+            daemonProcessesIncomplete = false
+            daemonReportedProcessCount = patchedProcesses.count
+            daemonLocalProcessCount = patchedProcesses.count
+        }
         processes = patchedProcesses
         updateDaemonProcessState()
         self.sources = sources
@@ -775,6 +801,16 @@ final class AppModel {
             }
             if measured.power == nil {
                 measured.power = PowerStatsReader.current()
+            }
+            host = measured
+        }
+        if var measured = host {
+            measured.cpu.taskCount = patchedProcesses.count
+            measured.cpu.threadCount = patchedProcesses.reduce(0) {
+                $0 + ($1.usage?.threads ?? 0)
+            }
+            measured.cpu.threadsRestricted = patchedProcesses.reduce(0) {
+                $0 + ($1.usage == nil ? 1 : 0)
             }
             host = measured
         }
