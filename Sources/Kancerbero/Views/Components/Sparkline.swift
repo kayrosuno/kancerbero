@@ -3,6 +3,10 @@ import SwiftUI
 struct Sparkline: View {
     var values: [Double]
     var tint: Color
+    /// Fixed denominator for the vertical scale. When `nil`, the line is
+    /// normalised to the series peak (the historical behaviour); pass 100 for
+    /// percentage series that should keep a fixed 0...100 scale.
+    var scale: Double? = nil
 
     var body: some View {
         GeometryReader { geometry in
@@ -33,7 +37,7 @@ struct Sparkline: View {
     private func makePoints(in size: CGSize) -> [CGPoint] {
         let data = Array(values.suffix(60))
         guard data.count > 1, size.width > 1, size.height > 1 else { return [] }
-        let peak = max(data.max() ?? 0, 1)
+        let peak = max(scale ?? data.max() ?? 0, 1)
         let stepX = size.width / CGFloat(data.count - 1)
         return data.enumerated().map { index, value in
             let normalized = min(max(value / peak, 0), 1)

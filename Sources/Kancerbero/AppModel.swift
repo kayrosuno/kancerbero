@@ -61,6 +61,13 @@ final class AppModel {
     var loadHistory: [Double] = []
     var threadHistory: [Double] = []
     var memoryUsageHistory: [Double] = []
+    /// Stacked composition history as percentages of physical memory. The five
+    /// arrays are appended together so their indices stay aligned.
+    var memoryAppHistory: [Double] = []
+    var memoryWiredHistory: [Double] = []
+    var memoryCompressedHistory: [Double] = []
+    var memoryCachedHistory: [Double] = []
+    var memoryFreeHistory: [Double] = []
     /// Activity Monitor-style memory pressure (0...100) and raw kernel level.
     var memoryPressureHistory: [Int] = []
     var memoryPressureLevelHistory: [Int] = []
@@ -913,7 +920,14 @@ final class AppModel {
             cpuNiceHistory.append(host.cpu.nicePercent)
             loadHistory.append(host.cpu.load1)
             threadHistory.append(Double(host.cpu.threadCount))
-            memoryUsageHistory.append(host.memory.usedFraction * 100)
+            let memory = host.memory
+            memoryUsageHistory.append(memory.activityMonitorUsedFraction * 100)
+            let total = max(Double(memory.totalBytes), 1)
+            memoryAppHistory.append(Double(memory.appMemoryBytes) / total * 100)
+            memoryWiredHistory.append(Double(memory.wiredBytes) / total * 100)
+            memoryCompressedHistory.append(Double(memory.compressedBytes) / total * 100)
+            memoryCachedHistory.append(Double(memory.cachedFileBytes) / total * 100)
+            memoryFreeHistory.append(Double(memory.activityMonitorFreeBytes) / total * 100)
             if let pressure = host.memory.pressurePercent {
                 memoryPressureHistory.append(pressure)
                 memoryPressureLevelHistory.append(host.memory.pressureLevel ?? 0)
@@ -945,6 +959,11 @@ final class AppModel {
         trim(&loadHistory, limit: limit)
         trim(&threadHistory, limit: limit)
         trim(&memoryUsageHistory, limit: limit)
+        trim(&memoryAppHistory, limit: limit)
+        trim(&memoryWiredHistory, limit: limit)
+        trim(&memoryCompressedHistory, limit: limit)
+        trim(&memoryCachedHistory, limit: limit)
+        trim(&memoryFreeHistory, limit: limit)
         trim(&memoryPressureHistory, limit: limit)
         trim(&memoryPressureLevelHistory, limit: limit)
         trim(&gpuUsageHistory, limit: limit)
@@ -968,6 +987,11 @@ final class AppModel {
         loadHistory.removeAll()
         threadHistory.removeAll()
         memoryUsageHistory.removeAll()
+        memoryAppHistory.removeAll()
+        memoryWiredHistory.removeAll()
+        memoryCompressedHistory.removeAll()
+        memoryCachedHistory.removeAll()
+        memoryFreeHistory.removeAll()
         memoryPressureHistory.removeAll()
         memoryPressureLevelHistory.removeAll()
         gpuUsageHistory.removeAll()
