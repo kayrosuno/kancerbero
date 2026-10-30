@@ -57,7 +57,9 @@ struct DaemonsView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            header
+            SectionHeader(title: "Daemons",
+                          subtitle: "launchd services, agents and daemons")
+
             cards
             controls
             HStack(spacing: 12) {
@@ -95,30 +97,6 @@ struct DaemonsView: View {
             }
         } message: { service in
             Text("\(actionTitle) \(service.label) in the \(service.domain.displayName) domain?")
-        }
-    }
-
-    private var header: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Daemons")
-                    .font(.system(size: 26, weight: .semibold, design: .rounded))
-                Text("launchd services, agents and daemons")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            daemonModePill
-
-            Button {
-                Task { await model.refreshDaemons() }
-            } label: {
-                Image(systemName: "arrow.clockwise")
-            }
-            .buttonStyle(.bordered)
-            .help("Refresh services")
         }
     }
 
@@ -335,6 +313,8 @@ struct DaemonsView: View {
                 .help("Search label, program, arguments or plist")
 
             Spacer(minLength: 8)
+
+            daemonModePill
 
             if model.daemonActionInFlight {
                 ProgressView().controlSize(.small)

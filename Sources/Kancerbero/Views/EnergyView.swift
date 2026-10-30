@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 import KancerberoCore
 
@@ -17,10 +16,9 @@ struct EnergyView: View {
     @State private var showWakeupsDetails = false
 
     var body: some View {
-        @Bindable var model = model
-
         VStack(spacing: 14) {
-            header(model: model)
+            SectionHeader(title: "Energy",
+                          subtitle: "Battery, energy and wake-ups")
 
             GeometryReader { proxy in
                 let topHeight = max(210, (proxy.size.height - 14) / 3)
@@ -39,98 +37,18 @@ struct EnergyView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    // MARK: - Header
-
-    private func header(model: AppModel) -> some View {
-        @Bindable var model = model
-
-        return HStack(alignment: .firstTextBaseline, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Energy")
-                    .font(.system(size: 26, weight: .semibold, design: .rounded))
-                Text("Battery, energy and wake-ups")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            HStack(spacing: 8) {
-                Text("Interval")
-                    .font(.body)
-                    .lineLimit(1)
-                    .fixedSize()
-
-                Picker("Interval", selection: $model.interval) {
-                    Text("0.5 s").tag(0.5)
-                    Text("1 s").tag(1.0)
-                    Text("2 s").tag(2.0)
-                    Text("5 s").tag(5.0)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 250)
-                .accessibilityLabel("Interval")
-            }
-            .fixedSize(horizontal: true, vertical: false)
-
-            Toggle(isOn: $model.isPaused) {
-                Image(systemName: model.isPaused ? "play.fill" : "pause.fill")
-            }
-            .toggleStyle(.button)
-            .buttonStyle(.bordered)
-            .help(model.isPaused ? "Resume" : "Pause")
-
-            Button {
-                model.refreshNow()
-            } label: {
-                Image(systemName: "arrow.clockwise")
-            }
-            .buttonStyle(.bordered)
-            .help("Refresh now")
-        }
-    }
-
     // MARK: - Top strip
 
     private var topGroups: some View {
         HStack(alignment: .top, spacing: 14) {
-            groupPanel("Battery") {
-                batteryCard
-            }
-            .frame(width: 260)
+            batteryCard
+                .frame(width: 260)
 
-            groupPanel("Energy") {
-                energyCard
-            }
+            energyCard
+                .frame(maxWidth: .infinity)
 
-            groupPanel("Wake-ups") {
-                wakeupsCard
-            }
-            .frame(width: 240)
-        }
-    }
-
-    private func groupPanel<Content: View>(_ title: String,
-                                           @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title.uppercased())
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(0.6)
-                .foregroundStyle(.tertiary)
-            content()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background {
-            RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.35))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
-                .strokeBorder(.quaternary.opacity(0.5), lineWidth: 1)
+            wakeupsCard
+                .frame(width: 240)
         }
     }
 

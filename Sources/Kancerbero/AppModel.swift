@@ -25,7 +25,7 @@ final class AppModel {
             }
         }
     }
-    var interval: TimeInterval = 1.0 {
+    var interval: TimeInterval = KBPreferences.startupInterval {
         didSet {
             guard oldValue != interval else { return }
             // Keep the collected history: samples carry their own timestamps,
@@ -685,7 +685,7 @@ final class AppModel {
     }
 
     private func refreshOnce() async {
-        let snapshot = await collector.refresh()
+        let snapshot = await collector.refresh(cadence: interval)
         apply(snapshot)
     }
 
@@ -694,7 +694,7 @@ final class AppModel {
         let elapsed = previousTimestamp == 0
             ? 0
             : Double(now &- previousTimestamp) / 1_000_000_000.0
-        let validInterval = elapsed > 0 && elapsed < 5.0
+        let validInterval = RateTiming.isValidGap(elapsed, cadence: interval)
 
         if let io = DiskIOReader.current() {
             if validInterval, let previous = previousDiskIO {

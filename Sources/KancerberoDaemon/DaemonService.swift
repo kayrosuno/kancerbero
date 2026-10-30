@@ -99,7 +99,7 @@ final class DaemonService: NSObject, KancerberoDaemonXPC, @unchecked Sendable {
             var sequence: UInt64 = 0
             while !Task.isCancelled {
                 guard let self else { return }
-                var collection = await self.collector.refresh()
+                var collection = await self.collector.refresh(cadence: interval)
                 collection.mode = geteuid() == 0 ? .daemonFull : .daemonRestricted
                 let capabilities = KBCapabilitiesProbe.current()
                 let diagnostics = KBDiagnostics(

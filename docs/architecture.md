@@ -141,8 +141,14 @@
   “Animate tab changes” persiste en `@AppStorage("tabAnimationsEnabled")` (por defecto `true`) y
   condiciona únicamente las transiciones de cambio de pestaña: `RootView` (secciones),
   `PillTabBar` + `NetworkingView`/`DiskView` (subpestañas) y el resaltado del sidebar. Con
-  Reduce Motion activo no se anima aunque el toggle esté encendido. Sparklines, valores de la
-  barra de estado, hover, `numericText`, paneles de detalle, filtros/foco y LiveDot no se tocan.
+  Reduce Motion activo no se anima aunque el toggle esté encendido.
+  El toggle “Animate status bar values” persiste en
+  `@AppStorage("statusBarTextAnimationsEnabled")` (por defecto `false`) y controla el
+  `numericText` y la animación de las cifras de la barra inferior.
+  El picker “Startup interval” persiste en `@AppStorage("startupSamplingInterval")` (por defecto
+  `2` s) y solo fija el valor inicial de `AppModel.interval`: el selector del toolbar cambia la
+  cadencia de la sesión actual sin modificar esa preferencia.
+  Sparklines, hover, paneles de detalle, filtros/foco y LiveDot no se tocan.
 - Disk → Volumes mantiene `expanded` y `volumesFocus` en `UIState`. La expansión inicial se hace
   una sola vez (`didExpandVolumesOnce`); los refrescos de inventario solo podan ids obsoletos, así
   que el colapso manual se conserva. La tarjeta All limpia el filtro y re-expande el árbol
@@ -293,6 +299,13 @@
 - **Permisos:** CPU global, memoria, swap, load, uptime y procesos propios no requieren root.
   Task info de otros uid y la enumeración de sus PIDs requieren el daemon root; sin él la tabla
   solo lista el uid actual y lo indica. No se usan entitlements privados ni `task_for_pid`.
+- **Ventana de tasas:** un delta de contadores solo se convierte en tasa si `elapsed > 0` y
+  `elapsed <= max(5 s, 2,5 × cadencia)` (`RateTiming`). El bucle duerme después de recolectar, así
+  que el hueco real es cadencia + duración de la recolección; el criterio descarta bases obsoletas
+  (pausa, desconexión, suspensión) sin anular los 5 s del selector ni los 10 s que acepta el
+  daemon. Se aplica en `AppModel.apply`, `CollectionActor.refresh` y
+  `ProcessCPUTracker.annotate`; cuando la cadencia es desconocida (petición puntual al daemon,
+  `KancerberoProbe`) el límite es 30 s.
 
 ## XPC
 

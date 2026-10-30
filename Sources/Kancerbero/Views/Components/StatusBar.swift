@@ -22,7 +22,13 @@ struct StatusBar: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 7)
         .background(.regularMaterial)
-        .animation(.snappy(duration: 0.25), value: model.systemRates.rxBytesPerSecond)
+        .animation(barAnimation, value: model.systemRates.rxBytesPerSecond)
+    }
+
+    private var barAnimation: Animation? {
+        KBPreferences.enabled(stored: statusBarTextAnimations, reduceMotion: reduceMotion)
+            ? .snappy(duration: 0.25)
+            : nil
     }
 
     /// Fixed-width slot so a changing value never shifts the neighbouring

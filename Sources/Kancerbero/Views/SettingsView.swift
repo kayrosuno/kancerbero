@@ -5,12 +5,31 @@ struct SettingsView: View {
     private var tabAnimations = KBPreferences.tabAnimationsDefault
     @AppStorage(KBPreferences.statusBarTextAnimationsKey)
     private var statusBarTextAnimations = KBPreferences.statusBarTextAnimationsDefault
+    @AppStorage(KBPreferences.startupIntervalKey)
+    private var startupInterval = KBPreferences.startupIntervalDefault
     @AppStorage(KBPreferences.dockIconStyleKey)
     private var dockIconStyle = KBPreferences.dockIconStyleDefault
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Form {
+            Section {
+                Picker("Startup interval", selection: $startupInterval) {
+                    Text("0.5 s").tag(0.5)
+                    Text("1 s").tag(1.0)
+                    Text("2 s").tag(2.0)
+                    Text("5 s").tag(5.0)
+                }
+                .pickerStyle(.menu)
+
+                Text("Sampling cadence used when Kancerbero launches. The toolbar selector changes the current session only; it does not modify this value.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } header: {
+                Text("Sampling")
+            }
+
             Section {
                 Toggle("Animate tab changes", isOn: $tabAnimations)
                     .toggleStyle(.switch)

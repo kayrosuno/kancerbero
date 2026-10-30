@@ -223,6 +223,9 @@ registrar desde la app (afecta a todos los ítems de Login Items del sistema).
 ### Límites
 
 - El intervalo de suscripción se recorta a `0.5...10` segundos en el daemon.
+- Las tasas por intervalo se validan con `RateTiming`: el hueco entre muestras debe cumplir
+  `elapsed <= max(5 s, 2,5 × cadencia)`. Así 5 s (selector) y hasta 10 s (suscripción) producen
+  tasas reales; solo un hueco mayor (pausa, desconexión) se descarta y reporta 0 en esa muestra.
 - Las acciones están limitadas a **10 por minuto y cliente**; no hay todavía guardia de una
   acción en vuelo, límite de 4 clientes ni payload máximo de 32 MB (figuran como pendientes en
   `docs/security.md`).

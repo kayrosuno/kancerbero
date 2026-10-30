@@ -52,7 +52,8 @@ public actor CollectionActor {
 
     public init() {}
 
-    public func refresh(timeoutMilliseconds: Int32 = 250) -> KBCollectionSnapshot {
+    public func refresh(timeoutMilliseconds: Int32 = 250,
+                        cadence: Double? = nil) -> KBCollectionSnapshot {
         let now = KBInterop.monotonicNanoseconds()
         var errorMessage: String?
 
@@ -95,14 +96,15 @@ public actor CollectionActor {
         let elapsed = lastSampleNanoseconds == 0
             ? 0
             : Double(now &- lastSampleNanoseconds) / 1_000_000_000.0
-        let validInterval = elapsed > 0 && elapsed < 5.0
+        let validInterval = RateTiming.isValidGap(elapsed, cadence: cadence)
 
         let host = hostSampler.sample(processes: processes)
         if let host {
             processCPUTracker.annotate(&processes,
                                        elapsed: validInterval ? elapsed : 0,
                                        totalMemoryBytes: host.memory.totalBytes,
-                                       coreCount: host.cpu.coreCount)
+                                       coreCount: host.cpu.coreCount,
+                                       cadence: cadence)
         }
         if let sleeping = PowerAssertionsReader.current() {
             for index in processes.indices {
