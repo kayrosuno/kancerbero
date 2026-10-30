@@ -220,3 +220,15 @@ privadas del sistema; su lógica es NSFileManager + launchctl + un helper propio
 kancerbero replica las categorías y la coincidencia exacta, sin helper propio: las rutas del
 usuario se mueven con `FileManager.trashItem` y las de `/Library`/`/Applications` se envían al
 daemon root (`trashItems`), con lista blanca y revalidación descritas en `docs/security.md`.
+
+Rutas y matcher concretos: `Resources/BundlePaths.plist` define `System/User Applications`
+(`/Applications`, `~/Applications`), `System/User Plugins` (Contextual Menu Items, InputManagers,
+Internet Plug-Ins, Mail/Bundles, PreferencePanes, QuickLook, QuickTime, Screen Savers, Spotlight) y
+`System/User Widgets` (`/Library/Widgets`, `~/Library/Widgets`). `relatedFilesInDirectories:` invoca
+la variante con `maxDepth:0` (profundidad ilimitada) sobre todo `~/Library` y `/Library`; el matcher
+acepta el bundle id por `contains` (≥8 caracteres) o prefijo (≥4, sin distinguir mayúsculas) y los
+nombres por variantes de `bundleName`/`bundleDisplayName` sin extensión (sensibles a mayúsculas), y
+al coincidir un directorio no desciende. En este Mac, Antigravity produce 4 relacionadas
+(`Application Support/Antigravity`, `Application Support/Logi/.../com.google.antigravity.png`,
+`Preferences/com.google.antigravity.plist`, `Logs/Antigravity`) y, con el bundle de la app, las 5
+entradas que muestra la app.

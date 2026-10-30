@@ -12,42 +12,38 @@ public enum AppInventoryCollector {
         }
     }
 
+    /// Paths from AppCleaner's BundlePaths.plist: system entries live under
+    /// `/Library`, user entries under `~/Library`.
+    private static let pluginDirectories = [
+        "Library/Contextual Menu Items",
+        "Library/InputManagers",
+        "Library/Internet Plug-Ins",
+        "Library/Mail/Bundles",
+        "Library/PreferencePanes",
+        "Library/QuickLook",
+        "Library/QuickTime",
+        "Library/Screen Savers",
+        "Library/Spotlight"
+    ]
+
     private static let pluginExtensions: Set<String> = [
         "bundle", "plugin", "prefpane", "qlgenerator", "mdimporter",
         "saver", "appex", "wdgt"
-    ]
-
-    private static let pluginDirectories = [
-        "Library/PreferencePanes",
-        "Library/Services",
-        "Library/Safari/Extensions",
-        "Library/Internet Plug-Ins",
-        "Library/QuickLook",
-        "Library/Spotlight",
-        "Library/Audio/Plug-Ins",
-        "Library/ColorPickers",
-        "Library/Screen Savers",
-        "Library/ScriptingAdditions"
-    ]
-
-    private static let widgetDirectories = [
-        "Library/Widgets"
     ]
 
     public static func snapshot() -> Snapshot {
         let home = NSHomeDirectory()
         var bundles: [KBAppBundle] = []
 
-        for root in ["/Applications", home + "/Applications"] {
-            bundles.append(contentsOf: applications(in: root))
-        }
-        for suffix in widgetDirectories {
-            bundles.append(contentsOf: widgets(in: "/" + suffix))
-            bundles.append(contentsOf: widgets(in: home + "/" + suffix))
-        }
+        bundles += applications(in: "/Applications", scope: .system)
+        bundles += applications(in: home + "/Applications", scope: .user)
+
+        bundles += widgets(in: "/Library/Widgets", scope: .system)
+        bundles += widgets(in: home + "/Library/Widgets", scope: .user)
+
         for suffix in pluginDirectories {
-            bundles.append(contentsOf: plugins(in: "/" + suffix))
-            bundles.append(contentsOf: plugins(in: home + "/" + suffix))
+            bundles += plugins(in: "/" + suffix, scope: .system)
+            bundles += plugins(in: home + "/" + suffix, scope: .user)
         }
 
         var seen = Set<String>()
@@ -60,7 +56,8 @@ public enum AppInventoryCollector {
 
     // MARK: - Discovery
 
-    private static func applications(in path: String) -> [KBAppBundle] {
+    private static func applications(in path: String,
+                                     scope: KBAppScope) -> [KBAppBundle] {
         let root = URL(fileURLWithPath: path)
         guard FileManager.default.fileExists(atPath: root.path) else { return [] }
         let keys: Set<URLResourceKey> = [.isDirectoryKey, .isPackageKey, .contentTypeKey]
@@ -82,7 +79,7 @@ public enum AppInventoryCollector {
             guard url.pathExtension.caseInsensitiveCompare("app") == .orderedSame else {
                 continue
             }
-            if let bundle = bundle(at: url, kind: .application) {
+            if let bundle = bundle(at: url, kind: .application, scope: scope) {
                 result.append(bundle)
             }
             enumerator.skipDescendants()
@@ -90,7 +87,8 @@ public enum AppInventoryCollector {
         return result
     }
 
-    private static func widgets(in path: String) -> [KBAppBundle] {
+    private static func widgets(in path: String,
+                                scope: KBAppScope) -> [KBAppBundle] {
         let widgetType = UTType("com.apple.dashboard.widget")
         return directChildren(in: path) { url in
             if url.pathExtension.caseInsensitiveCompare("wdgt") == .orderedSame {
@@ -99,13 +97,14 @@ public enum AppInventoryCollector {
             guard let widgetType else { return false }
             let values = try? url.resourceValues(forKeys: [.contentTypeKey])
             return values?.contentType == widgetType
-        }.compactMap { bundle(at: $0, kind: .widget) }
+        }.compactMap { bundle(at: $0, kind: .widget, scope: scope) }
     }
 
-    private static func plugins(in path: String) -> [KBAppBundle] {
+    private static func plugins(in path: String,
+                                scope: KBAppScope) -> [KBAppBundle] {
         directChildren(in: path) { url in
             pluginExtensions.contains(url.pathExtension.lowercased())
-        }.compactMap { bundle(at: $0, kind: .plugin) }
+        }.compactMap { bundle(at: $0, kind: .plugin, scope: scope) }
     }
 
     private static func directChildren(in path: String,
@@ -121,7 +120,8 @@ public enum AppInventoryCollector {
         return items.filter(matching)
     }
 
-    private static func bundle(at url: URL, kind: KBAppKind) -> KBAppBundle? {
+    private static func bundle(at url: URL, kind: KBAppKind,
+                               scope: KBAppScope) -> KBAppBundle? {
         let infoURL = url.appendingPathComponent("Contents/Info.plist")
         var info: [String: Any] = [:]
         if let data = try? Data(contentsOf: infoURL),
@@ -151,6 +151,7 @@ public enum AppInventoryCollector {
             version: version,
             executable: executable,
             kind: kind,
+            scope: scope,
             isApple: isApple,
             isProtected: isProtected
         )

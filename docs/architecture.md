@@ -117,7 +117,10 @@
   `AppLeftoversCollector` replica sus categorías (Preferencias, ByHost/SyncedPreferences,
   Application Support, Caches, Containers, Application Scripts y Group Containers —con los
   application groups de los entitlements—, Saved State, launch items, Logs, WebKit/HTTPStorages)
-  con coincidencia exacta del componente normalizado. `ApplicationsModel` cachea leftovers y
+  con la coincidencia de AppCleaner (bundle id case-insensitive por `contains`/prefijo,
+  nombres sensibles a mayúsculas) y un recorrido profundo de `~/Library` y `/Library`; los bundles
+  se clasifican en User/System según las rutas de `BundlePaths.plist` y la tabla filtra por tipo y
+  origen. `ApplicationsModel` cachea leftovers y
   tamaños; `TrashCoordinator` mueve a la papelera las rutas escribibles del usuario y envía las de
   `/Library` y `/Applications` al daemon root mediante `trashItems`, validado con
   `KBPathPolicy`.

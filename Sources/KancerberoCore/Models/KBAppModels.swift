@@ -22,6 +22,21 @@ public enum KBAppKind: String, Codable, Sendable, CaseIterable, Hashable {
     }
 }
 
+/// Where the bundle is installed, following AppCleaner's BundlePaths.plist:
+/// `/Applications` and `/Library` entries are system-wide, the `~/Applications`
+/// and `~/Library` counterparts belong to the current user.
+public enum KBAppScope: String, Codable, Sendable, CaseIterable, Hashable {
+    case user
+    case system
+
+    public var title: String {
+        switch self {
+        case .user: return "User"
+        case .system: return "System"
+        }
+    }
+}
+
 /// Categories of files left behind by an installed bundle, mirroring the
 /// groups Activity Monitor-style uninstallers use.
 public enum KBLeftoverKind: String, Codable, Sendable, CaseIterable, Hashable {
@@ -43,6 +58,7 @@ public enum KBLeftoverKind: String, Codable, Sendable, CaseIterable, Hashable {
     case safariExtension
     case service
     case shared
+    case other
 
     public var title: String {
         switch self {
@@ -64,6 +80,7 @@ public enum KBLeftoverKind: String, Codable, Sendable, CaseIterable, Hashable {
         case .safariExtension: return "Safari Extensions"
         case .service: return "Services"
         case .shared: return "Shared"
+        case .other: return "Other"
         }
     }
 
@@ -80,6 +97,7 @@ public enum KBLeftoverKind: String, Codable, Sendable, CaseIterable, Hashable {
         case .cookie, .httpStorage, .webKit: return 7
         case .safariExtension, .service: return 8
         case .shared: return 9
+        case .other: return 10
         }
     }
 }
@@ -93,6 +111,7 @@ public struct KBAppBundle: Identifiable, Codable, Sendable, Hashable {
     public var version: String?
     public var executable: String?
     public var kind: KBAppKind
+    public var scope: KBAppScope
     public var isApple: Bool
     public var isProtected: Bool
     public var sizeBytes: Int64?
@@ -100,6 +119,7 @@ public struct KBAppBundle: Identifiable, Codable, Sendable, Hashable {
     public init(path: String, name: String, displayName: String? = nil,
                 bundleIdentifier: String? = nil, version: String? = nil,
                 executable: String? = nil, kind: KBAppKind = .application,
+                scope: KBAppScope = .system,
                 isApple: Bool = false, isProtected: Bool = false,
                 sizeBytes: Int64? = nil) {
         self.path = path
@@ -109,6 +129,7 @@ public struct KBAppBundle: Identifiable, Codable, Sendable, Hashable {
         self.version = version
         self.executable = executable
         self.kind = kind
+        self.scope = scope
         self.isApple = isApple
         self.isProtected = isProtected
         self.sizeBytes = sizeBytes

@@ -1,9 +1,9 @@
 import Foundation
 
-/// Finds the files an installed bundle leaves behind, following the groups
-/// AppCleaner searches: preferences, application support, caches, containers,
-/// saved state, launch items and logs. Matching is exact on the normalized
-/// last path component (or the bundle id); a matched directory is added as a
+/// Finds the files an installed bundle leaves behind. AppCleaner scans the
+/// whole `~/Library` and `/Library` trees (unlimited depth) and matches the last
+/// path component against the bundle id (case-insensitive contains/prefix) or
+/// the app name variants (case-sensitive). A matched directory is added as a
 /// whole and its contents are not walked again.
 public enum AppLeftoversCollector {
     public static func leftovers(for bundle: KBAppBundle,
@@ -112,9 +112,15 @@ public enum AppLeftoversCollector {
             let recent = "\(home)/Library/Application Support/com.apple.sharedfilelist/"
                 + "com.apple.LSSharedFileList.ApplicationRecentDocuments"
             scan(recent, maxDepth: 1, ids: ids,
-                 acceptedIds: [normalized(bundleId)]) { url, reason in
+                 acceptedIds: [normalizedId(bundleId)]) { url, reason in
                 add(url, kind: .appSupport, selected: true, reason: reason)
             }
+        }
+
+        // AppCleaner's default search: the complete Library trees, unlimited
+        // depth, matching any component against the bundle id or app name.
+        scanDefaultLibrary([home + "/Library", "/Library"], ids: ids) { url, reason in
+            add(url, kind: leftoverKind(for: url.path), selected: true, reason: reason)
         }
 
         return found.values.sorted {
@@ -141,8 +147,9 @@ public enum AppLeftoversCollector {
     private static func candidateNames(for bundle: KBAppBundle) -> Set<String> {
         var names = Set<String>()
         for raw in [bundle.name, bundle.displayName, bundle.executable].compactMap({ $0 }) {
-            for candidate in [normalized(raw), normalized(strippingTrailingDigits(raw))] {
-                guard candidate.count >= 4, !genericNames.contains(candidate) else {
+            for candidate in [normalizedName(raw),
+                              normalizedName(strippingTrailingDigits(raw))] {
+                guard candidate.count >= 4, !genericNames.contains(candidate.lowercased()) else {
                     continue
                 }
                 names.insert(candidate)
@@ -151,7 +158,16 @@ public enum AppLeftoversCollector {
         return names
     }
 
-    private static func normalized(_ value: String) -> String {
+    /// Names keep their case: AppCleaner's regexes are case-sensitive, which is
+    /// why lowercase helpers under ~/Library/Developer are not listed.
+    private static func normalizedName(_ value: String) -> String {
+        value
+            .folding(options: [.diacriticInsensitive],
+                     locale: Locale(identifier: "en_US_POSIX"))
+            .replacingOccurrences(of: " ", with: "")
+    }
+
+    private static func normalizedId(_ value: String) -> String {
         value
             .folding(options: [.caseInsensitive, .diacriticInsensitive],
                      locale: Locale(identifier: "en_US_POSIX"))
@@ -166,17 +182,10 @@ public enum AppLeftoversCollector {
         return result
     }
 
-    private static let knownExtensions: Set<String> = [
-        "plist", "savedstate", "wdgt", "appex", "bundle", "prefpane",
-        "qlgenerator", "mdimporter", "saver", "plugin"
-    ]
-
+    /// The last component without its extension, like AppCleaner's
+    /// `stringByDeletingPathExtension`.
     private static func baseName(_ url: URL) -> String {
-        let ext = url.pathExtension.lowercased()
-        if knownExtensions.contains(ext) {
-            return url.deletingPathExtension().lastPathComponent
-        }
-        return url.lastPathComponent
+        url.deletingPathExtension().lastPathComponent
     }
 
     private static let helperSuffixes = ["helper", "updater", "shipit", "agent", "loginhelper"]
@@ -186,14 +195,17 @@ public enum AppLeftoversCollector {
                               allowBundleIdPrefix: Bool,
                               bundleIdOnly: Bool,
                               acceptedIds: Set<String>?) -> String? {
-        let component = normalized(url.lastPathComponent)
-        let base = normalized(baseName(url))
+        let component = url.lastPathComponent
+        let base = baseName(url)
 
         if let acceptedIds {
+            let lowerComponent = normalizedId(component)
+            let lowerBase = normalizedId(base)
             for accepted in acceptedIds {
-                let id = normalized(accepted)
+                let id = normalizedId(accepted)
                 if !id.isEmpty,
-                   component == id || base == id || component.hasPrefix(id + ".") {
+                   lowerComponent == id || lowerBase == id
+                       || lowerComponent.hasPrefix(id + ".") {
                     return "application group"
                 }
             }
@@ -201,14 +213,17 @@ public enum AppLeftoversCollector {
         }
 
         if !bundleIdOnly {
-            let candidates = [component, base, normalized(strippingTrailingDigits(base))]
+            let candidates = [normalizedName(component),
+                              normalizedName(base),
+                              normalizedName(strippingTrailingDigits(base))]
             for name in ids.names where candidates.contains(name) {
                 return "name"
             }
             if allowNamePrefix {
+                let folded = normalizedName(component)
                 for name in ids.names {
-                    guard component.hasPrefix(name) else { continue }
-                    let rest = component.dropFirst(name.count)
+                    guard folded.hasPrefix(name) else { continue }
+                    let rest = folded.dropFirst(name.count)
                     let tail = rest.trimmingCharacters(in: CharacterSet(charactersIn: " .-_"))
                     let lower = tail.lowercased()
                     if helperSuffixes.contains(where: { lower.hasPrefix($0) }) {
@@ -219,17 +234,63 @@ public enum AppLeftoversCollector {
         }
 
         if let bundleId = ids.bundleId {
-            let id = normalized(bundleId)
+            let id = normalizedId(bundleId)
             if !id.isEmpty {
-                if component == id || base == id || component.hasSuffix("." + id) {
+                let lowerComponent = normalizedId(component)
+                let lowerBase = normalizedId(base)
+                if lowerComponent == id || lowerBase == id
+                    || lowerComponent.hasSuffix("." + id) {
                     return "bundle id"
                 }
-                if allowBundleIdPrefix, component.hasPrefix(id + ".") {
+                if allowBundleIdPrefix, lowerComponent.hasPrefix(id + ".") {
                     return "bundle id prefix"
                 }
             }
         }
         return nil
+    }
+
+    /// AppCleaner's default matcher: for bundle ids of 8+ characters any
+    /// component containing the id matches; for 4+ a prefix is enough. Names
+    /// are compared without their extension, case-sensitively.
+    private static func defaultMatch(_ url: URL, ids: Identifiers) -> String? {
+        let component = url.lastPathComponent
+        let lower = normalizedId(component)
+        if let bundleId = ids.bundleId {
+            let id = normalizedId(bundleId)
+            if !id.isEmpty {
+                if id.count >= 8, lower.contains(id) {
+                    return "bundle id"
+                }
+                if id.count >= 4, lower.hasPrefix(id) {
+                    return "bundle id prefix"
+                }
+            }
+        }
+        let base = normalizedName(baseName(url))
+        let candidates = [base, normalizedName(strippingTrailingDigits(base))]
+        if candidates.contains(where: { ids.names.contains($0) }) {
+            return "name"
+        }
+        return nil
+    }
+
+    private static func leftoverKind(for path: String) -> KBLeftoverKind {
+        if path.contains("/Preferences/ByHost/") { return .byHost }
+        if path.contains("/SyncedPreferences/") { return .syncedPreferences }
+        if path.contains("/Preferences/") { return .preferences }
+        if path.contains("/Application Support/") { return .appSupport }
+        if path.contains("/Caches/") { return .cache }
+        if path.contains("/Saved Application State/") { return .savedState }
+        if path.contains("/LaunchDaemons/") { return .launchDaemon }
+        if path.contains("/LaunchAgents/") { return .launchAgent }
+        if path.contains("/Logs/") { return .log }
+        if path.contains("/Group Containers/") { return .groupContainer }
+        if path.contains("/Containers/") { return .container }
+        if path.contains("/Application Scripts/") { return .appScripts }
+        if path.contains("/Safari/Extensions/") { return .safariExtension }
+        if path.contains("/Services/") { return .service }
+        return .other
     }
 
     // MARK: - Walking
@@ -270,6 +331,36 @@ public enum AppLeftoversCollector {
             onMatch(url, reason)
             if (try? url.resourceValues(forKeys: keys))?.isDirectory == true {
                 enumerator.skipDescendants()
+            }
+        }
+    }
+
+    private static func scanDefaultLibrary(_ roots: [String], ids: Identifiers,
+                                           _ onMatch: (URL, String) -> Void) {
+        var budget = 250_000
+        var visited = 0
+        for path in roots {
+            let root = URL(fileURLWithPath: path)
+            guard FileManager.default.fileExists(atPath: root.path) else { continue }
+            let keys: Set<URLResourceKey> = [.isDirectoryKey]
+            guard let enumerator = FileManager.default.enumerator(
+                at: root,
+                includingPropertiesForKeys: Array(keys),
+                options: [.skipsHiddenFiles],
+                errorHandler: { _, _ in true }
+            ) else {
+                continue
+            }
+            for case let url as URL in enumerator {
+                visited += 1
+                budget -= 1
+                if budget <= 0 { return }
+                if visited % 512 == 0, Task.isCancelled { return }
+                guard let reason = defaultMatch(url, ids: ids) else { continue }
+                onMatch(url, reason)
+                if (try? url.resourceValues(forKeys: keys))?.isDirectory == true {
+                    enumerator.skipDescendants()
+                }
             }
         }
     }

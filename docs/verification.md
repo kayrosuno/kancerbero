@@ -821,11 +821,16 @@ $K --screenshot /tmp/kb-apps-claude.png --section applications \
   --applications-selected Claude --screenshot-delay 10
 ```
 
+- Para Antigravity el panel debe mostrar **5 entradas** (app + 4: Application Support, el PNG
+  de Logi, Preferences y Logs), igual que AppCleaner; `--applications-scope user` y
+  `--applications-search` permiten comprobar los filtros.
 - `apps` debe coincidir con `find /Applications -maxdepth 2 -name '*.app'` (más `~/Applications`,
   widgets y plugins) y `KB_APPS_LEFTOVERS` debe listar preferencias, Application Support, caches,
   contenedores, saved state, launch items y logs reales de esa app.
-- La tabla muestra icono, nombre, bundle id, tipo y tamaño del seleccionado; el panel derecho
-  agrupa los leftovers con su tamaño y marca `admin` en las rutas de `/Library`.
+- La tabla muestra icono, nombre, bundle id, tipo, origen (System/User) y tamaño del
+  seleccionado; el buscador está dentro de la tarjeta de la tabla y los chips filtran por tipo y
+  por origen. El panel derecho es una lista plana con la app siempre marcada (check fijo) y cada
+  relacionada en dos líneas (nombre y ruta) con su icono, tamaño y marca `admin` cuando toca.
 - Mover a la papelera una app de prueba en `~/Applications` con un plist y una carpeta en
   `~/Library`: todo debe acabar en `~/.Trash` y la lista refrescarse.
 - Rutas privilegiadas (`/Library/Application Support/...`, apps de `/Applications` propiedad de
