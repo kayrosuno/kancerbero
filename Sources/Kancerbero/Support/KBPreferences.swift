@@ -7,6 +7,9 @@ enum KBPreferences {
     static let statusBarTextAnimationsKey = "statusBarTextAnimationsEnabled"
     static let statusBarTextAnimationsDefault = true
 
+    static let dockIconStyleKey = "dockIconStyle"
+    static let dockIconStyleDefault = DockIconStyle.applicationIcon.rawValue
+
     /// The stored preference is subordinate to the system accessibility setting.
     static func enabled(stored: Bool, reduceMotion: Bool) -> Bool {
         stored && !reduceMotion

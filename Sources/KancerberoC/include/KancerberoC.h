@@ -62,9 +62,15 @@ int kb_power_stats_read(kb_power_stats *out);
 /* Per-process energy and wake-up counters from rusage_info_v6. */
 int kb_process_energy_read(int32_t pid, uint64_t *energy_nj,
                            uint64_t *interrupt_wkups, uint64_t *pkg_idle_wkups);
+/* Per-process disk counters from rusage_info_v6. */
+int kb_process_io_read(int32_t pid, uint64_t *bytes_read,
+                       uint64_t *bytes_written, uint64_t *logical_writes);
 /* PIDs holding an active PreventUserIdleSystemSleep/PreventSystemSleep
    assertion. Caller frees `pids` with free(). */
 int kb_prevent_sleep_pids(int32_t **pids, size_t *count);
+/* Cumulative bytes and operations across IOBlockStorageDriver services. */
+int kb_disk_io_read(uint64_t *bytes_read, uint64_t *bytes_written,
+                    uint64_t *read_ops, uint64_t *write_ops);
 
 #ifdef __cplusplus
 }

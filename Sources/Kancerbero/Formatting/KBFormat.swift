@@ -23,6 +23,26 @@ enum KBFormat {
         return "\(number) \(bitUnits[unit])"
     }
 
+    /// Bytes per second -> human-readable byte rate ("1,2 MB/s").
+    static func byteRate(_ bytesPerSecond: Double) -> String {
+        guard bytesPerSecond.isFinite, bytesPerSecond >= 1 else { return "0 B/s" }
+        let value = UInt64(max(0, min(bytesPerSecond, Double(UInt64.max))))
+        return bytes(value) + "/s"
+    }
+
+    /// Operations per second ("12,3/s", "1,2K/s").
+    static func opsRate(_ operationsPerSecond: Double) -> String {
+        guard operationsPerSecond.isFinite, operationsPerSecond >= 0.05 else {
+            return "0/s"
+        }
+        if operationsPerSecond >= 1000 {
+            return (operationsPerSecond / 1000)
+                .formatted(.number.precision(.fractionLength(0...1))) + "K/s"
+        }
+        return operationsPerSecond
+            .formatted(.number.precision(.fractionLength(0...1))) + "/s"
+    }
+
     static func count(_ value: UInt64) -> String {
         value.formatted()
     }

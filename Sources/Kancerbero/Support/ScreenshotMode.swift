@@ -9,8 +9,48 @@ import Foundation
 /// Recording permission is involved.
 enum ScreenshotMode {
     @MainActor
-    static func runIfRequested() async {
+    static func runIfRequested(model: AppModel? = nil) async {
         let arguments = CommandLine.arguments
+
+        // `--screenshot-dock` renders the Dock tile offscreen; it needs no
+        // NSWindow and no Screen Recording permission.
+        if let dockIndex = arguments.firstIndex(of: "--screenshot-dock") {
+            guard dockIndex + 1 < arguments.count else {
+                fail("usage: --screenshot-dock <path>")
+            }
+            guard let model else {
+                fail("dock screenshot requires the app model")
+            }
+            let url = URL(fileURLWithPath: arguments[dockIndex + 1])
+            try? await Task.sleep(for: .seconds(screenshotDelay(arguments, default: 4)))
+
+            let styles: [DockIconStyle]
+            if value(for: "--dock-style", in: arguments)?.lowercased() == "all" {
+                styles = DockIconStyle.allCases.filter { $0 != .applicationIcon }
+            } else if let raw = value(for: "--dock-style", in: arguments),
+                      let style = DockIconStyle(rawValue: raw) {
+                styles = [style]
+            } else {
+                let raw = UserDefaults.standard.string(forKey: KBPreferences.dockIconStyleKey) ?? ""
+                styles = [DockIconStyle(rawValue: raw) ?? .cpuHistory]
+            }
+
+            for style in styles {
+                let view = DockIconView()
+                view.apply(style: style, snapshot: DockIconSnapshot(model: model))
+                let target = styles.count > 1 ? styledURL(url, style: style) : url
+                do {
+                    try view.renderPNG(to: target, size: 256)
+                    print("dock screenshot: \(target.path)")
+                } catch {
+                    fail("dock capture failed: \(error)")
+                }
+            }
+            fflush(stdout)
+            NSApp.terminate(nil)
+            return
+        }
+
         guard let flagIndex = arguments.firstIndex(of: "--screenshot") else {
             return
         }
@@ -47,14 +87,7 @@ enum ScreenshotMode {
         }
 
         // Let the first daemon/local snapshot arrive and the table lay out.
-        let delay: TimeInterval
-        if let flag = arguments.firstIndex(of: "--screenshot-delay"),
-           flag + 1 < arguments.count,
-           let value = Double(arguments[flag + 1]) {
-            delay = value
-        } else {
-            delay = 4
-        }
+        let delay = screenshotDelay(arguments, default: 4)
         try? await Task.sleep(for: .seconds(delay))
 
         do {
@@ -66,6 +99,29 @@ enum ScreenshotMode {
         }
 
         NSApp.terminate(nil)
+    }
+
+    private static func screenshotDelay(_ arguments: [String],
+                                        default value: TimeInterval) -> TimeInterval {
+        guard let flag = arguments.firstIndex(of: "--screenshot-delay"),
+              flag + 1 < arguments.count,
+              let seconds = Double(arguments[flag + 1]) else {
+            return value
+        }
+        return seconds
+    }
+
+    private static func value(for flag: String, in arguments: [String]) -> String? {
+        guard let index = arguments.firstIndex(of: flag),
+              index + 1 < arguments.count else { return nil }
+        return arguments[index + 1]
+    }
+
+    private static func styledURL(_ url: URL, style: DockIconStyle) -> URL {
+        let directory = url.deletingLastPathComponent()
+        let base = url.deletingPathExtension().lastPathComponent
+        let ext = url.pathExtension.isEmpty ? "png" : url.pathExtension
+        return directory.appendingPathComponent("\(base)-\(style.rawValue).\(ext)")
     }
 
     private static func fail(_ message: String) -> Never {

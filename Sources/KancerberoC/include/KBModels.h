@@ -35,6 +35,9 @@ typedef struct {
     uint64_t penergy_nj;
     uint64_t interrupt_wkups;
     uint64_t pkg_idle_wkups;
+    uint64_t diskio_bytes_read;
+    uint64_t diskio_bytes_written;
+    uint64_t logical_writes;
 } kb_process;
 
 typedef struct {

@@ -62,7 +62,7 @@ El detalle de binarios, permisos, instalación y librerías está en
   `GB`). El selector de **Interval** ajusta la cadencia real de Networking y CPU; con el daemon
   conectado reenvía la suscripción y en local despierta el bucle de polling. Al cambiarlo, los
   historiales se reinician para que el eje temporal del gráfico coincida con la nueva cadencia.
-- **Disk** — dos subpestañas:
+- **Disk** — tres subpestañas:
   - **Volumes** — jerarquía nativa de discos físicos, particiones, contenedores APFS y volúmenes
     (IOKit + DiskArbitration + `getmntinfo`/`getattrlist`), con capacidad, usado, libre, punto de
     montaje, UUID, roles APFS, modelo/protocolo y cifrado. No ejecuta procesos externos. Las
@@ -75,6 +75,11 @@ El detalle de binarios, permisos, instalación y librerías está en
     escaneo; las tablas de contenidos y mayores archivos aparecen al terminar. Las etiquetas del
     mapa muestran el nombre y el tamaño en formato humano. Las tarjetas filtran el panel derecho
     (todo, solo ficheros, solo carpetas o rutas denegadas); no se lee contenido de ficheros.
+  - **I/O** — actividad de disco con gráfico espejado lectura/escritura (histórico de 60 muestras),
+    selector **Data / Operations**, tasas y totales de Reads in, Writes out, Data read y Data
+    written, y tabla de procesos por actividad de disco (Read/s, Write/s, Bytes Read, Bytes
+    Written, Writes, State, PID, USER). Los contadores del sistema salen de `IOBlockStorageDriver`
+    (`Bytes/Operations`); los de proceso de `rusage_info_v6`.
 - **Daemons** — inventario de servicios launchd con chips multiselección por tipo (agentes /
   daemons), ámbito (sistema / global / usuario / runtime), origen (Apple / custom / desconocido)
   y estado (running / stopped / disabled / not loaded). Todos los valores están pulsados al
@@ -103,6 +108,12 @@ El detalle de binarios, permisos, instalación y librerías está en
   conector), consumo por proceso en vatios y wake-ups inactivos con histórico, procesos que
   impiden dormir, y tabla ordenada por energía (Command, Energy, Impact, Wake-ups, CPU%, PID,
   USER, Preventing Sleep).
+
+**Dock icon** — el menú `Dock Icon` (y Ajustes → Dock) cambia el icono del Dock por gráficos en
+vivo, igual que Activity Monitor: aplicación, uso e histórico de CPU, uso de red, actividad de
+disco, uso y presión de memoria, GPU y energía. La elección se guarda en `dockIconStyle`;
+`Clear History` vacía los históricos y “Show Application Icon” restaura el icono normal. Se dibuja
+con `NSDockTile.contentView` y sigue actualizándose aunque la ventana esté cerrada.
 
 La barra inferior es contextual: muestra métricas de la sección activa (tráfico, capacidad de
 disco, servicios o CPU/memoria) y, a la derecha, el estado global de la conexión con el daemon,
@@ -194,11 +205,14 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   --screenshot /tmp/kancerbero-ui.png \
   [--section networking|disk|daemons|cpu|memory|energy] \
   [--tab interfaces|connections|processes] \
-  [--disk-tab volumes|analyzer] \
+  [--disk-tab volumes|analyzer|io] \
   [--disk-path=<carpeta>] [--disk-scan] [--disk-item <diskXsY>] \
+  [--disk-io-search <texto>] [--disk-io-selected <pid>] \
+  [--disk-io-graph data|operations] \
   [--cpu-search <texto>] [--cpu-selected <pid>] \
   [--memory-search <texto>] [--memory-selected <pid>] \
   [--energy-search <texto>] [--energy-selected <pid>] \
+  [--screenshot-dock <ruta>] [--dock-style <estilo|all>] \
   [--networking-focus download|upload|connections|processes] \
   [--networking-transport tcp|udp|other[,..]|all] \
   [--networking-ip ipv4|ipv6[,..]|all] \

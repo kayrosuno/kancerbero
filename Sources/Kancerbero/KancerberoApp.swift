@@ -6,6 +6,9 @@ struct KancerberoApp: App {
     @State private var disk = DiskModel()
     @State private var ui = UIState()
     @State private var filter = FilterModel()
+    @State private var dockIcon = DockIconController()
+    @AppStorage(KBPreferences.dockIconStyleKey)
+    private var dockIconStyle = KBPreferences.dockIconStyleDefault
 
     var body: some Scene {
         WindowGroup {
@@ -25,7 +28,8 @@ struct KancerberoApp: App {
                     }
                     model.start()
                     filter.start()
-                    await ScreenshotMode.runIfRequested()
+                    dockIcon.start(model: model)
+                    await ScreenshotMode.runIfRequested(model: model)
                 }
         }
         .defaultSize(width: 1440, height: 860)
@@ -61,6 +65,21 @@ struct KancerberoApp: App {
 
                 Button("Open Login Items Settings…") {
                     model.openLoginItemsSettings()
+                }
+            }
+
+            CommandMenu("Dock Icon") {
+                Picker("Dock icon", selection: $dockIconStyle) {
+                    ForEach(DockIconStyle.allCases) { style in
+                        Text(style.title).tag(style.rawValue)
+                    }
+                }
+                .pickerStyle(.inline)
+
+                Divider()
+
+                Button("Clear History") {
+                    model.clearHistories()
                 }
             }
 

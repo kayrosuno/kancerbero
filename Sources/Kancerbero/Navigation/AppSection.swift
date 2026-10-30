@@ -147,6 +147,7 @@ enum NetworkingTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
 enum DiskTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
     case volumes
     case analyzer
+    case io
 
     var id: String { rawValue }
 
@@ -154,6 +155,7 @@ enum DiskTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
         switch self {
         case .volumes: return "Volumes"
         case .analyzer: return "Analyzer"
+        case .io: return "I/O"
         }
     }
 
@@ -161,6 +163,7 @@ enum DiskTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
         switch self {
         case .volumes: return "internaldrive"
         case .analyzer: return "chart.pie"
+        case .io: return "arrow.left.arrow.right"
         }
     }
 
@@ -168,6 +171,7 @@ enum DiskTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
         switch self {
         case .volumes: return Color(red: 0.94, green: 0.56, blue: 0.18)
         case .analyzer: return Color(red: 0.90, green: 0.42, blue: 0.25)
+        case .io: return Color(red: 0.25, green: 0.62, blue: 0.95)
         }
     }
 
@@ -182,6 +186,7 @@ enum DiskTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
         switch value {
         case "0": return .volumes
         case "1": return .analyzer
+        case "2": return .io
         default: return nil
         }
     }

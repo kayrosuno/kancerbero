@@ -118,6 +118,19 @@ private func printCPU(interval: Double) {
     if let sleeping = PowerAssertionsReader.current() {
         write("preventingSleep pids=\(sleeping.sorted().map(String.init).joined(separator: ","))\n")
     }
+    if let io = DiskIOReader.current() {
+        write("disk read=\(formatBytes(io.bytesRead)) written=\(formatBytes(io.bytesWritten)) readOps=\(io.readOperations) writeOps=\(io.writeOperations)\n")
+    }
+    if let top = after.max(by: {
+        (($0.usage?.diskBytesReadPerSecond ?? 0) + ($0.usage?.diskBytesWrittenPerSecond ?? 0))
+            < (($1.usage?.diskBytesReadPerSecond ?? 0) + ($1.usage?.diskBytesWrittenPerSecond ?? 0))
+    }), (top.usage?.diskBytesReadPerSecond ?? 0) + (top.usage?.diskBytesWrittenPerSecond ?? 0) > 0 {
+        write(String(format: "diskTop %@ read=%.0fB/s write=%.0fB/s writes=%@\n",
+                     top.name,
+                     top.usage?.diskBytesReadPerSecond ?? 0,
+                     top.usage?.diskBytesWrittenPerSecond ?? 0,
+                     top.usage?.logicalWrites.map(String.init) ?? "n/a"))
+    }
 }
 
 private func printProcessesCPU(limit: Int, interval: Double) {

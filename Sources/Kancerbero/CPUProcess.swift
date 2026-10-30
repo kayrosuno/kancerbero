@@ -30,6 +30,17 @@ struct CPUProcessRow: Identifiable, Hashable {
     var energySortValue: Double { energyWatts ?? -1 }
     var wakeupSortValue: Double { wakeupsPerSecond ?? -1 }
     var sleepSortValue: Int { preventingSleep ? 1 : 0 }
+    var diskBytesRead: UInt64? { process.usage?.diskBytesRead }
+    var diskBytesWritten: UInt64? { process.usage?.diskBytesWritten }
+    var logicalWrites: UInt64? { process.usage?.logicalWrites }
+    var diskReadRate: Double? { process.usage?.diskBytesReadPerSecond }
+    var diskWriteRate: Double? { process.usage?.diskBytesWrittenPerSecond }
+    var diskSortValue: Double { (diskReadRate ?? 0) + (diskWriteRate ?? 0) }
+    var diskReadSortValue: Double { diskReadRate ?? -1 }
+    var diskWriteSortValue: Double { diskWriteRate ?? -1 }
+    var diskBytesReadSortValue: UInt64 { diskBytesRead ?? 0 }
+    var diskBytesWrittenSortValue: UInt64 { diskBytesWritten ?? 0 }
+    var logicalWritesSortValue: UInt64 { logicalWrites ?? 0 }
 
     var priorityText: String {
         process.usage.map { String($0.priority) } ?? "—"
@@ -73,6 +84,28 @@ struct CPUProcessRow: Identifiable, Hashable {
 
     var sleepText: String {
         preventingSleep ? "Yes" : "—"
+    }
+
+    var diskReadRateText: String {
+        diskReadRate.map { KBFormat.byteRate($0) } ?? "—"
+    }
+
+    var diskWriteRateText: String {
+        diskWriteRate.map { KBFormat.byteRate($0) } ?? "—"
+    }
+
+    var diskBytesReadText: String {
+        guard let diskBytesRead else { return "—" }
+        return diskBytesRead == 0 ? "0 B" : KBFormat.bytes(diskBytesRead)
+    }
+
+    var diskBytesWrittenText: String {
+        guard let diskBytesWritten else { return "—" }
+        return diskBytesWritten == 0 ? "0 B" : KBFormat.bytes(diskBytesWritten)
+    }
+
+    var logicalWritesText: String {
+        logicalWrites.map { $0.formatted() } ?? "—"
     }
 
     var timeText: String {

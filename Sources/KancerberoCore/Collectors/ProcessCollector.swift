@@ -90,7 +90,10 @@ public enum ProcessCollector {
                 priority: raw.priority,
                 energyNanojoules: raw.energy_nj,
                 interruptWakeups: raw.interrupt_wkups,
-                packageIdleWakeups: raw.pkg_idle_wkups)
+                packageIdleWakeups: raw.pkg_idle_wkups,
+                diskBytesRead: raw.diskio_bytes_read,
+                diskBytesWritten: raw.diskio_bytes_written,
+                logicalWrites: raw.logical_writes)
             : nil
         let state: KBProcessState?
         if hasTaskInfo {
