@@ -81,11 +81,13 @@ capturar su propia ventana con AppKit sin ese permiso:
 ```bash
 build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   --screenshot /tmp/kancerbero-ui.png \
-  [--section networking|disk|daemons|cpu] \
+  [--section networking|disk|daemons|cpu|memory|energy] \
   [--tab interfaces|connections|processes] \
   [--disk-tab volumes|analyzer] \
   [--disk-path=<carpeta>] [--disk-scan] [--disk-item <diskXsY>] \
   [--cpu-search <texto>] [--cpu-selected <pid>] \
+  [--memory-search <texto>] [--memory-selected <pid>] \
+  [--energy-search <texto>] [--energy-selected <pid>] \
   [--networking-transport tcp|udp|other[,..]|all] \
   [--networking-ip ipv4|ipv6[,..]|all] \
   [--networking-state established|listening|connecting|closing|other[,..]|all] \
@@ -99,7 +101,9 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
 `--section` selecciona la sección de primer nivel, `--tab` la subpestaña de Networking,
 `--disk-tab` la de Disk, `--disk-path`/`--disk-scan` lanzan el analizador sobre una ruta y
 `--disk-item` preselecciona un dispositivo en Volumes. `--cpu-search` aplica el filtro inicial de
-la tabla de CPU, `--cpu-selected` preselecciona un PID, `--networking-transport`/`--networking-ip`
+la tabla de CPU, `--cpu-selected` preselecciona un PID, `--memory-search`/`--memory-selected`
+hacen lo mismo en la tabla de Memory, `--energy-search`/`--energy-selected` en la de Energy,
+`--networking-transport`/`--networking-ip`
 marcan solo esos checkboxes (lista con comas; `all` equivale a todos), `--networking-state` marca
 solo esas categorías de estado TCP, `--networking-connection-search` el filtro de proceso de
 Connections y `--networking-search` el de la tabla de procesos. Los flags
@@ -118,6 +122,8 @@ for args in \
   "--section disk" \
   "--section daemons" \
   "--section cpu" \
+  "--section memory" \
+  "--section energy" \
   "--section networking --sidebar-collapsed"
 do
   ./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
@@ -290,6 +296,50 @@ $K --screenshot /tmp/kb-cpu-selected.png --section cpu \
 - Para fugas: dejar la pestaña abierta varios minutos con intervalo de 0,5 s y comprobar que el
   RSS de Kancerbero se mantiene estable (`ps -o rss`, `leaks`). El sampler libera el array de
   `host_processor_info` y el puerto Mach en cada tick.
+
+Pestaña Memory:
+
+```bash
+P=./build/Build/Products/Debug/KancerberoProbe
+K=./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
+$P cpu --interval 1 | grep -E "memoryAM|pressure"
+$K --screenshot /tmp/kb-memory.png --section memory --screenshot-delay 6
+$K --screenshot /tmp/kb-memory-filter.png --section memory \
+  --memory-search java --screenshot-delay 6
+```
+
+- `memoryAM` imprime los valores de Activity Monitor: `app = internal − purgeable`,
+  `cachedFiles = external + purgeable`, `used = app + wired + compressed`. Compararlos con
+  `vm_stat` (internal/external/purgeable × page size) y con Activity Monitor (±1%) y con
+  `memory_pressure`/`sysctl kern.memorystatus_vm_pressure_level` para la presión.
+- La composición App/Wired/Compressed/Cached/Free debe sumar la memoria física (±1%). La tabla
+  está ordenada por memoria residente: comparar el primer `Memory` con `ps -o rss` del mismo PID.
+- Filtrar (`--memory-search`), seleccionar e inspeccionar; los procesos sin task info muestran
+  `—` y el aviso “your processes only” aparece sin daemon root.
+
+Pestaña Energy:
+
+```bash
+P=./build/Build/Products/Debug/KancerberoProbe
+K=./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
+$P cpu --interval 1 | grep -E "energy|power|preventingSleep"
+pmset -g batt
+pmset -g assertions | grep -E "pid [0-9]+" | head
+$K --screenshot /tmp/kb-energy.png --section energy --screenshot-delay 6
+$K --screenshot /tmp/kb-energy-filter.png --section energy \
+  --energy-search java --screenshot-delay 6
+```
+
+- `power` debe coincidir con `pmset -g batt` (carga, cargando, conector y fuente); la lista de
+  `preventingSleep` debe coincidir con las assertions `PreventUserIdleSystemSleep`/`PreventSystemSleep`
+  de `pmset -g assertions`.
+- `energy` imprime el proceso con más vatios y sus wake-ups; comparar el orden con la pestaña
+  Energy de Activity Monitor y con `top`. La energía por proceso sale de `ri_energy_nj` y los
+  wake-ups de `ri_interrupt_wkups + ri_pkg_idle_wkups` (rusage_info_v6), convertidos a tasas por
+  `ProcessCPUTracker`. Solo se incluye el histórico de la sesión; la media de 12 h y la energía de
+  la GPU no se muestran.
+- Sin daemon root la tabla solo enumera procesos del uid actual; el fallback local rellena
+  energía/batería cuando el daemon conectado es antiguo.
 
 Tarjeta Traffic, Activity, Protocols y filtros de protocolo:
 

@@ -101,7 +101,47 @@ struct StatusBar: View {
                 slot("\(KBFormat.bytes(memory.usedBytes)) / \(KBFormat.bytes(memory.totalBytes))",
                      width: 135)
             }
+
+        case .memory:
+            if let memory = model.hostMetrics?.memory {
+                LiveDot(isLive: model.isLive)
+                slot("\(KBFormat.bytes(memory.activityMonitorUsedBytes)) / \(KBFormat.bytes(memory.totalBytes))",
+                     width: 150)
+                slot("Pressure \(memory.pressureLabel)", width: 95)
+                slot("Cached \(KBFormat.bytes(memory.cachedFileBytes))", width: 120)
+                slot("Swap \(KBFormat.bytes(memory.swapUsedBytes))", width: 110)
+            } else {
+                Text("Waiting for memory metrics…")
+                    .foregroundStyle(.secondary)
+            }
+
+        case .energy:
+            LiveDot(isLive: model.isLive)
+            if let power = model.hostMetrics?.power {
+                slot(power.hasBattery
+                     ? "Battery \(power.chargePercent.map { "\($0)%" } ?? "—")"
+                     : "No battery", width: 100)
+                slot(power.isCharging ? "Charging"
+                     : power.isPluggedIn ? "AC power" : "On battery",
+                     width: 80)
+                if let minutes = power.timeRemainingMinutes {
+                    slot("\(minutes / 60):\(String(format: "%02d", minutes % 60)) left",
+                         width: 90)
+                }
+            } else {
+                slot("Power —", width: 100)
+            }
+            slot(String(format: "Energy %.1f W", energyWatts), width: 100)
+            slot(String(format: "Wakeups %.0f/s", wakeupsPerSecond), width: 105)
         }
+    }
+
+    private var energyWatts: Double {
+        model.processes.reduce(0) { $0 + ($1.usage?.energyWatts ?? 0) }
+    }
+
+    private var wakeupsPerSecond: Double {
+        model.processes.reduce(0) { $0 + ($1.usage?.wakeupsPerSecond ?? 0) }
     }
 
     private var globalStatus: some View {
@@ -205,6 +245,10 @@ struct StatusBar: View {
         case .daemons:
             return model.daemonLastUpdate.map { "Updated \(KBFormat.time($0))" } ?? "Waiting…"
         case .cpu:
+            return model.lastUpdate.map { "Updated \(KBFormat.time($0))" } ?? "Waiting…"
+        case .memory:
+            return model.lastUpdate.map { "Updated \(KBFormat.time($0))" } ?? "Waiting…"
+        case .energy:
             return model.lastUpdate.map { "Updated \(KBFormat.time($0))" } ?? "Waiting…"
         }
     }

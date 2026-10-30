@@ -13,6 +13,8 @@ final class UIState {
     var daemons = DaemonsUIState()
     var disk = DiskUIState()
     var cpu = CPUUIState()
+    var memory = MemoryUIState()
+    var energy = EnergyUIState()
     var filter = FilterUIState()
 
     init(arguments: [String] = CommandLine.arguments) {
@@ -97,6 +99,14 @@ final class UIState {
 
         cpu.search = Self.value(for: "--cpu-search", in: arguments) ?? ""
         cpu.pendingSelectionPID = Self.value(for: "--cpu-selected", in: arguments)
+            .flatMap(Int32.init)
+
+        memory.search = Self.value(for: "--memory-search", in: arguments) ?? ""
+        memory.pendingSelectionPID = Self.value(for: "--memory-selected", in: arguments)
+            .flatMap(Int32.init)
+
+        energy.search = Self.value(for: "--energy-search", in: arguments) ?? ""
+        energy.pendingSelectionPID = Self.value(for: "--energy-selected", in: arguments)
             .flatMap(Int32.init)
     }
 
@@ -193,6 +203,26 @@ struct CPUUIState: Equatable {
         KeyPathComparator(\CPUProcessRow.cpuSortValue, order: .reverse)
     ]
     /// `--cpu-selected`, applied once when the row appears.
+    var pendingSelectionPID: Int32?
+}
+
+struct MemoryUIState: Equatable {
+    var search = ""
+    var selectedProcess: KBProcessKey?
+    var processSortOrder: [KeyPathComparator<CPUProcessRow>] = [
+        KeyPathComparator(\CPUProcessRow.residentSortValue, order: .reverse)
+    ]
+    /// `--memory-selected`, applied once when the row appears.
+    var pendingSelectionPID: Int32?
+}
+
+struct EnergyUIState: Equatable {
+    var search = ""
+    var selectedProcess: KBProcessKey?
+    var processSortOrder: [KeyPathComparator<CPUProcessRow>] = [
+        KeyPathComparator(\CPUProcessRow.energySortValue, order: .reverse)
+    ]
+    /// `--energy-selected`, applied once when the row appears.
     var pendingSelectionPID: Int32?
 }
 

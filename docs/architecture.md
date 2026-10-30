@@ -17,7 +17,8 @@
 - `RootView`: `NavigationSplitView` con `columnVisibility`; sidebar colapsable con
   `SidebarCommands()` y el toggle nativo que macOS dibuja en la toolbar.
 - `SidebarView`: selección propia con `matchedGeometryEffect` para Networking / Disk / Daemons /
-  CPU; cabecera con marca y estado live, pie con fuente (daemon/local), privcheck y hora.
+  CPU / Memory / Energy; cabecera con marca y estado live, pie con fuente (daemon/local), privcheck
+  y hora.
 - `NetworkingView`: `TrafficCard` ancha con Download/Upload en la cabecera y `TrafficChart`
   (gráfico espejado, escala compartida con techo 1/2/5×10^n, cuadrícula, niveles y eje temporal;
   ventana de 60 muestras anclada a la derecha). Debajo, `PillTabBar` y las tablas
@@ -85,6 +86,20 @@
   ordenable, con búsqueda, selección persistida e inspector. `CPUProcessRow` añade claves de
   orden no opcionales para que los procesos sin task info queden al final. SwiftUI limita el
   `TableColumnBuilder` a 10 columnas, así que PRI/NI y S/THR se muestran combinadas.
+- `MemoryView`: panel dedicado tipo Activity Monitor. Arriba (1/3) la presión con
+  `MemoryPressureChart` y su explicación, la composición App/Wired/Compressed/Cached/Free
+  (`SegmentedMeter` + `MeterLegend`) y el detalle Physical Memory / Memory Used / App / Wired /
+  Compressed / Cached Files, más una tarjeta de swap con `CapacityBar`. Debajo (2/3),
+  `MemoryProcessTable` ordena `CPUProcessRow` por memoria residente con búsqueda, selección e
+  inspector. Los valores AM se derivan de `KBMemoryStats` (`appMemoryBytes`,
+  `cachedFileBytes`, `activityMonitorUsedBytes`).
+- `EnergyView`: panel tipo Activity Monitor. Arriba (1/3) la batería (`IOPowerSources`:
+  carga, tiempo restante, cargando/conector), el consumo total en vatios de los procesos
+  visibles y los wake-ups inactivos, cada uno con `Sparkline` de su histórico. Debajo (2/3),
+  `EnergyProcessTable` ordena por `ri_energy_nj`/s con impacto relativo, wake-ups, CPU%, PID,
+  USER y `Preventing Sleep` (assertions `PreventUserIdleSystemSleep`/`PreventSystemSleep` vía
+  `IOPMCopyAssertionsByProcess`). Energía y wake-ups son acumulativos en `rusage_info_v6` y
+  `ProcessCPUTracker` los convierte en tasas por segundo.
 - `StatusBar`: barra inferior contextual; muestra métricas de la sección activa y el estado global
   del daemon/actualización de la fuente correspondiente.
 - `SystemStatusView`: ventana “System status” (escena `Window` con id `system-status`, abierta con
@@ -106,8 +121,9 @@
   `--networking-transport`, `--networking-ip` y `--networking-state` (listas separadas por comas;
   `all` o un valor desconocido no filtran), `--networking-connection-search`,
   `--networking-process-ip`, `--networking-process-protocol`, `--networking-process-socket`,
-  `--networking-search`, `--daemon-*`, `--volumes-focus`, `--analyzer-focus`, `--cpu-search` y
-  `--cpu-selected` se aplican una sola vez al crear `UIState`.
+  `--networking-search`, `--daemon-*`, `--volumes-focus`, `--analyzer-focus`, `--cpu-search`,
+  `--cpu-selected`, `--memory-search`, `--memory-selected`, `--energy-search` y
+  `--energy-selected` se aplican una sola vez al crear `UIState`.
 - Settings: `KancerberoApp` añade una escena nativa `Settings` con `SettingsView`. El toggle
   “Animate tab changes” persiste en `@AppStorage("tabAnimationsEnabled")` (por defecto `true`) y
   condiciona únicamente las transiciones de cambio de pestaña: `RootView` (secciones),
@@ -122,8 +138,9 @@
   `--networking-focus`, `--networking-transport`, `--networking-ip`, `--networking-state`,
   `--networking-connection-search`, `--networking-process-ip`,
   `--networking-process-protocol`, `--networking-process-socket`, `--networking-search`,
-  `--volumes-focus`, `--analyzer-focus`, `--cpu-search`, `--cpu-selected`,
-  filtros `--daemon-*` y `--sidebar-collapsed` (ver `docs/verification.md`).
+  `--volumes-focus`, `--analyzer-focus`, `--cpu-search`, `--cpu-selected`, `--memory-search`,
+  `--memory-selected`, `--energy-search`, `--energy-selected`, filtros `--daemon-*` y
+  `--sidebar-collapsed` (ver `docs/verification.md`).
 
 ## Flujo de datos
 

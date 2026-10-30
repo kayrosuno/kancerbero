@@ -126,7 +126,7 @@ struct CPUProcessTable: View {
         TableColumn("PID", value: \.process.pid) { row in
             pidCell(row)
         }
-        .width(min: 48, ideal: 55)
+        .width(min: 44, ideal: 52)
     }
 
     private var userColumn: some TableColumnContent<CPUProcessRow,
@@ -134,7 +134,7 @@ struct CPUProcessTable: View {
         TableColumn("USER", value: \.userSortValue) { row in
             userCell(row)
         }
-        .width(min: 70, ideal: 95)
+        .width(min: 60, ideal: 74)
     }
 
     private var priorityColumn: some TableColumnContent<CPUProcessRow,
@@ -142,7 +142,7 @@ struct CPUProcessTable: View {
         TableColumn("PRI/NI", value: \.prioritySortValue) { row in
             priorityCell(row)
         }
-        .width(min: 52, ideal: 62)
+        .width(min: 50, ideal: 56)
     }
 
     private var virtualColumn: some TableColumnContent<CPUProcessRow,
@@ -150,7 +150,7 @@ struct CPUProcessTable: View {
         TableColumn("VIRT", value: \.virtualSortValue) { row in
             numericText(row.virtualText)
         }
-        .width(min: 68, ideal: 82)
+        .width(min: 60, ideal: 66)
     }
 
     private var residentColumn: some TableColumnContent<CPUProcessRow,
@@ -158,7 +158,7 @@ struct CPUProcessTable: View {
         TableColumn("RES", value: \.residentSortValue) { row in
             numericText(row.residentText)
         }
-        .width(min: 68, ideal: 82)
+        .width(min: 60, ideal: 66)
     }
 
     private var stateColumn: some TableColumnContent<CPUProcessRow,
@@ -166,7 +166,7 @@ struct CPUProcessTable: View {
         TableColumn("S/THR", value: \.stateSortValue) { row in
             stateCell(row)
         }
-        .width(min: 42, ideal: 52)
+        .width(min: 40, ideal: 48)
     }
 
     private var cpuColumnView: some TableColumnContent<CPUProcessRow,
@@ -174,7 +174,7 @@ struct CPUProcessTable: View {
         TableColumn("CPU%", value: \.cpuSortValue) { row in
             cpuCell(row)
         }
-        .width(min: 52, ideal: 60)
+        .width(min: 50, ideal: 56)
     }
 
     private var memoryColumn: some TableColumnContent<CPUProcessRow,
@@ -182,7 +182,7 @@ struct CPUProcessTable: View {
         TableColumn("MEM%", value: \.memorySortValue) { row in
             numericText(row.memoryText)
         }
-        .width(min: 52, ideal: 60)
+        .width(min: 50, ideal: 56)
     }
 
     private var timeColumn: some TableColumnContent<CPUProcessRow,
@@ -190,7 +190,7 @@ struct CPUProcessTable: View {
         TableColumn("TIME+", value: \.timeSortValue) { row in
             numericText(row.timeText)
         }
-        .width(min: 68, ideal: 78)
+        .width(min: 60, ideal: 66)
     }
 
     private var commandColumn: some TableColumnContent<CPUProcessRow,
@@ -198,7 +198,7 @@ struct CPUProcessTable: View {
         TableColumn("Command", value: \.commandSortValue) { row in
             commandCell(row)
         }
-        .width(min: 150, ideal: 260)
+        .width(min: 110, ideal: 140)
     }
 
     private func pidCell(_ row: CPUProcessRow) -> some View {

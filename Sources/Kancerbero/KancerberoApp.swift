@@ -28,7 +28,7 @@ struct KancerberoApp: App {
                     await ScreenshotMode.runIfRequested()
                 }
         }
-        .defaultSize(width: 1320, height: 820)
+        .defaultSize(width: 1440, height: 860)
         .windowStyle(.titleBar)
         .commands {
             SidebarCommands()

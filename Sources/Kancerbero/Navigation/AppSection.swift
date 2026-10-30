@@ -5,6 +5,8 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     case disk
     case daemons
     case cpu
+    case memory
+    case energy
 
     var id: String { rawValue }
 
@@ -14,6 +16,8 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .disk: return "Disk"
         case .daemons: return "Daemons"
         case .cpu: return "CPU"
+        case .memory: return "Memory"
+        case .energy: return "Energy"
         }
     }
 
@@ -23,6 +27,8 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .disk: return "Storage & I/O"
         case .daemons: return "launchd services"
         case .cpu: return "Cores & processes"
+        case .memory: return "Usage & pressure"
+        case .energy: return "Battery & power"
         }
     }
 
@@ -32,6 +38,8 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .disk: return "internaldrive"
         case .daemons: return "gearshape.2"
         case .cpu: return "cpu"
+        case .memory: return "memorychip"
+        case .energy: return "bolt.fill"
         }
     }
 
@@ -41,6 +49,8 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .disk: return Color(red: 0.94, green: 0.56, blue: 0.18)
         case .daemons: return Color(red: 0.62, green: 0.42, blue: 0.95)
         case .cpu: return Color(red: 0.20, green: 0.72, blue: 0.52)
+        case .memory: return Color(red: 0.20, green: 0.70, blue: 0.62)
+        case .energy: return Color(red: 0.95, green: 0.72, blue: 0.20)
         }
     }
 
@@ -50,6 +60,8 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .disk: return "2"
         case .daemons: return "3"
         case .cpu: return "4"
+        case .memory: return "5"
+        case .energy: return "6"
         }
     }
 
@@ -66,6 +78,8 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case "1": return .disk
         case "2": return .daemons
         case "3": return .cpu
+        case "4": return .memory
+        case "5": return .energy
         default: return nil
         }
     }

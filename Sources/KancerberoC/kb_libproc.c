@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/proc_info.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 
 int kb_process_list(kb_process **out, size_t *count)
@@ -22,7 +23,8 @@ int kb_process_list(kb_process **out, size_t *count)
     if (needed <= 0) {
         return -1;
     }
-    size_t capacity = (size_t)needed / sizeof(pid_t) + 32;
+    /* proc_listallpids returns a count of PIDs, never bytes. */
+    size_t capacity = (size_t)needed + 32;
     pid_t *pids = NULL;
     int written = 0;
 
@@ -38,7 +40,7 @@ int kb_process_list(kb_process **out, size_t *count)
             free(pids);
             return -1;
         }
-        size_t found = (size_t)written / sizeof(pid_t);
+        size_t found = (size_t)written;
         if (found < capacity) {
             break;
         }
@@ -49,7 +51,7 @@ int kb_process_list(kb_process **out, size_t *count)
         return -1;
     }
 
-    size_t found = (size_t)written / sizeof(pid_t);
+    size_t found = (size_t)written;
     kb_process *items = (kb_process *)calloc(found ? found : 1, sizeof(kb_process));
     if (!items) {
         free(pids);
@@ -111,6 +113,16 @@ int kb_process_list(kb_process **out, size_t *count)
             item->priority = (int32_t)all.ptinfo.pti_priority;
             item->has_task_info = 1;
         }
+
+        struct rusage_info_v6 usage;
+        memset(&usage, 0, sizeof(usage));
+        if (proc_pid_rusage(pid, RUSAGE_INFO_V6,
+                            (rusage_info_t *)&usage) == 0) {
+            item->energy_nj = usage.ri_energy_nj;
+            item->penergy_nj = usage.ri_penergy_nj;
+            item->interrupt_wkups = usage.ri_interrupt_wkups;
+            item->pkg_idle_wkups = usage.ri_pkg_idle_wkups;
+        }
     }
 
     free(pids);
@@ -122,6 +134,30 @@ int kb_process_list(kb_process **out, size_t *count)
 void kb_process_list_free(kb_process *items)
 {
     free(items);
+}
+
+int kb_process_energy_read(int32_t pid, uint64_t *energy_nj,
+                           uint64_t *interrupt_wkups, uint64_t *pkg_idle_wkups)
+{
+    if (pid <= 0) {
+        return -1;
+    }
+    struct rusage_info_v6 usage;
+    memset(&usage, 0, sizeof(usage));
+    if (proc_pid_rusage((pid_t)pid, RUSAGE_INFO_V6,
+                        (rusage_info_t *)&usage) != 0) {
+        return -1;
+    }
+    if (energy_nj) {
+        *energy_nj = usage.ri_energy_nj;
+    }
+    if (interrupt_wkups) {
+        *interrupt_wkups = usage.ri_interrupt_wkups;
+    }
+    if (pkg_idle_wkups) {
+        *pkg_idle_wkups = usage.ri_pkg_idle_wkups;
+    }
+    return 0;
 }
 
 int kb_process_path(int32_t pid, char *buffer, size_t size)

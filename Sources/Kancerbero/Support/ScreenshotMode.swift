@@ -42,7 +42,7 @@ enum ScreenshotMode {
             // Wide enough for the logo rail and the three status columns.
             window.setContentSize(NSSize(width: 1180, height: 820))
         } else {
-            window.setContentSize(NSSize(width: 1320, height: 820))
+            window.setContentSize(NSSize(width: 1440, height: 860))
             window.center()
         }
 

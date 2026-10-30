@@ -122,10 +122,16 @@ public struct HostMetricsSampler {
             swapUsedBytes: raw.swap_used,
             swapAvailBytes: raw.swap_avail,
             swapEncrypted: raw.swap_encrypted != 0,
-            pageSize: raw.page_size
+            pageSize: raw.page_size,
+            pressurePercent: raw.mem_pressure_percent >= 0
+                ? Int(raw.mem_pressure_percent) : nil,
+            pressureLevel: raw.mem_pressure_level >= 0
+                ? Int(raw.mem_pressure_level) : nil
         )
 
-        return KBHostMetrics(cpu: cpu, memory: memory)
+        return KBHostMetrics(cpu: cpu, memory: memory,
+                             gpu: GPUStatsReader.current(),
+                             power: PowerStatsReader.current())
     }
 
     private static func percentages(idle: UInt64, total: UInt64,
@@ -143,11 +149,17 @@ public struct HostMetricsSampler {
     }
 }
 
-/// Turns the cumulative per-process CPU time into a htop-style percentage
-/// between samples. Keys include the start time, so PID reuse starts a new
-/// baseline instead of producing a bogus delta.
+/// Turns the cumulative per-process CPU, energy and wake-up counters into
+/// per-second rates between samples. Keys include the start time, so PID reuse
+/// starts a new baseline instead of producing a bogus delta.
 public struct ProcessCPUTracker {
-    private var previous: [KBProcessKey: UInt64] = [:]
+    private struct Counters {
+        var cpuTime: UInt64
+        var energy: UInt64
+        var wakeups: UInt64
+    }
+
+    private var previous: [KBProcessKey: Counters] = [:]
 
     public init() {}
 
@@ -157,20 +169,34 @@ public struct ProcessCPUTracker {
                                   coreCount: Int) {
         let validInterval = elapsed > 0 && elapsed < 5 && elapsed.isFinite
         let maxPercent = Double(max(1, coreCount)) * 100
-        var baseline: [KBProcessKey: UInt64] = [:]
+        var baseline: [KBProcessKey: Counters] = [:]
         baseline.reserveCapacity(processes.count)
 
         for index in processes.indices {
             guard var usage = processes[index].usage else { continue }
             let key = processes[index].id
             let current = usage.cpuTimeNanoseconds
-            baseline[key] = current
+            let energy = usage.energyNanojoules ?? 0
+            let wakeups = (usage.interruptWakeups ?? 0) &+ (usage.packageIdleWakeups ?? 0)
+            baseline[key] = Counters(cpuTime: current, energy: energy, wakeups: wakeups)
 
-            if let prior = previous[key], validInterval, current >= prior {
-                let seconds = Double(current - prior) / 1_000_000_000
-                usage.cpuPercent = min(maxPercent, max(0, seconds / elapsed * 100))
+            if let prior = previous[key], validInterval {
+                if current >= prior.cpuTime {
+                    let seconds = Double(current - prior.cpuTime) / 1_000_000_000
+                    usage.cpuPercent = min(maxPercent, max(0, seconds / elapsed * 100))
+                } else {
+                    usage.cpuPercent = 0
+                }
+                usage.energyWatts = energy >= prior.energy
+                    ? Double(energy - prior.energy) / 1_000_000_000 / elapsed
+                    : 0
+                usage.wakeupsPerSecond = wakeups >= prior.wakeups
+                    ? Double(wakeups - prior.wakeups) / elapsed
+                    : 0
             } else {
                 usage.cpuPercent = 0
+                usage.energyWatts = 0
+                usage.wakeupsPerSecond = 0
             }
 
             if totalMemoryBytes > 0 {
@@ -184,5 +210,103 @@ public struct ProcessCPUTracker {
 
         // Replacing the whole dictionary prunes dead processes.
         previous = baseline
+    }
+}
+
+/// Host-wide memory pressure. It needs no privileges, so it also fills the
+/// gap when a connected daemon predates the pressure fields.
+public enum MemoryPressureReader {
+    public static func current() -> (percent: Int?, level: Int?) {
+        var percent: Int32 = -1
+        var level: Int32 = -1
+        guard kb_memory_pressure_read(&percent, &level) == 0 else {
+            return (nil, nil)
+        }
+        return (percent >= 0 ? Int(percent) : nil,
+                level >= 0 ? Int(level) : nil)
+    }
+}
+
+/// GPU utilisation from IOAccelerator PerformanceStatistics. Readable without
+/// privileges, so it also fills the gap when a connected daemon predates the
+/// GPU fields.
+public enum GPUStatsReader {
+    public static func current() -> KBGPUStats? {
+        var raw = kb_gpu_stats()
+        guard kb_gpu_stats_read(&raw) == 0 else {
+            return nil
+        }
+        let name = withUnsafeBytes(of: &raw.name) { bytes -> String in
+            guard let pointer = bytes.baseAddress?
+                .assumingMemoryBound(to: CChar.self) else { return "" }
+            return String(cString: pointer)
+        }
+        return KBGPUStats(
+            name: name.isEmpty ? nil : name,
+            utilizationPercent: raw.utilization_percent >= 0
+                ? raw.utilization_percent : nil,
+            rendererPercent: raw.renderer_percent >= 0
+                ? raw.renderer_percent : nil,
+            tilerPercent: raw.tiler_percent >= 0
+                ? raw.tiler_percent : nil,
+            inUseMemoryBytes: raw.in_use_memory > 0
+                ? raw.in_use_memory : nil,
+            allocatedMemoryBytes: raw.alloc_memory > 0
+                ? raw.alloc_memory : nil
+        )
+    }
+}
+
+/// Battery state, readable without privileges so it also fills the gap when a
+/// connected daemon predates the power fields.
+public enum PowerStatsReader {
+    public static func current() -> KBPowerStats? {
+        var raw = kb_power_stats()
+        guard kb_power_stats_read(&raw) == 0 else { return nil }
+        let source = withUnsafeBytes(of: &raw.source) { bytes -> String in
+            guard let pointer = bytes.baseAddress?
+                .assumingMemoryBound(to: CChar.self) else { return "" }
+            return String(cString: pointer)
+        }
+        return KBPowerStats(
+            hasBattery: raw.has_battery != 0,
+            isPluggedIn: raw.is_plugged_in != 0,
+            isCharging: raw.is_charging != 0,
+            isCharged: raw.is_charged != 0,
+            chargePercent: raw.charge_percent >= 0 ? Int(raw.charge_percent) : nil,
+            timeRemainingMinutes: raw.time_remaining_min > 0
+                ? Int(raw.time_remaining_min) : nil,
+            source: source.isEmpty ? nil : source
+        )
+    }
+}
+
+/// PIDs that currently hold a PreventUserIdleSystemSleep/PreventSystemSleep
+/// assertion. `nil` when the system refuses the query.
+public enum PowerAssertionsReader {
+    public static func current() -> Set<Int32>? {
+        var pids: UnsafeMutablePointer<Int32>?
+        var count = 0
+        guard kb_prevent_sleep_pids(&pids, &count) == 0 else { return nil }
+        defer {
+            if let pids {
+                free(UnsafeMutableRawPointer(pids))
+            }
+        }
+        guard let pids, count > 0 else { return [] }
+        return Set(UnsafeBufferPointer(start: pids, count: count))
+    }
+}
+
+/// Per-process cumulative energy and wake-up counters from rusage_info_v6.
+public enum ProcessEnergyReader {
+    public static func current(pid: Int32) -> (energy: UInt64, wakeups: UInt64)? {
+        var energy: UInt64 = 0
+        var interrupt: UInt64 = 0
+        var idle: UInt64 = 0
+        guard kb_process_energy_read(pid, &energy, &interrupt, &idle) == 0 else {
+            return nil
+        }
+        return (energy, interrupt &+ idle)
     }
 }

@@ -104,6 +104,14 @@ public actor CollectionActor {
                                        totalMemoryBytes: host.memory.totalBytes,
                                        coreCount: host.cpu.coreCount)
         }
+        if let sleeping = PowerAssertionsReader.current() {
+            for index in processes.indices {
+                guard var usage = processes[index].usage else { continue }
+                let pid = processes[index].pid
+                usage.preventingSleep = sleeping.contains(pid)
+                processes[index].usage = usage
+            }
+        }
 
         var interfaceRates: [UInt32: KBRates] = [:]
         if validInterval {
