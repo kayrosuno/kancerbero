@@ -102,7 +102,10 @@ struct MemoryView: View {
             .frame(width: 280)
 
             groupPanel("Breakdown") {
-                breakdownCard
+                HStack(spacing: 10) {
+                    activityMonitorCard
+                    compositionCard
+                }
             }
 
             groupPanel("Swap") {
@@ -137,14 +140,18 @@ struct MemoryView: View {
     private var pressureCard: some View {
         let memory = model.hostMetrics?.memory
         return VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .center, spacing: 6) {
+                cardIcon("gauge.medium", tint: memoryTint)
                 Text("Memory pressure")
                     .font(.system(size: 12, weight: .semibold))
-                Spacer()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 2)
                 if let memory, memory.pressurePercent != nil {
                     Text(memory.pressureLabel)
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(pressureColor(memory.pressureBand))
+                        .lineLimit(1)
                 }
             }
 
@@ -188,79 +195,108 @@ struct MemoryView: View {
         }
     }
 
-    private var breakdownCard: some View {
+    private var activityMonitorCard: some View {
         let memory = model.hostMetrics?.memory
-        return HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Composition")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-
-                if let memory {
-                    SegmentedMeter(
-                        segments: [
-                            MeterSegment(id: "App", value: Double(memory.appMemoryBytes),
-                                         color: appColor),
-                            MeterSegment(id: "Wired", value: Double(memory.wiredBytes),
-                                         color: wiredColor),
-                            MeterSegment(id: "Compressed", value: Double(memory.compressedBytes),
-                                         color: compressedColor),
-                            MeterSegment(id: "Cached", value: Double(memory.cachedFileBytes),
-                                         color: cachedColor),
-                            MeterSegment(id: "Free", value: Double(memory.activityMonitorFreeBytes),
-                                         color: idleColor)
-                        ],
-                        height: 12,
-                        accessibilityLabel: "Memory composition"
-                    )
-
-                    MeterLegend(items: [
-                        MeterLegendItem("App", value: KBFormat.bytes(memory.appMemoryBytes),
-                                        color: appColor),
-                        MeterLegendItem("Wired", value: KBFormat.bytes(memory.wiredBytes),
-                                        color: wiredColor),
-                        MeterLegendItem("Compressed", value: KBFormat.bytes(memory.compressedBytes),
-                                        color: compressedColor),
-                        MeterLegendItem("Cached", value: KBFormat.bytes(memory.cachedFileBytes),
-                                        color: cachedColor),
-                        MeterLegendItem("Free", value: KBFormat.bytes(memory.activityMonitorFreeBytes),
-                                        color: idleColor)
-                    ], minItemWidth: 120)
-                } else {
-                    Text("Waiting for metrics…")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 0)
-            }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-
-            Divider().opacity(0.4)
-
-            VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .center, spacing: 6) {
+                cardIcon("memorychip", tint: KBTheme.downloadTint)
                 Text("Activity Monitor detail")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Spacer(minLength: 0)
+            }
 
-                if let memory {
-                    LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading),
-                                        GridItem(.flexible(), alignment: .leading)],
-                              alignment: .leading,
-                              spacing: 8) {
-                        metric("Physical Memory", KBFormat.bytes(memory.totalBytes))
-                        metric("Memory Used",
-                               "\(KBFormat.bytes(memory.activityMonitorUsedBytes)) · \(KBFormat.percent(memory.activityMonitorUsedFraction))")
-                        metric("App Memory", KBFormat.bytes(memory.appMemoryBytes))
-                        metric("Wired Memory", KBFormat.bytes(memory.wiredBytes))
-                        metric("Compressed", KBFormat.bytes(memory.compressedBytes))
-                        metric("Cached Files", KBFormat.bytes(memory.cachedFileBytes))
-                    }
+            if let memory {
+                HStack(alignment: .top, spacing: 12) {
+                    headlineMetric("Physical Memory", KBFormat.bytes(memory.totalBytes))
+                    headlineMetric("Memory Used",
+                                   KBFormat.bytes(memory.activityMonitorUsedBytes),
+                                   detail: "· \(KBFormat.percent(memory.activityMonitorUsedFraction))")
+                }
+
+                Divider().opacity(0.4)
+
+                LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading),
+                                    GridItem(.flexible(), alignment: .leading)],
+                          alignment: .leading,
+                          spacing: 8) {
+                    metric("App Memory", KBFormat.bytes(memory.appMemoryBytes))
+                    metric("Wired Memory", KBFormat.bytes(memory.wiredBytes))
+                    metric("Compressed", KBFormat.bytes(memory.compressedBytes))
+                    metric("Cached Files", KBFormat.bytes(memory.cachedFileBytes))
                 }
 
                 Spacer(minLength: 0)
+            } else {
+                Text("Waiting for metrics…")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.regularMaterial)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(memoryTint.opacity(0.22), lineWidth: 1)
+        }
+    }
+
+    private var compositionCard: some View {
+        let memory = model.hostMetrics?.memory
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 6) {
+                cardIcon("chart.bar.fill", tint: compressedColor)
+                Text("Composition")
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 0)
+            }
+
+            if let memory {
+                SegmentedMeter(
+                    segments: [
+                        MeterSegment(id: "App", value: Double(memory.appMemoryBytes),
+                                     color: appColor),
+                        MeterSegment(id: "Wired", value: Double(memory.wiredBytes),
+                                     color: wiredColor),
+                        MeterSegment(id: "Compressed", value: Double(memory.compressedBytes),
+                                     color: compressedColor),
+                        MeterSegment(id: "Cached", value: Double(memory.cachedFileBytes),
+                                     color: cachedColor),
+                        MeterSegment(id: "Free", value: Double(memory.activityMonitorFreeBytes),
+                                     color: idleColor)
+                    ],
+                    height: 12,
+                    accessibilityLabel: "Memory composition"
+                )
+
+                MeterLegend(items: [
+                    MeterLegendItem("App", value: KBFormat.bytes(memory.appMemoryBytes),
+                                    color: appColor),
+                    MeterLegendItem("Wired", value: KBFormat.bytes(memory.wiredBytes),
+                                    color: wiredColor),
+                    MeterLegendItem("Compressed", value: KBFormat.bytes(memory.compressedBytes),
+                                    color: compressedColor),
+                    MeterLegendItem("Cached", value: KBFormat.bytes(memory.cachedFileBytes),
+                                    color: cachedColor),
+                    MeterLegendItem("Free", value: KBFormat.bytes(memory.activityMonitorFreeBytes),
+                                    color: idleColor)
+                ], minItemWidth: 120)
+
+                Spacer(minLength: 0)
+            } else {
+                Text("Waiting for metrics…")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+            }
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -277,14 +313,18 @@ struct MemoryView: View {
     private var swapCard: some View {
         let memory = model.hostMetrics?.memory
         return VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .center, spacing: 6) {
+                cardIcon("arrow.left.arrow.right", tint: swapColor)
                 Text("Swap")
                     .font(.system(size: 12, weight: .semibold))
-                Spacer()
+                    .lineLimit(1)
+                Spacer(minLength: 2)
                 if let memory {
                     Text(KBFormat.bytes(memory.swapTotalBytes))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
             }
 
@@ -349,6 +389,49 @@ struct MemoryView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
+    }
+
+    /// Decorative badge matching the top-strip cards in the CPU tab.
+    private func cardIcon(_ systemImage: String, tint: Color) -> some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 20, height: 20)
+            .background {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(KBTheme.gradient(tint))
+            }
+            .accessibilityHidden(true)
+    }
+
+    /// Prominent figure for the Activity Monitor detail card.
+    private func headlineMetric(_ label: String,
+                                _ value: String,
+                                detail: String? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(value)
+                    .font(.system(size: 19, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .layoutPriority(1)
+                if let detail {
+                    Text(detail)
+                        .font(.system(size: 10, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(memoryTint)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func pressureColor(_ band: KBMemoryStats.PressureBand) -> Color {

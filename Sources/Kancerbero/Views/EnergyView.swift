@@ -12,6 +12,10 @@ struct EnergyView: View {
     private let wakeupTint = KBTheme.uploadTint
     private let batteryTint = Color(red: 0.20, green: 0.72, blue: 0.52)
 
+    @State private var showBatteryDetails = false
+    @State private var showEnergyDetails = false
+    @State private var showWakeupsDetails = false
+
     var body: some View {
         @Bindable var model = model
 
@@ -131,11 +135,31 @@ struct EnergyView: View {
     }
 
     private var batteryCard: some View {
+        Button {
+            showBatteryDetails = true
+        } label: {
+            batteryCardContent
+        }
+        .buttonStyle(.plain)
+        .help("Battery charge and power source")
+        .popover(isPresented: $showBatteryDetails, arrowEdge: .bottom) {
+            batteryDetails
+                .padding(16)
+                .frame(width: 460)
+        }
+    }
+
+    private var batteryCardContent: some View {
         let power = model.hostMetrics?.power
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text("Battery")
                     .font(.system(size: 12, weight: .semibold))
+                if power?.isPluggedIn == true {
+                    Image(systemName: "powerplug.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 if let power {
                     Text(powerLabel(power))
@@ -152,24 +176,14 @@ struct EnergyView: View {
 
                 CapacityBar(fraction: power.chargeFraction,
                             tint: batteryTintFor(power),
-                            height: 12)
+                            height: 10)
 
-                HStack(spacing: 4) {
-                    Text(timeRemainingText(power))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    if power.isPluggedIn {
-                        Label("Plugged in", systemImage: "powerplug.fill")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.secondary)
-                    }
+                HStack(alignment: .top, spacing: 12) {
+                    metric("Power source", power.source ?? "—")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    metric("Time remaining", timeRemainingText(power))
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-
-                Divider().opacity(0.4)
-
-                metric("Power source", power.source ?? "—")
-                metric("Time remaining", timeRemainingText(power))
 
                 Spacer(minLength: 0)
             } else {
@@ -181,7 +195,7 @@ struct EnergyView: View {
                 Spacer(minLength: 0)
             }
         }
-        .padding(12)
+        .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -191,10 +205,26 @@ struct EnergyView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(energyTint.opacity(0.22), lineWidth: 1)
         }
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private var energyCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        Button {
+            showEnergyDetails = true
+        } label: {
+            energyCardContent
+        }
+        .buttonStyle(.plain)
+        .help("Energy history and top processes")
+        .popover(isPresented: $showEnergyDetails, arrowEdge: .bottom) {
+            energyDetails
+                .padding(16)
+                .frame(width: 560)
+        }
+    }
+
+    private var energyCardContent: some View {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Energy")
                     .font(.system(size: 12, weight: .semibold))
@@ -216,6 +246,8 @@ struct EnergyView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .truncationMode(.middle)
+                .help(topEnergyProcess?.process.path ?? "Energy history")
 
             if model.energyUsageHistory.count > 1 {
                 Sparkline(values: model.energyUsageHistory, tint: energyTint)
@@ -228,7 +260,7 @@ struct EnergyView: View {
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
         }
-        .padding(12)
+        .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -238,10 +270,26 @@ struct EnergyView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(energyTint.opacity(0.22), lineWidth: 1)
         }
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private var wakeupsCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        Button {
+            showWakeupsDetails = true
+        } label: {
+            wakeupsCardContent
+        }
+        .buttonStyle(.plain)
+        .help("Idle wake-ups and top processes")
+        .popover(isPresented: $showWakeupsDetails, arrowEdge: .bottom) {
+            wakeupsDetails
+                .padding(16)
+                .frame(width: 460)
+        }
+    }
+
+    private var wakeupsCardContent: some View {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Idle wake-ups")
                     .font(.system(size: 12, weight: .semibold))
@@ -263,6 +311,8 @@ struct EnergyView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .truncationMode(.middle)
+                .help(topWakeupProcess?.process.path ?? "Idle wake-ups")
 
             if model.wakeupHistory.count > 1 {
                 Sparkline(values: model.wakeupHistory, tint: wakeupTint)
@@ -275,7 +325,7 @@ struct EnergyView: View {
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
         }
-        .padding(12)
+        .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -285,6 +335,7 @@ struct EnergyView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(energyTint.opacity(0.22), lineWidth: 1)
         }
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private func metric(_ label: String, _ value: String) -> some View {
@@ -312,17 +363,70 @@ struct EnergyView: View {
     }
 
     private var topEnergyProcess: CPUProcessRow? {
-        guard let row = model.cpuProcessRows.max(by: {
-            ($0.energyWatts ?? 0) < ($1.energyWatts ?? 0)
-        }), (row.energyWatts ?? 0) > 0 else { return nil }
-        return row
+        topEnergyProcesses(limit: 1).first
     }
 
     private var topWakeupProcess: CPUProcessRow? {
-        guard let row = model.cpuProcessRows.max(by: {
-            ($0.wakeupsPerSecond ?? 0) < ($1.wakeupsPerSecond ?? 0)
-        }), (row.wakeupsPerSecond ?? 0) > 0 else { return nil }
-        return row
+        topWakeupProcesses(limit: 1).first
+    }
+
+    private func topEnergyProcesses(limit: Int) -> [CPUProcessRow] {
+        Array(model.cpuProcessRows
+            .filter { ($0.energyWatts ?? 0) > 0 }
+            .sorted {
+                let lhs = $0.energyWatts ?? 0
+                let rhs = $1.energyWatts ?? 0
+                if lhs == rhs {
+                    return $0.commandText.localizedStandardCompare($1.commandText) == .orderedAscending
+                }
+                return lhs > rhs
+            }
+            .prefix(limit))
+    }
+
+    private func topWakeupProcesses(limit: Int) -> [CPUProcessRow] {
+        Array(model.cpuProcessRows
+            .filter { ($0.wakeupsPerSecond ?? 0) > 0 }
+            .sorted {
+                let lhs = $0.wakeupsPerSecond ?? 0
+                let rhs = $1.wakeupsPerSecond ?? 0
+                if lhs == rhs {
+                    return $0.commandText.localizedStandardCompare($1.commandText) == .orderedAscending
+                }
+                return lhs > rhs
+            }
+            .prefix(limit))
+    }
+
+    private func energyShareText(_ row: CPUProcessRow) -> String {
+        guard totalEnergy > 0, let watts = row.energyWatts else { return "—" }
+        return String(format: "%.0f%%", min(100, watts / totalEnergy * 100))
+    }
+
+    private func wakeupShareText(_ row: CPUProcessRow) -> String {
+        guard totalWakeups > 0, let rate = row.wakeupsPerSecond else { return "—" }
+        return String(format: "%.0f%%", min(100, rate / totalWakeups * 100))
+    }
+
+    private func processShareRow(_ row: CPUProcessRow,
+                                 detail: String,
+                                 share: String) -> some View {
+        HStack(spacing: 8) {
+            Text(row.commandText)
+                .font(.system(size: 11))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .help(row.process.path.isEmpty ? row.commandText : row.process.path)
+            Spacer(minLength: 4)
+            Text(detail)
+                .font(.system(size: 11, weight: .medium))
+                .monospacedDigit()
+            Text(share)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .frame(width: 42, alignment: .trailing)
+        }
     }
 
     private func powerLabel(_ power: KBPowerStats) -> String {
@@ -347,6 +451,174 @@ struct EnergyView: View {
         if charge <= 10 { return .red }
         if charge <= 20 { return .yellow }
         return batteryTint
+    }
+
+    // MARK: - Popover details
+
+    private var batteryDetails: some View {
+        let power = model.hostMetrics?.power
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("Battery")
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer()
+                if let power {
+                    Text(powerLabel(power))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(batteryTintFor(power))
+                }
+            }
+
+            if let power, power.hasBattery {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(power.chargePercent.map { "\($0)%" } ?? "—")
+                        .font(.system(size: 34, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                    Text(power.isPluggedIn ? "Plugged in" : "On battery")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+
+                CapacityBar(fraction: power.chargeFraction,
+                            tint: batteryTintFor(power),
+                            height: 14)
+
+                HStack(alignment: .top, spacing: 28) {
+                    metric("Power source", power.source ?? "—")
+                    metric("Time remaining", timeRemainingText(power))
+                    Spacer(minLength: 0)
+                }
+
+                Divider().opacity(0.4)
+
+                Text("Charge and time estimates come from IOKit power sources. The estimate reads “Calculating…” until macOS has enough samples.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if power != nil {
+                Text("No battery")
+                    .font(.system(size: 22, weight: .semibold, design: .rounded))
+                Text("This Mac runs on AC power.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Waiting for power metrics…")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var energyDetails: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Energy")
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer()
+                Text("\(model.energyUsageHistory.count) samples")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+
+            Text(String(format: "%.2f W", totalEnergy))
+                .font(.system(size: 30, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+
+            if model.energyUsageHistory.count > 1 {
+                Sparkline(values: model.energyUsageHistory, tint: energyTint)
+                    .frame(height: 200)
+            } else {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.secondary.opacity(0.15))
+                    .frame(height: 200)
+                    .overlay {
+                        Text("Collecting samples…")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+            }
+
+            Divider().opacity(0.4)
+
+            Text("Top processes by energy")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            let rows = topEnergyProcesses(limit: 5)
+            if rows.isEmpty {
+                Text("No per-process energy reported yet.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(spacing: 5) {
+                    ForEach(rows) { row in
+                        processShareRow(row,
+                                        detail: row.energyText,
+                                        share: energyShareText(row))
+                    }
+                }
+            }
+
+            Text("Session total of visible processes.")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var wakeupsDetails: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Idle wake-ups")
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer()
+                Text("\(model.wakeupHistory.count) samples")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+
+            Text(String(format: "%.0f/s", totalWakeups))
+                .font(.system(size: 30, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+
+            if model.wakeupHistory.count > 1 {
+                Sparkline(values: model.wakeupHistory, tint: wakeupTint)
+                    .frame(height: 180)
+            } else {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.secondary.opacity(0.15))
+                    .frame(height: 180)
+                    .overlay {
+                        Text("Collecting samples…")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+            }
+
+            Divider().opacity(0.4)
+
+            Text("Top processes by wake-ups")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            let rows = topWakeupProcesses(limit: 5)
+            if rows.isEmpty {
+                Text("No per-process wake-up data yet.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(spacing: 5) {
+                    ForEach(rows) { row in
+                        processShareRow(row,
+                                        detail: row.wakeupsText,
+                                        share: wakeupShareText(row))
+                    }
+                }
+            }
+
+            Text("Interrupt + package idle wake-ups.")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+        }
     }
 
     // MARK: - Processes

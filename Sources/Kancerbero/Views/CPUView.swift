@@ -31,9 +31,11 @@ struct CPUView: View {
             header(model: model)
 
             GeometryReader { proxy in
-                // The card strip takes one third of the space below the header;
-                // the process table keeps the remaining two thirds.
-                let topHeight = max(200, (proxy.size.height - 14) / 3)
+                // The card strip takes a bit under a third of the space below
+                // the header; the process table keeps the rest. The 200 pt floor
+                // is the smallest height at which every card still lays out
+                // without clipping.
+                let topHeight = max(200, (proxy.size.height - 14) / 3.2)
                 VStack(spacing: 14) {
                     topGroups
                         .frame(height: topHeight)
@@ -157,9 +159,10 @@ struct CPUView: View {
     /// can fill the remaining height.
     private func statCard<Content: View>(title: String,
                                          value: String,
-                                         caption: String,
+                                         caption: String? = nil,
                                          systemImage: String,
                                          tint: Color,
+                                         accessory: String? = nil,
                                          @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
@@ -181,17 +184,31 @@ struct CPUView: View {
                     .foregroundStyle(.tertiary)
             }
 
-            Text(value)
-                .font(.system(size: 19, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.65)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(value)
+                    .font(.system(size: 19, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+                    .layoutPriority(1)
 
-            Text(caption)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
+                if let accessory {
+                    Text(accessory)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let caption {
+                Text(caption)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
 
             content()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -218,18 +235,15 @@ struct CPUView: View {
         } label: {
             statCard(title: "CPU",
                      value: cpu.map { KBFormat.usagePercent($0.totalUsagePercent) } ?? "—",
-                     caption: cpu.map {
-                         "idle \(KBFormat.usagePercent($0.idlePercent))"
-                     } ?? "Waiting for metrics",
+                     caption: cpu == nil ? "Waiting for metrics" : nil,
                      systemImage: "cpu",
-                     tint: cpuTint) {
+                     tint: cpuTint,
+                     accessory: cpu.map {
+                         "idle \(KBFormat.usagePercent($0.idlePercent))"
+                     }) {
                 if let cpu {
-                    VStack(alignment: .leading, spacing: 4) {
-                        breakdownRow("User", value: cpu.userPercent, color: userColor)
-                        breakdownRow("System", value: cpu.systemPercent, color: systemColor)
-                        if cpu.nicePercent > 0.05 {
-                            breakdownRow("Nice", value: cpu.nicePercent, color: niceColor)
-                        }
+                    VStack(alignment: .leading, spacing: 6) {
+                        breakdownInlineRow(cpu)
                         CPUHistoryChart(user: model.cpuUserHistory,
                                         system: model.cpuSystemHistory,
                                         nice: model.cpuNiceHistory,
@@ -250,7 +264,7 @@ struct CPUView: View {
         .popover(isPresented: $showCPUDetails, arrowEdge: .bottom) {
             cpuDetails
                 .padding(16)
-                .frame(width: 460)
+                .frame(width: 560)
         }
     }
 
@@ -298,7 +312,7 @@ struct CPUView: View {
         .popover(isPresented: $showCoresDetails, arrowEdge: .bottom) {
             coresDetails
                 .padding(16)
-                .frame(width: 460)
+                .frame(width: 560)
         }
     }
 
@@ -436,7 +450,7 @@ struct CPUView: View {
         .popover(isPresented: $showMemoryDetails, arrowEdge: .bottom) {
             memoryDetails
                 .padding(16)
-                .frame(width: 380)
+                .frame(width: 460)
         }
     }
 
@@ -464,7 +478,7 @@ struct CPUView: View {
         .popover(isPresented: $showPressureDetails, arrowEdge: .bottom) {
             pressureDetails
                 .padding(16)
-                .frame(width: 380)
+                .frame(width: 460)
         }
     }
 
@@ -493,7 +507,7 @@ struct CPUView: View {
         .popover(isPresented: $showGPUDetails, arrowEdge: .bottom) {
             gpuDetails
                 .padding(16)
-                .frame(width: 380)
+                .frame(width: 460)
         }
     }
 
@@ -522,7 +536,7 @@ struct CPUView: View {
                                 systemColor: systemColor,
                                 niceColor: niceColor,
                                 freeColor: idleColor)
-                    .frame(height: 160)
+                    .frame(height: 200)
 
                 MeterLegend(items: [
                     MeterLegendItem("System", value: KBFormat.usagePercent(cpu.systemPercent),
@@ -722,7 +736,7 @@ struct CPUView: View {
 
                 MemoryPressureChart(values: model.memoryPressureHistory,
                                     levels: model.memoryPressureLevelHistory)
-                    .frame(height: 140)
+                    .frame(height: 180)
 
                 Text("Memory pressure is an indicator of the system’s ability to meet the memory requirements of the user’s activities. Higher memory pressure indicates that the system is reaching its limits, and performance may degrade.")
                     .font(.system(size: 10))
@@ -758,7 +772,7 @@ struct CPUView: View {
                 }
 
                 Sparkline(values: model.gpuUsageHistory, tint: gpuTint)
-                    .frame(height: 120)
+                    .frame(height: 150)
 
                 Divider().opacity(0.4)
 
@@ -805,18 +819,33 @@ struct CPUView: View {
 
     // MARK: - Small building blocks
 
-    private func breakdownRow(_ label: String, value: Double, color: Color) -> some View {
+    private func breakdownInlineRow(_ cpu: KBCPUStats) -> some View {
         HStack(spacing: 6) {
+            breakdownInlineItem("User", value: cpu.userPercent, color: userColor)
+            breakdownInlineItem("System", value: cpu.systemPercent, color: systemColor)
+            if cpu.nicePercent > 0.05 {
+                breakdownInlineItem("Nice", value: cpu.nicePercent, color: niceColor)
+            }
+            Spacer(minLength: 0)
+        }
+        .lineLimit(1)
+    }
+
+    private func breakdownInlineItem(_ label: String, value: Double, color: Color) -> some View {
+        HStack(spacing: 2) {
             Circle()
                 .fill(color)
-                .frame(width: 7, height: 7)
+                .frame(width: 5, height: 5)
             Text(label)
-                .font(.system(size: 12))
+                .font(.system(size: 9))
                 .foregroundStyle(.secondary)
-            Spacer(minLength: 2)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
             Text(KBFormat.usagePercent(value))
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 9, weight: .medium))
                 .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
         }
     }
 
