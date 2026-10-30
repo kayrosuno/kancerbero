@@ -215,6 +215,7 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--memory-search <texto>] [--memory-selected <pid>] \
   [--energy-search <texto>] [--energy-selected <pid>] \
   [--applications-search <texto>] [--applications-selected <bundle-id>] \
+  [--applications-scope user|system] \
   [--screenshot-dock <ruta>] [--dock-style <estilo|all>] \
   [--networking-focus download|upload|connections|processes] \
   [--networking-transport tcp|udp|other[,..]|all] \

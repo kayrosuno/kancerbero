@@ -137,10 +137,11 @@ private func printApps() {
     let inventory = AppInventoryCollector.snapshot()
     write("apps: \(inventory.bundles.count)\n")
     for bundle in inventory.bundles {
-        write(String(format: "  %-28@ %-12@ %-8@ %@\n",
+        write(String(format: "  %-28@ %-12@ %-8@ %-6@ %@\n",
                      bundle.name as NSString,
                      (bundle.bundleIdentifier ?? "—") as NSString,
                      bundle.kind.rawValue as NSString,
+                     bundle.scope.title as NSString,
                      bundle.path as NSString))
     }
     guard let wanted = ProcessInfo.processInfo.environment["KB_APPS_LEFTOVERS"] else {

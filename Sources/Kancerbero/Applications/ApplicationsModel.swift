@@ -11,6 +11,7 @@ final class ApplicationsModel {
     var generatedAt: Date?
     var searchText = ""
     var kindFilter = Set(KBAppKind.allCases)
+    var scopeFilter = Set(KBAppScope.allCases)
     var selectedPath: String?
 
     var leftovers: [KBLeftover] = []
@@ -42,6 +43,15 @@ final class ApplicationsModel {
                 kindFilter = Set(kinds)
             }
         }
+        if let index = arguments.firstIndex(of: "--applications-scope"),
+           index + 1 < arguments.count {
+            let scopes = arguments[index + 1]
+                .split(separator: ",")
+                .compactMap { KBAppScope(rawValue: $0.lowercased()) }
+            if !scopes.isEmpty {
+                scopeFilter = Set(scopes)
+            }
+        }
     }
 
     var visibleBundles: [KBAppBundle] {
@@ -49,7 +59,8 @@ final class ApplicationsModel {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         return bundles.filter { bundle in
-            guard kindFilter.contains(bundle.kind) else { return false }
+            guard kindFilter.contains(bundle.kind),
+                  scopeFilter.contains(bundle.scope) else { return false }
             guard !query.isEmpty else { return true }
             return bundle.name.lowercased().contains(query)
                 || (bundle.displayName?.lowercased().contains(query) ?? false)
@@ -119,7 +130,16 @@ final class ApplicationsModel {
         selectedPath = path
         leftovers = []
         checkedLeftovers = []
+        isScanningLeftovers = false
         await loadLeftovers()
+    }
+
+    /// Closes the leftovers panel without touching any file.
+    func clearSelection() {
+        selectedPath = nil
+        leftovers = []
+        checkedLeftovers = []
+        isScanningLeftovers = false
     }
 
     func loadLeftovers() async {
@@ -141,7 +161,10 @@ final class ApplicationsModel {
 
         let found = await foundTask
         let size = await sizeTask
-        guard selectedPath == bundle.path else { return }
+        guard selectedPath == bundle.path else {
+            isScanningLeftovers = false
+            return
+        }
 
         if let index = bundles.firstIndex(where: { $0.path == bundle.path }) {
             bundles[index].sizeBytes = size

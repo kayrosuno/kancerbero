@@ -21,8 +21,9 @@ struct ApplicationsView: View {
             HStack(spacing: 12) {
                 ApplicationsTable(selection: $model.selectedPath)
                 if model.selectedBundle != nil {
-                    LeftoversPanel(onTrash: { confirming = true })
-                        .frame(width: 420)
+                    LeftoversPanel(onClose: { model.clearSelection() },
+                                   onTrash: { confirming = true })
+                        .frame(minWidth: 380, idealWidth: 520, maxWidth: 600)
                         .transition(.move(edge: .trailing))
                 }
             }
@@ -74,14 +75,15 @@ struct ApplicationsView: View {
 
     private var controls: some View {
         @Bindable var model = model
-        return HStack(spacing: 10) {
-            TextField("Filter applications", text: $model.searchText)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 240)
-
+        return HStack(spacing: 8) {
             kindChip(.application, "Applications")
             kindChip(.widget, "Widgets")
             kindChip(.plugin, "Plugins")
+
+            Divider().frame(height: 14).opacity(0.4)
+
+            scopeChip(.system, "System")
+            scopeChip(.user, "User")
 
             Spacer()
 
@@ -95,6 +97,29 @@ struct ApplicationsView: View {
             }
             .disabled(model.isScanning || model.isTrashing)
         }
+    }
+
+    private func scopeChip(_ scope: KBAppScope, _ title: String) -> some View {
+        let selected = model.scopeFilter.contains(scope)
+        return Button {
+            if selected, model.scopeFilter.count > 1 {
+                model.scopeFilter.remove(scope)
+            } else {
+                model.scopeFilter.insert(scope)
+            }
+        } label: {
+            Text(title)
+                .font(.system(size: 10, weight: .medium))
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background {
+                    Capsule().fill(selected
+                        ? Color.secondary.opacity(0.20)
+                        : Color.secondary.opacity(0.08))
+                }
+                .foregroundStyle(selected ? .primary : .secondary)
+        }
+        .buttonStyle(.plain)
     }
 
     private func kindChip(_ kind: KBAppKind, _ title: String) -> some View {
