@@ -67,6 +67,22 @@ final class AppModel {
     var gpuUsageHistory: [Double] = []
     var energyUsageHistory: [Double] = []
     var wakeupHistory: [Double] = []
+    var diskReadRate: Double = 0
+    var diskWriteRate: Double = 0
+    var diskReadOpsRate: Double = 0
+    var diskWriteOpsRate: Double = 0
+    var diskReadHistory: [Double] = []
+    var diskWriteHistory: [Double] = []
+    var diskReadOpsHistory: [Double] = []
+    var diskWriteOpsHistory: [Double] = []
+    var diskReadTotalBytes: UInt64 = 0
+    var diskWriteTotalBytes: UInt64 = 0
+    var diskReadOperationsTotal: UInt64 = 0
+    var diskWriteOperationsTotal: UInt64 = 0
+    /// Baselines for the disk I/O rates (host-wide, no privileges).
+    private var previousDiskIO: DiskIOReading?
+    /// Baselines for the per-process disk fallback used with old daemons.
+    private var previousProcessIO: [KBProcessKey: (read: UInt64, written: UInt64)] = [:]
     /// Baselines for the local energy fallback used with old daemons.
     private var previousProcessEnergy: [KBProcessKey: (energy: UInt64, wakeups: UInt64)] = [:]
     var serviceStatus: SMAppService.Status = .notRegistered
@@ -673,6 +689,29 @@ final class AppModel {
             : Double(now &- previousTimestamp) / 1_000_000_000.0
         let validInterval = elapsed > 0 && elapsed < 5.0
 
+        if let io = DiskIOReader.current() {
+            if validInterval, let previous = previousDiskIO {
+                diskReadRate = io.bytesRead >= previous.bytesRead
+                    ? Double(io.bytesRead - previous.bytesRead) / elapsed : 0
+                diskWriteRate = io.bytesWritten >= previous.bytesWritten
+                    ? Double(io.bytesWritten - previous.bytesWritten) / elapsed : 0
+                diskReadOpsRate = io.readOperations >= previous.readOperations
+                    ? Double(io.readOperations - previous.readOperations) / elapsed : 0
+                diskWriteOpsRate = io.writeOperations >= previous.writeOperations
+                    ? Double(io.writeOperations - previous.writeOperations) / elapsed : 0
+            } else {
+                diskReadRate = 0
+                diskWriteRate = 0
+                diskReadOpsRate = 0
+                diskWriteOpsRate = 0
+            }
+            diskReadTotalBytes = io.bytesRead
+            diskWriteTotalBytes = io.bytesWritten
+            diskReadOperationsTotal = io.readOperations
+            diskWriteOperationsTotal = io.writeOperations
+            previousDiskIO = io
+        }
+
         var sources = snapshot.sources
         var rates: [UInt32: KBRates] = [:]
 
@@ -745,6 +784,32 @@ final class AppModel {
                 patchedProcesses[index].usage = usage
             }
             previousProcessEnergy = baseline
+        }
+        if validInterval {
+            var ioBaseline: [KBProcessKey: (read: UInt64, written: UInt64)] = [:]
+            for index in patchedProcesses.indices {
+                guard var usage = patchedProcesses[index].usage else { continue }
+                if usage.diskBytesReadPerSecond == nil,
+                   (patchedProcesses[index].uid == UInt32(getuid()) || isRoot),
+                   let reading = ProcessIOReader.current(pid: patchedProcesses[index].pid) {
+                    let key = patchedProcesses[index].id
+                    usage.diskBytesRead = reading.read
+                    usage.diskBytesWritten = reading.written
+                    usage.logicalWrites = reading.writes
+                    if let prior = previousProcessIO[key], reading.read >= prior.read {
+                        usage.diskBytesReadPerSecond =
+                            Double(reading.read - prior.read) / elapsed
+                        usage.diskBytesWrittenPerSecond = reading.written >= prior.written
+                            ? Double(reading.written - prior.written) / elapsed : 0
+                    } else {
+                        usage.diskBytesReadPerSecond = 0
+                        usage.diskBytesWrittenPerSecond = 0
+                    }
+                    ioBaseline[key] = (reading.read, reading.written)
+                }
+                patchedProcesses[index].usage = usage
+            }
+            previousProcessIO = ioBaseline
         }
         if patchedProcesses.contains(where: {
             $0.usage != nil && $0.usage?.preventingSleep == nil
@@ -864,6 +929,10 @@ final class AppModel {
         wakeupHistory.append(processes.reduce(0.0) {
             $0 + ($1.usage?.wakeupsPerSecond ?? 0)
         })
+        diskReadHistory.append(diskReadRate)
+        diskWriteHistory.append(diskWriteRate)
+        diskReadOpsHistory.append(diskReadOpsRate)
+        diskWriteOpsHistory.append(diskWriteOpsRate)
 
         let limit = 60
         trim(&rxHistory, limit: limit)
@@ -881,6 +950,33 @@ final class AppModel {
         trim(&gpuUsageHistory, limit: limit)
         trim(&energyUsageHistory, limit: limit)
         trim(&wakeupHistory, limit: limit)
+        trim(&diskReadHistory, limit: limit)
+        trim(&diskWriteHistory, limit: limit)
+        trim(&diskReadOpsHistory, limit: limit)
+        trim(&diskWriteOpsHistory, limit: limit)
+    }
+
+    /// Clears every graph history (Dock icon "Clear History").
+    func clearHistories() {
+        rxHistory.removeAll()
+        txHistory.removeAll()
+        sampleDates.removeAll()
+        cpuUsageHistory.removeAll()
+        cpuUserHistory.removeAll()
+        cpuSystemHistory.removeAll()
+        cpuNiceHistory.removeAll()
+        loadHistory.removeAll()
+        threadHistory.removeAll()
+        memoryUsageHistory.removeAll()
+        memoryPressureHistory.removeAll()
+        memoryPressureLevelHistory.removeAll()
+        gpuUsageHistory.removeAll()
+        energyUsageHistory.removeAll()
+        wakeupHistory.removeAll()
+        diskReadHistory.removeAll()
+        diskWriteHistory.removeAll()
+        diskReadOpsHistory.removeAll()
+        diskWriteOpsHistory.removeAll()
     }
 
     private func trim<Element>(_ values: inout [Element], limit: Int) {

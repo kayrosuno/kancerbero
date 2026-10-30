@@ -65,9 +65,10 @@
   produce el daemon root. Sin root solo cubre el uid actual. Los historiales y
   `KBRates` siguen en bytes/s; la presentación usa `KBFormat.bitRate` y los totales acumulados
   `KBFormat.bytes`.
-- `DiskView`: `PillTabBar` con Volumes / Analyzer. Volumes muestra el árbol
+- `DiskView`: `PillTabBar` con Volumes / Analyzer / I/O. Volumes muestra el árbol
   disco → partición → contenedor APFS → volumen, un inspector y `CapacityBar`; Analyzer muestra
-  controles de escaneo, progreso, `RadialDiskMap` y las tablas de contenidos y mayores archivos.
+  controles de escaneo, progreso, `RadialDiskMap` y las tablas de contenidos y mayores archivos;
+  I/O muestra el gráfico Data/Operations y la tabla de procesos por actividad de disco.
   Las tarjetas de ambas subpestañas filtran el contenido (medios/volúmenes/orden por tamaño o
   espacio libre; todo/ficheros/carpetas/denegados).
 - `DaemonsView`: inventario launchd deduplicado por label (`DaemonDeduplicator`). Los filtros de
@@ -106,6 +107,11 @@
   USER y `Preventing Sleep` (assertions `PreventUserIdleSystemSleep`/`PreventSystemSleep` vía
   `IOPMCopyAssertionsByProcess`). Energía y wake-ups son acumulativos en `rusage_info_v6` y
   `ProcessCPUTracker` los convierte en tasas por segundo.
+- `DockIconController`/`DockIconView`: `NSDockTile.contentView` con una vista AppKit que dibuja
+  CPU usage/history, red, disco (`IOBlockStorageDriver`), memoria, presión, GPU y energía; el
+  controlador vive en `KancerberoApp`, refresca cada 0,5 s y no depende de ninguna vista. La
+  preferencia es `@AppStorage("dockIconStyle")` y “Show Application Icon” pone el contentView a
+  `nil` para recuperar el icono de la app.
 - `StatusBar`: barra inferior contextual; muestra métricas de la sección activa y el estado global
   del daemon/actualización de la fuente correspondiente.
 - `SystemStatusView`: ventana “System status” (escena `Window` con id `system-status`, abierta con
@@ -119,15 +125,16 @@
   `retryDaemonConnection`, `repairDaemonService` (unregister + register para re-lanzar la
   aprobación), `revealAppInFinder`, `openApplicationsFolder` y `copyLegacyRemovalCommands`. La
   ventana abre Settings/Finder y usa SMAppService; no ejecuta sudo ni scripts.
-- Persistencia: `@AppStorage("selectedSection")`, `@AppStorage("networkingTab")` y
-  `@AppStorage("diskTab")`. El estado de UI de cada sección (filtros, tarjeta activa, selección,
+- Persistencia: `@AppStorage("selectedSection")`, `@AppStorage("networkingTab")`,
+  `@AppStorage("diskTab")` y `@AppStorage("dockIconStyle")`. El estado de UI de cada sección (filtros, tarjeta activa, selección,
   panel de detalle y árbol expandido) vive en `UIState`, un `@Observable` inyectado desde
   `KancerberoApp`. Es **solo de sesión**: sobrevive a la destrucción de las vistas al cambiar de
   sección/subpestaña, pero no se guarda en disco. Los overrides `--networking-focus`,
   `--networking-transport`, `--networking-ip` y `--networking-state` (listas separadas por comas;
   `all` o un valor desconocido no filtran), `--networking-connection-search`,
   `--networking-process-ip`, `--networking-process-protocol`, `--networking-process-socket`,
-  `--networking-search`, `--daemon-*`, `--volumes-focus`, `--analyzer-focus`, `--cpu-search`,
+  `--networking-search`, `--daemon-*`, `--volumes-focus`, `--analyzer-focus`,
+  `--disk-io-search`, `--disk-io-selected`, `--disk-io-graph`, `--cpu-search`,
   `--cpu-selected`, `--memory-search`, `--memory-selected`, `--energy-search` y
   `--energy-selected` se aplican una sola vez al crear `UIState`.
 - Settings: `KancerberoApp` añade una escena nativa `Settings` con `SettingsView`. El toggle
@@ -144,9 +151,10 @@
   `--networking-focus`, `--networking-transport`, `--networking-ip`, `--networking-state`,
   `--networking-connection-search`, `--networking-process-ip`,
   `--networking-process-protocol`, `--networking-process-socket`, `--networking-search`,
-  `--volumes-focus`, `--analyzer-focus`, `--cpu-search`, `--cpu-selected`, `--memory-search`,
-  `--memory-selected`, `--energy-search`, `--energy-selected`, filtros `--daemon-*` y
-  `--sidebar-collapsed` (ver `docs/verification.md`).
+  `--volumes-focus`, `--analyzer-focus`, `--disk-io-search`, `--disk-io-selected`,
+  `--disk-io-graph`, `--cpu-search`, `--cpu-selected`, `--memory-search`,
+  `--memory-selected`, `--energy-search`, `--energy-selected`, `--screenshot-dock`,
+  `--dock-style`, filtros `--daemon-*` y `--sidebar-collapsed` (ver `docs/verification.md`).
 
 ## Flujo de datos
 
@@ -239,6 +247,15 @@
     asignado; hit-test por radio/ángulo. Las etiquetas muestran nombre y tamaño humano en dos
     líneas. El centro muestra el nodo actual y el porcentaje del volumen; pulsarlo sube un
     nivel. Respeta Reduce Motion.
+- **Actividad de E/S (`DiskIOView`)**
+  - Host: `kb_disk_io_read` recorre `IOBlockStorageDriver` y suma su `Statistics` (`Bytes
+    (Read/Write)`, `Operations (Read/Write)`); `DiskIOReader` y `AppModel` derivan tasas por
+    muestra, totales acumulados y los históricos de 60 muestras (bytes y operaciones).
+  - Procesos: `rusage_info_v6` (`ri_diskio_bytesread`, `ri_diskio_byteswritten`,
+    `ri_logical_writes`), convertidos a tasas por `ProcessCPUTracker`; con daemons antiguos la app
+    rellena los procesos del usuario mediante `ProcessIOReader`/`kb_process_io_read`. El gráfico
+    (`DiskIOChart`) alterna Data/Operations y la tabla (`DiskIOProcessTable`) ordena por actividad
+    con estado, PID y usuario.
 - **Límites:** SMART no está expuesto por APIs públicas; los volúmenes desmontados no tienen
   libre/usado; los hard links se cuentan por entrada; clones/snapshots APFS hacen que la suma de
   tamaños no coincida exactamente con el “Used” del contenedor.

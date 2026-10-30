@@ -157,6 +157,8 @@ public struct ProcessCPUTracker {
         var cpuTime: UInt64
         var energy: UInt64
         var wakeups: UInt64
+        var diskRead: UInt64
+        var diskWrite: UInt64
     }
 
     private var previous: [KBProcessKey: Counters] = [:]
@@ -178,7 +180,11 @@ public struct ProcessCPUTracker {
             let current = usage.cpuTimeNanoseconds
             let energy = usage.energyNanojoules ?? 0
             let wakeups = (usage.interruptWakeups ?? 0) &+ (usage.packageIdleWakeups ?? 0)
-            baseline[key] = Counters(cpuTime: current, energy: energy, wakeups: wakeups)
+            let diskRead = usage.diskBytesRead ?? 0
+            let diskWrite = usage.diskBytesWritten ?? 0
+            baseline[key] = Counters(cpuTime: current, energy: energy,
+                                     wakeups: wakeups,
+                                     diskRead: diskRead, diskWrite: diskWrite)
 
             if let prior = previous[key], validInterval {
                 if current >= prior.cpuTime {
@@ -193,10 +199,18 @@ public struct ProcessCPUTracker {
                 usage.wakeupsPerSecond = wakeups >= prior.wakeups
                     ? Double(wakeups - prior.wakeups) / elapsed
                     : 0
+                usage.diskBytesReadPerSecond = diskRead >= prior.diskRead
+                    ? Double(diskRead - prior.diskRead) / elapsed
+                    : 0
+                usage.diskBytesWrittenPerSecond = diskWrite >= prior.diskWrite
+                    ? Double(diskWrite - prior.diskWrite) / elapsed
+                    : 0
             } else {
                 usage.cpuPercent = 0
                 usage.energyWatts = 0
                 usage.wakeupsPerSecond = 0
+                usage.diskBytesReadPerSecond = 0
+                usage.diskBytesWrittenPerSecond = 0
             }
 
             if totalMemoryBytes > 0 {
@@ -308,5 +322,19 @@ public enum ProcessEnergyReader {
             return nil
         }
         return (energy, interrupt &+ idle)
+    }
+}
+
+/// Per-process cumulative disk counters from rusage_info_v6.
+public enum ProcessIOReader {
+    public static func current(pid: Int32) -> (read: UInt64, written: UInt64,
+                                               writes: UInt64)? {
+        var read: UInt64 = 0
+        var written: UInt64 = 0
+        var writes: UInt64 = 0
+        guard kb_process_io_read(pid, &read, &written, &writes) == 0 else {
+            return nil
+        }
+        return (read, written, writes)
     }
 }

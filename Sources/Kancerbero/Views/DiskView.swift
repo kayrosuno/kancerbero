@@ -4,6 +4,7 @@ import KancerberoCore
 struct DiskView: View {
     @Binding var tab: DiskTab
     @Environment(DiskModel.self) private var disk
+    @Environment(AppModel.self) private var model
     @AppStorage(KBPreferences.tabAnimationsKey)
     private var tabAnimations = KBPreferences.tabAnimationsDefault
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -44,6 +45,8 @@ struct DiskView: View {
                     }
                 case .analyzer:
                     DiskAnalyzerView()
+                case .io:
+                    DiskIOView()
                 }
             }
             .id(tab)
@@ -66,7 +69,7 @@ struct DiskView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Disk")
                     .font(.system(size: 26, weight: .semibold, design: .rounded))
-                Text("Volumes, filesystems and space analysis")
+                Text("Volumes, analysis and disk I/O")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -103,6 +106,8 @@ struct DiskView: View {
                 return "\(KBFormat.bytes(node.allocatedBytes)) · \(KBFormat.compactCount(node.fileCount)) files"
             }
             return "Not scanned"
+        case .io:
+            return "Read \(KBFormat.byteRate(model.diskReadRate)) · Write \(KBFormat.byteRate(model.diskWriteRate))"
         }
     }
 }

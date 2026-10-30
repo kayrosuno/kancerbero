@@ -20,6 +20,7 @@
 #include <IOKit/ps/IOPSKeys.h>
 #include <IOKit/ps/IOPowerSources.h>
 #include <IOKit/pwr_mgt/IOPMLib.h>
+#include <IOKit/storage/IOBlockStorageDriver.h>
 
 /*
  * Exported by libsystem_kernel and used by Activity Monitor. It fills the
@@ -306,6 +307,53 @@ int kb_power_stats_read(kb_power_stats *out)
     CFRelease(sources);
     CFRelease(blob);
     return 0;
+}
+
+int kb_disk_io_read(uint64_t *bytes_read, uint64_t *bytes_written,
+                    uint64_t *read_ops, uint64_t *write_ops)
+{
+    if (!bytes_read || !bytes_written || !read_ops || !write_ops) {
+        return -1;
+    }
+    *bytes_read = 0;
+    *bytes_written = 0;
+    *read_ops = 0;
+    *write_ops = 0;
+
+    io_iterator_t iterator = 0;
+    if (IOServiceGetMatchingServices(kIOMainPortDefault,
+                                     IOServiceMatching("IOBlockStorageDriver"),
+                                     &iterator) != KERN_SUCCESS) {
+        return -1;
+    }
+
+    int found = 0;
+    io_service_t service = 0;
+    while ((service = IOIteratorNext(iterator)) != 0) {
+        CFMutableDictionaryRef properties = NULL;
+        if (IORegistryEntryCreateCFProperties(service, &properties,
+                                              kCFAllocatorDefault, 0) == KERN_SUCCESS
+            && properties) {
+            CFTypeRef statistics = CFDictionaryGetValue(
+                properties, CFSTR(kIOBlockStorageDriverStatisticsKey));
+            if (statistics && CFGetTypeID(statistics) == CFDictionaryGetTypeID()) {
+                CFDictionaryRef dictionary = (CFDictionaryRef)statistics;
+                *bytes_read += kb_cf_u64(
+                    dictionary, CFSTR(kIOBlockStorageDriverStatisticsBytesReadKey));
+                *bytes_written += kb_cf_u64(
+                    dictionary, CFSTR(kIOBlockStorageDriverStatisticsBytesWrittenKey));
+                *read_ops += kb_cf_u64(
+                    dictionary, CFSTR(kIOBlockStorageDriverStatisticsReadsKey));
+                *write_ops += kb_cf_u64(
+                    dictionary, CFSTR(kIOBlockStorageDriverStatisticsWritesKey));
+                found = 1;
+            }
+            CFRelease(properties);
+        }
+        IOObjectRelease(service);
+    }
+    IOObjectRelease(iterator);
+    return found ? 0 : -1;
 }
 
 int kb_prevent_sleep_pids(int32_t **pids, size_t *count)

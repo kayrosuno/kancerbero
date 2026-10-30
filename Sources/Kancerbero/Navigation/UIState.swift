@@ -96,6 +96,13 @@ final class UIState {
             .flatMap { DiskVolumesFocus(rawValue: $0.lowercased()) }
         disk.analyzerFocus = Self.value(for: "--analyzer-focus", in: arguments)
             .flatMap { DiskAnalyzerFocus(rawValue: $0.lowercased()) } ?? .scanned
+        disk.ioSearch = Self.value(for: "--disk-io-search", in: arguments) ?? ""
+        disk.ioPendingSelectionPID = Self.value(for: "--disk-io-selected", in: arguments)
+            .flatMap(Int32.init)
+        if let raw = Self.value(for: "--disk-io-graph", in: arguments),
+           let mode = DiskIOGraphMode(rawValue: raw.lowercased()) {
+            disk.ioGraphMode = mode
+        }
 
         cpu.search = Self.value(for: "--cpu-search", in: arguments) ?? ""
         cpu.pendingSelectionPID = Self.value(for: "--cpu-selected", in: arguments)
@@ -194,6 +201,14 @@ struct DiskUIState: Equatable {
     var analyzerFocus: DiskAnalyzerFocus = .scanned
     /// nil means "use DiskModel.scanRootPath".
     var analyzerPathDraft: String?
+
+    var ioSearch = ""
+    var ioSelectedProcess: KBProcessKey?
+    var ioSortOrder: [KeyPathComparator<CPUProcessRow>] = [
+        KeyPathComparator(\CPUProcessRow.diskSortValue, order: .reverse)
+    ]
+    var ioPendingSelectionPID: Int32?
+    var ioGraphMode: DiskIOGraphMode = .data
 }
 
 struct CPUUIState: Equatable {

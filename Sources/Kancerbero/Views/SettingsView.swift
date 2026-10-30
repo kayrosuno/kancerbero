@@ -5,6 +5,8 @@ struct SettingsView: View {
     private var tabAnimations = KBPreferences.tabAnimationsDefault
     @AppStorage(KBPreferences.statusBarTextAnimationsKey)
     private var statusBarTextAnimations = KBPreferences.statusBarTextAnimationsDefault
+    @AppStorage(KBPreferences.dockIconStyleKey)
+    private var dockIconStyle = KBPreferences.dockIconStyleDefault
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -31,6 +33,22 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             } header: {
                 Text("Status bar")
+            }
+
+            Section {
+                Picker("Dock icon", selection: $dockIconStyle) {
+                    ForEach(DockIconStyle.allCases) { style in
+                        Text(style.title).tag(style.rawValue)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Text("Shows a live graph in the Dock instead of the application icon. “Show Application Icon” restores the default; the Dock Icon menu offers the same choices.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } header: {
+                Text("Dock")
             }
 
             if reduceMotion {

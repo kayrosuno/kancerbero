@@ -55,6 +55,13 @@ public struct KBProcessUsage: Codable, Sendable, Hashable {
     public var wakeupsPerSecond: Double?
     /// True when the PID holds a PreventUserIdleSystemSleep/PreventSystemSleep assertion.
     public var preventingSleep: Bool?
+    /// Cumulative disk counters from rusage_info_v6.
+    public var diskBytesRead: UInt64?
+    public var diskBytesWritten: UInt64?
+    public var logicalWrites: UInt64?
+    /// Disk rates computed between samples by `ProcessCPUTracker`.
+    public var diskBytesReadPerSecond: Double?
+    public var diskBytesWrittenPerSecond: Double?
 
     public init(cpuTimeNanoseconds: UInt64 = 0, residentBytes: UInt64 = 0,
                 virtualBytes: UInt64 = 0, threads: Int = 0,
@@ -65,7 +72,12 @@ public struct KBProcessUsage: Codable, Sendable, Hashable {
                 packageIdleWakeups: UInt64? = nil,
                 energyWatts: Double? = nil,
                 wakeupsPerSecond: Double? = nil,
-                preventingSleep: Bool? = nil) {
+                preventingSleep: Bool? = nil,
+                diskBytesRead: UInt64? = nil,
+                diskBytesWritten: UInt64? = nil,
+                logicalWrites: UInt64? = nil,
+                diskBytesReadPerSecond: Double? = nil,
+                diskBytesWrittenPerSecond: Double? = nil) {
         self.cpuTimeNanoseconds = cpuTimeNanoseconds
         self.residentBytes = residentBytes
         self.virtualBytes = virtualBytes
@@ -80,6 +92,11 @@ public struct KBProcessUsage: Codable, Sendable, Hashable {
         self.energyWatts = energyWatts
         self.wakeupsPerSecond = wakeupsPerSecond
         self.preventingSleep = preventingSleep
+        self.diskBytesRead = diskBytesRead
+        self.diskBytesWritten = diskBytesWritten
+        self.logicalWrites = logicalWrites
+        self.diskBytesReadPerSecond = diskBytesReadPerSecond
+        self.diskBytesWrittenPerSecond = diskBytesWrittenPerSecond
     }
 }
 

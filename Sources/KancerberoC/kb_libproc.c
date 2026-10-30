@@ -143,6 +143,9 @@ int kb_process_list(kb_process **out, size_t *count)
             item->penergy_nj = usage.ri_penergy_nj;
             item->interrupt_wkups = usage.ri_interrupt_wkups;
             item->pkg_idle_wkups = usage.ri_pkg_idle_wkups;
+            item->diskio_bytes_read = usage.ri_diskio_bytesread;
+            item->diskio_bytes_written = usage.ri_diskio_byteswritten;
+            item->logical_writes = usage.ri_logical_writes;
         }
     }
     return 0;
@@ -173,6 +176,30 @@ int kb_process_energy_read(int32_t pid, uint64_t *energy_nj,
     }
     if (pkg_idle_wkups) {
         *pkg_idle_wkups = usage.ri_pkg_idle_wkups;
+    }
+    return 0;
+}
+
+int kb_process_io_read(int32_t pid, uint64_t *bytes_read,
+                       uint64_t *bytes_written, uint64_t *logical_writes)
+{
+    if (pid <= 0) {
+        return -1;
+    }
+    struct rusage_info_v6 usage;
+    memset(&usage, 0, sizeof(usage));
+    if (proc_pid_rusage((pid_t)pid, RUSAGE_INFO_V6,
+                        (rusage_info_t *)&usage) != 0) {
+        return -1;
+    }
+    if (bytes_read) {
+        *bytes_read = usage.ri_diskio_bytesread;
+    }
+    if (bytes_written) {
+        *bytes_written = usage.ri_diskio_byteswritten;
+    }
+    if (logical_writes) {
+        *logical_writes = usage.ri_logical_writes;
     }
     return 0;
 }

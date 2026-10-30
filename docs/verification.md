@@ -83,11 +83,14 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   --screenshot /tmp/kancerbero-ui.png \
   [--section networking|disk|daemons|cpu|memory|energy] \
   [--tab interfaces|connections|processes] \
-  [--disk-tab volumes|analyzer] \
+  [--disk-tab volumes|analyzer|io] \
   [--disk-path=<carpeta>] [--disk-scan] [--disk-item <diskXsY>] \
+  [--disk-io-search <texto>] [--disk-io-selected <pid>] \
+  [--disk-io-graph data|operations] \
   [--cpu-search <texto>] [--cpu-selected <pid>] \
   [--memory-search <texto>] [--memory-selected <pid>] \
   [--energy-search <texto>] [--energy-selected <pid>] \
+  [--screenshot-dock <ruta>] [--dock-style <estilo|all>] \
   [--networking-transport tcp|udp|other[,..]|all] \
   [--networking-ip ipv4|ipv6[,..]|all] \
   [--networking-state established|listening|connecting|closing|other[,..]|all] \
@@ -100,9 +103,14 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
 
 `--section` selecciona la sección de primer nivel, `--tab` la subpestaña de Networking,
 `--disk-tab` la de Disk, `--disk-path`/`--disk-scan` lanzan el analizador sobre una ruta y
-`--disk-item` preselecciona un dispositivo en Volumes. `--cpu-search` aplica el filtro inicial de
+`--disk-item` preselecciona un dispositivo en Volumes. `--disk-tab io` abre la pestaña de
+actividad; `--disk-io-search`/`--disk-io-selected` filtran y preseleccionan procesos y
+`--disk-io-graph data|operations` elige el tipo de gráfico. `--cpu-search` aplica el filtro inicial de
 la tabla de CPU, `--cpu-selected` preselecciona un PID, `--memory-search`/`--memory-selected`
 hacen lo mismo en la tabla de Memory, `--energy-search`/`--energy-selected` en la de Energy,
+`--screenshot-dock` renderiza el icono del Dock a PNG (256×256) y `--dock-style` elige el estilo
+(`applicationIcon`, `cpuUsage`, `cpuHistory`, `networkUsage`, `diskActivity`, `memoryUsage`,
+`memoryPressure`, `gpuUsage`, `energyUsage` o `all`),
 `--networking-transport`/`--networking-ip`
 marcan solo esos checkboxes (lista con comas; `all` equivale a todos), `--networking-state` marca
 solo esas categorías de estado TCP, `--networking-connection-search` el filtro de proceso de
@@ -212,6 +220,8 @@ $K --screenshot /tmp/kb-disk-free.png --section disk \
 $K --screenshot /tmp/kb-disk-folders.png --section disk \
   --disk-tab analyzer --disk-path="$HOME/Documents" --disk-scan \
   --analyzer-focus folders --screenshot-delay 8
+$K --screenshot /tmp/kb-disk-io.png --section disk \
+  --disk-tab io --screenshot-delay 6
 ```
 
 La barra inferior debe mostrar métricas de la sección activa y la marca de actualización de su
@@ -344,6 +354,23 @@ $K --screenshot /tmp/kb-energy-filter.png --section energy \
   la GPU no se muestran.
 - Sin daemon root la tabla solo enumera procesos del uid actual; el fallback local rellena
   energía/batería cuando el daemon conectado es antiguo.
+
+Icono del Dock:
+
+```bash
+K=./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
+$K --screenshot-dock /tmp/dock.png --dock-style all --screenshot-delay 6
+ioreg -r -d 1 -w 0 -c IOBlockStorageDriver | grep Statistics
+```
+
+- Se generan `/tmp/dock-<estilo>.png` (CPU usage/history, red, disco, memoria, presión, GPU,
+  energía). Cada tile debe ser legible: CPU History apilado, NET/DISK con dos gráficos
+  (RX/TX, lectura/escritura) e importes que coinciden con las pestañas.
+- En la app, el menú **Dock Icon** (y Ajustes → Dock) cambia el icono en vivo; “Show Application
+  Icon” restaura el icono; la elección persiste en `dockIconStyle` y `Clear History` vacía los
+  históricos. El controlador sigue refrescando con la ventana cerrada.
+- La actividad de disco sale de `IOBlockStorageDriver.Statistics` (`Bytes (Read)`/`Bytes (Write)`)
+  y es host-wide sin privilegios; comparar las tasas con deltas de `ioreg`.
 
 Tarjeta Traffic, Activity, Protocols y filtros de protocolo:
 
@@ -540,7 +567,17 @@ Capturas:
 ./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   --screenshot /tmp/kb-disk-analyzer.png --section disk --disk-tab analyzer \
   --disk-path="$HOME/Documents" --disk-scan --screenshot-delay 8
+./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
+  --screenshot /tmp/kb-disk-io.png --section disk --disk-tab io \
+  --screenshot-delay 6
 ```
+
+- En la captura de I/O, copiar un archivo grande mientras la pestaña está abierta: el gráfico y
+  las tasas Read/Write deben moverse; Data/Operations cambia las unidades; los totales
+  “Reads in/Writes out/Data read/Data written” deben coincidir con
+  `ioreg -r -d 1 -w 0 -c IOBlockStorageDriver | grep Statistics`. La tabla se ordena por
+  actividad y los procesos sin contadores (`usage` nulo o daemon antiguo) muestran “—”; el
+  fallback local rellena los del usuario y el daemon actualizado todos.
 
 Mapa en vivo durante el escaneo:
 
