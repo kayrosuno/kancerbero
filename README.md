@@ -142,8 +142,8 @@ intervalo de muestreo con el que arranca la app (2 s por defecto) y el icono del
 guarda en `UserDefaults` y las animaciones respetan Reduce Motion de macOS. El selector del
 toolbar cambia el intervalo solo durante la sesión y no modifica la preferencia de arranque.
 
-El panel se oculta con el toggle de la toolbar o `Cmd+Ctrl+S`; `Cmd+1/2/3/4/5/6` cambia de sección
-(Networking, Disk, Daemons, CPU, Memory, Energy).
+El panel se oculta con el toggle de la toolbar o `Cmd+Ctrl+S`; `Cmd+1/2/3/4/5/6/7` cambia de sección
+(Networking, Disk, Daemons, CPU, Memory, Energy, Applications).
 
 ## Compilar
 
@@ -205,7 +205,7 @@ Captura de la UI sin permisos de Grabación de pantalla (la app se dibuja a sí 
 ```bash
 build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   --screenshot /tmp/kancerbero-ui.png \
-  [--section networking|disk|daemons|cpu|memory|energy] \
+  [--section networking|disk|daemons|cpu|memory|energy|applications] \
   [--tab interfaces|connections|processes] \
   [--disk-tab volumes|analyzer|io] \
   [--disk-path=<carpeta>] [--disk-scan] [--disk-item <diskXsY>] \
@@ -214,6 +214,7 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--cpu-search <texto>] [--cpu-selected <pid>] \
   [--memory-search <texto>] [--memory-selected <pid>] \
   [--energy-search <texto>] [--energy-selected <pid>] \
+  [--applications-search <texto>] [--applications-selected <bundle-id>] \
   [--screenshot-dock <ruta>] [--dock-style <estilo|all>] \
   [--networking-focus download|upload|connections|processes] \
   [--networking-transport tcp|udp|other[,..]|all] \

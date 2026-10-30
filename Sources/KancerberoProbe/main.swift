@@ -133,6 +133,36 @@ private func printCPU(interval: Double) {
     }
 }
 
+private func printApps() {
+    let inventory = AppInventoryCollector.snapshot()
+    write("apps: \(inventory.bundles.count)\n")
+    for bundle in inventory.bundles {
+        write(String(format: "  %-28@ %-12@ %-8@ %@\n",
+                     bundle.name as NSString,
+                     (bundle.bundleIdentifier ?? "—") as NSString,
+                     bundle.kind.rawValue as NSString,
+                     bundle.path as NSString))
+    }
+    guard let wanted = ProcessInfo.processInfo.environment["KB_APPS_LEFTOVERS"] else {
+        return
+    }
+    guard let bundle = inventory.bundles.first(where: {
+        $0.path == wanted || $0.bundleIdentifier == wanted
+    }) else {
+        write("leftovers: bundle not found\n")
+        return
+    }
+    let leftovers = AppLeftoversCollector.leftovers(for: bundle)
+    write("leftovers for \(bundle.name): \(leftovers.count)\n")
+    for item in leftovers {
+        write(String(format: "  %-18@ %10lld %@%@\n",
+                     item.kind.title as NSString,
+                     item.sizeBytes ?? 0,
+                     item.requiresPrivilege ? "[admin] " : "",
+                     item.path as NSString))
+    }
+}
+
 private func printProcessesCPU(limit: Int, interval: Double) {
     var sampler = HostMetricsSampler()
     var tracker = ProcessCPUTracker()
@@ -458,6 +488,8 @@ case "procs":
     }
 case "cpu":
     printCPU(interval: doubleOption("--interval", default: 1))
+case "apps":
+    printApps()
 case "ifaces":
     printInterfaces()
 case "sockets":
@@ -532,5 +564,5 @@ case "all":
     printInterfaces()
     printNStat(seconds: integerOption("--seconds", default: 3))
 default:
-    fail("unknown command '\(command)'. Use: version|symbols|procs [--cpu]|cpu|ifaces|sockets <pid>|sockets-summary [pid...]|files <pid>|daemons|disk|nstat|all")
+    fail("unknown command '\(command)'. Use: version|symbols|procs [--cpu]|cpu|apps|ifaces|sockets <pid>|sockets-summary [pid...]|files <pid>|daemons|disk|nstat|all")
 }

@@ -76,17 +76,21 @@ public struct KBRequestMessage: Codable, Sendable {
         case processDetail
         case daemonServices
         case daemonAction
+        case trashItems
     }
 
     public var kind: Kind
     public var pid: Int32?
     public var daemonRequest: KBDaemonActionRequest?
+    public var trashRequest: KBTrashRequest?
 
     public init(kind: Kind, pid: Int32? = nil,
-                daemonRequest: KBDaemonActionRequest? = nil) {
+                daemonRequest: KBDaemonActionRequest? = nil,
+                trashRequest: KBTrashRequest? = nil) {
         self.kind = kind
         self.pid = pid
         self.daemonRequest = daemonRequest
+        self.trashRequest = trashRequest
     }
 }
 
@@ -103,6 +107,54 @@ public struct KBDaemonActionResultPayload: Codable, Sendable {
 
     public init(result: KBDaemonActionResult) {
         self.result = result
+    }
+}
+
+/// One path the uninstaller wants moved to the trash. `kind` is an advisory
+/// string (application, widget, plugin, file, launchAgent, launchDaemon); the
+/// daemon re-derives identities from the file system instead of trusting it.
+public struct KBTrashItem: Codable, Sendable {
+    public var path: String
+    public var kind: String
+    public var bundleIdentifier: String?
+
+    public init(path: String, kind: String, bundleIdentifier: String? = nil) {
+        self.path = path
+        self.kind = kind
+        self.bundleIdentifier = bundleIdentifier
+    }
+}
+
+public struct KBTrashRequest: Codable, Sendable {
+    public var items: [KBTrashItem]
+
+    public init(items: [KBTrashItem]) {
+        self.items = items
+    }
+}
+
+public struct KBTrashResult: Codable, Sendable {
+    public var path: String
+    public var trashedPath: String?
+    public var ok: Bool
+    public var code: String?
+    public var message: String?
+
+    public init(path: String, trashedPath: String? = nil, ok: Bool,
+                code: String? = nil, message: String? = nil) {
+        self.path = path
+        self.trashedPath = trashedPath
+        self.ok = ok
+        self.code = code
+        self.message = message
+    }
+}
+
+public struct KBTrashResponsePayload: Codable, Sendable {
+    public var results: [KBTrashResult]
+
+    public init(results: [KBTrashResult]) {
+        self.results = results
     }
 }
 

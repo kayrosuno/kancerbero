@@ -4,6 +4,7 @@ import KancerberoFilterContract
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @Environment(DiskModel.self) private var disk
+    @Environment(ApplicationsModel.self) private var applications
     @Environment(FilterModel.self) private var filter
     @Environment(\.openWindow) private var openWindow
     @AppStorage("selectedSection") private var sectionRaw = AppSection.networking.rawValue
@@ -104,6 +105,8 @@ struct RootView: View {
                         MemoryView()
                     case .energy:
                         EnergyView()
+                    case .applications:
+                        ApplicationsView()
                     }
                 }
                 .id(currentSection)
@@ -178,6 +181,8 @@ struct RootView: View {
             Task { await model.refreshDaemons() }
         case .networking, .cpu, .memory, .energy:
             model.refreshNow()
+        case .applications:
+            Task { await applications.refresh(force: true) }
         }
     }
 
@@ -185,6 +190,7 @@ struct RootView: View {
         switch currentSection {
         case .disk: return "Refresh volumes"
         case .daemons: return "Refresh services"
+        case .applications: return "Rescan applications"
         default: return "Refresh now"
         }
     }

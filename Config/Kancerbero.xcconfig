@@ -14,5 +14,5 @@ PROVISIONING_PROFILE_SPECIFIER[config=Release] = $(KANCERBERO_APP_PROFILE)
 // strip them, which it refuses with "not stripping binary because it is signed".
 // Each target strips its own product via STRIP_INSTALLED_PRODUCT instead.
 COPY_PHASE_STRIP = NO
-OTHER_LDFLAGS = $(inherited) -framework CoreFoundation -framework IOKit -framework DiskArbitration -framework ServiceManagement -framework NetworkExtension
+OTHER_LDFLAGS = $(inherited) -framework CoreFoundation -framework Security -framework IOKit -framework DiskArbitration -framework ServiceManagement -framework NetworkExtension
 SWIFT_INCLUDE_PATHS = $(BUILT_PRODUCTS_DIR) $(inherited)

@@ -7,6 +7,10 @@ enum KBFormat {
         ByteCountFormatter.string(fromByteCount: Int64(clamping: value), countStyle: .binary)
     }
 
+    static func bytes(_ value: Int64) -> String {
+        bytes(UInt64(max(0, value)))
+    }
+
     /// Bytes per second -> human-readable decimal bit rate (1 Kbps = 1000 bps).
     static func bitRate(_ bytesPerSecond: Double) -> String {
         guard bytesPerSecond.isFinite, bytesPerSecond > 0 else { return "0 bps" }

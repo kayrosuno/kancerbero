@@ -71,6 +71,9 @@ struct MeterLegendItem: Identifiable {
 struct MeterLegend: View {
     let items: [MeterLegendItem]
     var minItemWidth: CGFloat = 96
+    /// Keeps each value right after its label instead of pushing it to the
+    /// far edge of the grid column.
+    var inlineValues = false
 
     private var columns: [GridItem] {
         [GridItem(.adaptive(minimum: minItemWidth), spacing: 10)]
@@ -85,7 +88,9 @@ struct MeterLegend: View {
                         .frame(width: 7, height: 7)
                     Text(item.label)
                         .foregroundStyle(.secondary)
-                    Spacer(minLength: 2)
+                    if !inlineValues {
+                        Spacer(minLength: 2)
+                    }
                     Text(item.value)
                         .monospacedDigit()
                         .foregroundStyle(.primary.opacity(0.8))

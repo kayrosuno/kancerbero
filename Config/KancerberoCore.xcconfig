@@ -6,4 +6,4 @@ DEFINES_MODULE = YES
 PRODUCT_MODULE_NAME = KancerberoCore
 SWIFT_OBJC_BRIDGING_HEADER = $(SRCROOT)/Sources/KancerberoCore/KancerberoCore-Bridging-Header.h
 HEADER_SEARCH_PATHS = $(SRCROOT)/Sources/KancerberoC/include
-OTHER_LDFLAGS = $(inherited) -framework CoreFoundation -framework IOKit -framework DiskArbitration
+OTHER_LDFLAGS = $(inherited) -framework CoreFoundation -framework Security -framework IOKit -framework DiskArbitration

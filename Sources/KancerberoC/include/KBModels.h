@@ -102,6 +102,17 @@ typedef struct {
     char source[32];               /* "AC Power" / "Battery Power" */
 } kb_power_stats;
 
+/* Battery charge history for the last 12 hours, as Activity Monitor's Energy
+   tab shows it. Times are seconds before the moment of the read. */
+typedef struct {
+    double *charge_times;          /* charge sample times, oldest -> newest */
+    double *charge_levels;         /* percentage 0...100 */
+    size_t charge_count;
+    double *state_times;           /* AC/battery transition times */
+    int32_t *on_ac;                /* 1 = on AC power, 0 = on battery */
+    size_t state_count;
+} kb_battery_charge_graph;
+
 typedef struct {
     uint64_t source_id;
     int32_t pid;

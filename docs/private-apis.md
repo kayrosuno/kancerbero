@@ -176,3 +176,47 @@ Conclusiones y decisión para kancerbero:
   daemon propio solo ejecuta operaciones concretas de `launchctl` y valida el cliente.
 - `launchctl kickstart -k` se queda esperando en macOS 27 con servicios de larga duración;
   `restart` se implementa como `kill SIGTERM` + `kickstart`.
+
+## Gráfico de batería (pestaña Energy)
+
+Análisis con REA/Ghidra 12.2 sobre la build actual de Activity Monitor (arm64e, sha256
+`2c5fddfd8a1c32e43592688a69ec91a9ffa64c78e1d0d491ceec92ef2d565200`). El gráfico de batería de la
+pestaña Energy no es una serie que calcule la app: viene de `libsystemstats`.
+
+| Función | Mecanismo | Evidencia |
+|---|---|---|
+| Datos | `systemstats_get_battery_charge_graph` importado de `/usr/lib/libsystemstats.dylib` (dyld cache); devuelve un `CFDictionary` con `charge_times`, `charge_levels`, `battery_times` y `battery_states` | `otool -L`, `dyld_info -imports`; `_refreshBatteryGraph:` 0x10000dbf0 → 0x10000dcfc |
+| Ventana | 12 h = 43 200 s; `x = ancho · (1 − t/43200)`; descarta `t >> 6 ≥ 675` | `_processChargeTimes:` 0x10000d8bc; `_processBatteryStates:` 0x10000d40c |
+| Estados | `battery_states`: **0 = en AC**, 1 = batería; las bandas AC salen de las transiciones | `_processBatteryStates:` (`TIME_ON_AC` cuando el último estado es 0) |
+| Dibujo | rejilla discontinua `[6,3]` al 25/50/75 % en ambos ejes; bandas verdes (`systemGreen` α 0,3) a altura completa; polígono cerrado cian (`systemCyan`, 1 pt) con el nivel de carga | `BatteryGraphView::drawRect:` 0x100044a9c |
+
+Comprobación directa con `dlopen` + `dlsym` como usuario sin privilegios: el diccionario contiene
+las cuatro claves; en la prueba, `charge_times`/`charge_levels` con 141 puntos (segundos hacia
+atrás) y `battery_times`/`battery_states` con las transiciones. La función usa convención «get»
+(+0): el diccionario no se libera. Activity Monitor serializa la llamada en una cola privada.
+
+kancerbero replica el gráfico en la card Battery: `kb_battery_graph.c` carga la librería con
+`dlopen`, serializa la llamada con un mutex y expone `kb_battery_charge_graph_read`;
+`AppModel` refresca el dato como mucho una vez por minuto y cae en la `CapacityBar` cuando la API
+no está disponible.
+
+## AppCleaner 3.7.0 (pestaña Applications)
+
+Análisis con REA/Hopper (mismo motor que el resto del documento) y contraste con Ghidra 12.2 sobre
+la slice arm64 de `/Applications/AppCleaner.app` (sha256
+`1b30c99cc8f132885e2b85a94a3a79e4b87680863d32969181cca89ec35fdbf8`). AppCleaner no usa APIs
+privadas del sistema; su lógica es NSFileManager + launchctl + un helper propio.
+
+| Función | Mecanismo | Evidencia |
+|---|---|---|
+| Inventario | UTType application bundle en `/Applications` (nivel 3); plugins `UTType bundle` y widgets `com.apple.dashboard.widget` a nivel 1 | `-[ACBundle applicationBundlesInDirectory:]` 0x10001cbc4, `widgetBundlesInDirectory:` 0x10001cd64, `pluginBundlesInDirectory:` 0x10001cf28 |
+| Leftovers | `fetchRelatedFiles` agrega preferencesFiles, miscFiles, containersFiles, savedStateFiles, agentsAndDaemonsFiles y logsFiles | `-[ACBundle fetchRelatedFiles]` 0x10001e550 |
+| Misc | `libraryPaths`/`appSupportPaths`, PreferencePanes, Services, Safari/Extensions, `/Users/Shared`; con bundle id ≥ 8: Cookies, HTTPStorages, WebKit y ApplicationRecentDocuments | `-[ACBundle miscFiles]` 0x10001e990 |
+| Contenedores | Containers + Application Scripts; `com.apple.security.application-groups` de los entitlements (scripts de grupo seleccionados, Group Containers no) | `-[ACBundle containersFiles]` 0x10001efc0 |
+| Coincidencia | último componente normalizado; bundle id y variantes de `bundleName`/`bundleDisplayName` (sin espacios, sin dígitos finales); al coincidir una carpeta no desciende | `relatedFilesInDirectories:maxDepth:matching:` 0x100020920 |
+| Tamaños | `getAllocatedSize:ofItemAtURL:options:error:` | `-[ACFile fetchSize]` 0x100014810 |
+| Borrado | descarga LaunchAgents, limpia `UF_IMMUTABLE`, `trashItemAtURL:` y, si falla por permisos, `ACHelperClient` privilegiado | `-[ACBundle recycle]` 0x100020f88 |
+
+kancerbero replica las categorías y la coincidencia exacta, sin helper propio: las rutas del
+usuario se mueven con `FileManager.trashItem` y las de `/Library`/`/Applications` se envían al
+daemon root (`trashItems`), con lista blanca y revalidación descritas en `docs/security.md`.

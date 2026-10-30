@@ -6,21 +6,15 @@ struct CPUView: View {
 
     private let cpuTint = Color(red: 0.20, green: 0.72, blue: 0.52)
     private let loadTint = Color(red: 0.94, green: 0.56, blue: 0.18)
-    private let memoryTint = Color(red: 0.20, green: 0.70, blue: 0.62)
 
     private let userColor = KBTheme.downloadTint
     private let systemColor = Color(red: 0.94, green: 0.56, blue: 0.18)
     private let niceColor = KBTheme.uploadTint
     private let idleColor = Color.gray.opacity(0.28)
-    private let wiredColor = Color(red: 0.95, green: 0.42, blue: 0.30)
-    private let compressedColor = Color(red: 0.72, green: 0.40, blue: 0.92)
-    private let cachedColor = KBTheme.connectionsTint
     private let gpuTint = Color(red: 0.36, green: 0.50, blue: 0.95)
 
     @State private var showCPUDetails = false
     @State private var showCoresDetails = false
-    @State private var showMemoryDetails = false
-    @State private var showPressureDetails = false
     @State private var showGPUDetails = false
 
     var body: some View {
@@ -28,20 +22,13 @@ struct CPUView: View {
             SectionHeader(title: "CPU",
                           subtitle: "Cores, load, memory and processes")
 
-            GeometryReader { proxy in
-                // The card strip takes a bit under a third of the space below
-                // the header; the process table keeps the rest. The 200 pt floor
-                // is the smallest height at which every card still lays out
-                // without clipping.
-                let topHeight = max(200, (proxy.size.height - 14) / 3.2)
-                VStack(spacing: 14) {
-                    topGroups
-                        .frame(height: topHeight)
-                    processCard
-                        .frame(maxHeight: .infinity)
-                }
-                .frame(maxHeight: .infinity, alignment: .top)
+            VStack(spacing: 14) {
+                topGroups
+                    .frame(height: KBTheme.cardStripHeight)
+                processCard
+                    .frame(maxHeight: .infinity)
             }
+            .frame(maxHeight: .infinity, alignment: .top)
         }
         .padding(.horizontal, KBTheme.contentPadding)
         .padding(.top, 14)
@@ -65,11 +52,8 @@ struct CPUView: View {
             gpuCard
                 .frame(width: 185)
 
-            HStack(spacing: 10) {
-                memoryCard
-                pressureCard
-            }
-            .frame(width: 420)
+            PhysicalMemoryCard()
+                .frame(width: 185)
         }
     }
 
@@ -92,11 +76,11 @@ struct CPUView: View {
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .fill(KBTheme.gradient(tint))
                     }
-                Spacer(minLength: 2)
                 Text(title)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12, weight: .semibold))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 2)
                 Image(systemName: "info.circle")
                     .font(.system(size: 9))
                     .foregroundStyle(.tertiary)
@@ -245,10 +229,15 @@ struct CPUView: View {
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .fill(KBTheme.gradient(cpuTint))
                     }
-                Spacer(minLength: 2)
                 Text("Cores")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 2)
+                ViewThatFits(in: .horizontal) {
+                    coreSegmentLegend
+                    EmptyView()
+                }
                 Image(systemName: "info.circle")
                     .font(.system(size: 9))
                     .foregroundStyle(.tertiary)
@@ -267,12 +256,8 @@ struct CPUView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
 
-                VStack {
-                    Spacer(minLength: 0)
-                    compactCoreGrid(cpu)
-                    Spacer(minLength: 0)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                compactCoreGrid(cpu)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Spacer(minLength: 0)
             }
@@ -290,113 +275,94 @@ struct CPUView: View {
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
+    /// Two-column core grid that stretches its rows to fill the card. The bar
+    /// height grows when there are fewer rows, so an 8-core Mac gets visibly
+    /// bigger meters than a 12-core one.
     private func compactCoreGrid(_ cpu: KBCPUStats) -> some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10),
-                            GridItem(.flexible(), spacing: 10)],
-                  alignment: .center,
-                  spacing: 5) {
-            ForEach(cpu.cores.prefix(12)) { core in
-                HStack(spacing: 5) {
-                    Text("\(core.index + 1)")
-                        .font(.system(size: 9, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 15, alignment: .trailing)
-                    SegmentedMeter(
-                        segments: [
-                            MeterSegment(id: "User", value: core.userPercent, color: userColor),
-                            MeterSegment(id: "System", value: core.systemPercent, color: systemColor),
-                            MeterSegment(id: "Nice", value: core.nicePercent, color: niceColor),
-                            MeterSegment(id: "Idle", value: core.idlePercent, color: idleColor)
-                        ],
-                        height: 8,
-                        accessibilityLabel: "CPU \(core.index + 1)"
-                    )
-                    Text(KBFormat.usagePercent(core.usagePercent))
-                        .font(.system(size: 9, weight: .medium, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(core.usagePercent > 85 ? .orange : .secondary)
-                        .frame(width: 38, alignment: .trailing)
-                }
-            }
+        let cores = Array(cpu.cores.prefix(12))
+        let rows = stride(from: 0, to: cores.count, by: 2).map {
+            Array(cores[$0..<min($0 + 2, cores.count)])
         }
-    }
+        let rowCount = max(rows.count, 1)
+        let meterHeight: CGFloat = rowCount >= 6 ? 15 : (rowCount == 5 ? 16 : 20)
 
-    private var memoryCard: some View {
-        let memory = model.hostMetrics?.memory
-        return Button {
-            showMemoryDetails = true
-        } label: {
-            statCard(title: "Memory",
-                     value: memory.map { KBFormat.percent($0.usedFraction) } ?? "—",
-                     caption: memory.map {
-                         "\(KBFormat.bytes($0.usedBytes)) of \(KBFormat.bytes($0.totalBytes))"
-                     } ?? "Waiting for metrics",
-                     systemImage: "memorychip",
-                     tint: memoryTint) {
-                if let memory {
-                    VStack(alignment: .leading, spacing: 6) {
-                        SegmentedMeter(
-                            segments: [
-                                MeterSegment(id: "Active", value: Double(memory.activeBytes),
-                                             color: userColor),
-                                MeterSegment(id: "Wired", value: Double(memory.wiredBytes),
-                                             color: wiredColor),
-                                MeterSegment(id: "Compressed", value: Double(memory.compressedBytes),
-                                             color: compressedColor),
-                                MeterSegment(id: "Cached", value: Double(memory.cachedBytes),
-                                             color: cachedColor),
-                                MeterSegment(id: "Free", value: Double(memory.barFreeBytes),
-                                             color: idleColor)
-                            ],
-                            height: 10,
-                            accessibilityLabel: "Memory"
-                        )
-                        Text("Cached \(KBFormat.bytes(memory.cachedBytes)) · Free \(KBFormat.bytes(memory.barFreeBytes))")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
+        return VStack(spacing: 4) {
+            ForEach(rows.indices, id: \.self) { rowIndex in
+                HStack(spacing: 8) {
+                    ForEach(rows[rowIndex]) { core in
+                        compactCoreRow(core, meterHeight: meterHeight)
+                            .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                } else {
-                    Color.clear
+                    if rows[rowIndex].count < 2 {
+                        Color.clear
+                            .frame(maxWidth: .infinity)
+                    }
                 }
+                .frame(maxHeight: .infinity)
             }
         }
-        .buttonStyle(.plain)
-        .help("Memory breakdown and swap")
-        .popover(isPresented: $showMemoryDetails, arrowEdge: .bottom) {
-            memoryDetails
-                .padding(16)
-                .frame(width: 460)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func compactCoreRow(_ core: KBCoreCPU, meterHeight: CGFloat) -> some View {
+        let meter = SegmentedMeter(
+            segments: [
+                MeterSegment(id: "System", value: core.systemPercent, color: systemColor),
+                MeterSegment(id: "User", value: core.userPercent, color: userColor),
+                MeterSegment(id: "Nice", value: core.nicePercent, color: niceColor),
+                MeterSegment(id: "Idle", value: core.idlePercent, color: idleColor)
+            ],
+            height: meterHeight,
+            accessibilityLabel: "CPU \(core.index + 1)"
+        )
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 4) {
+                coreIndexLabel(core)
+                meter
+                corePercentLabel(core)
+            }
+            HStack(spacing: 4) {
+                coreIndexLabel(core)
+                meter
+            }
+            meter
         }
     }
 
-    private var pressureCard: some View {
-        let memory = model.hostMetrics?.memory
-        let hasPressure = memory?.pressurePercent != nil
-        return Button {
-            showPressureDetails = true
-        } label: {
-            statCard(title: "Pressure",
-                     value: hasPressure ? (memory?.pressureLabel ?? "—") : "—",
-                     caption: memory?.pressurePercent.map { "\($0)% pressure" } ?? "Not reported",
-                     systemImage: "gauge.medium",
-                     tint: pressureTint(memory?.pressureBand)) {
-                if model.memoryPressureHistory.count > 1 {
-                    MemoryPressureChart(values: model.memoryPressureHistory,
-                                        levels: model.memoryPressureLevelHistory)
-                } else {
-                    Color.clear
-                }
-            }
+    private func coreIndexLabel(_ core: KBCoreCPU) -> some View {
+        Text("\(core.index + 1)")
+            .font(.system(size: 9, weight: .medium, design: .monospaced))
+            .foregroundStyle(.secondary)
+            .frame(width: 12, alignment: .trailing)
+    }
+
+    private func corePercentLabel(_ core: KBCoreCPU) -> some View {
+        Text(KBFormat.usagePercent(core.usagePercent))
+            .font(.system(size: 9, weight: .medium, design: .rounded))
+            .monospacedDigit()
+            .foregroundStyle(core.usagePercent > 85 ? .orange : .secondary)
+            .frame(width: 32, alignment: .trailing)
+    }
+
+    private var coreSegmentLegend: some View {
+        HStack(spacing: 6) {
+            legendDot("System", color: systemColor)
+            legendDot("User", color: userColor)
+            legendDot("Nice", color: niceColor)
+            legendDot("Idle", color: idleColor)
         }
-        .buttonStyle(.plain)
-        .help("Memory pressure details")
-        .popover(isPresented: $showPressureDetails, arrowEdge: .bottom) {
-            pressureDetails
-                .padding(16)
-                .frame(width: 460)
+        .fixedSize()
+        .accessibilityHidden(true)
+    }
+
+    private func legendDot(_ label: String, color: Color) -> some View {
+        HStack(spacing: 3) {
+            Circle()
+                .fill(color)
+                .frame(width: 5, height: 5)
+            Text(label)
+                .font(.system(size: 8))
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -516,10 +482,10 @@ struct CPUView: View {
                 Divider().opacity(0.4)
 
                 MeterLegend(items: [
-                    MeterLegendItem("User", value: KBFormat.usagePercent(cpu.userPercent),
-                                    color: userColor),
                     MeterLegendItem("System", value: KBFormat.usagePercent(cpu.systemPercent),
                                     color: systemColor),
+                    MeterLegendItem("User", value: KBFormat.usagePercent(cpu.userPercent),
+                                    color: userColor),
                     MeterLegendItem("Nice", value: KBFormat.usagePercent(cpu.nicePercent),
                                     color: niceColor),
                     MeterLegendItem("Idle", value: KBFormat.usagePercent(cpu.idlePercent),
@@ -536,132 +502,6 @@ struct CPUView: View {
                 .foregroundStyle(.secondary)
             } else {
                 Text("Waiting for metrics…")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var memoryDetails: some View {
-        let memory = model.hostMetrics?.memory
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Memory & Swap")
-                    .font(.system(size: 14, weight: .semibold))
-                Spacer()
-                if let memory {
-                    Text(KBFormat.bytes(memory.totalBytes))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if let memory {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Memory")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("\(KBFormat.bytes(memory.usedBytes)) used · \(KBFormat.percent(memory.usedFraction))")
-                        .font(.system(size: 10))
-                        .monospacedDigit()
-                }
-
-                SegmentedMeter(
-                    segments: [
-                        MeterSegment(id: "Active", value: Double(memory.activeBytes),
-                                     color: userColor),
-                        MeterSegment(id: "Wired", value: Double(memory.wiredBytes),
-                                     color: wiredColor),
-                        MeterSegment(id: "Compressed", value: Double(memory.compressedBytes),
-                                     color: compressedColor),
-                        MeterSegment(id: "Cached", value: Double(memory.cachedBytes),
-                                     color: cachedColor),
-                        MeterSegment(id: "Free", value: Double(memory.barFreeBytes),
-                                     color: idleColor)
-                    ],
-                    height: 10,
-                    accessibilityLabel: "Memory"
-                )
-
-                MeterLegend(items: [
-                    MeterLegendItem("Active", value: KBFormat.bytes(memory.activeBytes),
-                                    color: userColor),
-                    MeterLegendItem("Wired", value: KBFormat.bytes(memory.wiredBytes),
-                                    color: wiredColor),
-                    MeterLegendItem("Compressed", value: KBFormat.bytes(memory.compressedBytes),
-                                    color: compressedColor),
-                    MeterLegendItem("Cached", value: KBFormat.bytes(memory.cachedBytes),
-                                    color: cachedColor),
-                    MeterLegendItem("Free", value: KBFormat.bytes(memory.barFreeBytes),
-                                    color: idleColor)
-                ], minItemWidth: 120)
-
-                Divider().opacity(0.4)
-
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Swap")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("\(KBFormat.bytes(memory.swapUsedBytes)) / \(KBFormat.bytes(memory.swapTotalBytes))")
-                        .font(.system(size: 10))
-                        .monospacedDigit()
-                }
-
-                CapacityBar(
-                    fraction: memory.swapUsedFraction,
-                    tint: memory.swapUsedFraction > 0.8 ? .red : compressedColor
-                )
-
-                HStack(spacing: 4) {
-                    Text(KBFormat.percent(memory.swapUsedFraction))
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    if memory.swapEncrypted {
-                        Label("Encrypted", systemImage: "lock.fill")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } else {
-                Text("Waiting for metrics…")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var pressureDetails: some View {
-        let memory = model.hostMetrics?.memory
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("Memory pressure")
-                    .font(.system(size: 14, weight: .semibold))
-                Spacer()
-                if let memory, memory.pressurePercent != nil {
-                    Text(memory.pressureLabel)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(pressureColor(memory.pressureBand))
-                }
-            }
-
-            if let memory, let percent = memory.pressurePercent {
-                Text("\(percent)% pressure · level \(memory.pressureLevel ?? 0)")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-
-                MemoryPressureChart(values: model.memoryPressureHistory,
-                                    levels: model.memoryPressureLevelHistory)
-                    .frame(height: 180)
-
-                Text("Memory pressure is an indicator of the system’s ability to meet the memory requirements of the user’s activities. Higher memory pressure indicates that the system is reaching its limits, and performance may degrade.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                Text("Update the background daemon to report memory pressure.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -776,8 +616,8 @@ struct CPUView: View {
 
             SegmentedMeter(
                 segments: [
-                    MeterSegment(id: "User", value: core.userPercent, color: userColor),
                     MeterSegment(id: "System", value: core.systemPercent, color: systemColor),
+                    MeterSegment(id: "User", value: core.userPercent, color: userColor),
                     MeterSegment(id: "Nice", value: core.nicePercent, color: niceColor),
                     MeterSegment(id: "Idle", value: core.idlePercent, color: idleColor)
                 ],
@@ -790,25 +630,6 @@ struct CPUView: View {
                 .monospacedDigit()
                 .foregroundStyle(core.usagePercent > 85 ? .orange : .secondary)
                 .frame(width: 42, alignment: .trailing)
-        }
-    }
-
-    private func pressureColor(_ band: KBMemoryStats.PressureBand) -> Color {
-        switch band {
-        case .low: return .green
-        case .medium: return .yellow
-        case .high: return .red
-        case .unknown: return .secondary
-        }
-    }
-
-    private func pressureTint(_ band: KBMemoryStats.PressureBand?) -> Color {
-        guard let band else { return memoryTint }
-        switch band {
-        case .low: return .green
-        case .medium: return .yellow
-        case .high: return .red
-        case .unknown: return memoryTint
         }
     }
 

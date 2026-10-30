@@ -121,6 +121,15 @@ final class DaemonMetricsSource: NSObject, KancerberoClientXPC, @unchecked Senda
         return payload.result
     }
 
+    func trashItems(_ items: [KBTrashItem]) throws -> [KBTrashResult] {
+        let message = try KBWireCodec.encode(
+            KBRequestMessage(kind: .trashItems,
+                             trashRequest: KBTrashRequest(items: items)))
+        let data = try requestData(message, timeout: 60)
+        let payload = try KBWireCodec.decode(KBTrashResponsePayload.self, from: data)
+        return payload.results
+    }
+
     private func requestData(_ message: Data, timeout: TimeInterval = 5) throws -> Data {
         lock.lock()
         let remote = self.remote

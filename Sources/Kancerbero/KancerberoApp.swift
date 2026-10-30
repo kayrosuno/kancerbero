@@ -4,6 +4,7 @@ import SwiftUI
 struct KancerberoApp: App {
     @State private var model = AppModel()
     @State private var disk = DiskModel()
+    @State private var applications = ApplicationsModel()
     @State private var ui = UIState()
     @State private var filter = FilterModel()
     @State private var dockIcon = DockIconController()
@@ -15,6 +16,7 @@ struct KancerberoApp: App {
             RootView()
                 .environment(model)
                 .environment(disk)
+                .environment(applications)
                 .environment(ui)
                 .environment(filter)
                 .frame(minWidth: 1040, minHeight: 640)
@@ -87,6 +89,7 @@ struct KancerberoApp: App {
                 Button("Refresh Now") {
                     model.refreshNow()
                     Task { await disk.refreshInventory(force: true) }
+                    Task { await applications.refresh(force: true) }
                 }
                 .keyboardShortcut("r")
                 Button(model.isPaused ? "Resume" : "Pause") {

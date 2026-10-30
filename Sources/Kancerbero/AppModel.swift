@@ -74,6 +74,9 @@ final class AppModel {
     var gpuUsageHistory: [Double] = []
     var energyUsageHistory: [Double] = []
     var wakeupHistory: [Double] = []
+    /// Twelve-hour battery charge graph from libsystemstats, as Activity
+    /// Monitor's Energy tab shows it. Refreshed at most once a minute.
+    var batteryChargeGraph: KBBatteryChargeGraph?
     var diskReadRate: Double = 0
     var diskWriteRate: Double = 0
     var diskReadOpsRate: Double = 0
@@ -134,6 +137,8 @@ final class AppModel {
     private var daemonSource: DaemonMetricsSource?
     private var task: Task<Void, Never>?
     private var sleepTask: Task<Void, Never>?
+    private var batteryGraphFetchedAt = Date.distantPast
+    private var batteryGraphFetchInFlight = false
     private static let daemonServicePlist = "uno.kayros.kancerbero.daemon.plist"
 
     private var daemonService: SMAppService {
@@ -153,6 +158,11 @@ final class AppModel {
     private let logger = Logger(subsystem: "uno.kayros.kancerbero", category: "daemon.lifecycle")
 
     var isRoot: Bool { geteuid() == 0 }
+
+    /// Client for privileged trash requests; nil while the daemon is not in use.
+    var daemonTrashClient: DaemonMetricsSource? {
+        usingDaemon ? daemonSource : nil
+    }
 
     var isConnectingToDaemon: Bool { daemonConnecting }
 
@@ -275,6 +285,7 @@ final class AppModel {
             }
         }
         connectDaemon()
+        refreshBatteryChargeGraph(force: true)
         scheduleRegistrationHealthCheck()
     }
 
@@ -295,6 +306,26 @@ final class AppModel {
 
     private func wakeRefreshLoop() {
         sleepTask?.cancel()
+    }
+
+    /// Reads the 12-hour battery graph off the main actor. The private
+    /// systemstats call is serialized in C; here we also avoid overlapping
+    /// refresh tasks. A failed read keeps the last good graph.
+    func refreshBatteryChargeGraph(force: Bool = false) {
+        guard !batteryGraphFetchInFlight else { return }
+        guard force || Date().timeIntervalSince(batteryGraphFetchedAt) > 60 else { return }
+        batteryGraphFetchedAt = Date()
+        batteryGraphFetchInFlight = true
+        Task { [weak self] in
+            let graph = await Task.detached(priority: .utility) {
+                BatteryChargeGraphReader.current()
+            }.value
+            guard let self else { return }
+            self.batteryGraphFetchInFlight = false
+            if let graph {
+                self.batteryChargeGraph = graph
+            }
+        }
     }
 
     func refreshServiceStatus() {
@@ -905,6 +936,7 @@ final class AppModel {
         lastError = snapshot.error
         lastUpdate = snapshot.generatedAt
         recordHistory()
+        refreshBatteryChargeGraph()
     }
 
     private func recordHistory() {
