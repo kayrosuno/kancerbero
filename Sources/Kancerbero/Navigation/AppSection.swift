@@ -145,9 +145,9 @@ enum NetworkingTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
 }
 
 enum DiskTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
+    case io
     case volumes
     case analyzer
-    case io
 
     var id: String { rawValue }
 
