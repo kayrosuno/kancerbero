@@ -92,6 +92,15 @@ El detalle de binarios, permisos, instalación y librerías está en
   (PID, USER, PRI/NI, VIRT, RES, S/THR, CPU%, MEM%, TIME+ y Command). CPU% no se normaliza
   (puede superar 100% en multihilo). Sin daemon root macOS solo enumera los procesos del uid
   actual; el daemon root muestra todos.
+- **Memory** — panel dedicado tipo Activity Monitor: presión de memoria (Low/Medium/High) con
+  histórico y explicación, composición App/Wired/Compressed/Cached/Free, detalle de Physical
+  Memory, Memory Used, App Memory, Wired, Compressed, Cached Files y Swap, y tabla de procesos
+  ordenada por memoria residente (Command, Memory, MEM%, Threads, PID, USER) con búsqueda,
+  selección e inspector.
+- **Energy** — panel tipo Activity Monitor: estado de batería (carga, tiempo restante, cargando,
+  conector), consumo por proceso en vatios y wake-ups inactivos con histórico, procesos que
+  impiden dormir, y tabla ordenada por energía (Command, Energy, Impact, Wake-ups, CPU%, PID,
+  USER, Preventing Sleep).
 
 La barra inferior es contextual: muestra métricas de la sección activa (tráfico, capacidad de
 disco, servicios o CPU/memoria) y, a la derecha, el estado global de la conexión con el daemon,
@@ -118,8 +127,8 @@ la excepción: **Kancerbero → Settings… (⌘,)** permite activar o desactiva
 cambio de sección/subpestaña y del resaltado del sidebar y las píldoras. Se guarda en
 `UserDefaults` y respeta Reduce Motion de macOS.
 
-El panel se oculta con el toggle de la toolbar o `Cmd+Ctrl+S`; `Cmd+1/2/3/4` cambia de sección
-(Networking, Disk, Daemons, CPU).
+El panel se oculta con el toggle de la toolbar o `Cmd+Ctrl+S`; `Cmd+1/2/3/4/5/6` cambia de sección
+(Networking, Disk, Daemons, CPU, Memory, Energy).
 
 ## Compilar
 
@@ -181,11 +190,13 @@ Captura de la UI sin permisos de Grabación de pantalla (la app se dibuja a sí 
 ```bash
 build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   --screenshot /tmp/kancerbero-ui.png \
-  [--section networking|disk|daemons|cpu] \
+  [--section networking|disk|daemons|cpu|memory|energy] \
   [--tab interfaces|connections|processes] \
   [--disk-tab volumes|analyzer] \
   [--disk-path=<carpeta>] [--disk-scan] [--disk-item <diskXsY>] \
   [--cpu-search <texto>] [--cpu-selected <pid>] \
+  [--memory-search <texto>] [--memory-selected <pid>] \
+  [--energy-search <texto>] [--energy-selected <pid>] \
   [--networking-focus download|upload|connections|processes] \
   [--networking-transport tcp|udp|other[,..]|all] \
   [--networking-ip ipv4|ipv6[,..]|all] \

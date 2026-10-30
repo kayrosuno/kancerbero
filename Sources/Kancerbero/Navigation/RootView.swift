@@ -97,6 +97,10 @@ struct RootView: View {
                         DaemonsView()
                     case .cpu:
                         CPUView()
+                    case .memory:
+                        MemoryView()
+                    case .energy:
+                        EnergyView()
                     }
                 }
                 .id(currentSection)
@@ -111,7 +115,8 @@ struct RootView: View {
         .navigationSplitViewStyle(.balanced)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                if currentSection == .networking || currentSection == .cpu {
+                if currentSection == .networking || currentSection == .cpu
+            || currentSection == .memory || currentSection == .energy {
                     Button {
                         model.refreshNow()
                     } label: {

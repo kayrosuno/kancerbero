@@ -64,13 +64,19 @@ private func formatDuration(_ nanoseconds: UInt64) -> String {
 
 private func printCPU(interval: Double) {
     var sampler = HostMetricsSampler()
-    let before = (try? ProcessCollector.snapshot()) ?? []
+    var energyTracker = ProcessCPUTracker()
+    var before = (try? ProcessCollector.snapshot()) ?? []
+    energyTracker.annotate(&before, elapsed: 0, totalMemoryBytes: 0, coreCount: 1)
     _ = sampler.sample(processes: before)
     Thread.sleep(forTimeInterval: max(0.1, interval))
-    let after = (try? ProcessCollector.snapshot()) ?? []
+    var after = (try? ProcessCollector.snapshot()) ?? []
     guard let metrics = sampler.sample(processes: after) else {
         fail("host metrics unavailable")
     }
+    energyTracker.annotate(&after,
+                           elapsed: max(0.1, interval),
+                           totalMemoryBytes: metrics.memory.totalBytes,
+                           coreCount: metrics.cpu.coreCount)
 
     write("cpu cores=\(metrics.cpu.coreCount) load=\(String(format: "%.2f", metrics.cpu.load1))/\(String(format: "%.2f", metrics.cpu.load5))/\(String(format: "%.2f", metrics.cpu.load15))\n")
     for core in metrics.cpu.cores {
@@ -85,7 +91,33 @@ private func printCPU(interval: Double) {
     write("tasks=\(cpu.taskCount) threads=\(cpu.threadCount) restricted=\(cpu.threadsRestricted) uptime=\(formatDuration(UInt64(cpu.uptimeSeconds * 1_000_000_000)))\n")
     let memory = metrics.memory
     write("memory used=\(formatBytes(memory.usedBytes)) active=\(formatBytes(memory.activeBytes)) wired=\(formatBytes(memory.wiredBytes)) compressed=\(formatBytes(memory.compressedBytes)) cached=\(formatBytes(memory.cachedBytes)) free=\(formatBytes(memory.barFreeBytes)) total=\(formatBytes(memory.totalBytes))\n")
+    write("memoryAM app=\(formatBytes(memory.appMemoryBytes)) cachedFiles=\(formatBytes(memory.cachedFileBytes)) used=\(formatBytes(memory.activityMonitorUsedBytes)) free=\(formatBytes(memory.activityMonitorFreeBytes))\n")
     write("swap used=\(formatBytes(memory.swapUsedBytes)) total=\(formatBytes(memory.swapTotalBytes)) encrypted=\(memory.swapEncrypted ? 1 : 0)\n")
+    write("pressure percent=\(memory.pressurePercent.map(String.init) ?? "n/a") level=\(memory.pressureLevel.map(String.init) ?? "n/a") band=\(memory.pressureLabel)\n")
+    if let gpu = metrics.gpu {
+        let utilization = gpu.utilizationPercent.map { String(format: "%.1f", $0) } ?? "n/a"
+        let renderer = gpu.rendererPercent.map { String(format: "%.1f", $0) } ?? "n/a"
+        let tiler = gpu.tilerPercent.map { String(format: "%.1f", $0) } ?? "n/a"
+        let inUse = gpu.inUseMemoryBytes.map(formatBytes) ?? "n/a"
+        let allocated = gpu.allocatedMemoryBytes.map(formatBytes) ?? "n/a"
+        write("gpu name=\(gpu.name ?? "unknown") util=\(utilization)% renderer=\(renderer)% tiler=\(tiler)% inuse=\(inUse) alloc=\(allocated)\n")
+    } else {
+        write("gpu unavailable\n")
+    }
+    if let top = after.max(by: {
+        ($0.usage?.energyWatts ?? 0) < ($1.usage?.energyWatts ?? 0)
+    }), let watts = top.usage?.energyWatts {
+        write(String(format: "energy top=%@ %.2fW wakeups=%.1f/s\n",
+                     top.name, watts, top.usage?.wakeupsPerSecond ?? 0))
+    }
+    if let power = metrics.power {
+        write("power battery=\(power.hasBattery ? 1 : 0) charge=\(power.chargePercent.map(String.init) ?? "n/a") charging=\(power.isCharging ? 1 : 0) plugged=\(power.isPluggedIn ? 1 : 0) minutes=\(power.timeRemainingMinutes.map(String.init) ?? "n/a") source=\(power.source ?? "n/a")\n")
+    } else {
+        write("power unavailable\n")
+    }
+    if let sleeping = PowerAssertionsReader.current() {
+        write("preventingSleep pids=\(sleeping.sorted().map(String.init).joined(separator: ","))\n")
+    }
 }
 
 private func printProcessesCPU(limit: Int, interval: Double) {

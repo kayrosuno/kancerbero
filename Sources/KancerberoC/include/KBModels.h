@@ -30,6 +30,11 @@ typedef struct {
     int32_t nice;
     uint32_t status;        /* proc_bsdinfo.pbi_status */
     uint8_t has_task_info;  /* 0 when taskinfo is not readable */
+    /* rusage_info_v6; cumulative counters. */
+    uint64_t energy_nj;
+    uint64_t penergy_nj;
+    uint64_t interrupt_wkups;
+    uint64_t pkg_idle_wkups;
 } kb_process;
 
 typedef struct {
@@ -60,12 +65,39 @@ typedef struct {
     uint64_t swap_used;
     uint64_t swap_avail;
     uint8_t swap_encrypted;
+    /* 100 - memorystatus free %, or -1 when unavailable. */
+    int32_t mem_pressure_percent;
+    /* kern.memorystatus_vm_pressure_level (1 normal, 2 warning, 4 critical),
+       or -1 when unavailable. */
+    int32_t mem_pressure_level;
     uint8_t load_valid;
     double load1;
     double load5;
     double load15;
     uint64_t boot_time_us;
 } kb_host_stats;
+
+typedef struct {
+    int32_t valid;
+    /* -1 when the key is missing. */
+    double utilization_percent;   /* Device Utilization % */
+    double renderer_percent;       /* Renderer Utilization % */
+    double tiler_percent;          /* Tiler Utilization % */
+    uint64_t in_use_memory;        /* In use system memory */
+    uint64_t alloc_memory;         /* Alloc system memory */
+    char name[128];                /* machdep.cpu.brand_string */
+} kb_gpu_stats;
+
+typedef struct {
+    int32_t valid;
+    int32_t has_battery;
+    int32_t is_plugged_in;
+    int32_t is_charging;
+    int32_t is_charged;
+    int32_t charge_percent;        /* -1 unknown */
+    int32_t time_remaining_min;    /* minutes; -1 unknown */
+    char source[32];               /* "AC Power" / "Battery Power" */
+} kb_power_stats;
 
 typedef struct {
     uint64_t source_id;

@@ -24,6 +24,13 @@ struct CPUProcessRow: Identifiable, Hashable {
     var userSortValue: UInt32 { process.uid }
     var commandSortValue: String { process.name.isEmpty ? process.path : process.name }
 
+    var energyWatts: Double? { process.usage?.energyWatts }
+    var wakeupsPerSecond: Double? { process.usage?.wakeupsPerSecond }
+    var preventingSleep: Bool { process.usage?.preventingSleep ?? false }
+    var energySortValue: Double { energyWatts ?? -1 }
+    var wakeupSortValue: Double { wakeupsPerSecond ?? -1 }
+    var sleepSortValue: Int { preventingSleep ? 1 : 0 }
+
     var priorityText: String {
         process.usage.map { String($0.priority) } ?? "—"
     }
@@ -52,6 +59,20 @@ struct CPUProcessRow: Identifiable, Hashable {
     var memoryText: String {
         guard let memoryPercent else { return "—" }
         return String(format: "%.1f%%", memoryPercent)
+    }
+
+    var energyText: String {
+        guard let energyWatts else { return "—" }
+        return String(format: "%.2f W", energyWatts)
+    }
+
+    var wakeupsText: String {
+        guard let wakeupsPerSecond else { return "—" }
+        return String(format: "%.1f/s", wakeupsPerSecond)
+    }
+
+    var sleepText: String {
+        preventingSleep ? "Yes" : "—"
     }
 
     var timeText: String {

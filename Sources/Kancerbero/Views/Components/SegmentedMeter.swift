@@ -70,8 +70,11 @@ struct MeterLegendItem: Identifiable {
 
 struct MeterLegend: View {
     let items: [MeterLegendItem]
+    var minItemWidth: CGFloat = 96
 
-    private let columns = [GridItem(.adaptive(minimum: 96), spacing: 10)]
+    private var columns: [GridItem] {
+        [GridItem(.adaptive(minimum: minItemWidth), spacing: 10)]
+    }
 
     var body: some View {
         LazyVGrid(columns: columns, alignment: .leading, spacing: 5) {

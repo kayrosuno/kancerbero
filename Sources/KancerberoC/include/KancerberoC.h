@@ -50,6 +50,19 @@ int kb_sysctl_int(const char *name, int *value);
 
 /* CPU cores, memory, swap, load average and boot time. */
 int kb_host_stats_read(kb_host_stats *out);
+/* Host-wide memory pressure, as Activity Monitor reports it. Fills the
+   pressure percentage (100 - free %) and the kernel level (1/2/4). */
+int kb_memory_pressure_read(int32_t *percent, int32_t *level);
+/* GPU utilisation and memory from IOAccelerator PerformanceStatistics. */
+int kb_gpu_stats_read(kb_gpu_stats *out);
+/* Battery charge, time remaining and power source. */
+int kb_power_stats_read(kb_power_stats *out);
+/* Per-process energy and wake-up counters from rusage_info_v6. */
+int kb_process_energy_read(int32_t pid, uint64_t *energy_nj,
+                           uint64_t *interrupt_wkups, uint64_t *pkg_idle_wkups);
+/* PIDs holding an active PreventUserIdleSystemSleep/PreventSystemSleep
+   assertion. Caller frees `pids` with free(). */
+int kb_prevent_sleep_pids(int32_t **pids, size_t *count);
 
 #ifdef __cplusplus
 }

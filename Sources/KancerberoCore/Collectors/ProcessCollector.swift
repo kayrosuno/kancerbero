@@ -63,7 +63,10 @@ public enum ProcessCollector {
                     virtualBytes: raw.virtual_bytes,
                     threads: Int(raw.threads),
                     runningThreads: runningThreads,
-                    priority: raw.priority)
+                    priority: raw.priority,
+                    energyNanojoules: raw.energy_nj,
+                    interruptWakeups: raw.interrupt_wkups,
+                    packageIdleWakeups: raw.pkg_idle_wkups)
                 : nil
             let state: KBProcessState?
             if hasTaskInfo {

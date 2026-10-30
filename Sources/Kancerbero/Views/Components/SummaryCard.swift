@@ -67,9 +67,10 @@ struct SummaryCard: View {
                 .minimumScaleFactor(0.65)
 
             Text(caption)
-                .font(.system(size: 9))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .minimumScaleFactor(0.85)
 
             if let sparkline {
                 if sparkline.isEmpty {

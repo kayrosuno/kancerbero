@@ -15,6 +15,18 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <CoreFoundation/CoreFoundation.h>
+#include <IOKit/IOKitLib.h>
+#include <IOKit/ps/IOPSKeys.h>
+#include <IOKit/ps/IOPowerSources.h>
+#include <IOKit/pwr_mgt/IOPMLib.h>
+
+/*
+ * Exported by libsystem_kernel and used by Activity Monitor. It fills the
+ * system-wide memory free percentage (0-100); it takes no port argument.
+ */
+extern int memorystatus_get_level(int *level);
+
 /*
  * Interface counters come from the IFMIB sysctl, not NET_RT_IFLIST2.
  * On macOS 27 the NET_RT_IFLIST2 path returns if_data64 with only the low
@@ -103,6 +115,280 @@ int kb_sysctl_int(const char *name, int *value)
     return sysctlbyname(name, value, &length, NULL, 0);
 }
 
+int kb_memory_pressure_read(int32_t *percent, int32_t *level)
+{
+    if (!percent || !level) {
+        return -1;
+    }
+
+    int free_percent = -1;
+    if (memorystatus_get_level(&free_percent) != 0) {
+        return -1;
+    }
+    *percent = (int32_t)(100 - free_percent);
+
+    int vm_level = 0;
+    size_t level_size = sizeof(vm_level);
+    if (sysctlbyname("kern.memorystatus_vm_pressure_level", &vm_level,
+                     &level_size, NULL, 0) == 0) {
+        *level = (int32_t)vm_level;
+    } else {
+        *level = -1;
+    }
+    return 0;
+}
+
+static double kb_cf_double(CFDictionaryRef dictionary, CFStringRef key)
+{
+    CFTypeRef value = CFDictionaryGetValue(dictionary, key);
+    if (!value || CFGetTypeID(value) != CFNumberGetTypeID()) {
+        return -1;
+    }
+    double result = -1;
+    if (!CFNumberGetValue((CFNumberRef)value, kCFNumberDoubleType, &result)) {
+        return -1;
+    }
+    return result;
+}
+
+static uint64_t kb_cf_u64(CFDictionaryRef dictionary, CFStringRef key)
+{
+    CFTypeRef value = CFDictionaryGetValue(dictionary, key);
+    if (!value || CFGetTypeID(value) != CFNumberGetTypeID()) {
+        return 0;
+    }
+    int64_t result = 0;
+    if (!CFNumberGetValue((CFNumberRef)value, kCFNumberSInt64Type, &result)) {
+        return 0;
+    }
+    return result < 0 ? 0 : (uint64_t)result;
+}
+
+int kb_gpu_stats_read(kb_gpu_stats *out)
+{
+    if (!out) {
+        return -1;
+    }
+    memset(out, 0, sizeof(*out));
+    out->utilization_percent = -1;
+    out->renderer_percent = -1;
+    out->tiler_percent = -1;
+
+    size_t name_length = sizeof(out->name);
+    if (sysctlbyname("machdep.cpu.brand_string", out->name, &name_length,
+                     NULL, 0) != 0) {
+        out->name[0] = '\0';
+    }
+
+    io_iterator_t iterator = 0;
+    if (IOServiceGetMatchingServices(kIOMainPortDefault,
+                                     IOServiceMatching("IOAccelerator"),
+                                     &iterator) != KERN_SUCCESS) {
+        return -1;
+    }
+
+    io_service_t service = 0;
+    while ((service = IOIteratorNext(iterator)) != 0) {
+        CFMutableDictionaryRef properties = NULL;
+        if (IORegistryEntryCreateCFProperties(service, &properties,
+                                              kCFAllocatorDefault, 0) == KERN_SUCCESS
+            && properties) {
+            CFTypeRef statistics =
+                CFDictionaryGetValue(properties, CFSTR("PerformanceStatistics"));
+            if (statistics && CFGetTypeID(statistics) == CFDictionaryGetTypeID()) {
+                CFDictionaryRef dictionary = (CFDictionaryRef)statistics;
+                out->utilization_percent =
+                    kb_cf_double(dictionary, CFSTR("Device Utilization %"));
+                out->renderer_percent =
+                    kb_cf_double(dictionary, CFSTR("Renderer Utilization %"));
+                out->tiler_percent =
+                    kb_cf_double(dictionary, CFSTR("Tiler Utilization %"));
+                out->in_use_memory =
+                    kb_cf_u64(dictionary, CFSTR("In use system memory"));
+                out->alloc_memory =
+                    kb_cf_u64(dictionary, CFSTR("Alloc system memory"));
+                out->valid = 1;
+            }
+            CFRelease(properties);
+        }
+        IOObjectRelease(service);
+        if (out->valid) {
+            break;
+        }
+    }
+    IOObjectRelease(iterator);
+    return out->valid ? 0 : -1;
+}
+
+static int kb_cf_int(CFDictionaryRef dictionary, CFStringRef key, int fallback)
+{
+    CFTypeRef value = CFDictionaryGetValue(dictionary, key);
+    if (!value || CFGetTypeID(value) != CFNumberGetTypeID()) {
+        return fallback;
+    }
+    int result = fallback;
+    if (!CFNumberGetValue((CFNumberRef)value, kCFNumberIntType, &result)) {
+        return fallback;
+    }
+    return result;
+}
+
+static int kb_cf_bool(CFDictionaryRef dictionary, CFStringRef key)
+{
+    CFTypeRef value = CFDictionaryGetValue(dictionary, key);
+    if (!value || CFGetTypeID(value) != CFBooleanGetTypeID()) {
+        return 0;
+    }
+    return CFBooleanGetValue((CFBooleanRef)value) ? 1 : 0;
+}
+
+int kb_power_stats_read(kb_power_stats *out)
+{
+    if (!out) {
+        return -1;
+    }
+    memset(out, 0, sizeof(*out));
+    out->charge_percent = -1;
+    out->time_remaining_min = -1;
+
+    CFTypeRef blob = IOPSCopyPowerSourcesInfo();
+    if (!blob) {
+        return -1;
+    }
+    CFArrayRef sources = IOPSCopyPowerSourcesList(blob);
+    if (!sources) {
+        CFRelease(blob);
+        return -1;
+    }
+
+    out->valid = 1;
+    CFIndex count = CFArrayGetCount(sources);
+    for (CFIndex index = 0; index < count; index++) {
+        CFTypeRef source = CFArrayGetValueAtIndex(sources, index);
+        CFDictionaryRef description = IOPSGetPowerSourceDescription(blob, source);
+        if (!description) {
+            continue;
+        }
+        CFStringRef type = CFDictionaryGetValue(description, CFSTR(kIOPSTypeKey));
+        if (!type || CFGetTypeID(type) != CFStringGetTypeID() ||
+            CFStringCompare(type, CFSTR(kIOPSInternalBatteryType), 0) != kCFCompareEqualTo) {
+            continue;
+        }
+
+        out->has_battery = kb_cf_bool(description, CFSTR(kIOPSIsPresentKey));
+        if (out->has_battery) {
+            int current = kb_cf_int(description, CFSTR(kIOPSCurrentCapacityKey), -1);
+            int maximum = kb_cf_int(description, CFSTR(kIOPSMaxCapacityKey), -1);
+            if (current >= 0 && maximum > 0) {
+                out->charge_percent = (int32_t)((int64_t)current * 100 / maximum);
+            }
+            out->is_charging = kb_cf_bool(description, CFSTR(kIOPSIsChargingKey));
+            out->is_charged = kb_cf_bool(description, CFSTR(kIOPSIsChargedKey));
+
+            CFStringRef state = CFDictionaryGetValue(description,
+                                                     CFSTR(kIOPSPowerSourceStateKey));
+            if (state && CFGetTypeID(state) == CFStringGetTypeID()) {
+                out->is_plugged_in =
+                    CFStringCompare(state, CFSTR(kIOPSACPowerValue), 0) == kCFCompareEqualTo;
+                CFStringGetCString(state, out->source, sizeof(out->source),
+                                   kCFStringEncodingUTF8);
+            }
+
+            CFStringRef time_key = out->is_charging
+                ? CFSTR(kIOPSTimeToFullChargeKey)
+                : CFSTR(kIOPSTimeToEmptyKey);
+            int minutes = kb_cf_int(description, time_key, -1);
+            out->time_remaining_min = minutes > 0 ? minutes : -1;
+        }
+        break;
+    }
+
+    CFRelease(sources);
+    CFRelease(blob);
+    return 0;
+}
+
+int kb_prevent_sleep_pids(int32_t **pids, size_t *count)
+{
+    if (!pids || !count) {
+        return -1;
+    }
+    *pids = NULL;
+    *count = 0;
+
+    CFDictionaryRef assertions = NULL;
+    if (IOPMCopyAssertionsByProcess(&assertions) != kIOReturnSuccess ||
+        !assertions) {
+        return -1;
+    }
+
+    CFIndex total = CFDictionaryGetCount(assertions);
+    size_t capacity = (size_t)(total > 0 ? total : 1);
+    int32_t *result = (int32_t *)calloc(capacity, sizeof(int32_t));
+    const void **keys = (const void **)calloc(capacity, sizeof(void *));
+    const void **values = (const void **)calloc(capacity, sizeof(void *));
+    if (!result || !keys || !values) {
+        free(result);
+        free(keys);
+        free(values);
+        CFRelease(assertions);
+        return -1;
+    }
+    CFDictionaryGetKeysAndValues(assertions, keys, values);
+
+    size_t found = 0;
+    for (CFIndex index = 0; index < total; index++) {
+        int32_t pid = 0;
+        if (!keys[index] || CFGetTypeID(keys[index]) != CFNumberGetTypeID() ||
+            !CFNumberGetValue((CFNumberRef)keys[index], kCFNumberSInt32Type, &pid)) {
+            continue;
+        }
+        if (!values[index] || CFGetTypeID(values[index]) != CFArrayGetTypeID()) {
+            continue;
+        }
+        CFArrayRef list = (CFArrayRef)values[index];
+        CFIndex assertionCount = CFArrayGetCount(list);
+        int prevents = 0;
+        for (CFIndex item = 0; item < assertionCount && !prevents; item++) {
+            CFTypeRef entry = CFArrayGetValueAtIndex(list, item);
+            if (!entry || CFGetTypeID(entry) != CFDictionaryGetTypeID()) {
+                continue;
+            }
+            CFDictionaryRef dictionary = (CFDictionaryRef)entry;
+            if (kb_cf_int(dictionary, kIOPMAssertionLevelKey, 0) <= 0) {
+                continue;
+            }
+            CFStringRef type = CFDictionaryGetValue(dictionary,
+                                                    kIOPMAssertionTypeKey);
+            if (!type || CFGetTypeID(type) != CFStringGetTypeID()) {
+                continue;
+            }
+            if (CFStringCompare(type,
+                                kIOPMAssertionTypePreventUserIdleSystemSleep, 0)
+                    == kCFCompareEqualTo ||
+                CFStringCompare(type, kIOPMAssertionTypePreventSystemSleep, 0)
+                    == kCFCompareEqualTo) {
+                prevents = 1;
+            }
+        }
+        if (prevents) {
+            result[found++] = pid;
+        }
+    }
+
+    free(keys);
+    free(values);
+    CFRelease(assertions);
+
+    if (found == 0) {
+        free(result);
+        return 0;
+    }
+    *pids = result;
+    *count = found;
+    return 0;
+}
+
 int kb_host_stats_read(kb_host_stats *out)
 {
     if (!out) {
@@ -136,6 +422,20 @@ int kb_host_stats_read(kb_host_stats *out)
         out->swap_used = swap.xsu_used;
         out->swap_avail = swap.xsu_avail;
         out->swap_encrypted = swap.xsu_encrypted ? 1 : 0;
+    }
+
+    /*
+     * Memory pressure exactly as Activity Monitor reports it: the free
+     * percentage from memorystatus_get_level, inverted, plus the kernel's
+     * discrete pressure level (1 normal, 2 warning, 4 critical).
+     */
+    out->mem_pressure_percent = -1;
+    out->mem_pressure_level = -1;
+    int32_t pressure_percent = -1;
+    int32_t pressure_level = -1;
+    if (kb_memory_pressure_read(&pressure_percent, &pressure_level) == 0) {
+        out->mem_pressure_percent = pressure_percent;
+        out->mem_pressure_level = pressure_level;
     }
 
     struct timeval boot_time;

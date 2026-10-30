@@ -55,9 +55,20 @@ final class AppModel {
     var cpuProcessRows: [CPUProcessRow] = []
     var userNames: [UInt32: String] = [:]
     var cpuUsageHistory: [Double] = []
+    var cpuUserHistory: [Double] = []
+    var cpuSystemHistory: [Double] = []
+    var cpuNiceHistory: [Double] = []
     var loadHistory: [Double] = []
     var threadHistory: [Double] = []
     var memoryUsageHistory: [Double] = []
+    /// Activity Monitor-style memory pressure (0...100) and raw kernel level.
+    var memoryPressureHistory: [Int] = []
+    var memoryPressureLevelHistory: [Int] = []
+    var gpuUsageHistory: [Double] = []
+    var energyUsageHistory: [Double] = []
+    var wakeupHistory: [Double] = []
+    /// Baselines for the local energy fallback used with old daemons.
+    private var previousProcessEnergy: [KBProcessKey: (energy: UInt64, wakeups: UInt64)] = [:]
     var serviceStatus: SMAppService.Status = .notRegistered
     var serviceError: String?
     var serviceActionInFlight = false
@@ -701,15 +712,77 @@ final class AppModel {
 
         interfaces = snapshot.interfaces
         interfaceRates = rates
-        processes = snapshot.processes
+        var patchedProcesses = snapshot.processes
+        if validInterval {
+            var baseline: [KBProcessKey: (energy: UInt64, wakeups: UInt64)] = [:]
+            for index in patchedProcesses.indices {
+                guard var usage = patchedProcesses[index].usage else { continue }
+                if usage.energyWatts == nil,
+                   (patchedProcesses[index].uid == UInt32(getuid()) || isRoot),
+                   let reading = ProcessEnergyReader.current(pid: patchedProcesses[index].pid) {
+                    let key = patchedProcesses[index].id
+                    usage.energyNanojoules = reading.energy
+                    usage.interruptWakeups = reading.wakeups
+                    usage.packageIdleWakeups = 0
+                    if let prior = previousProcessEnergy[key],
+                       reading.energy >= prior.energy {
+                        usage.energyWatts = Double(reading.energy - prior.energy)
+                            / 1_000_000_000 / elapsed
+                        usage.wakeupsPerSecond = reading.wakeups >= prior.wakeups
+                            ? Double(reading.wakeups - prior.wakeups) / elapsed
+                            : 0
+                    } else {
+                        usage.energyWatts = 0
+                        usage.wakeupsPerSecond = 0
+                    }
+                    baseline[key] = (reading.energy, reading.wakeups)
+                }
+                patchedProcesses[index].usage = usage
+            }
+            previousProcessEnergy = baseline
+        }
+        if patchedProcesses.contains(where: {
+            $0.usage != nil && $0.usage?.preventingSleep == nil
+        }), let sleeping = PowerAssertionsReader.current() {
+            for index in patchedProcesses.indices {
+                guard var usage = patchedProcesses[index].usage else { continue }
+                let pid = patchedProcesses[index].pid
+                usage.preventingSleep = sleeping.contains(pid)
+                patchedProcesses[index].usage = usage
+            }
+        }
+        processes = patchedProcesses
         updateDaemonProcessState()
         self.sources = sources
         socketInventory = snapshot.socketInventory
-        hostMetrics = snapshot.hostMetrics
-        cpuProcessRows = snapshot.processes.map { CPUProcessRow(process: $0) }
-        resolveUserNames(for: snapshot.processes.map(\.uid))
+        // Pressure, GPU and battery are host-wide and readable without
+        // privileges: fill them in when the daemon predates these fields.
+        var host = snapshot.hostMetrics
+        if var measured = host,
+           measured.memory.pressurePercent == nil
+            || measured.memory.pressureLevel == nil
+            || measured.gpu == nil
+            || measured.power == nil {
+            let local = MemoryPressureReader.current()
+            if measured.memory.pressurePercent == nil {
+                measured.memory.pressurePercent = local.percent
+            }
+            if measured.memory.pressureLevel == nil {
+                measured.memory.pressureLevel = local.level
+            }
+            if measured.gpu == nil {
+                measured.gpu = GPUStatsReader.current()
+            }
+            if measured.power == nil {
+                measured.power = PowerStatsReader.current()
+            }
+            host = measured
+        }
+        hostMetrics = host
+        cpuProcessRows = patchedProcesses.map { CPUProcessRow(process: $0) }
+        resolveUserNames(for: patchedProcesses.map(\.uid))
         processInventory = ProcessInventoryBuilder.build(
-            processes: snapshot.processes,
+            processes: patchedProcesses,
             sources: sources,
             socketInventory: snapshot.socketInventory
         )
@@ -734,19 +807,44 @@ final class AppModel {
 
         if let host = hostMetrics {
             cpuUsageHistory.append(host.cpu.totalUsagePercent)
+            cpuUserHistory.append(host.cpu.userPercent)
+            cpuSystemHistory.append(host.cpu.systemPercent)
+            cpuNiceHistory.append(host.cpu.nicePercent)
             loadHistory.append(host.cpu.load1)
             threadHistory.append(Double(host.cpu.threadCount))
             memoryUsageHistory.append(host.memory.usedFraction * 100)
+            if let pressure = host.memory.pressurePercent {
+                memoryPressureHistory.append(pressure)
+                memoryPressureLevelHistory.append(host.memory.pressureLevel ?? 0)
+            }
+            if let utilization = host.gpu?.utilizationPercent {
+                gpuUsageHistory.append(utilization)
+            }
         }
+
+        energyUsageHistory.append(processes.reduce(0.0) {
+            $0 + ($1.usage?.energyWatts ?? 0)
+        })
+        wakeupHistory.append(processes.reduce(0.0) {
+            $0 + ($1.usage?.wakeupsPerSecond ?? 0)
+        })
 
         let limit = 60
         trim(&rxHistory, limit: limit)
         trim(&txHistory, limit: limit)
         trim(&sampleDates, limit: limit)
         trim(&cpuUsageHistory, limit: limit)
+        trim(&cpuUserHistory, limit: limit)
+        trim(&cpuSystemHistory, limit: limit)
+        trim(&cpuNiceHistory, limit: limit)
         trim(&loadHistory, limit: limit)
         trim(&threadHistory, limit: limit)
         trim(&memoryUsageHistory, limit: limit)
+        trim(&memoryPressureHistory, limit: limit)
+        trim(&memoryPressureLevelHistory, limit: limit)
+        trim(&gpuUsageHistory, limit: limit)
+        trim(&energyUsageHistory, limit: limit)
+        trim(&wakeupHistory, limit: limit)
     }
 
     private func trim<Element>(_ values: inout [Element], limit: Int) {
