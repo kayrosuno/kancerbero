@@ -65,7 +65,7 @@ struct CPUProcessTable: View {
                     Label("\(cpu.threadsRestricted) restricted", systemImage: "lock.fill")
                         .font(.system(size: 10))
                         .foregroundStyle(.orange)
-                        .help("CPU, memory and thread counts of other users require the root daemon.")
+                        .help("CPU, memory and thread counts for other users require the root daemon; reinstall the current build if the daemon reports fewer processes than macOS.")
                 }
 
                 Text("\(displayRows.count) of \(rows.count)")

@@ -291,6 +291,10 @@ $K --screenshot /tmp/kb-cpu-selected.png --section cpu \
   Con el daemon root aparecen todos. Los procesos sin task info muestran `—`, nunca 0.
 - CPU% puede superar 100% en multithread; `TIME+` es tiempo acumulado. Ordenar por cada columna,
   filtrar y cambiar de sección: búsqueda, selección y orden se conservan.
+- El recuento de procesos debe coincidir con `ps -ax | wc -l` y `top -l 1 -n 0` (±5) e incluir
+  kernel_task (PID 0). Como usuario, `threads` es menor que `top` y la UI muestra
+  “partial”/“N restricted”; con el daemon root actualizado coinciden procesos e hilos. Si el
+  daemon es antiguo, System status muestra “Process data Incomplete — N of M processes”.
 - Igual que en otras tablas con refresco en vivo, macOS 27 puede registrar
   `reentrant operation in its NSTableView delegate`; no afecta a los datos.
 - Para fugas: dejar la pestaña abierta varios minutos con intervalo de 0,5 s y comprobar que el

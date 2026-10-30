@@ -319,6 +319,9 @@ struct SystemStatusView: View {
                     approvalRow
                     connectionRow
                     daemonProcessRow
+                    if model.daemonProcessesIncomplete {
+                        processDataRow
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .top)
@@ -608,6 +611,16 @@ struct SystemStatusView: View {
                          actionTitle: actionTitle,
                          actionDisabled: model.serviceActionInFlight,
                          action: enabled && !running ? { showRepairConfirmation = true } : nil)
+    }
+
+    private var processDataRow: some View {
+        statusRow(.warning,
+                  title: "Process data",
+                  value: "Incomplete",
+                  detail: "The background daemon reports \(model.daemonReportedProcessCount) of \(model.daemonLocalProcessCount) processes. Install the current Kancerbero build and repair the background service to update it; CPU, memory and thread values for the remaining processes stay unavailable until then.",
+                  actionTitle: "Repair…",
+                  actionDisabled: !canRepair,
+                  action: { showRepairConfirmation = true })
     }
 
     private var filterExtensionRow: some View {

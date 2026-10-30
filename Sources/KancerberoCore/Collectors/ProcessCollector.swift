@@ -52,48 +52,70 @@ public enum ProcessCollector {
         var items: [KBProcessInfo] = []
         items.reserveCapacity(count)
         for index in 0..<count {
-            let raw = base[index]
-            let hasTaskInfo = raw.has_task_info != 0
-            let runningThreads = Int(raw.running_threads)
-            let usage: KBProcessUsage? = hasTaskInfo
-                ? KBProcessUsage(
-                    cpuTimeNanoseconds: nanoseconds(
-                        fromTicks: raw.cpu_user_ticks + raw.cpu_system_ticks),
-                    residentBytes: raw.resident_bytes,
-                    virtualBytes: raw.virtual_bytes,
-                    threads: Int(raw.threads),
-                    runningThreads: runningThreads,
-                    priority: raw.priority,
-                    energyNanojoules: raw.energy_nj,
-                    interruptWakeups: raw.interrupt_wkups,
-                    packageIdleWakeups: raw.pkg_idle_wkups)
-                : nil
-            let state: KBProcessState?
-            if hasTaskInfo {
-                state = KBProcessState.from(status: raw.status,
-                                            runningThreads: runningThreads)
-            } else {
-                // pbi_status is not a reliable run state on macOS 27, but
-                // stopped/zombie/idle still carry useful information.
-                switch raw.status {
-                case 1: state = .idle
-                case 4: state = .stopped
-                case 5: state = .zombie
-                default: state = nil
-                }
-            }
-            items.append(KBProcessInfo(
-                pid: raw.pid,
-                ppid: raw.ppid,
-                uid: raw.uid,
-                startTimeUS: raw.start_time_us,
-                name: KBInterop.string(raw.name),
-                path: KBInterop.string(raw.path),
-                state: state,
-                nice: raw.nice,
-                usage: usage
-            ))
+            items.append(info(from: base[index]))
         }
         return items.sorted { $0.pid < $1.pid }
+    }
+
+    /// Identity-only snapshot from KERN_PROC_ALL. It lists every process,
+    /// including ones whose task counters are unreadable without the root
+    /// daemon, but never blocks on per-PID syscalls.
+    public static func metadataSnapshot() -> [KBProcessInfo] {
+        var pointer: UnsafeMutablePointer<kb_process>?
+        var count = 0
+        guard kb_process_metadata_list(&pointer, &count) == 0,
+              let base = pointer else {
+            return []
+        }
+        defer { kb_process_list_free(base) }
+        var items: [KBProcessInfo] = []
+        items.reserveCapacity(count)
+        for index in 0..<count {
+            items.append(info(from: base[index]))
+        }
+        return items.sorted { $0.pid < $1.pid }
+    }
+
+    public static func info(from raw: kb_process) -> KBProcessInfo {
+        let hasTaskInfo = raw.has_task_info != 0
+        let runningThreads = Int(raw.running_threads)
+        let usage: KBProcessUsage? = hasTaskInfo
+            ? KBProcessUsage(
+                cpuTimeNanoseconds: nanoseconds(
+                    fromTicks: raw.cpu_user_ticks + raw.cpu_system_ticks),
+                residentBytes: raw.resident_bytes,
+                virtualBytes: raw.virtual_bytes,
+                threads: Int(raw.threads),
+                runningThreads: runningThreads,
+                priority: raw.priority,
+                energyNanojoules: raw.energy_nj,
+                interruptWakeups: raw.interrupt_wkups,
+                packageIdleWakeups: raw.pkg_idle_wkups)
+            : nil
+        let state: KBProcessState?
+        if hasTaskInfo {
+            state = KBProcessState.from(status: raw.status,
+                                        runningThreads: runningThreads)
+        } else {
+            // pbi_status is not a reliable run state on macOS 27, but
+            // stopped/zombie/idle still carry useful information.
+            switch raw.status {
+            case 1: state = .idle
+            case 4: state = .stopped
+            case 5: state = .zombie
+            default: state = nil
+            }
+        }
+        return KBProcessInfo(
+            pid: raw.pid,
+            ppid: raw.ppid,
+            uid: raw.uid,
+            startTimeUS: raw.start_time_us,
+            name: KBInterop.string(raw.name),
+            path: KBInterop.string(raw.path),
+            state: state,
+            nice: raw.nice,
+            usage: usage
+        )
     }
 }

@@ -90,8 +90,10 @@ El detalle de binarios, permisos, instalación y librerías está en
   sparklines; medidores segmentados por núcleo (user/system/nice/idle); uptime; memoria y swap
   con desglose Active/Wired/Compressed/Cached/Free; y tabla de procesos ordenable con búsqueda
   (PID, USER, PRI/NI, VIRT, RES, S/THR, CPU%, MEM%, TIME+ y Command). CPU% no se normaliza
-  (puede superar 100% en multihilo). Sin daemon root macOS solo enumera los procesos del uid
-  actual; el daemon root muestra todos.
+  (puede superar 100% en multihilo). El listado usa `KERN_PROC_ALL` e incluye todos los procesos
+  (kernel_task incluido), sin descartar los que no exponen task info. Sin daemon root los
+  contadores de otros usuarios quedan restringidos; si el daemon es antiguo la app fusiona las
+  identidades locales y avisa en System status (los hilos aparecen como “partial”).
 - **Memory** — panel dedicado tipo Activity Monitor: presión de memoria (Low/Medium/High) con
   histórico y explicación, composición App/Wired/Compressed/Cached/Free, detalle de Physical
   Memory, Memory Used, App Memory, Wired, Compressed, Cached Files y Swap, y tabla de procesos

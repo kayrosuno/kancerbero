@@ -86,6 +86,12 @@
   ordenable, con búsqueda, selección persistida e inspector. `CPUProcessRow` añade claves de
   orden no opcionales para que los procesos sin task info queden al final. SwiftUI limita el
   `TableColumnBuilder` a 10 columnas, así que PRI/NI y S/THR se muestran combinadas.
+- `ProcessCollector`/`kb_process_list`: enumera con `sysctl(KERN_PROC_ALL)` (incluye PID 0 y
+  procesos sin task info), enriquece con `PROC_PIDTASKALLINFO` y `rusage_info_v6` y nunca descarta
+  un proceso por falta de permisos. `AppModel` fusiona `ProcessCollector.metadataSnapshot()`
+  cuando el daemon reporta menos procesos que macOS y expone `daemonProcessesIncomplete`; System
+  status muestra el aviso y la tabla marca “N restricted”. Con el daemon root actualizado los
+  contadores e hilos están completos; sin root quedan restringidos.
 - `MemoryView`: panel dedicado tipo Activity Monitor. Arriba (1/3) la presión con
   `MemoryPressureChart` y su explicación, la composición App/Wired/Compressed/Cached/Free
   (`SegmentedMeter` + `MeterLegend`) y el detalle Physical Memory / Memory Used / App / Wired /
