@@ -211,9 +211,7 @@ final class DockIconView: NSView {
                                       yRadius: bounds.width * 0.22)
         Palette.background.setFill()
         background.fill()
-        Palette.border.setStroke()
-        background.lineWidth = max(1, bounds.width * 0.006)
-        background.stroke()
+        strokeIconBorder(in: frame)
 
         let content = bounds.insetBy(dx: bounds.width * 0.10,
                                      dy: bounds.height * 0.09)
@@ -223,7 +221,7 @@ final class DockIconView: NSView {
         case .cpuUsage:
             drawCPUUsage(in: content)
         case .cpuHistory:
-            drawCPUHistory(in: content)
+            drawCPUHistory(in: frame)
         case .networkUsage:
             drawNetwork(in: content)
         case .diskActivity:
@@ -263,12 +261,34 @@ final class DockIconView: NSView {
                      in: bar)
     }
 
-    private func drawCPUHistory(in content: NSRect) {
-        drawLabel("CPU", in: relative(content, 0, 0, 0.5, 0.13))
-        drawStatus(KBFormat.usagePercent(snapshot.cpuUsage),
-                   in: relative(content, 0.5, 0, 0.5, 0.13))
-        let graph = relative(content, 0, 0.24, 1, 0.72)
-        drawStackedHistory(in: graph)
+    private func drawCPUHistory(in rect: NSRect) {
+        // Full-bleed history, clipped to the rounded icon silhouette.
+        NSGraphicsContext.saveGraphicsState()
+        let clip = NSBezierPath(roundedRect: rect,
+                                xRadius: rect.width * 0.22,
+                                yRadius: rect.width * 0.22)
+        clip.addClip()
+        drawStackedHistory(in: rect)
+        NSGraphicsContext.restoreGraphicsState()
+
+        // The graph covers the original border; repaint it on top.
+        strokeIconBorder(in: rect)
+
+        drawText("CPU",
+                 in: relative(rect, 0, 0.08, 1, 0.12),
+                 size: rect.height * 0.10,
+                 color: Palette.secondary,
+                 monospaced: false,
+                 alignment: .center,
+                 shadow: true)
+
+        drawText(KBFormat.usagePercent(snapshot.cpuUsage),
+                 in: relative(rect, 0, 0.28, 1, 0.40),
+                 size: rect.height * 0.25,
+                 color: Palette.text,
+                 monospaced: true,
+                 alignment: .center,
+                 shadow: true)
     }
 
     private func drawNetwork(in content: NSRect) {
@@ -359,6 +379,15 @@ final class DockIconView: NSView {
                height: content.height * height)
     }
 
+    private func strokeIconBorder(in rect: NSRect) {
+        let path = NSBezierPath(roundedRect: rect,
+                                xRadius: rect.width * 0.22,
+                                yRadius: rect.width * 0.22)
+        Palette.border.setStroke()
+        path.lineWidth = max(1, rect.width * 0.006)
+        path.stroke()
+    }
+
     private func drawLabel(_ text: String, in rect: NSRect) {
         drawText(text, in: rect, size: rect.height * 0.95,
                  color: Palette.secondary, monospaced: false)
@@ -373,18 +402,27 @@ final class DockIconView: NSView {
     private func drawText(_ text: String, in rect: NSRect, size: CGFloat,
                           color: NSColor = Palette.text,
                           monospaced: Bool,
-                          alignment: NSTextAlignment = .left) {
+                          alignment: NSTextAlignment = .left,
+                          shadow: Bool = false) {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = alignment
         paragraph.lineBreakMode = .byTruncatingTail
         let font = monospaced
             ? NSFont.monospacedDigitSystemFont(ofSize: size, weight: .semibold)
             : NSFont.systemFont(ofSize: size, weight: .semibold)
-        NSAttributedString(string: text,
-                           attributes: [.font: font,
-                                        .foregroundColor: color,
-                                        .paragraphStyle: paragraph])
-            .draw(in: rect)
+        var attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: color,
+            .paragraphStyle: paragraph
+        ]
+        if shadow {
+            let textShadow = NSShadow()
+            textShadow.shadowColor = NSColor.black.withAlphaComponent(0.65)
+            textShadow.shadowBlurRadius = size * 0.18
+            textShadow.shadowOffset = .zero
+            attributes[.shadow] = textShadow
+        }
+        NSAttributedString(string: text, attributes: attributes).draw(in: rect)
     }
 
     // MARK: Charts
