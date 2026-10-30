@@ -16,6 +16,10 @@ struct MemoryView: View {
     private let idleColor = Color.gray.opacity(0.28)
     private let swapColor = Color(red: 0.62, green: 0.42, blue: 0.95)
 
+    @State private var showPressureDetails = false
+    @State private var showCompositionDetails = false
+    @State private var showSwapDetails = false
+
     var body: some View {
         @Bindable var model = model
 
@@ -104,7 +108,9 @@ struct MemoryView: View {
             groupPanel("Breakdown") {
                 HStack(spacing: 10) {
                     activityMonitorCard
+                        .frame(minWidth: 210, idealWidth: 250, maxWidth: 250)
                     compositionCard
+                        .frame(maxWidth: .infinity)
                 }
             }
 
@@ -138,6 +144,21 @@ struct MemoryView: View {
     }
 
     private var pressureCard: some View {
+        Button {
+            showPressureDetails = true
+        } label: {
+            pressureCardContent
+        }
+        .buttonStyle(.plain)
+        .help("Memory pressure history")
+        .popover(isPresented: $showPressureDetails, arrowEdge: .bottom) {
+            pressureDetails
+                .padding(16)
+                .frame(width: 460)
+        }
+    }
+
+    private var pressureCardContent: some View {
         let memory = model.hostMetrics?.memory
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 6) {
@@ -193,6 +214,7 @@ struct MemoryView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(memoryTint.opacity(0.22), lineWidth: 1)
         }
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private var activityMonitorCard: some View {
@@ -200,20 +222,24 @@ struct MemoryView: View {
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .center, spacing: 6) {
                 cardIcon("memorychip", tint: KBTheme.downloadTint)
-                Text("Activity Monitor detail")
+                Text("Physical Memory")
                     .font(.system(size: 12, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
-                Spacer(minLength: 0)
+                Spacer(minLength: 4)
+                if let memory {
+                    Text(KBFormat.bytes(memory.totalBytes))
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                }
             }
 
             if let memory {
-                HStack(alignment: .top, spacing: 12) {
-                    headlineMetric("Physical Memory", KBFormat.bytes(memory.totalBytes))
-                    headlineMetric("Memory Used",
-                                   KBFormat.bytes(memory.activityMonitorUsedBytes),
-                                   detail: "· \(KBFormat.percent(memory.activityMonitorUsedFraction))")
-                }
+                headlineMetric("Memory Used",
+                               KBFormat.bytes(memory.activityMonitorUsedBytes),
+                               detail: "· \(KBFormat.percent(memory.activityMonitorUsedFraction))")
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 Divider().opacity(0.4)
 
@@ -248,6 +274,21 @@ struct MemoryView: View {
     }
 
     private var compositionCard: some View {
+        Button {
+            showCompositionDetails = true
+        } label: {
+            compositionCardContent
+        }
+        .buttonStyle(.plain)
+        .help("Memory composition and detail")
+        .popover(isPresented: $showCompositionDetails, arrowEdge: .bottom) {
+            compositionDetails
+                .padding(16)
+                .frame(width: 460)
+        }
+    }
+
+    private var compositionCardContent: some View {
         let memory = model.hostMetrics?.memory
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 6) {
@@ -308,9 +349,25 @@ struct MemoryView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(memoryTint.opacity(0.22), lineWidth: 1)
         }
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private var swapCard: some View {
+        Button {
+            showSwapDetails = true
+        } label: {
+            swapCardContent
+        }
+        .buttonStyle(.plain)
+        .help("Swap usage and status")
+        .popover(isPresented: $showSwapDetails, arrowEdge: .bottom) {
+            swapDetails
+                .padding(16)
+                .frame(width: 460)
+        }
+    }
+
+    private var swapCardContent: some View {
         let memory = model.hostMetrics?.memory
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 6) {
@@ -375,6 +432,7 @@ struct MemoryView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(memoryTint.opacity(0.22), lineWidth: 1)
         }
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private func metric(_ label: String, _ value: String) -> some View {
@@ -414,7 +472,7 @@ struct MemoryView: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
                 Text(value)
                     .font(.system(size: 19, weight: .semibold, design: .rounded))
                     .monospacedDigit()
@@ -423,7 +481,7 @@ struct MemoryView: View {
                     .layoutPriority(1)
                 if let detail {
                     Text(detail)
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(memoryTint)
                         .lineLimit(1)
@@ -431,7 +489,6 @@ struct MemoryView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func pressureColor(_ band: KBMemoryStats.PressureBand) -> Color {
@@ -440,6 +497,166 @@ struct MemoryView: View {
         case .medium: return .yellow
         case .high: return .red
         case .unknown: return .secondary
+        }
+    }
+
+    // MARK: - Popover details
+
+    private var pressureDetails: some View {
+        let memory = model.hostMetrics?.memory
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("Memory pressure")
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer()
+                if let memory, memory.pressurePercent != nil {
+                    Text(memory.pressureLabel)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(pressureColor(memory.pressureBand))
+                }
+            }
+
+            if let memory, let percent = memory.pressurePercent {
+                Text("\(percent)% pressure · level \(memory.pressureLevel ?? 0)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+
+                MemoryPressureChart(values: model.memoryPressureHistory,
+                                    levels: model.memoryPressureLevelHistory)
+                    .frame(height: 180)
+
+                Text("Memory pressure is an indicator of the system’s ability to meet the memory requirements of the user’s activities. Higher memory pressure indicates that the system is reaching its limits, and performance may degrade.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("Update the background daemon to report memory pressure.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var compositionDetails: some View {
+        let memory = model.hostMetrics?.memory
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Memory composition")
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer()
+                if let memory {
+                    Text(KBFormat.bytes(memory.totalBytes))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let memory {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Memory")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(KBFormat.bytes(memory.activityMonitorUsedBytes)) used · \(KBFormat.percent(memory.activityMonitorUsedFraction))")
+                        .font(.system(size: 10))
+                        .monospacedDigit()
+                }
+
+                SegmentedMeter(
+                    segments: [
+                        MeterSegment(id: "App", value: Double(memory.appMemoryBytes),
+                                     color: appColor),
+                        MeterSegment(id: "Wired", value: Double(memory.wiredBytes),
+                                     color: wiredColor),
+                        MeterSegment(id: "Compressed", value: Double(memory.compressedBytes),
+                                     color: compressedColor),
+                        MeterSegment(id: "Cached", value: Double(memory.cachedFileBytes),
+                                     color: cachedColor),
+                        MeterSegment(id: "Free", value: Double(memory.activityMonitorFreeBytes),
+                                     color: idleColor)
+                    ],
+                    height: 14,
+                    accessibilityLabel: "Memory composition"
+                )
+
+                MeterLegend(items: [
+                    MeterLegendItem("App", value: KBFormat.bytes(memory.appMemoryBytes),
+                                    color: appColor),
+                    MeterLegendItem("Wired", value: KBFormat.bytes(memory.wiredBytes),
+                                    color: wiredColor),
+                    MeterLegendItem("Compressed", value: KBFormat.bytes(memory.compressedBytes),
+                                    color: compressedColor),
+                    MeterLegendItem("Cached", value: KBFormat.bytes(memory.cachedFileBytes),
+                                    color: cachedColor),
+                    MeterLegendItem("Free", value: KBFormat.bytes(memory.activityMonitorFreeBytes),
+                                    color: idleColor)
+                ], minItemWidth: 140)
+
+                Text("App, wired, compressed and cached memory as Activity Monitor reports it.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Waiting for metrics…")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var swapDetails: some View {
+        let memory = model.hostMetrics?.memory
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Swap")
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer()
+                if let memory {
+                    Text(KBFormat.bytes(memory.swapTotalBytes))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let memory {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("\(KBFormat.bytes(memory.swapUsedBytes)) used")
+                        .font(.system(size: 26, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                    Text(KBFormat.percent(memory.swapUsedFraction))
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(memory.swapUsedFraction > 0.8 ? .red : swapColor)
+                }
+
+                CapacityBar(
+                    fraction: memory.swapUsedFraction,
+                    tint: memory.swapUsedFraction > 0.8 ? .red : swapColor,
+                    height: 14
+                )
+
+                if memory.swapEncrypted {
+                    Label("Encrypted", systemImage: "lock.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+
+                Divider().opacity(0.4)
+
+                HStack(alignment: .top, spacing: 28) {
+                    metric("Free", KBFormat.bytes(memory.activityMonitorFreeBytes))
+                    metric("Cached files", KBFormat.bytes(memory.cachedFileBytes))
+                    Spacer(minLength: 0)
+                }
+
+                Text("Swap is used when physical memory is full; heavy swap use can slow the Mac down.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("Waiting for metrics…")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
