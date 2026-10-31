@@ -435,9 +435,10 @@ NetworkStatistics y de `net.statistics_privcheck`.
 | Comando | Efecto | Valores por defecto |
 |---|---|---|
 | `version` | Versión del probe, del core y schema | — |
-| `symbols` | Disponibilidad de NetworkStatistics, `net.statistics_privcheck` y `euid` | — |
+| `symbols` | Disponibilidad de NetworkStatistics, `net.statistics_privcheck`, `euid` y Thermal (IOHID) | — |
 | `procs [--cpu] [--limit N] [--interval S]` | Lista de procesos, con CPU acumulada si `--cpu` | `--limit 20`, `--interval 1` |
-| `cpu [--interval S]` | Ticks por núcleo y agregado | `--interval 1` |
+| `cpu [--interval S]` | Ticks por núcleo y agregado, con temperatura de paquete y por core | `--interval 1` |
+| `thermal [--seconds N] [--interval S] [--core-count N]` | Lectura forzada de temperaturas IOHID (paquete, fuente y sensores) | `--seconds 3`, `--interval 1`, `0` = todos los cores |
 | `ifaces` | Contadores de interfaz (IFMIB) | — |
 | `sockets <pid>` | Sockets del proceso | — |
 | `sockets-summary [pid...]` | Resumen de sockets por protocolo/tipo; sin PIDs usa todos | — |
@@ -499,6 +500,7 @@ system extension no la usa.
 | NetworkStatistics (privado) | `kb_nstat.c` | `kb_nstat_open/close/is_available/start/poll/snapshot/source_count`, `kb_nstat_last_error` |
 | Procesos, sockets y ficheros | `kb_libproc.c` | `kb_process_list`, `kb_process_path`, `kb_socket_list`, `kb_socket_summary_all`, `kb_open_file_list` |
 | sysctl, interfaces y CPU/memoria | `kb_sysctl.c` | `kb_interface_list`, `kb_sysctl_int`, `kb_host_stats_read` |
+| Temperaturas CPU (IOHID privado) | `kb_thermal.c` | `kb_thermal_stats_read`, `kb_thermal_is_available`, `kb_thermal_last_error`, `kb_thermal_reset` |
 | launchd | `kb_launchd.c` | `kb_launchd_jobs`, `kb_launchd_last_error` (`launch_msg("GetJobs")`) |
 | Discos (IOKit/DiskArbitration) | `kb_disk_media.c` | `kb_disk_media_list` |
 | Escaneo de directorios | `kb_disk_scan.c` | `kb_disk_list_directory` (`getattrlistbulk`) |
@@ -508,7 +510,9 @@ system extension no la usa.
 
 - Solo lectura: no escribe ficheros, no lanza procesos y no usa shell.
 - `NetworkStatistics.framework` se abre con `dlopen` y las funciones con `dlsym`; es una API
-  privada y no apta para App Store.
+  privada y no apta para App Store. `kb_thermal.c` hace lo mismo con los símbolos de temperatura
+  de IOHID (`IOHIDEventSystemClient*`, `IOHIDServiceClientCopyEvent`, `IOHIDEventGetFloatValue`):
+  son de solo lectura y, si faltan, la temperatura queda sin datos.
 - La visibilidad de libproc es la del kernel: mismo uid salvo que el proceso sea root.
 - No necesita entitlements. El daemon hereda esta capacidad al enlazarla.
 
@@ -548,9 +552,9 @@ consumidor.
 |---|---|---|
 | `Models/` | `KBModels.swift`, `KBDaemonModels.swift`, `KBDiskModels.swift`, `KBHostMetrics.swift` | Procesos, sockets, interfaces, snapshots, daemons, disco, CPU/memoria y tasas |
 | `Wire/` | `KBWire.swift`, `KancerberoXPC.swift` | `KBWireEnvelope`, `KBHello*`, `KBSubscription`, `KBRequestMessage`, codec binario y protocolos `KancerberoDaemonXPC`/`KancerberoClientXPC` |
-| `Collectors/` | `CollectionActor.swift`, `NStatCollector`, `ProcessCollector`, `DescriptorCollector`, `InterfaceCollector`, `DaemonsCollector`, `LaunchdQuery`, `LaunchctlRunner`, `DiskInventoryCollector`, `DiskScanner`, `HostMetricsCollector`, `SocketSummaryCollector`, `UserCollector` | Recolección y contabilidad de cada fuente |
+| `Collectors/` | `CollectionActor.swift`, `NStatCollector`, `ProcessCollector`, `DescriptorCollector`, `InterfaceCollector`, `DaemonsCollector`, `LaunchdQuery`, `LaunchctlRunner`, `DiskInventoryCollector`, `DiskScanner`, `HostMetricsCollector`, `ThermalStatsReader`, `SocketSummaryCollector`, `UserCollector` | Recolección y contabilidad de cada fuente |
 | `Diagnostics/` | `KBCapabilitiesProbe.swift` | Modo efectivo (local/daemon), disponibilidad de NetworkStatistics y privacidad |
-| `Support/` | `KBInterop.swift` | Conversión entre structs C y modelos Swift |
+| `Support/` | `KBInterop.swift`, `CPUTopology.swift` | Conversión entre structs C y modelos Swift; clústeres Performance/Efficiency |
 | — | `KBVersion`, `KBRates`, `KBProcessKey` | Versión de schema, tasas y claves estables |
 
 `CollectionActor` es el punto de entrada: `refresh()` devuelve un `KBCollectionSnapshot` y

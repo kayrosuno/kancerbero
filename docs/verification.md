@@ -324,8 +324,14 @@ $K --screenshot /tmp/kb-cpu-selected.png --section cpu \
   RSS de Kancerbero se mantiene estable (`ps -o rss`, `leaks`). El sampler libera el array de
   `host_processor_info` y el puerto Mach en cada tick.
 - Altura de las cards: al maximizar o estirar la ventana, la franja superior de CPU, Memory,
-  Energy y Disk → I/O se mantiene en 210 pt (`KBTheme.cardStripHeight`) y todo el espacio extra
-  lo absorbe la tabla de procesos. Comparar una captura a 1440×860 con otra de ventana más alta.
+  Energy, Disk → I/O y Networking se mantiene en 190 pt (`KBTheme.cardStripHeight`, Traffic 190,
+  Activity 100 + Protocols 80) y todo el espacio extra lo absorbe la tabla de procesos. Comparar
+  una captura a 1440×860 con otra de ventana más alta.
+- Temperaturas: `$P symbols` debe informar `Thermal: available`; `$P thermal --seconds 5
+  --interval 1` muestra paquete, fuente (`PMU tdie` en Apple Silicon; `eACC/pACC` o `SOC MTR` como
+  respaldo) y temperatura por core, y `$P cpu --interval 1` añade `temp=` a cada `cpuN`.
+  Contrastar con btop (±1–2 °C). Bajo carga (`yes > /dev/null` por core) los valores deben subir.
+  Si no hay sensores (Intel/VM) la UI muestra `—` y el popover lo explica.
 
 Pestaña Memory:
 

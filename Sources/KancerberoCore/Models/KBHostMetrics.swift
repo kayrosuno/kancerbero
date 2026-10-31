@@ -106,6 +106,10 @@ public struct KBCoreCPU: Codable, Sendable, Identifiable, Hashable {
     public var systemPercent: Double
     public var nicePercent: Double
     public var idlePercent: Double
+    /// Approximate core temperature, mapped from the available IOHID sensors.
+    /// Nil when the Mac does not expose them (Intel, some VMs) or an older
+    /// daemon did not report any.
+    public var temperatureCelsius: Double?
 
     public var id: Int { index }
     public var usagePercent: Double {
@@ -113,12 +117,14 @@ public struct KBCoreCPU: Codable, Sendable, Identifiable, Hashable {
     }
 
     public init(index: Int, userPercent: Double = 0, systemPercent: Double = 0,
-                nicePercent: Double = 0, idlePercent: Double = 0) {
+                nicePercent: Double = 0, idlePercent: Double = 0,
+                temperatureCelsius: Double? = nil) {
         self.index = index
         self.userPercent = userPercent
         self.systemPercent = systemPercent
         self.nicePercent = nicePercent
         self.idlePercent = idlePercent
+        self.temperatureCelsius = temperatureCelsius
     }
 }
 
@@ -137,6 +143,10 @@ public struct KBCPUStats: Codable, Sendable, Hashable {
     public var threadsRestricted: Int
     public var uptimeSeconds: Double
     public var bootDate: Date?
+    /// Average of the available IOHID CPU cluster/die sensors.
+    public var packageTemperatureCelsius: Double?
+    /// Human-readable sensor family ("eACC/pACC", "PMU tdie", "SOC MTR").
+    public var temperatureSource: String?
 
     public var totalUsagePercent: Double {
         min(100, max(0, userPercent + systemPercent + nicePercent))
@@ -148,7 +158,9 @@ public struct KBCPUStats: Codable, Sendable, Hashable {
                 load1: Double = 0, load5: Double = 0, load15: Double = 0,
                 taskCount: Int = 0, threadCount: Int = 0,
                 threadsRestricted: Int = 0, uptimeSeconds: Double = 0,
-                bootDate: Date? = nil) {
+                bootDate: Date? = nil,
+                packageTemperatureCelsius: Double? = nil,
+                temperatureSource: String? = nil) {
         self.coreCount = coreCount
         self.cores = cores
         self.userPercent = userPercent
@@ -163,6 +175,8 @@ public struct KBCPUStats: Codable, Sendable, Hashable {
         self.threadsRestricted = threadsRestricted
         self.uptimeSeconds = uptimeSeconds
         self.bootDate = bootDate
+        self.packageTemperatureCelsius = packageTemperatureCelsius
+        self.temperatureSource = temperatureSource
     }
 }
 

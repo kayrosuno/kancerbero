@@ -8,10 +8,10 @@ struct ActivityCard: View {
     let focus: NetworkingFocus?
     let onToggle: (NetworkingFocus) -> Void
 
-    static let cardHeight: CGFloat = 104
+    static let cardHeight: CGFloat = 100
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Image(systemName: "rectangle.stack.fill")
                     .font(.system(size: 9, weight: .semibold))
@@ -38,9 +38,9 @@ struct ActivityCard: View {
                     caption: connectionsFiltered ? "matching flows" : "active flows",
                     hint: "Show rows tied to active connections",
                     isSelected: focus == .connections,
-                    valueSize: 19,
+                    valueSize: 18,
                     iconSize: 10,
-                    verticalPadding: 6
+                    verticalPadding: 4
                 ) {
                     onToggle(.connections)
                 }
@@ -54,16 +54,16 @@ struct ActivityCard: View {
                     caption: processesFiltered ? "matching processes" : "with sockets",
                     hint: "Show rows attributable to processes",
                     isSelected: focus == .processes,
-                    valueSize: 19,
+                    valueSize: 18,
                     iconSize: 10,
-                    verticalPadding: 6
+                    verticalPadding: 4
                 ) {
                     onToggle(.processes)
                 }
             }
             .frame(maxHeight: .infinity)
         }
-        .padding(10)
+        .padding(9)
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: Self.cardHeight)
         .background {

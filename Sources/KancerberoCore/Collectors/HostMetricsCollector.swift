@@ -21,6 +21,7 @@ public struct HostMetricsSampler {
         guard kb_host_stats_read(&raw) == 0 else { return nil }
 
         let coreCount = min(Int(raw.core_count), 256)
+        let thermal = ThermalStatsReader.current(coreCount: coreCount)
         var cores: [KBCoreCPU] = []
         cores.reserveCapacity(coreCount)
 
@@ -64,7 +65,9 @@ public struct HostMetricsSampler {
                                            userPercent: percentages.user,
                                            systemPercent: percentages.system,
                                            nicePercent: percentages.nice,
-                                           idlePercent: percentages.idle))
+                                           idlePercent: percentages.idle,
+                                           temperatureCelsius:
+                                            thermal?.coreCelsius[Int(coreIndex)]))
                 }
             }
         }
@@ -104,7 +107,9 @@ public struct HostMetricsSampler {
             threadCount: threadCount,
             threadsRestricted: restricted,
             uptimeSeconds: uptime,
-            bootDate: bootDate
+            bootDate: bootDate,
+            packageTemperatureCelsius: thermal?.packageCelsius,
+            temperatureSource: thermal?.source
         )
 
         let memory = KBMemoryStats(

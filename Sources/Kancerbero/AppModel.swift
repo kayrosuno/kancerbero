@@ -1072,6 +1072,13 @@ final class AppModel {
             measured.cpu.threadsRestricted = patchedProcesses.reduce(0) {
                 $0 + ($1.usage == nil ? 1 : 0)
             }
+            // Temperature is host-wide and readable without privileges, so a
+            // daemon that predates the thermal fields still gets values.
+            if usingDaemon,
+               measured.cpu.packageTemperatureCelsius == nil,
+               measured.cpu.cores.allSatisfy({ $0.temperatureCelsius == nil }) {
+                ThermalStatsReader.fillMissing(&measured.cpu)
+            }
             host = measured
         }
         hostMetrics = host

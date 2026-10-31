@@ -92,7 +92,9 @@ El detalle de binarios, permisos, instalación y librerías está en
   Las acciones de sistema requieren el daemon root y confirmación; GUI/User funcionan en local.
   Los login items quedan para una iteración posterior.
 - **CPU** — dashboard tipo `htop`: tarjetas de CPU, load average, tareas/hilos y memoria con
-  sparklines; medidores segmentados por núcleo (user/system/nice/idle); uptime; memoria y swap
+  sparklines; card de núcleos agrupada por clúster Performance/Efficiency con medidores
+  segmentados (user/system/nice/idle), uso y temperatura por core, y temperatura de paquete vía
+  IOHID (como btop); uptime; memoria y swap
   con desglose Active/Wired/Compressed/Cached/Free; y tabla de procesos ordenable con búsqueda
   (PID, USER, PRI/NI, VIRT, RES, S/THR, CPU%, MEM%, TIME+ y Command). CPU% no se normaliza
   (puede superar 100% en multihilo). El listado usa `KERN_PROC_ALL` e incluye todos los procesos
