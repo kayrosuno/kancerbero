@@ -86,13 +86,9 @@ struct NetworkingView: View {
                 ipVersions: ui.networking.ipVersions
             )
         }
-        .frame(minWidth: 232, idealWidth: 248, maxWidth: 256)
+        .frame(minWidth: 224, idealWidth: 248, maxWidth: 256)
 
         let traffic = TrafficCard(
-            downloadBytesPerSecond: rates.rxBytesPerSecond,
-            uploadBytesPerSecond: rates.txBytesPerSecond,
-            downloadPacketsPerSecond: rates.rxPacketsPerSecond,
-            uploadPacketsPerSecond: rates.txPacketsPerSecond,
             downloadHistory: model.rxHistory,
             uploadHistory: model.txHistory,
             downloadPacketHistory: model.rxPacketHistory,
@@ -104,9 +100,7 @@ struct NetworkingView: View {
             onToggle: toggleFocus
         )
 
-        let counters = model.systemCounters
-        let networkVertical = NetworkTotalsCard(counters: counters, layout: .vertical)
-        let networkHorizontal = NetworkTotalsCard(counters: counters, layout: .horizontal)
+        let network = NetworkTotalsCard(counters: model.systemCounters, rates: rates)
 
         VStack(spacing: 14) {
             CollapsibleSectionHeader(
@@ -116,28 +110,14 @@ struct NetworkingView: View {
             )
 
             if !ui.cardsCollapsed(for: .networking) {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: KBTheme.summaryGridSpacing) {
-                        activityColumn
-                        networkVertical
-                            .frame(width: 156)
-                        traffic
-                            .frame(minWidth: 340, maxWidth: .infinity)
-                    }
-                    .frame(height: KBTheme.cardStripHeight)
-                    .frame(minWidth: 820)
-
-                    VStack(spacing: KBTheme.summaryGridSpacing) {
-                        HStack(alignment: .top, spacing: KBTheme.summaryGridSpacing) {
-                            activityColumn
-                            traffic
-                                .frame(minWidth: 400, maxWidth: .infinity)
-                        }
-                        .frame(height: KBTheme.cardStripHeight)
-
-                        networkHorizontal
-                    }
+                HStack(alignment: .top, spacing: KBTheme.summaryGridSpacing) {
+                    activityColumn
+                    network
+                        .frame(width: 172)
+                    traffic
+                        .frame(minWidth: 260, maxWidth: .infinity)
                 }
+                .frame(height: KBTheme.cardStripHeight)
                 .transition(.opacity)
             }
 

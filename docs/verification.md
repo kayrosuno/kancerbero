@@ -27,17 +27,16 @@ nettop -P -d -L 3 -s 1 -x
   diferencia de atribución, no de contadores.
 - Comprobado: `ollama`, `2.1.310` y `rapportd` coinciden con `nettop` (±1%).
 - **Network totals y selector Bits/Packets:** capturar
-  `--section networking --traffic-graph bits` y `--traffic-graph packets`. Las cuatro métricas
-  siguen en los chips de Traffic (Download/Upload en bits/s y pkt/s, al mismo tamaño, con el valor
-  del modo activo resaltado), alineados a la izquierda junto al título y con huecos fijos para que
-  los valores no se desplacen al crecer; no cambian al alternar el selector, solo el gráfico y sus
-  etiquetas (bps vs pkt/s). La card **Network totals** muestra únicamente los acumulados desde el
-  arranque en dos paneles apilados y sombreados (como las tiles de Activity), Input con los datos
-  y paquetes recibidos encima de Output con los enviados. Contrastar tasas
-  con Activity Monitor → Network y totales con `netstat -ib` sumando `en*` y excluyendo
-  `lo0`/`utun`. A 1040×640 comprobar el fallback (Network totals horizontal debajo) y que los
-  chips sin etiqueta conservan ambos valores al mismo tamaño. `--cards-collapsed` oculta toda la
-  franja.
+  `--section networking --traffic-graph bits` y `--traffic-graph packets`. La card **Network
+  totals** queda siempre en la franja superior (ya no hay variante horizontal debajo): sus dos
+  paneles sombreados, Input y Output, muestran la tasa actual (`now`, bits/s y pkt/s) y bajo un
+  separador los acumulados desde el arranque (datos y paquetes). Traffic se adapta hasta su mínimo
+  y conserva solo el gráfico y una leyenda que cambia con el modo (Download/Upload · bps o
+  Packets in/out · pkt/s); sus entradas alternan el foco al pulsarlas. El selector está a la
+  izquierda del título con el control glass en macOS 26+ (fallback segmentado en versiones
+  anteriores). Contrastar tasas con Activity Monitor → Network y totales con `netstat -ib`
+  sumando `en*` y excluyendo `lo0`/`utun`. A 1040×640 comprobar que las tres cards siguen en una
+  fila, sin card Network debajo ni recortes de Traffic. `--cards-collapsed` oculta toda la franja.
 - Prueba controlada:
 
 ```bash

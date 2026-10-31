@@ -17,17 +17,19 @@
 - `RootView`: `NavigationSplitView` con `columnVisibility`; sidebar colapsable con
   `SidebarCommands()` y el toggle nativo que macOS dibuja en la toolbar.
 - `SidebarView`: selección propia con `matchedGeometryEffect` para Networking / Disk / Daemons /
-  CPU / Memory / Energy / Applications; cabecera con marca y estado live, pie con fuente (daemon/local), privcheck
-  y hora.
-- `NetworkingView`: columna izquierda con `ActivityCard` (Connections+Processes) y `ProtocolCard`
-  (desglose por `protocolBucket`); card `NetworkTotalsCard`, solo con los acumulados de datos y
-  paquetes de las interfaces en dos paneles apilados y sombreados, Input (recibidos) encima de
-  Output (enviados), y `TrafficCard` con selector Bits/Packets y `TrafficChart` (gráfico espejado,
-  escala compartida con techo
-  1/2/5×10^n, cuadrícula, niveles y eje temporal; ventana de 60 muestras anclada a la derecha). El
-  selector cambia solo las unidades e historiales del gráfico; dos chips alineados a la izquierda
-  junto al título agrupan Download+Pkts in y Upload+Pkts out (bits/s y pkt/s al mismo tamaño,
-  resaltando el valor del modo activo), y el chip completo alterna el foco.
+  CPU / Memory / Energy / Applications; cabecera con marca y estado live, engranaje de Settings
+  sobre el separador de estado y pie con fuente (daemon/local), privcheck y hora.
+- `NetworkingView`: franja superior como un único `HStack` sin `ViewThatFits`: columna
+  `ActivityCard` (Connections+Processes) + `ProtocolCard`, `NetworkTotalsCard` fijo y
+  `TrafficCard` con mínimo 260. Network siempre queda en la franja. `NetworkTotalsCard` recibe
+  contadores y tasas: dos paneles apilados y sombreados, Input (recibidos) sobre Output
+  (enviados), con la tasa actual en bits/s y pkt/s (`now`) y, bajo un separador, los acumulados
+  de datos y paquetes desde el arranque. `TrafficCard` usa `TrafficModeSelector` (glass en macOS
+  26+, `Picker` segmentado nativo en versiones anteriores), `TrafficChart` (gráfico espejado,
+  escala compartida con techo 1/2/5×10^n, cuadrícula, niveles y eje temporal; ventana de 60
+  muestras anclada a la derecha) y una leyenda inferior que cambia con el modo
+  (Download/Upload · bps o Packets in/out · pkt/s). Sus entradas son botones que alternan el foco
+  Download/Upload, con borde y atenuación de la serie contraria.
   Debajo, `PillTabBar` y las tablas (`NetworkingTables.swift`). `NetworkingUIState` guarda, por un
   lado, los filtros de Connections —`transports: Set<NetworkingTransport>`, `ipVersions:
   Set<NetworkingIPVersion>` y `connectionStates: Set<NetworkingConnectionState>`— y, por otro,

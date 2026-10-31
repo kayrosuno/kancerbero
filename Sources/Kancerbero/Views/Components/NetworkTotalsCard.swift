@@ -1,16 +1,11 @@
 import SwiftUI
 import KancerberoCore
 
-enum NetworkTotalsLayout: Equatable {
-    case vertical
-    case horizontal
-}
-
-/// Cumulative interface totals grouped by direction, modelled on Activity
-/// Monitor's Network tab. The live rates live in the Traffic card chips.
+/// Live interface rates and cumulative totals grouped by direction, modelled
+/// on Activity Monitor's Network tab.
 struct NetworkTotalsCard: View {
     let counters: KBCounters
-    var layout: NetworkTotalsLayout = .vertical
+    let rates: KBRates
 
     private enum Direction {
         case input
@@ -20,12 +15,6 @@ struct NetworkTotalsCard: View {
             self == .input ? "Input" : "Output"
         }
 
-        func values(in counters: KBCounters) -> (bytes: UInt64, packets: UInt64) {
-            self == .input
-                ? (counters.rxBytes, counters.rxPackets)
-                : (counters.txBytes, counters.txPackets)
-        }
-
         var icon: String {
             self == .input ? "arrow.down.circle.fill" : "arrow.up.circle.fill"
         }
@@ -33,71 +22,55 @@ struct NetworkTotalsCard: View {
         var tint: Color {
             self == .input ? KBTheme.downloadTint : KBTheme.uploadTint
         }
-    }
 
-    var body: some View {
-        content
-            .padding(9)
-            .frame(maxWidth: .infinity,
-                   maxHeight: layout == .vertical ? .infinity : nil,
-                   alignment: .topLeading)
-            .frame(height: layout == .horizontal ? 72 : nil)
-            .background {
-                RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
-                    .fill(.regularMaterial)
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [KBTheme.downloadTint.opacity(0.32),
-                                     KBTheme.uploadTint.opacity(0.32)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing),
-                        lineWidth: 1
-                    )
-            }
-            .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
-            .help("Interface counters are cumulative since boot and reset if an interface restarts.")
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Network totals")
-            .accessibilityValue(accessibilityValue)
-    }
+        func totals(in counters: KBCounters) -> (bytes: UInt64, packets: UInt64) {
+            self == .input
+                ? (counters.rxBytes, counters.rxPackets)
+                : (counters.txBytes, counters.txPackets)
+        }
 
-    @ViewBuilder
-    private var content: some View {
-        switch layout {
-        case .vertical:
-            VStack(alignment: .leading, spacing: 8) {
-                header(showsBootInline: true)
-                VStack(spacing: 6) {
-                    directionPanel(.input)
-                    directionPanel(.output)
-                }
-                .frame(maxHeight: .infinity)
-            }
-        case .horizontal:
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    header(showsBootInline: false)
-                    Text("since boot")
-                        .font(.system(size: 8))
-                        .foregroundStyle(.tertiary)
-                }
-                .frame(width: 130, alignment: .leading)
-
-                Divider().frame(height: 44)
-
-                VStack(spacing: 4) {
-                    directionRow(.input)
-                    directionRow(.output)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+        func liveRates(in rates: KBRates) -> (bytes: Double, packets: Double) {
+            self == .input
+                ? (rates.rxBytesPerSecond, rates.rxPacketsPerSecond)
+                : (rates.txBytesPerSecond, rates.txPacketsPerSecond)
         }
     }
 
-    private func header(showsBootInline: Bool) -> some View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            header
+            VStack(spacing: 6) {
+                directionPanel(.input)
+                directionPanel(.output)
+            }
+            .frame(maxHeight: .infinity)
+        }
+        .padding(9)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background {
+            RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
+                .fill(.regularMaterial)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [KBTheme.downloadTint.opacity(0.32),
+                                 KBTheme.uploadTint.opacity(0.32)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing),
+                    lineWidth: 1
+                )
+        }
+        .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
+        .help("Live interface rates and cumulative totals since boot. Counters reset "
+              + "if an interface restarts.")
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Network totals")
+        .accessibilityValue(accessibilityValue)
+    }
+
+    private var header: some View {
         HStack(spacing: 5) {
             Image(systemName: "network")
                 .font(.system(size: 9, weight: .semibold))
@@ -113,25 +86,21 @@ struct NetworkTotalsCard: View {
                     Text("Network totals")
                         .font(.system(size: 11, weight: .semibold))
                         .lineLimit(1)
-                    if showsBootInline {
-                        Spacer(minLength: 2)
-                        Text("since boot")
-                            .font(.system(size: 8))
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                    }
+                    Spacer(minLength: 2)
+                    Text("since boot")
+                        .font(.system(size: 8))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
                 }
                 HStack(spacing: 4) {
                     Text("Network")
                         .font(.system(size: 11, weight: .semibold))
                         .lineLimit(1)
-                    if showsBootInline {
-                        Spacer(minLength: 2)
-                        Text("since boot")
-                            .font(.system(size: 8))
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                    }
+                    Spacer(minLength: 2)
+                    Text("since boot")
+                        .font(.system(size: 8))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
                 }
                 Text("Network")
                     .font(.system(size: 11, weight: .semibold))
@@ -141,32 +110,44 @@ struct NetworkTotalsCard: View {
         .frame(height: 18)
     }
 
-    /// Both totals share size, colour and a fixed value slot, so the labels do
-    /// not jump when a longer byte or packet total arrives.
-    private func metricRow(_ value: String, label: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 3) {
-            Text(value)
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(Color.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .frame(width: 80, alignment: .leading)
-                .contentTransition(.numericText())
-            Text(label)
-                .font(.system(size: 8, weight: .medium))
-                .tracking(0.3)
-                .foregroundStyle(.tertiary)
-            Spacer(minLength: 0)
-        }
+    /// Both live rates share size and colour; both totals do too.
+    private func liveValue(_ value: String) -> some View {
+        Text(value)
+            .font(.system(size: 12, weight: .medium, design: .rounded))
+            .monospacedDigit()
+            .foregroundStyle(Color.primary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .contentTransition(.numericText())
+    }
+
+    private func totalValue(_ value: String) -> some View {
+        Text(value)
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+            .foregroundStyle(Color.primary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .layoutPriority(1)
+            .contentTransition(.numericText())
+    }
+
+    private func metricLabel(_ label: String) -> some View {
+        Text(label)
+            .font(.system(size: 8, weight: .medium))
+            .tracking(0.2)
+            .foregroundStyle(.tertiary)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
     }
 
     /// Static, unselected twin of `MetricTile`: same radius, fill and border,
     /// but no button, checkmark or focus treatment.
     private func directionPanel(_ direction: Direction) -> some View {
-        let values = direction.values(in: counters)
+        let totals = direction.totals(in: counters)
+        let live = direction.liveRates(in: rates)
 
-        return VStack(alignment: .leading, spacing: 2) {
+        return VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 4) {
                 Image(systemName: direction.icon)
                     .font(.system(size: 10, weight: .semibold))
@@ -177,15 +158,37 @@ struct NetworkTotalsCard: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                 Spacer(minLength: 0)
+                Text("now")
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle(.tertiary)
             }
 
-            metricRow(KBFormat.totalBytes(values.bytes), label: "data")
-            metricRow(KBFormat.compactTotal(values.packets), label: "packets")
+            HStack(spacing: 4) {
+                liveValue(KBFormat.bitRate(live.bytes))
+                Text("·")
+                    .font(.system(size: 7))
+                    .foregroundStyle(.tertiary)
+                liveValue(KBFormat.packetsRate(live.packets))
+                Spacer(minLength: 0)
+            }
+
+            Divider().opacity(0.6)
+
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                totalValue(KBFormat.totalBytes(totals.bytes))
+                metricLabel("data")
+                Text("·")
+                    .font(.system(size: 7))
+                    .foregroundStyle(.tertiary)
+                totalValue(KBFormat.compactTotal(totals.packets))
+                metricLabel("pkts")
+                Spacer(minLength: 0)
+            }
 
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 3)
+        .padding(.vertical, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -198,72 +201,25 @@ struct NetworkTotalsCard: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(direction == .input ? "Network input" : "Network output")
         .accessibilityValue(
-            "\(KBFormat.totalBytes(values.bytes)) data, " +
-            "\(KBFormat.compactTotal(values.packets)) packets since boot"
-        )
-    }
-
-    /// Compact single-line variant for the full-width fallback below the strip.
-    private func directionRow(_ direction: Direction) -> some View {
-        let values = direction.values(in: counters)
-
-        return HStack(spacing: 4) {
-            Image(systemName: direction.icon)
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(direction.tint)
-            Text(direction.title)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            Spacer(minLength: 4)
-            Text(KBFormat.totalBytes(values.bytes))
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .layoutPriority(1)
-                .contentTransition(.numericText())
-            Text("data")
-                .font(.system(size: 8, weight: .medium))
-                .foregroundStyle(.tertiary)
-            Text("·")
-                .font(.system(size: 7))
-                .foregroundStyle(.tertiary)
-            Text(KBFormat.compactTotal(values.packets))
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.primary)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .layoutPriority(1)
-                .contentTransition(.numericText())
-            Text("pkts")
-                .font(.system(size: 8, weight: .medium))
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.horizontal, 7)
-        .padding(.vertical, 3)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(direction.tint.opacity(0.045))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(direction.tint.opacity(0.18), lineWidth: 1)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(direction == .input ? "Network input" : "Network output")
-        .accessibilityValue(
-            "\(KBFormat.totalBytes(values.bytes)) data, " +
-            "\(KBFormat.compactTotal(values.packets)) packets since boot"
+            "Now \(KBFormat.bitRate(live.bytes)), \(KBFormat.packetsRate(live.packets)). " +
+            "\(KBFormat.totalBytes(totals.bytes)) data, " +
+            "\(KBFormat.compactTotal(totals.packets)) packets since boot."
         )
     }
 
     private var accessibilityValue: String {
-        "Input \(KBFormat.totalBytes(counters.rxBytes)) data, " +
-            "\(KBFormat.compactTotal(counters.rxPackets)) packets. " +
-            "Output \(KBFormat.totalBytes(counters.txBytes)) data, " +
-            "\(KBFormat.compactTotal(counters.txPackets)) packets since boot."
+        let input = Direction.input.totals(in: counters)
+        let output = Direction.output.totals(in: counters)
+        let inputLive = Direction.input.liveRates(in: rates)
+        let outputLive = Direction.output.liveRates(in: rates)
+
+        return "Input now \(KBFormat.bitRate(inputLive.bytes)), " +
+            "\(KBFormat.packetsRate(inputLive.packets)); since boot " +
+            "\(KBFormat.totalBytes(input.bytes)) data, " +
+            "\(KBFormat.compactTotal(input.packets)) packets. " +
+            "Output now \(KBFormat.bitRate(outputLive.bytes)), " +
+            "\(KBFormat.packetsRate(outputLive.packets)); since boot " +
+            "\(KBFormat.totalBytes(output.bytes)) data, " +
+            "\(KBFormat.compactTotal(output.packets)) packets."
     }
 }
