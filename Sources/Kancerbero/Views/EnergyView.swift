@@ -96,7 +96,7 @@ struct EnergyView: View {
                 }
 
                 if let graph = model.batteryChargeGraph,
-                   graph.chargeLevels.count > 1 {
+                   !graph.chargeLevels.isEmpty {
                     BatteryChargeChart(graph: graph)
                         .frame(maxHeight: .infinity)
                         .layoutPriority(1)
@@ -441,7 +441,7 @@ struct EnergyView: View {
                 timeOnPowerLine(power)
 
                 if let graph = model.batteryChargeGraph,
-                   graph.chargeLevels.count > 1 {
+                   !graph.chargeLevels.isEmpty {
                     BatteryChargeChart(graph: graph)
                         .frame(height: 180)
                 } else {

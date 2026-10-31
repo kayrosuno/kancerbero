@@ -217,10 +217,21 @@ las cuatro claves; en la prueba, `charge_times`/`charge_levels` con 141 puntos (
 atrás) y `battery_times`/`battery_states` con las transiciones. La función usa convención «get»
 (+0): el diccionario no se libera. Activity Monitor serializa la llamada en una cola privada.
 
+En macOS 27.2 sobre un M1 Pro la misma llamada devolvió **una sola muestra**:
+`charge_times=[37626]`, `charge_levels=[100]`, `battery_times=[37626]`, `battery_states=[0]`.
+REA/Ghidra 12.2 confirma que Activity Monitor la sigue dibujando: `_processChargeTimes:`
+(`0x10000d8bc`) arranca en la primera muestra dentro de 12 h (o en la más reciente si no hay
+ninguna), toma opcionalmente la muestra inmediatamente anterior como ancla, fija el primer punto a
+`x = 0` y **siempre añade un punto final en `x = ancho`** con el último nivel, así que una muestra
+produce una línea plana. `_processBatteryStates:` (`0x10000d40c`) extiende el estado actual hasta el
+borde derecho y calcula «Time on AC/Time on Battery» con `battery_times` del inicio del tramo de
+estado actual. kancerbero replica ambas cosas y acepta `>= 1` muestra.
+
 kancerbero replica el gráfico en la card Battery: `kb_battery_graph.c` carga la librería con
 `dlopen`, serializa la llamada con un mutex y expone `kb_battery_charge_graph_read`;
-`AppModel` refresca el dato como mucho una vez por minuto y cae en la `CapacityBar` cuando la API
-no está disponible.
+`AppModel` refresca el dato como mucho una vez por minuto. La `CapacityBar` queda solo como
+fallback cuando la API no está disponible o el diccionario está malformado; con una muestra
+dibuja una línea plana y muestra el tiempo en la fuente actual.
 
 ## AppCleaner 3.7.0 (pestaña Applications)
 

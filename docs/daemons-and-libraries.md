@@ -439,6 +439,7 @@ NetworkStatistics y de `net.statistics_privcheck`.
 | `procs [--cpu] [--limit N] [--interval S]` | Lista de procesos, con CPU acumulada si `--cpu` | `--limit 20`, `--interval 1` |
 | `cpu [--interval S]` | Ticks por núcleo y agregado, con temperatura de paquete y por core | `--interval 1` |
 | `thermal [--seconds N] [--interval S] [--core-count N]` | Lectura forzada de temperaturas IOHID (paquete, fuente y sensores) | `--seconds 3`, `--interval 1`, `0` = todos los cores |
+| `battery-graph` | Muestras del gráfico de batería de 12 h, estados AC/batería y tiempo en la fuente actual | — |
 | `ifaces` | Contadores de interfaz (IFMIB) | — |
 | `sockets <pid>` | Sockets del proceso | — |
 | `sockets-summary [pid...]` | Resumen de sockets por protocolo/tipo; sin PIDs usa todos | — |
@@ -461,6 +462,8 @@ es una herramienta de desarrollo y hay que tratarla como tal.
 ./build/Build/Products/Debug/KancerberoProbe all --seconds 3
 ./build/Build/Products/Debug/KancerberoProbe symbols
 ./build/Build/Products/Debug/KancerberoProbe cpu --interval 1
+./build/Build/Products/Debug/KancerberoProbe thermal --seconds 2 --interval 1
+./build/Build/Products/Debug/KancerberoProbe battery-graph
 ./build/Build/Products/Debug/KancerberoProbe procs --cpu --limit 20
 ./build/Build/Products/Debug/KancerberoProbe daemons system
 ./build/Build/Products/Debug/KancerberoProbe disk volumes
