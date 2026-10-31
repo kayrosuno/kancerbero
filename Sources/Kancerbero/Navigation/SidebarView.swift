@@ -15,6 +15,7 @@ struct SidebarView: View {
             Divider().opacity(0.4)
             navigation
             Spacer(minLength: 0)
+            SidebarSettingsButton()
             Divider().opacity(0.4)
             footer
         }
@@ -186,6 +187,38 @@ struct SidebarView: View {
             return model.daemonIsRoot ? .green : .orange
         }
         return .orange
+    }
+}
+
+private struct SidebarSettingsButton: View {
+    @Environment(\.openSettings) private var openSettings
+    @State private var hovering = false
+
+    var body: some View {
+        Button {
+            openSettings()
+        } label: {
+            Image(systemName: "gearshape")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(hovering ? Color.primary : Color.secondary)
+                .frame(width: 22, height: 22)
+                .background {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.primary.opacity(hovering ? 0.08 : 0))
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { value in
+            withAnimation(.easeOut(duration: 0.12)) { hovering = value }
+        }
+        .help("Open Settings")
+        .accessibilityLabel("Settings")
+        .accessibilityHint("Opens the Kancerbero settings window")
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.top, 4)
+        .padding(.bottom, 8)
     }
 }
 

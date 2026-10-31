@@ -1,10 +1,6 @@
 import SwiftUI
 
 struct TrafficCard: View {
-    let downloadBytesPerSecond: Double
-    let uploadBytesPerSecond: Double
-    let downloadPacketsPerSecond: Double
-    let uploadPacketsPerSecond: Double
     let downloadHistory: [Double]
     let uploadHistory: [Double]
     let downloadPacketHistory: [Double]
@@ -16,14 +12,6 @@ struct TrafficCard: View {
     let onToggle: (NetworkingFocus) -> Void
 
     static let cardHeight: CGFloat = 190
-
-    private var downloadValue: String {
-        KBFormat.bitRate(downloadBytesPerSecond)
-    }
-
-    private var uploadValue: String {
-        KBFormat.bitRate(uploadBytesPerSecond)
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -38,6 +26,8 @@ struct TrafficCard: View {
                 mode: graphMode
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            legend
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -54,33 +44,13 @@ struct TrafficCard: View {
         .accessibilityElement(children: .contain)
     }
 
-    /// Title and unit selector with the direction chips left-aligned next to
-    /// the title. In narrow cards the chips move to a second row, also
-    /// left-aligned.
     private var header: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 12) {
-                titleBlock
-                directionChips(showsLabel: true)
-                Spacer(minLength: 8)
-                unitSelector
-            }
-            .frame(height: 26)
-            .frame(minWidth: 700)
-
-            VStack(spacing: 4) {
-                HStack(spacing: 6) {
-                    titleBlock
-                    Spacer(minLength: 4)
-                    unitSelector
-                }
-                .frame(height: 22)
-
-                directionChips(showsLabel: false)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(height: 24)
-            }
+        HStack(spacing: 8) {
+            titleBlock
+            TrafficModeSelector(mode: $graphMode)
+            Spacer(minLength: 0)
         }
+        .frame(height: 28)
     }
 
     private var titleBlock: some View {
@@ -104,108 +74,78 @@ struct TrafficCard: View {
         }
     }
 
-    private var unitSelector: some View {
-        Picker("Traffic graph units", selection: $graphMode) {
-            ForEach(TrafficGraphMode.allCases) { mode in
-                Text(mode.title).tag(mode)
-            }
+    private var legend: some View {
+        HStack(spacing: 10) {
+            legendButton(.download)
+            legendButton(.upload)
+            Spacer(minLength: 0)
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .controlSize(.small)
-        .frame(width: 124)
-        .accessibilityLabel("Traffic graph units")
-        .help("Show the graph in bits per second or packets per second")
+        .frame(height: 16)
     }
 
-    private func directionChips(showsLabel: Bool) -> some View {
-        HStack(spacing: 8) {
-            directionChip(.download, showsLabel: showsLabel)
-            directionChip(.upload, showsLabel: showsLabel)
+    private func legendLabel(_ direction: NetworkingFocus) -> String {
+        let isDownload = direction == .download
+        switch graphMode {
+        case .bits:
+            return isDownload ? "Download" : "Upload"
+        case .packets:
+            return isDownload ? "Packets in" : "Packets out"
         }
     }
 
-    private func directionChip(_ direction: NetworkingFocus,
-                               showsLabel: Bool) -> some View {
+    private var legendUnit: String {
+        graphMode == .bits ? "bps" : "pkt/s"
+    }
+
+    private func legendButton(_ direction: NetworkingFocus) -> some View {
         let isDownload = direction == .download
         let tint = isDownload ? KBTheme.downloadTint : KBTheme.uploadTint
         let selected = focus == direction
-        let bits = isDownload ? downloadValue : uploadValue
-        let packets = KBFormat.packetsRate(isDownload
-            ? downloadPacketsPerSecond
-            : uploadPacketsPerSecond)
-        let label = isDownload ? "Download" : "Upload"
-        let packetLabel = isDownload ? "in" : "out"
-        let bitsActive = graphMode == .bits
+        let dimmed = focus != nil && !selected
 
         return Button {
             onToggle(direction)
         } label: {
-            HStack(spacing: 0) {
-                HStack(spacing: 4) {
-                    Image(systemName: isDownload
-                          ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(tint)
-                    if showsLabel {
-                        Text(label)
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(Color.primary.opacity(0.78))
-                            .lineLimit(1)
-                            .frame(width: 54, alignment: .leading)
-                    }
-                }
-
-                HStack(spacing: 3) {
-                    Text(bits)
-                        .font(.system(size: 11,
-                                      weight: bitsActive ? .semibold : .medium,
-                                      design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(bitsActive
-                                         ? Color.primary
-                                         : Color.secondary.opacity(0.85))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.65)
-                        .frame(width: 58, alignment: .leading)
-                    Text("·")
-                        .font(.system(size: 7))
-                        .foregroundStyle(.tertiary)
-                    Text(packets)
-                        .font(.system(size: 11,
-                                      weight: bitsActive ? .medium : .semibold,
-                                      design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(bitsActive
-                                         ? Color.secondary.opacity(0.85)
-                                         : Color.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.65)
-                        .frame(width: 68, alignment: .leading)
-                }
-                .frame(maxWidth: .infinity, alignment: .center)
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(tint)
+                    .frame(width: 7, height: 7)
+                Text(legendLabel(direction))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(selected ? tint : Color.secondary)
+                    .lineLimit(1)
+                Text(legendUnit)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .frame(width: 26, alignment: .leading)
             }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .frame(width: showsLabel ? 232 : 172, height: 24, alignment: .leading)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 2)
             .background {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(tint.opacity(selected ? 0.14 : 0.045))
+                if selected {
+                    Capsule(style: .continuous)
+                        .fill(tint.opacity(0.12))
+                }
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .strokeBorder(selected ? tint.opacity(0.9) : tint.opacity(0.16),
-                                  lineWidth: selected ? 1.5 : 1)
+                if selected {
+                    Capsule(style: .continuous)
+                        .strokeBorder(tint.opacity(0.45), lineWidth: 1)
+                }
             }
-            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .opacity(dimmed ? 0.5 : 1)
+            .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(.plain)
         .help(isDownload ? "Show rows with receive traffic"
                          : "Show rows with send traffic")
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(label): \(bits), packets \(packetLabel) \(packets)")
-        .accessibilityHint(isDownload ? "Toggle receive traffic filter"
-                                      : "Toggle send traffic filter")
+        .accessibilityLabel("\(legendLabel(direction)), "
+                            + (graphMode == .bits ? "bits per second"
+                                                  : "packets per second"))
+        .accessibilityValue(selected ? "Selected" : "Not selected")
+        .accessibilityHint(isDownload ? "Toggle receive traffic focus filter"
+                                      : "Toggle send traffic focus filter")
         .accessibilityAddTraits(.isButton)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
