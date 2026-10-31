@@ -135,8 +135,9 @@ espejados y selecciona la fuente según un popup `graphType`.
 kancerbero replica el modelo con las interfaces IFMIB: `AppModel.systemRates` agrega tasas de bytes
 y paquetes (sin loopback/túnel), `systemCounters` agrega los contadores acumulados y
 `rxPacketHistory`/`txPacketHistory` guardan el histórico de paquetes. La card `Network` muestra
-tasas y totales; el selector Bits/Packets de `TrafficCard` cambia solo el gráfico, como el popup de
-Activity Monitor.
+solo los totales acumulados; las tasas actuales viven en los grupos Bytes/Packets de la cabecera de
+`TrafficCard`, y el selector Bits/Packets cambia el gráfico y resalta el grupo correspondiente, como
+el popup de Activity Monitor.
 
 ## Disk Inspector y Disk Utility (pestaña Disk)
 

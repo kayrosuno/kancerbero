@@ -35,15 +35,14 @@ El detalle de binarios, permisos, instalación y librerías está en
 
 - **Networking** — a la izquierda, una tarjeta **Activity** que agrupa Connections y Processes y
   una tarjeta **Protocols** con el desglose TCP4/TCP6/UDP4/UDP6/UNIX/OTHER; en medio, la tarjeta
-  **Network totals**, siempre visible en la franja, con dos paneles apilados y sombreados,
-  **Input** (recibidos) sobre **Output** (enviados), que muestran la tasa actual en bits/s y pkt/s
-  y, bajo un separador, los acumulados de datos y paquetes desde el arranque; a la derecha, la
-  tarjeta **Traffic** se adapta hasta un mínimo y lleva el selector **Bits/Packets** glass a la
-  izquierda del título y una leyenda que cambia con el modo (**Download/Upload · bps** o
-  **Packets in/out · pkt/s**); la leyenda filtra las filas por dirección al pulsarla. El gráfico
-  espejado (download arriba, upload abajo) conserva cuadrícula, niveles y eje temporal. Una
-  **barra de filtros** entre las pills y la tarjeta de la tabla reúne los grupos de checkboxes
-  multiselección en cápsulas. En Connections:
+  **Network totals**, siempre visible en la franja, con dos grupos apilados y sombreados,
+  **Bytes** sobre **Packets**; cada grupo muestra las filas **Input**/**Output** y su total
+  acumulado desde el arranque. A la derecha, la tarjeta **Traffic** se adapta hasta un mínimo y
+  lleva en la cabecera los grupos de tasas **Bytes** y **Packets** (ambos visibles, con el grupo
+  del modo activo resaltado) y el selector **Bits/Packets** glass a la derecha; cada tasa es
+  clicable para filtrar por dirección. El gráfico espejado (download arriba, upload abajo)
+  conserva cuadrícula, niveles y eje temporal. Una **barra de filtros** entre las pills y la
+  tarjeta de la tabla reúne los grupos de checkboxes multiselección en cápsulas. En Connections:
   **IP** (IPv4/IPv6), **Transport** (TCP/UDP/Other) y **State** (Established, Listening,
   Connecting (SYN), Closing (Close/Fin/Time Wait), Other); en Processes: **IP**,
   **Protocols** (TCP/UDP/RAW/UNIX/OTHER) y **Socket type** (stream/dgram/raw/seqpacket/other).
@@ -147,10 +146,11 @@ Extension y aprobar la system extension; el detalle de binario y permisos está 
 Las selecciones y configuraciones de cada sección (filtros, tarjeta activa, fila seleccionada,
 panel de detalle y árbol expandido) se conservan al cambiar de pestaña o sección durante la
 sesión; al reiniciar la app se vuelven a los valores iniciales. **Kancerbero → Settings… (⌘,)** o el
-engranaje al pie del sidebar permiten ajustar las animaciones de cambio de sección/subpestaña y
-del resaltado del sidebar y las píldoras, las animaciones de los valores de la barra de estado
-(desactivadas por defecto), el intervalo de muestreo con el que arranca la app (2 s por defecto)
-y el icono del Dock. Todo se guarda en `UserDefaults` y las animaciones respetan Reduce Motion de
+botón **Settings** (engranaje) al pie del sidebar permiten ajustar las animaciones de cambio de
+sección/subpestaña y del resaltado del sidebar y las píldoras, las animaciones de los valores de
+la barra de estado (desactivadas por defecto), el intervalo de muestreo con el que arranca la app
+(2 s por defecto) y el icono del Dock. Todo se guarda en `UserDefaults` y las animaciones respetan
+Reduce Motion de
 macOS. El selector del toolbar cambia el intervalo solo durante la sesión y no modifica la
 preferencia de arranque.
 

@@ -1,6 +1,8 @@
 import SwiftUI
+import KancerberoCore
 
 struct TrafficCard: View {
+    let rates: KBRates
     let downloadHistory: [Double]
     let uploadHistory: [Double]
     let downloadPacketHistory: [Double]
@@ -12,6 +14,29 @@ struct TrafficCard: View {
     let onToggle: (NetworkingFocus) -> Void
 
     static let cardHeight: CGFloat = 190
+
+    private enum RateMetric {
+        case bytes
+        case packets
+
+        var title: String {
+            self == .bytes ? "Bytes" : "Packets"
+        }
+
+        func value(for direction: NetworkingFocus, in rates: KBRates) -> String {
+            let isDownload = direction == .download
+            switch self {
+            case .bytes:
+                return KBFormat.bitRate(isDownload
+                    ? rates.rxBytesPerSecond
+                    : rates.txBytesPerSecond)
+            case .packets:
+                return KBFormat.packetsRate(isDownload
+                    ? rates.rxPacketsPerSecond
+                    : rates.txPacketsPerSecond)
+            }
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -26,8 +51,6 @@ struct TrafficCard: View {
                 mode: graphMode
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            legend
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -45,12 +68,35 @@ struct TrafficCard: View {
     }
 
     private var header: some View {
-        HStack(spacing: 8) {
-            titleBlock
-            TrafficModeSelector(mode: $graphMode)
-            Spacer(minLength: 0)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) {
+                titleBlock
+                rateGroup(.bytes)
+                rateGroup(.packets)
+                Spacer(minLength: 8)
+                TrafficModeSelector(mode: $graphMode)
+            }
+            .frame(minWidth: 480)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    titleBlock
+                    Spacer(minLength: 4)
+                    TrafficModeSelector(mode: $graphMode)
+                }
+
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 6) {
+                        rateGroup(.bytes)
+                        rateGroup(.packets)
+                    }
+                    VStack(alignment: .leading, spacing: 3) {
+                        rateGroup(.bytes)
+                        rateGroup(.packets)
+                    }
+                }
+            }
         }
-        .frame(height: 28)
     }
 
     private var titleBlock: some View {
@@ -74,54 +120,63 @@ struct TrafficCard: View {
         }
     }
 
-    private var legend: some View {
-        HStack(spacing: 10) {
-            legendButton(.download)
-            legendButton(.upload)
-            Spacer(minLength: 0)
+    private func rateGroup(_ metric: RateMetric) -> some View {
+        let active = (metric == .bytes) == (graphMode == .bits)
+
+        return VStack(alignment: .leading, spacing: 2) {
+            Text(metric.title)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(active ? Color.primary : Color.secondary)
+                .lineLimit(1)
+
+            HStack(spacing: 3) {
+                rateItem(metric, .download, active: active)
+                rateItem(metric, .upload, active: active)
+            }
         }
-        .frame(height: 16)
-    }
-
-    private func legendLabel(_ direction: NetworkingFocus) -> String {
-        let isDownload = direction == .download
-        switch graphMode {
-        case .bits:
-            return isDownload ? "Download" : "Upload"
-        case .packets:
-            return isDownload ? "Packets in" : "Packets out"
+        .padding(.horizontal, 5)
+        .padding(.vertical, 3)
+        .background {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(active ? Color.accentColor.opacity(0.12)
+                             : Color.primary.opacity(0.04))
         }
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(active ? Color.accentColor.opacity(0.35)
+                                     : Color.primary.opacity(0.12),
+                              lineWidth: 1)
+        }
+        .opacity(active ? 1 : 0.7)
+        .animation(.snappy(duration: 0.2), value: active)
     }
 
-    private var legendUnit: String {
-        graphMode == .bits ? "bps" : "pkt/s"
-    }
-
-    private func legendButton(_ direction: NetworkingFocus) -> some View {
+    private func rateItem(_ metric: RateMetric,
+                          _ direction: NetworkingFocus,
+                          active: Bool) -> some View {
         let isDownload = direction == .download
         let tint = isDownload ? KBTheme.downloadTint : KBTheme.uploadTint
         let selected = focus == direction
-        let dimmed = focus != nil && !selected
+        let value = metric.value(for: direction, in: rates)
 
         return Button {
             onToggle(direction)
         } label: {
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(tint)
-                    .frame(width: 7, height: 7)
-                Text(legendLabel(direction))
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(selected ? tint : Color.secondary)
+            HStack(spacing: 3) {
+                Image(systemName: isDownload ? "arrow.down" : "arrow.up")
+                    .font(.system(size: 7, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .accessibilityHidden(true)
+                Text(value)
+                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(active ? Color.primary : Color.secondary)
                     .lineLimit(1)
-                Text(legendUnit)
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                    .frame(width: 26, alignment: .leading)
+                    .minimumScaleFactor(0.7)
+                    .contentTransition(.numericText())
             }
             .padding(.horizontal, 4)
-            .padding(.vertical, 2)
+            .padding(.vertical, 1)
             .background {
                 if selected {
                     Capsule(style: .continuous)
@@ -134,15 +189,13 @@ struct TrafficCard: View {
                         .strokeBorder(tint.opacity(0.45), lineWidth: 1)
                 }
             }
-            .opacity(dimmed ? 0.5 : 1)
             .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(.plain)
         .help(isDownload ? "Show rows with receive traffic"
                          : "Show rows with send traffic")
-        .accessibilityLabel("\(legendLabel(direction)), "
-                            + (graphMode == .bits ? "bits per second"
-                                                  : "packets per second"))
+        .accessibilityLabel("\(metric.title) "
+                            + (isDownload ? "download" : "upload") + ", \(value)")
         .accessibilityValue(selected ? "Selected" : "Not selected")
         .accessibilityHint(isDownload ? "Toggle receive traffic focus filter"
                                       : "Toggle send traffic focus filter")

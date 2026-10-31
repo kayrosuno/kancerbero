@@ -22,14 +22,13 @@
 - `NetworkingView`: franja superior como un único `HStack` sin `ViewThatFits`: columna
   `ActivityCard` (Connections+Processes) + `ProtocolCard`, `NetworkTotalsCard` fijo y
   `TrafficCard` con mínimo 260. Network siempre queda en la franja. `NetworkTotalsCard` recibe
-  contadores y tasas: dos paneles apilados y sombreados, Input (recibidos) sobre Output
-  (enviados), con la tasa actual en bits/s y pkt/s (`now`) y, bajo un separador, los acumulados
-  de datos y paquetes desde el arranque. `TrafficCard` usa `TrafficModeSelector` (glass en macOS
-  26+, `Picker` segmentado nativo en versiones anteriores), `TrafficChart` (gráfico espejado,
-  escala compartida con techo 1/2/5×10^n, cuadrícula, niveles y eje temporal; ventana de 60
-  muestras anclada a la derecha) y una leyenda inferior que cambia con el modo
-  (Download/Upload · bps o Packets in/out · pkt/s). Sus entradas son botones que alternan el foco
-  Download/Upload, con borde y atenuación de la serie contraria.
+  solo contadores: dos grupos apilados y sombreados, **Bytes** encima de **Packets**, cada uno
+  con filas Input/Output y su total acumulado. `TrafficCard` recibe las tasas y usa
+  `TrafficModeSelector` (glass en macOS 26+, `Picker` segmentado nativo en versiones anteriores)
+  a la derecha de una cabecera con dos grupos de tasas, **Bytes** y **Packets**, ambos visibles;
+  el grupo del modo activo se resalta y el otro queda atenuado. Cada tasa es un botón que alterna
+  el foco Download/Upload. `TrafficChart` dibuja el gráfico espejado, escala compartida con techo
+  1/2/5×10^n, cuadrícula, niveles y eje temporal; ventana de 60 muestras anclada a la derecha.
   Debajo, `PillTabBar` y las tablas (`NetworkingTables.swift`). `NetworkingUIState` guarda, por un
   lado, los filtros de Connections —`transports: Set<NetworkingTransport>`, `ipVersions:
   Set<NetworkingIPVersion>` y `connectionStates: Set<NetworkingConnectionState>`— y, por otro,
