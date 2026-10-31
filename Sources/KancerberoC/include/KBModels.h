@@ -102,6 +102,30 @@ typedef struct {
     char source[32];               /* "AC Power" / "Battery Power" */
 } kb_power_stats;
 
+/* IOHID temperature sensors (page 0xff00, usage 5). The package value and
+   the per-core array are derived the same way btop does on Apple silicon:
+   cluster sensors (eACC/pACC) first, then indexed PMU tdie sensors, then
+   SOC MTR sensors. Per-core values are approximated by mapping logical
+   cores proportionally onto the available sensor groups. */
+#define KB_THERMAL_SOURCE_NONE 0
+#define KB_THERMAL_SOURCE_ACC  1
+#define KB_THERMAL_SOURCE_DIE  2
+#define KB_THERMAL_SOURCE_SOC  3
+
+typedef struct {
+    int32_t valid;                    /* 1 when package or any core temp exists */
+    int32_t source;                   /* KB_THERMAL_SOURCE_* */
+    int32_t package_valid;
+    double package_celsius;
+    uint32_t core_count;              /* logical cores the array was mapped to */
+    uint32_t core_temp_sensors;       /* distinct sensor groups before mapping */
+    double core_celsius[KB_MAX_CORES];/* -1 when unavailable */
+    uint32_t sensor_count;            /* valid HID readings in the last cycle */
+    uint32_t cluster_count;           /* eACC/pACC groups */
+    uint32_t die_count;               /* PMU tdie groups */
+    uint32_t soc_count;               /* SOC MTR readings */
+} kb_thermal_stats;
+
 /* Battery charge history for the last 12 hours, as Activity Monitor's Energy
    tab shows it. Times are seconds before the moment of the read. */
 typedef struct {

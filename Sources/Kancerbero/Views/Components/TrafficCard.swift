@@ -10,7 +10,7 @@ struct TrafficCard: View {
     var sampleInterval: TimeInterval = 1
     let onToggle: (NetworkingFocus) -> Void
 
-    static let cardHeight: CGFloat = 208
+    static let cardHeight: CGFloat = 190
     private static let headerHeight: CGFloat = 38
     private static let metricWidth: CGFloat = 140
 

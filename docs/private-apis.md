@@ -97,6 +97,28 @@ inspeccionaron `_CPUMeterCommonDraw`, `_CPUMeter_updateValues`, `_Platform_setCP
   `sysctlbyname` y `getloadavg` son APIs públicas del SDK; no se usan símbolos privados de
   `libsysmon` ni `task_for_pid`.
 
+## Temperaturas CPU (IOHID)
+
+kancerbero no lee SMC: usa los servicios de temperatura HID del sistema, la misma fuente que btop
+1.4.8 en Apple Silicon. Verificado contra el código fuente de btop 1.4.8
+(`src/osx/sensors.cpp`) y sus literales (`strings /opt/homebrew/bin/btop`).
+
+- `IOHIDEventSystemClientCreate` + `IOHIDEventSystemClientSetMatching` con
+  `{PrimaryUsagePage: 0xff00, PrimaryUsage: 5}`; `IOHIDEventSystemClientCopyServices`.
+- Por servicio se lee `"Product"` y se clasifica por prefijo:
+  `eACC`/`pACC` (clústeres), `PMU tdie<N>` (die indexado) y `SOC MTR Temp Sensor`.
+- Temperatura: `IOHIDServiceClientCopyEvent(service, 15, 0, 0)` y
+  `IOHIDEventGetFloatValue(event, 15 << 16)`; se descarta fuera de `0...150 °C`.
+- Paquete: media de ACC; si no hay, de tdie; si no, de SOC. Sensores por core: índices tdie
+  ordenados o, en su defecto, nombres ACC. Cada core lógico `i` usa
+  `sensor = i × sensores / coreCount`, como btop. Apple no expone el mapa real core→sensor, así
+  que el valor por core es aproximado; la UI lo indica en el popover.
+- Los símbolos no están en cabeceras públicas del SDK (sí en `IOKit.tbd`). Se resuelven con
+  `dlopen`/`dlsym` desde `kb_thermal.c` y, si desaparecen en una versión futura, la temperatura
+  muestra `—` sin impedir el arranque. No se añaden entitlements.
+- Macs Intel y algunas VMs no publican estos servicios: `valid = 0` y la card muestra `—`. La
+  ruta SMC (`TC0P`/`TC0c`) de btop para Intel queda fuera de alcance.
+
 ## Disk Inspector y Disk Utility (pestaña Disk)
 
 Análisis REA (Hopper) de `/Applications/Disk Inspector.app` (`com.nektony.diskinspector`, que se

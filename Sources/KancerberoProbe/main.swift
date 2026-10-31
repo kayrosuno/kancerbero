@@ -32,6 +32,12 @@ private func printSymbols() {
     let rc = kb_sysctl_int("net.statistics_privcheck", &privcheck)
     write("net.statistics_privcheck: \(rc == 0 ? String(privcheck) : "unreadable")\n")
     write("euid: \(geteuid()) root: \(geteuid() == 0 ? "yes" : "no")\n")
+    if kb_thermal_is_available() != 0 {
+        write("Thermal: available\n")
+    } else {
+        let reason = String(cString: kb_thermal_last_error())
+        write("Thermal: unavailable — \(reason)\n")
+    }
 }
 
 private func printProcesses(limit: Int) {
@@ -80,10 +86,16 @@ private func printCPU(interval: Double) {
 
     write("cpu cores=\(metrics.cpu.coreCount) load=\(String(format: "%.2f", metrics.cpu.load1))/\(String(format: "%.2f", metrics.cpu.load5))/\(String(format: "%.2f", metrics.cpu.load15))\n")
     for core in metrics.cpu.cores {
-        write(String(format: "  cpu%-3d user=%5.1f%% system=%5.1f%% nice=%5.1f%% idle=%5.1f%% usage=%5.1f%%\n",
+        let temperature = core.temperatureCelsius
+            .map { String(format: "%.1f°C", $0) } ?? "n/a"
+        write(String(format: "  cpu%-3d user=%5.1f%% system=%5.1f%% nice=%5.1f%% idle=%5.1f%% usage=%5.1f%% temp=%@\n",
                      core.index + 1, core.userPercent, core.systemPercent,
-                     core.nicePercent, core.idlePercent, core.usagePercent))
+                     core.nicePercent, core.idlePercent, core.usagePercent,
+                     temperature as NSString))
     }
+    let packageTemperature = metrics.cpu.packageTemperatureCelsius
+        .map { String(format: "%.1f°C", $0) } ?? "n/a"
+    write("thermal package=\(packageTemperature) source=\(metrics.cpu.temperatureSource ?? "n/a")\n")
     let cpu = metrics.cpu
     write(String(format: "aggregate user=%.1f%% system=%.1f%% nice=%.1f%% idle=%.1f%% usage=%.1f%%\n",
                  cpu.userPercent, cpu.systemPercent, cpu.nicePercent,
@@ -130,6 +142,31 @@ private func printCPU(interval: Double) {
                      top.usage?.diskBytesReadPerSecond ?? 0,
                      top.usage?.diskBytesWrittenPerSecond ?? 0,
                      top.usage?.logicalWrites.map(String.init) ?? "n/a"))
+    }
+}
+
+private func printThermal(seconds: Int, interval: Double, coreCount: Int) {
+    let count = max(1, seconds)
+    let delay = max(0.1, interval)
+    for second in 0..<count {
+        guard let reading = ThermalStatsReader.current(
+            coreCount: coreCount, minIntervalMilliseconds: 0) else {
+            write("thermal unavailable — \(String(cString: kb_thermal_last_error()))\n")
+            return
+        }
+        let package = reading.packageCelsius
+            .map { String(format: "%.1f°C", $0) } ?? "n/a"
+        let cores = reading.coreCelsius.keys.sorted().compactMap { index -> String? in
+            guard let value = reading.coreCelsius[index] else { return nil }
+            return String(format: "cpu%d=%.1f°C", index + 1, value)
+        }.joined(separator: " ")
+        write("t=\(second + 1) thermal package=\(package) source=\(reading.source ?? "n/a") sensors=\(reading.sensorCount) cores=\(reading.coreCelsius.count)\n")
+        if !cores.isEmpty {
+            write("  \(cores)\n")
+        }
+        if second + 1 < count {
+            Thread.sleep(forTimeInterval: delay)
+        }
     }
 }
 
@@ -489,6 +526,10 @@ case "procs":
     }
 case "cpu":
     printCPU(interval: doubleOption("--interval", default: 1))
+case "thermal":
+    printThermal(seconds: integerOption("--seconds", default: 3),
+                 interval: doubleOption("--interval", default: 1),
+                 coreCount: integerOption("--core-count", default: 0))
 case "apps":
     printApps()
 case "fda":
@@ -567,5 +608,5 @@ case "all":
     printInterfaces()
     printNStat(seconds: integerOption("--seconds", default: 3))
 default:
-    fail("unknown command '\(command)'. Use: version|symbols|procs [--cpu]|cpu|apps|fda|ifaces|sockets <pid>|sockets-summary [pid...]|files <pid>|daemons|disk|nstat|all")
+    fail("unknown command '\(command)'. Use: version|symbols|procs [--cpu]|cpu|thermal|apps|fda|ifaces|sockets <pid>|sockets-summary [pid...]|files <pid>|daemons|disk|nstat|all")
 }

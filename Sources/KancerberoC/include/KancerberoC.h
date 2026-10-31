@@ -59,6 +59,18 @@ int kb_memory_pressure_read(int32_t *percent, int32_t *level);
 int kb_gpu_stats_read(kb_gpu_stats *out);
 /* Battery charge, time remaining and power source. */
 int kb_power_stats_read(kb_power_stats *out);
+/* CPU package and per-core temperatures through the private IOHID event
+   system (IOKit), resolved with dlopen/dlsym. core_count == 0 uses
+   hw.logicalcpu. min_interval_ms throttles repeated reads; 0 forces a
+   fresh one. Unknown core temperatures are written as -1. */
+int kb_thermal_stats_read(kb_thermal_stats *out, uint32_t core_count,
+                          uint32_t min_interval_ms);
+/* Returns 1 when at least one sensor is readable. */
+int kb_thermal_is_available(void);
+/* Static diagnostic message; do not free. */
+const char *kb_thermal_last_error(void);
+/* Releases the cached IOHID client and services. */
+void kb_thermal_reset(void);
 /* 12-hour charge graph from libsystemstats (private), loaded with dlopen.
    Returns 1 on success; caller frees with kb_battery_charge_graph_free. */
 int kb_battery_charge_graph_read(kb_battery_charge_graph *out);

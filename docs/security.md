@@ -28,7 +28,10 @@
 
 - Usa APIs públicas de solo lectura: `host_processor_info`, `host_statistics64`, `getloadavg`,
   `sysctlbyname("vm.swapusage")`, `sysctl(KERN_BOOTTIME)`, `PROC_PIDTASKALLINFO` y
-  `PROC_PIDTBSDINFO`. No se añaden entitlements ni frameworks privados.
+  `PROC_PIDTBSDINFO`. Además lee temperaturas con símbolos privados de IOHID
+  (`IOHIDEventSystemClient*`, `IOHIDServiceClientCopyEvent`, `IOHIDEventGetFloatValue`),
+  resueltos con `dlopen`/`dlsym`: son de solo lectura, no requieren root y degradan a `—` si no
+  existen. No se añaden entitlements ni frameworks privados enlazados.
 - Sin root, macOS solo enumera y expone procesos del uid actual (`proc_listallpids` incluido).
   Con el daemon root se ven todos; el daemon no necesita entitlements adicionales.
 - Los contadores de procesos de otro uid no legibles se marcan como no disponibles (`—`), nunca

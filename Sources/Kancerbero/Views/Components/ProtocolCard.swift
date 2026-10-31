@@ -10,7 +10,7 @@ struct ProtocolCard: View {
         ipVersions.count == 1 ? ipVersions.first : nil
     }
 
-    static let cardHeight: CGFloat = 94
+    static let cardHeight: CGFloat = 80
 
     private static let order: [KBConnectionProtocol] = [
         .tcp4, .tcp6, .udp4, .udp6, .unix, .other
@@ -30,16 +30,16 @@ struct ProtocolCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 3) {
             header
-                .frame(height: 18)
+                .frame(height: 16)
 
             ProtocolBar(counts: counts, order: Self.order, colors: Self.colors)
-                .frame(height: 8)
+                .frame(height: 6)
 
             legend
         }
-        .padding(8)
+        .padding(7)
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: Self.cardHeight)
         .background {
@@ -70,9 +70,9 @@ struct ProtocolCard: View {
             Image(systemName: "chart.bar.fill")
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 18, height: 18)
+                .frame(width: 16, height: 16)
                 .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
                         .fill(KBTheme.brandGradient)
                 )
             Text("Protocols")
@@ -92,16 +92,16 @@ struct ProtocolCard: View {
     }
 
     private var legend: some View {
-        VStack(spacing: 3) {
-            ForEach(0..<3, id: \.self) { row in
-                HStack(spacing: 10) {
-                    ForEach(0..<2, id: \.self) { column in
-                        let proto = Self.order[row * 2 + column]
+        VStack(spacing: 2) {
+            ForEach(0..<2, id: \.self) { row in
+                HStack(spacing: 8) {
+                    ForEach(0..<3, id: \.self) { column in
+                        let proto = Self.order[row * 3 + column]
                         legendItem(proto, count: counts[proto] ?? 0)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                .frame(height: 12)
+                .frame(height: 11)
             }
         }
     }

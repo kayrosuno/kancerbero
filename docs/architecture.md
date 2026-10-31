@@ -81,7 +81,9 @@
   (rangos enteros para los enums y centinelas para valores ausentes); el criterio vive en
   `DaemonsUIState.sortOrder` y, sin orden elegido, se conserva el del deduplicador.
 - `CPUView`: dashboard tipo `htop`. Cuatro `SummaryCard` (CPU, load, tareas/hilos, memoria) con
-  `Sparkline`; tarjeta de núcleos con `SegmentedMeter` (user/system/nice/idle) y uptime; tarjeta
+  `Sparkline`; tarjeta de núcleos agrupada por clúster Performance/Efficiency
+  (`CPUTopology`), con `SegmentedMeter` (user/system/nice/idle), uso, temperatura por core y
+  temperatura de paquete (IOHID); uptime; tarjeta
   de memoria/swap con segmentos Active/Wired/Compressed/Cached/Free y `CapacityBar`; tabla de
   procesos `CPUProcessTable` (PID, USER, PRI/NI, VIRT, RES, S/THR, CPU%, MEM%, TIME+, Command)
   ordenable, con búsqueda, selección persistida e inspector. `CPUProcessRow` añade claves de
@@ -94,7 +96,7 @@
   status muestra el aviso y la tabla marca “N restricted”. Con el daemon root actualizado los
   contadores e hilos están completos; sin root quedan restringidos.
 - `MemoryView`: panel dedicado tipo Activity Monitor. En una franja superior fija
-  (`KBTheme.cardStripHeight`, 210 pt) van la presión con
+  (`KBTheme.cardStripHeight`, 190 pt) van la presión con
   `MemoryPressureChart` y su explicación, la composición App/Wired/Compressed/Cached/Free
   (`SegmentedMeter` + `MeterLegend`) y el detalle Physical Memory / Memory Used / App / Wired /
   Compressed / Cached Files, más una tarjeta de swap con `CapacityBar`. Debajo, el resto del alto,
@@ -102,7 +104,7 @@
   inspector. Los valores AM se derivan de `KBMemoryStats` (`appMemoryBytes`,
   `cachedFileBytes`, `activityMonitorUsedBytes`).
 - `EnergyView`: panel tipo Activity Monitor. En una franja superior fija
-  (`KBTheme.cardStripHeight`, 210 pt) van la batería (`IOPowerSources`:
+  (`KBTheme.cardStripHeight`, 190 pt) van la batería (`IOPowerSources`:
   carga, tiempo restante, cargando/conector), el consumo total en vatios de los procesos
   visibles y los wake-ups inactivos, cada uno con `Sparkline` de su histórico. La card Battery
   muestra además el gráfico de 12 h de `libsystemstats` (`BatteryChargeChart`: línea cian, bandas
@@ -297,6 +299,17 @@
   (`current &- previous`); `used = user + system + nice`, `total = used + idle`; el agregado se
   calcula sumando ticks de todos los núcleos, no promediando porcentajes. La primera muestra no
   tiene baseline y reporta 0.
+- **Temperaturas** (`kb_thermal_stats_read` → `ThermalStatsReader`): servicios IOHID de
+  temperatura (page `0xff00`, usage `5`) clasificados por `Product` (`eACC`/`pACC`, `PMU tdie<N>`,
+  `SOC MTR Temp Sensor`). El paquete usa ACC → tdie → SOC; los sensores por core son los índices
+  tdie (o los nombres ACC) y se asignan a cada core lógico con `i × sensores / coreCount`, como
+  btop. Apple no publica el mapa real core→sensor, así que el valor es aproximado. `CPUTopology`
+  lee `hw.perflevel0/1.logicalcpu` para agrupar Performance/Efficiency. El reader no abre IOHID
+  cuando corre como root (el LaunchDaemon de sistema no tiene sesión HID); en modo daemon la app
+  rellena la temperatura localmente.
+- **Wire (temperaturas):** `KBCoreCPU.temperatureCelsius`, `KBCPUStats.packageTemperatureCelsius`
+  y `temperatureSource` son opcionales; un payload sin esas claves decodifica a `nil` y el app
+  rellena la temperatura localmente si el daemon es antiguo. No se cambia `KBVersion.schema`.
 - **CPU por proceso** (`ProcessCPUTracker`): `PROC_PIDTASKINFO.pti_total_user/system` está en
   unidades mach absolute; se convierte con `mach_timebase_info` cacheado (125/3 en Apple
   silicon, 1/1 en Intel). `cpu% = delta_segundos / elapsed * 100`, primera muestra 0, se recorta

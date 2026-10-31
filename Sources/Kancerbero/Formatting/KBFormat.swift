@@ -83,6 +83,17 @@ enum KBFormat {
         return value.formatted(.number.precision(.fractionLength(2)))
     }
 
+    /// Sensor temperature. Compact form fits the core rows ("61°"); the full
+    /// form carries the unit for popovers and tooltips.
+    static func temperature(_ celsius: Double?, compact: Bool = false) -> String {
+        guard let celsius, celsius.isFinite, celsius > 0, celsius < 150 else {
+            return "—"
+        }
+        let number = celsius.formatted(
+            .number.precision(.fractionLength(compact ? 0 : 1)))
+        return compact ? "\(number)°" : "\(number) °C"
+    }
+
     /// Accumulated CPU time for htop's TIME+ column.
     static func cpuDuration(_ nanoseconds: UInt64) -> String {
         let total = nanoseconds / 1_000_000_000

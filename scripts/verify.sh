@@ -6,6 +6,7 @@ PROBE="$ROOT/build/Build/Products/Debug/KancerberoProbe"
 
 "$PROBE" symbols
 "$PROBE" procs --limit 5
+"$PROBE" thermal --seconds 2 --interval 1
 "$PROBE" ifaces
 "$PROBE" nstat --seconds 2
 
