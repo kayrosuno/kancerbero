@@ -85,7 +85,7 @@ struct NetworkTotalsCard: View {
     }
 
     private var header: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 6) {
             Image(systemName: "network")
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(.white)
@@ -96,7 +96,8 @@ struct NetworkTotalsCard: View {
                 }
 
             Text("Network")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
 
             Spacer(minLength: 2)
