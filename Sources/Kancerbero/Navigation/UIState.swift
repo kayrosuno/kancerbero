@@ -242,8 +242,8 @@ final class UIState {
 
 struct NetworkingUIState: Equatable {
     var focus: NetworkingFocus?
-    /// Units for the Traffic graph and legend only; Network always shows both
-    /// live bit/packet rates and both cumulative totals per direction.
+    /// Units for the Traffic graph and its Bytes/Packets rate groups; Network
+    /// always shows cumulative totals only.
     var trafficGraphMode: TrafficGraphMode = .bits
     /// Every case pressed means "no filter"; an empty group matches nothing.
     var transports: Set<NetworkingTransport> = Set(NetworkingTransport.allCases)

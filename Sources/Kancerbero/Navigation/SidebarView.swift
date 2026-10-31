@@ -198,15 +198,22 @@ private struct SidebarSettingsButton: View {
         Button {
             openSettings()
         } label: {
-            Image(systemName: "gearshape")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(hovering ? Color.primary : Color.secondary)
-                .frame(width: 22, height: 22)
-                .background {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color.primary.opacity(hovering ? 0.08 : 0))
-                }
-                .contentShape(Rectangle())
+            HStack(spacing: 6) {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 22, height: 22)
+                Text("Settings")
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(hovering ? Color.primary : Color.secondary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
+            .background {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.primary.opacity(hovering ? 0.08 : 0))
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .buttonStyle(.plain)
         .onHover { value in

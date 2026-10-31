@@ -89,6 +89,7 @@ struct NetworkingView: View {
         .frame(minWidth: 224, idealWidth: 248, maxWidth: 256)
 
         let traffic = TrafficCard(
+            rates: rates,
             downloadHistory: model.rxHistory,
             uploadHistory: model.txHistory,
             downloadPacketHistory: model.rxPacketHistory,
@@ -100,7 +101,7 @@ struct NetworkingView: View {
             onToggle: toggleFocus
         )
 
-        let network = NetworkTotalsCard(counters: model.systemCounters, rates: rates)
+        let network = NetworkTotalsCard(counters: model.systemCounters)
 
         VStack(spacing: 14) {
             CollapsibleSectionHeader(

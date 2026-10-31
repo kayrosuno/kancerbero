@@ -28,15 +28,16 @@ nettop -P -d -L 3 -s 1 -x
 - Comprobado: `ollama`, `2.1.310` y `rapportd` coinciden con `nettop` (±1%).
 - **Network totals y selector Bits/Packets:** capturar
   `--section networking --traffic-graph bits` y `--traffic-graph packets`. La card **Network
-  totals** queda siempre en la franja superior (ya no hay variante horizontal debajo): sus dos
-  paneles sombreados, Input y Output, muestran la tasa actual (`now`, bits/s y pkt/s) y bajo un
-  separador los acumulados desde el arranque (datos y paquetes). Traffic se adapta hasta su mínimo
-  y conserva solo el gráfico y una leyenda que cambia con el modo (Download/Upload · bps o
-  Packets in/out · pkt/s); sus entradas alternan el foco al pulsarlas. El selector está a la
-  izquierda del título con el control glass en macOS 26+ (fallback segmentado en versiones
-  anteriores). Contrastar tasas con Activity Monitor → Network y totales con `netstat -ib`
-  sumando `en*` y excluyendo `lo0`/`utun`. A 1040×640 comprobar que las tres cards siguen en una
-  fila, sin card Network debajo ni recortes de Traffic. `--cards-collapsed` oculta toda la franja.
+  totals** queda siempre en la franja superior (ya no hay variante horizontal debajo): dos grupos
+  sombreados, **Bytes** encima de **Packets**, con filas Input/Output y solo el total acumulado
+  desde el arranque. Traffic se adapta hasta su mínimo y lleva en la cabecera los grupos de tasas
+  **Bytes** y **Packets**, ambos visibles, con el grupo del modo activo resaltado y el otro
+  atenuado; el selector glass está a la derecha (fallback segmentado en versiones anteriores) y
+  cada tasa alterna el foco Download/Upload al pulsarla. Contrastar tasas con Activity Monitor →
+  Network y totales con `netstat -ib` sumando `en*` y excluyendo `lo0`/`utun`. A 1040×640
+  comprobar que las tres cards siguen en una fila, sin card Network debajo ni recortes de
+  Traffic, y que el fallback de cabecera mantiene ambos grupos. `--cards-collapsed` oculta toda
+  la franja.
 - Prueba controlada:
 
 ```bash
