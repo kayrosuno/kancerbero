@@ -13,10 +13,10 @@ struct DiskIOView: View {
         VStack(spacing: 14) {
             if !ui.cardsCollapsed(for: .disk) {
                 HStack(alignment: .top, spacing: 14) {
-                    activityCard
-                        .frame(maxWidth: .infinity)
                     statsCard
                         .frame(width: 300)
+                    activityCard
+                        .frame(maxWidth: .infinity)
                 }
                 .frame(height: KBTheme.cardStripHeight)
                 .transition(.opacity)
@@ -39,6 +39,10 @@ struct DiskIOView: View {
         let isData = ui.disk.ioGraphMode == .data
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 10) {
+                cardIcon("chart.line.uptrend.xyaxis",
+                         fill: LinearGradient(colors: [readTint, writeTint],
+                                              startPoint: .topLeading,
+                                              endPoint: .bottomTrailing))
                 Text("Disk activity")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
@@ -103,8 +107,13 @@ struct DiskIOView: View {
 
     private var statsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Disk statistics")
-                .font(.system(size: 12, weight: .semibold))
+            HStack(spacing: 6) {
+                cardIcon("chart.bar.fill",
+                         fill: KBTheme.gradient(KBTheme.downloadTint))
+                Text("Disk statistics")
+                    .font(.system(size: 12, weight: .semibold))
+                Spacer()
+            }
 
             LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading),
                                 GridItem(.flexible(), alignment: .leading)],
@@ -132,6 +141,18 @@ struct DiskIOView: View {
             RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
                 .strokeBorder(.quaternary.opacity(0.5), lineWidth: 1)
         }
+    }
+
+    private func cardIcon(_ systemImage: String, fill: LinearGradient) -> some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 18, height: 18)
+            .background {
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(fill)
+            }
+            .accessibilityHidden(true)
     }
 
     private func metric(_ label: String, _ value: String) -> some View {
