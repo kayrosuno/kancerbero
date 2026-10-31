@@ -20,11 +20,14 @@
   CPU / Memory / Energy / Applications; cabecera con marca y estado live, pie con fuente (daemon/local), privcheck
   y hora.
 - `NetworkingView`: columna izquierda con `ActivityCard` (Connections+Processes) y `ProtocolCard`
-  (desglose por `protocolBucket`); card `NetworkTotalsCard` (tasas de bytes/paquetes y totales
-  acumulados de las interfaces) y `TrafficCard` con selector Bits/Packets y `TrafficChart`
-  (gráfico espejado, escala compartida con techo 1/2/5×10^n, cuadrícula, niveles y eje temporal;
-  ventana de 60 muestras anclada a la derecha). El selector cambia solo las unidades e historiales
-  del gráfico; las cuatro métricas muestran siempre bits para download/upload y paquetes in/out.
+  (desglose por `protocolBucket`); card `NetworkTotalsCard`, solo con los acumulados de datos y
+  paquetes de las interfaces en dos paneles apilados y sombreados, Input (recibidos) encima de
+  Output (enviados), y `TrafficCard` con selector Bits/Packets y `TrafficChart` (gráfico espejado,
+  escala compartida con techo
+  1/2/5×10^n, cuadrícula, niveles y eje temporal; ventana de 60 muestras anclada a la derecha). El
+  selector cambia solo las unidades e historiales del gráfico; dos chips centrados en la cabecera
+  agrupan Download+Pkts in y Upload+Pkts out (bits/s y pkt/s al mismo tamaño, resaltando el valor
+  del modo activo), y el chip completo alterna el foco.
   Debajo, `PillTabBar` y las tablas (`NetworkingTables.swift`). `NetworkingUIState` guarda, por un
   lado, los filtros de Connections —`transports: Set<NetworkingTransport>`, `ipVersions:
   Set<NetworkingIPVersion>` y `connectionStates: Set<NetworkingConnectionState>`— y, por otro,

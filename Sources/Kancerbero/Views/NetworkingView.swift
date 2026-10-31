@@ -105,10 +105,8 @@ struct NetworkingView: View {
         )
 
         let counters = model.systemCounters
-        let networkVertical = NetworkTotalsCard(rates: rates, counters: counters,
-                                                layout: .vertical)
-        let networkHorizontal = NetworkTotalsCard(rates: rates, counters: counters,
-                                                  layout: .horizontal)
+        let networkVertical = NetworkTotalsCard(counters: counters, layout: .vertical)
+        let networkHorizontal = NetworkTotalsCard(counters: counters, layout: .horizontal)
 
         VStack(spacing: 14) {
             CollapsibleSectionHeader(

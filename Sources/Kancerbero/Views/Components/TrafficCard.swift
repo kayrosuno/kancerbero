@@ -27,14 +27,7 @@ struct TrafficCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            VStack(alignment: .leading, spacing: 2) {
-                headerRow
-                    .frame(height: 22)
-                downloadUploadRow
-                    .frame(height: 22)
-                packetRow
-                    .frame(height: 18)
-            }
+            header
 
             TrafficChart(
                 download: graphMode == .bits ? downloadHistory : downloadPacketHistory,
@@ -61,7 +54,28 @@ struct TrafficCard: View {
         .accessibilityElement(children: .contain)
     }
 
-    private var headerRow: some View {
+    /// Title and unit selector with the two direction chips centered in the
+    /// same top line. In narrow cards the chips move to a second row.
+    private var header: some View {
+        ViewThatFits(in: .horizontal) {
+            ZStack {
+                titleAndSelector
+                directionChips(showsLabel: true)
+            }
+            .frame(height: 24)
+            .frame(minWidth: 700)
+
+            VStack(spacing: 4) {
+                titleAndSelector
+                    .frame(height: 22)
+                directionChips(showsLabel: false)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 20)
+            }
+        }
+    }
+
+    private var titleAndSelector: some View {
         HStack(spacing: 6) {
             Image(systemName: "chart.line.uptrend.xyaxis")
                 .font(.system(size: 9, weight: .semibold))
@@ -96,91 +110,90 @@ struct TrafficCard: View {
         }
     }
 
-    private var downloadUploadRow: some View {
-        HStack(spacing: 6) {
-            MetricTile(
-                layout: .compact,
-                title: "Download",
-                value: downloadValue,
-                icon: "arrow.down.circle.fill",
-                tint: KBTheme.downloadTint,
-                hint: "Show rows with receive traffic",
-                isSelected: focus == .download,
-                valueSize: 13,
-                valueMinWidth: 0,
-                valueScales: true,
-                iconSize: 10,
-                verticalPadding: 2
-            ) {
-                onToggle(.download)
-            }
-            .frame(maxWidth: .infinity)
-
-            MetricTile(
-                layout: .compact,
-                title: "Upload",
-                value: uploadValue,
-                icon: "arrow.up.circle.fill",
-                tint: KBTheme.uploadTint,
-                hint: "Show rows with send traffic",
-                isSelected: focus == .upload,
-                valueSize: 13,
-                valueMinWidth: 0,
-                valueScales: true,
-                iconSize: 10,
-                verticalPadding: 2
-            ) {
-                onToggle(.upload)
-            }
-            .frame(maxWidth: .infinity)
+    private func directionChips(showsLabel: Bool) -> some View {
+        HStack(spacing: 8) {
+            directionChip(.download, showsLabel: showsLabel)
+            directionChip(.upload, showsLabel: showsLabel)
         }
     }
 
-    private var packetRow: some View {
-        HStack(spacing: 6) {
-            packetCell(icon: "arrow.down.circle",
-                       label: "Pkts in",
-                       value: KBFormat.packetsRate(downloadPacketsPerSecond),
-                       tint: KBTheme.downloadTint)
-                .frame(maxWidth: .infinity)
-            packetCell(icon: "arrow.up.circle",
-                       label: "Pkts out",
-                       value: KBFormat.packetsRate(uploadPacketsPerSecond),
-                       tint: KBTheme.uploadTint)
-                .frame(maxWidth: .infinity)
-        }
-    }
+    private func directionChip(_ direction: NetworkingFocus,
+                               showsLabel: Bool) -> some View {
+        let isDownload = direction == .download
+        let tint = isDownload ? KBTheme.downloadTint : KBTheme.uploadTint
+        let selected = focus == direction
+        let bits = isDownload ? downloadValue : uploadValue
+        let packets = KBFormat.packetsRate(isDownload
+            ? downloadPacketsPerSecond
+            : uploadPacketsPerSecond)
+        let label = isDownload ? "Download" : "Upload"
+        let packetLabel = isDownload ? "in" : "out"
+        let bitsActive = graphMode == .bits
 
-    private func packetCell(icon: String, label: String, value: String,
-                            tint: Color) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(tint)
-            Text(label)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            Spacer(minLength: 2)
-            Text(value)
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .contentTransition(.numericText())
+        return Button {
+            onToggle(direction)
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: isDownload
+                      ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(tint)
+                if showsLabel {
+                    Text(label)
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                Text(bits)
+                    .font(.system(size: 10,
+                                  weight: bitsActive ? .semibold : .medium,
+                                  design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(bitsActive
+                                     ? Color.primary
+                                     : Color.secondary.opacity(0.55))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .layoutPriority(1)
+                Text("·")
+                    .font(.system(size: 7))
+                    .foregroundStyle(.tertiary)
+                Text(packets)
+                    .font(.system(size: 10,
+                                  weight: bitsActive ? .medium : .semibold,
+                                  design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(bitsActive
+                                     ? Color.secondary.opacity(0.55)
+                                     : Color.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .layoutPriority(1)
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .frame(width: showsLabel ? 214 : 160, height: 20, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(tint.opacity(selected ? 0.14 : 0.045))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .strokeBorder(selected ? tint.opacity(0.9) : tint.opacity(0.16),
+                                  lineWidth: selected ? 1.5 : 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 1)
-        .background {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(tint.opacity(0.04))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .strokeBorder(tint.opacity(0.14), lineWidth: 1)
-        }
+        .buttonStyle(.plain)
+        .help(isDownload ? "Show rows with receive traffic"
+                         : "Show rows with send traffic")
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(label): \(value)")
+        .accessibilityLabel("\(label): \(bits), packets \(packetLabel) \(packets)")
+        .accessibilityHint(isDownload ? "Toggle receive traffic filter"
+                                      : "Toggle send traffic filter")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private var borderStyle: AnyShapeStyle {
