@@ -70,18 +70,6 @@ struct NetworkingView: View {
 
             if !ui.cardsCollapsed(for: .networking) {
                 HStack(alignment: .top, spacing: KBTheme.summaryGridSpacing) {
-                    TrafficCard(
-                        downloadBytesPerSecond: rates.rxBytesPerSecond,
-                        uploadBytesPerSecond: rates.txBytesPerSecond,
-                        downloadHistory: model.rxHistory,
-                        uploadHistory: model.txHistory,
-                        sampleDates: model.sampleDates,
-                        focus: ui.networking.focus,
-                        sampleInterval: model.interval,
-                        onToggle: toggleFocus
-                    )
-                    .frame(minWidth: 400, maxWidth: .infinity)
-
                     VStack(spacing: KBTheme.summaryGridSpacing) {
                         ActivityCard(
                             connectionsCount: activityConnections,
@@ -104,6 +92,18 @@ struct NetworkingView: View {
                         )
                     }
                     .frame(minWidth: 232, idealWidth: 248, maxWidth: 256)
+
+                    TrafficCard(
+                        downloadBytesPerSecond: rates.rxBytesPerSecond,
+                        uploadBytesPerSecond: rates.txBytesPerSecond,
+                        downloadHistory: model.rxHistory,
+                        uploadHistory: model.txHistory,
+                        sampleDates: model.sampleDates,
+                        focus: ui.networking.focus,
+                        sampleInterval: model.interval,
+                        onToggle: toggleFocus
+                    )
+                    .frame(minWidth: 400, maxWidth: .infinity)
                 }
                 .transition(.opacity)
             }
