@@ -114,7 +114,7 @@ struct NetworkingView: View {
                 HStack(alignment: .top, spacing: KBTheme.summaryGridSpacing) {
                     activityColumn
                     network
-                        .frame(width: 172)
+                        .frame(width: 160)
                     traffic
                         .frame(minWidth: 260, maxWidth: .infinity)
                 }
