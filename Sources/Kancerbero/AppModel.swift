@@ -38,6 +38,9 @@ final class AppModel {
     }
     var usingDaemon = false
     var daemonVersion: String?
+    /// The connected daemon advertises `trashItems`. Older daemons decode the
+    /// capability as nil, which reads as false here.
+    var daemonSupportsTrash = false
     var rxHistory: [Double] = []
     var txHistory: [Double] = []
     /// Timestamps of the traffic samples, parallel to `rxHistory`/`txHistory`.
@@ -149,6 +152,10 @@ final class AppModel {
     private var previousTimestamp: UInt64 = 0
     private var daemonConnecting = false
     private var lastDaemonAttempt = Date.distantPast
+    /// Incremented whenever the daemon connection is replaced so late callbacks
+    /// from the previous connection cannot overwrite the new one.
+    private var daemonGeneration = 0
+    private var daemonConnectTask: Task<Void, Never>?
     private var resolvingUIDs: Set<UInt32> = []
     private var registrationCheckTask: Task<Void, Never>?
     private static let daemonFingerprintKey = "daemon.registrationFingerprint"
@@ -410,10 +417,14 @@ final class AppModel {
     }
 
     private func unregisterDaemonServiceInternal() async {
+        daemonGeneration += 1
+        daemonConnectTask?.cancel()
+        daemonConnectTask = nil
         daemonSource?.stop()
         daemonSource = nil
         usingDaemon = false
         daemonIsRoot = false
+        daemonSupportsTrash = false
         serviceError = nil
         let plistName = Self.daemonServicePlist
         do {
@@ -545,10 +556,14 @@ final class AppModel {
         sleepTask = nil
         task?.cancel()
         task = nil
+        daemonGeneration += 1
+        daemonConnectTask?.cancel()
+        daemonConnectTask = nil
         daemonSource?.stop()
         daemonSource = nil
         usingDaemon = false
         daemonIsRoot = false
+        daemonSupportsTrash = false
         Task { await collector.stop() }
     }
 
@@ -663,23 +678,29 @@ final class AppModel {
         guard !daemonConnecting else { return }
         daemonConnecting = true
         lastDaemonAttempt = Date()
+        daemonGeneration += 1
+        let generation = daemonGeneration
+        daemonConnectTask?.cancel()
         let requestedInterval = interval
         let privileged = serviceStatus == .enabled
-        Task { [weak self] in
+        daemonConnectTask = Task { [weak self] in
             let source = DaemonMetricsSource()
             source.onCollection = { [weak self] snapshot in
                 Task { @MainActor in
-                    guard let self, !self.isPaused else { return }
+                    guard let self, self.daemonGeneration == generation,
+                          !self.isPaused else { return }
                     self.usingDaemon = true
                     self.apply(snapshot)
                 }
             }
             source.onInvalidate = { [weak self] in
                 Task { @MainActor in
-                    self?.usingDaemon = false
-                    self?.daemonVersion = nil
-                    self?.daemonIsRoot = false
-                    self?.daemonConnectionError = "Daemon connection closed."
+                    guard let self, self.daemonGeneration == generation else { return }
+                    self.usingDaemon = false
+                    self.daemonVersion = nil
+                    self.daemonIsRoot = false
+                    self.daemonSupportsTrash = false
+                    self.daemonConnectionError = "Daemon connection closed."
                 }
             }
             do {
@@ -695,10 +716,18 @@ final class AppModel {
                         throw error
                     }
                 }.value
-                guard let self else { return }
+                guard let self else {
+                    source.stop()
+                    return
+                }
+                guard self.daemonGeneration == generation else {
+                    source.stop()
+                    return
+                }
                 self.daemonSource = source
                 self.daemonVersion = hello.daemonVersion
                 self.daemonIsRoot = hello.capabilities.root
+                self.daemonSupportsTrash = hello.capabilities.trash ?? false
                 self.usingDaemon = true
                 self.daemonConnecting = false
                 self.daemonConnectionError = nil
@@ -708,11 +737,71 @@ final class AppModel {
             } catch {
                 source.stop()
                 let message = error.localizedDescription
-                self?.daemonConnecting = false
-                self?.daemonConnectionError = message
-                self?.logger.error("daemon connection failed: \(message, privacy: .public)")
+                guard let self, self.daemonGeneration == generation else { return }
+                self.daemonConnecting = false
+                self.daemonConnectionError = message
+                self.logger.error("daemon connection failed: \(message, privacy: .public)")
             }
         }
+    }
+
+    /// Restarts the installed background service without an administrator prompt
+    /// and reconnects. `KeepAlive.SuccessfulExit=false` makes launchd relaunch
+    /// the daemon after the self-requested SIGTERM. Used when the running daemon
+    /// predates the trash API or when a stale helper must be replaced.
+    func restartDaemonService() async {
+        let previous = daemonSource
+        resetDaemonConnection()
+        if let previous {
+            await Self.stopDaemon(previous)
+        }
+
+        let deadline = Date().addingTimeInterval(15)
+        while Date() < deadline {
+            // The stop request can fail (for example a daemon too old to control
+            // services). Retry against the daemon that just answered.
+            if usingDaemon, (!daemonSupportsTrash || !daemonIsRoot),
+               let stale = daemonSource {
+                await Self.stopDaemon(stale)
+                resetDaemonConnection()
+                continue
+            }
+            if !usingDaemon && !daemonConnecting {
+                connectDaemon()
+            }
+            if usingDaemon && daemonSupportsTrash && daemonIsRoot {
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+    }
+
+    private func resetDaemonConnection() {
+        daemonGeneration += 1
+        daemonConnectTask?.cancel()
+        daemonConnectTask = nil
+        daemonSource?.stop()
+        daemonSource = nil
+        usingDaemon = false
+        daemonIsRoot = false
+        daemonVersion = nil
+        daemonSupportsTrash = false
+        daemonConnectionError = nil
+        daemonConnecting = false
+        lastDaemonAttempt = .distantPast
+    }
+
+    /// Sends the self-stop and waits briefly so XPC delivers it before the
+    /// connection is invalidated. The daemon usually dies before replying.
+    private static func stopDaemon(_ source: DaemonMetricsSource) async {
+        let request = KBDaemonActionRequest(label: KancerberoXPCNames.machService,
+                                            domain: .system, action: .stop)
+        let task = Task.detached(priority: .userInitiated) {
+            _ = try? source.performDaemonAction(request)
+        }
+        try? await Task.sleep(for: .milliseconds(300))
+        _ = await task.value
+        source.stop()
     }
 
     private func refreshOnce() async {

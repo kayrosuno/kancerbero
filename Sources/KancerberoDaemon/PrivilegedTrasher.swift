@@ -59,7 +59,9 @@ enum PrivilegedTrasher {
         do {
             try FileManager.default.moveItem(atPath: canonical, toPath: destination)
         } catch {
-            return failure(original, error.localizedDescription)
+            let code = KBTrashError.isPermissionDenied(error)
+                ? KBTrashError.permissionCode : nil
+            return failure(original, error.localizedDescription, code: code)
         }
 
         chownTree(at: destination, uid: peer.uid, gid: peer.gid)
@@ -83,14 +85,16 @@ enum PrivilegedTrasher {
     }
 
     private static func bundleRefusal(at path: String) -> String? {
-        let url = URL(fileURLWithPath: path)
-        if KBBundleSigning.isAppleSigned(url) {
-            return "Apple-signed bundles are protected"
+        if path.contains("/Kancerbero.app/") {
+            return "Kancerbero itself is protected"
         }
-        if let identifier = KBBundleSigning.bundleIdentifier(of: url),
-           identifier.hasPrefix("com.apple.") {
-            return "Apple bundles are protected"
+        let resolved = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+        if resolved != path {
+            // Application bundles must not be symlinks into SIP-protected places.
+            return "symlinked bundles are protected"
         }
+        // Apple apps under /Applications are removable with administrator
+        // rights; only SIP paths (/System) are refused by KBPathPolicy.
         return nil
     }
 

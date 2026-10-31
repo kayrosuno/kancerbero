@@ -48,12 +48,10 @@ public enum AppLeftoversCollector {
                     add(url, kind: .syncedPreferences, selected: true, reason: reason)
                 }
             }
-            scan("\(base)/Application Support", maxDepth: 2, ids: ids,
-                 allowNamePrefix: true) { url, reason in
+            scan("\(base)/Application Support", maxDepth: 0, ids: ids, budget: 150_000) { url, reason in
                 add(url, kind: .appSupport, selected: true, reason: reason)
             }
-            scan("\(base)/Caches", maxDepth: 1, ids: ids,
-                 allowNamePrefix: true) { url, reason in
+            scan("\(base)/Caches", maxDepth: 1, ids: ids) { url, reason in
                 add(url, kind: .cache, selected: true, reason: reason)
             }
             scan("\(base)/Saved Application State", maxDepth: 1, ids: ids) { url, reason in
@@ -73,6 +71,9 @@ public enum AppLeftoversCollector {
             }
             scan("\(base)/Services", maxDepth: 1, ids: ids) { url, reason in
                 add(url, kind: .service, selected: true, reason: reason)
+            }
+            scan("\(base)/Developer", maxDepth: 0, ids: ids, budget: 100_000) { url, reason in
+                add(url, kind: .other, selected: true, reason: reason)
             }
             if bundleIdVeryLong {
                 scan("\(base)/Cookies", maxDepth: 1, ids: ids, bundleIdOnly: true) { url, reason in
@@ -117,11 +118,6 @@ public enum AppLeftoversCollector {
             }
         }
 
-        // AppCleaner's default search: the complete Library trees, unlimited
-        // depth, matching any component against the bundle id or app name.
-        scanDefaultLibrary([home + "/Library", "/Library"], ids: ids) { url, reason in
-            add(url, kind: leftoverKind(for: url.path), selected: true, reason: reason)
-        }
 
         return found.values.sorted {
             if $0.kind.sortOrder != $1.kind.sortOrder {
@@ -188,10 +184,7 @@ public enum AppLeftoversCollector {
         url.deletingPathExtension().lastPathComponent
     }
 
-    private static let helperSuffixes = ["helper", "updater", "shipit", "agent", "loginhelper"]
-
     private static func match(_ url: URL, ids: Identifiers,
-                              allowNamePrefix: Bool,
                               allowBundleIdPrefix: Bool,
                               bundleIdOnly: Bool,
                               acceptedIds: Set<String>?) -> String? {
@@ -213,23 +206,15 @@ public enum AppLeftoversCollector {
         }
 
         if !bundleIdOnly {
-            let candidates = [normalizedName(component),
-                              normalizedName(base),
+            // AppCleaner builds a case-sensitive prefix regex from the app
+            // name, so "Claude" also matches "Claude - send.workflow" and
+            // "ClaudeAgentConfig".
+            let candidates = [normalizedName(base),
                               normalizedName(strippingTrailingDigits(base))]
-            for name in ids.names where candidates.contains(name) {
+            if candidates.contains(where: { candidate in
+                ids.names.contains(where: { candidate.hasPrefix($0) })
+            }) {
                 return "name"
-            }
-            if allowNamePrefix {
-                let folded = normalizedName(component)
-                for name in ids.names {
-                    guard folded.hasPrefix(name) else { continue }
-                    let rest = folded.dropFirst(name.count)
-                    let tail = rest.trimmingCharacters(in: CharacterSet(charactersIn: " .-_"))
-                    let lower = tail.lowercased()
-                    if helperSuffixes.contains(where: { lower.hasPrefix($0) }) {
-                        return "name helper"
-                    }
-                }
             }
         }
 
@@ -269,37 +254,23 @@ public enum AppLeftoversCollector {
         }
         let base = normalizedName(baseName(url))
         let candidates = [base, normalizedName(strippingTrailingDigits(base))]
-        if candidates.contains(where: { ids.names.contains($0) }) {
+        if candidates.contains(where: { candidate in
+            ids.names.contains(where: { candidate.hasPrefix($0) })
+        }) {
             return "name"
         }
         return nil
     }
 
-    private static func leftoverKind(for path: String) -> KBLeftoverKind {
-        if path.contains("/Preferences/ByHost/") { return .byHost }
-        if path.contains("/SyncedPreferences/") { return .syncedPreferences }
-        if path.contains("/Preferences/") { return .preferences }
-        if path.contains("/Application Support/") { return .appSupport }
-        if path.contains("/Caches/") { return .cache }
-        if path.contains("/Saved Application State/") { return .savedState }
-        if path.contains("/LaunchDaemons/") { return .launchDaemon }
-        if path.contains("/LaunchAgents/") { return .launchAgent }
-        if path.contains("/Logs/") { return .log }
-        if path.contains("/Group Containers/") { return .groupContainer }
-        if path.contains("/Containers/") { return .container }
-        if path.contains("/Application Scripts/") { return .appScripts }
-        if path.contains("/Safari/Extensions/") { return .safariExtension }
-        if path.contains("/Services/") { return .service }
-        return .other
-    }
+
 
     // MARK: - Walking
 
     private static func scan(_ directory: String, maxDepth: Int, ids: Identifiers,
-                             allowNamePrefix: Bool = false,
                              allowBundleIdPrefix: Bool = false,
                              bundleIdOnly: Bool = false,
                              acceptedIds: Set<String>? = nil,
+                             budget: Int = 250_000,
                              _ onMatch: (URL, String) -> Void) {
         let root = URL(fileURLWithPath: directory)
         guard FileManager.default.fileExists(atPath: root.path) else { return }
@@ -313,15 +284,20 @@ public enum AppLeftoversCollector {
             return
         }
 
+        var remaining = budget
+        var visited = 0
         for case let url as URL in enumerator {
-            if enumerator.level > maxDepth {
+            visited += 1
+            remaining -= 1
+            if remaining <= 0 { return }
+            if visited % 512 == 0, Task.isCancelled { return }
+            if maxDepth > 0, enumerator.level > maxDepth {
                 enumerator.skipDescendants()
                 continue
             }
             guard let reason = match(
                 url,
                 ids: ids,
-                allowNamePrefix: allowNamePrefix,
                 allowBundleIdPrefix: allowBundleIdPrefix,
                 bundleIdOnly: bundleIdOnly,
                 acceptedIds: acceptedIds
@@ -335,33 +311,5 @@ public enum AppLeftoversCollector {
         }
     }
 
-    private static func scanDefaultLibrary(_ roots: [String], ids: Identifiers,
-                                           _ onMatch: (URL, String) -> Void) {
-        var budget = 250_000
-        var visited = 0
-        for path in roots {
-            let root = URL(fileURLWithPath: path)
-            guard FileManager.default.fileExists(atPath: root.path) else { continue }
-            let keys: Set<URLResourceKey> = [.isDirectoryKey]
-            guard let enumerator = FileManager.default.enumerator(
-                at: root,
-                includingPropertiesForKeys: Array(keys),
-                options: [.skipsHiddenFiles],
-                errorHandler: { _, _ in true }
-            ) else {
-                continue
-            }
-            for case let url as URL in enumerator {
-                visited += 1
-                budget -= 1
-                if budget <= 0 { return }
-                if visited % 512 == 0, Task.isCancelled { return }
-                guard let reason = defaultMatch(url, ids: ids) else { continue }
-                onMatch(url, reason)
-                if (try? url.resourceValues(forKeys: keys))?.isDirectory == true {
-                    enumerator.skipDescendants()
-                }
-            }
-        }
-    }
+
 }

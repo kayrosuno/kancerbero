@@ -821,9 +821,13 @@ $K --screenshot /tmp/kb-apps-claude.png --section applications \
   --applications-selected Claude --screenshot-delay 10
 ```
 
-- Para Antigravity el panel debe mostrar **5 entradas** (app + 4: Application Support, el PNG
-  de Logi, Preferences y Logs), igual que AppCleaner; `--applications-scope user` y
-  `--applications-search` permiten comprobar los filtros.
+- Al abrir la pestaña por primera vez no debe haber ninguna app seleccionada ni panel lateral;
+  la tabla ocupa todo el ancho. `--applications-scope user` y `--applications-search` permiten
+  comprobar los filtros.
+- Para Antigravity el panel debe mostrar **5 entradas** (app + 4: Application Support, el PNG de
+  Logi, Preferences y Logs) y para Claude **13** (app + 12, incluidas las tres de Services y
+  `ClaudeAgentConfig`), igual que AppCleaner. El resumen del pie debe ser la cápsula coloreada
+  «1 app + N files selected · tamaño».
 - `apps` debe coincidir con `find /Applications -maxdepth 2 -name '*.app'` (más `~/Applications`,
   widgets y plugins) y `KB_APPS_LEFTOVERS` debe listar preferencias, Application Support, caches,
   contenedores, saved state, launch items y logs reales de esa app.
@@ -831,6 +835,13 @@ $K --screenshot /tmp/kb-apps-claude.png --section applications \
   seleccionado; el buscador está dentro de la tarjeta de la tabla y los chips filtran por tipo y
   por origen. El panel derecho es una lista plana con la app siempre marcada (check fijo) y cada
   relacionada en dos líneas (nombre y ruta) con su icono, tamaño y marca `admin` cuando toca.
+- Las apps Apple de `/Applications` (Xcode, Developer, Feedback Assistant…) aparecen sin
+  candado y con aviso en la hoja de confirmación; `Safari.app` no se lista y todo lo que resuelve
+  a `/System` sigue rechazado. «Move to Trash» es rojo en el pie del panel y en la hoja.
+- Daemon antiguo: `hello.capabilities.trash` debe ser `true` con el binario actual. Si el proceso
+  en ejecución es anterior a `trashItems`, la hoja avisa «The background helper is outdated…» y
+  el borrado pide el autodespido (`daemonAction` stop), espera la reconexión y continúa; el PID
+  del daemon debe cambiar y `log show` debe mostrar el nuevo handshake.
 - Mover a la papelera una app de prueba en `~/Applications` con un plist y una carpeta en
   `~/Library`: todo debe acabar en `~/.Trash` y la lista refrescarse.
 - Rutas privilegiadas (`/Library/Application Support/...`, apps de `/Applications` propiedad de
@@ -841,3 +852,14 @@ $K --screenshot /tmp/kb-apps-claude.png --section applications \
 - Negativos: cliente no autorizado, ruta fuera de la lista blanca, symlink a `/System`, >256 rutas
   y >1 MiB deben rechazarse; sin daemon, los ítems privilegiados fallan con un mensaje claro y
   los del usuario siguen funcionando.
+- Fallback de permisos: con un ítem escribible cuyo padre no lo es (`chmod -w ~/Applications`),
+  `FileManager.trashItem` falla con `EACCES`; el daemon debe reintentarlo y moverlo a `~/.Trash`.
+  La alerta cuenta el ítem como movido, no como fallo, y no deben aparecer resultados duplicados.
+- Contenedores TCC: con `~/Library/Containers/<bundle-id>` de otra app, `trashItem` y el daemon
+  reciben `kTCCServiceSystemPolicyAppDataDetailed` denegado sin Acceso Total al Disco. La alerta
+  debe mostrar la ruta, el aviso de Acceso Total al Disco y el botón que abre
+  `Privacy_AllFiles`; no debe mostrar un error genérico de «permission» sin explicación.
+  Tras conceder Acceso Total al Disco a `uno.kayros.kancerbero` y reabrir la app, el borrado debe
+  completarse y el contenedor aparecer en `~/.Trash` con propietario del usuario.
+- Comprobar `tccd` (`log show --predicate 'process == "tccd"'`) para ver la petición de la app
+  (`euid 501`) y la del daemon (`euid 0`) cuando el fallback se ejecuta.

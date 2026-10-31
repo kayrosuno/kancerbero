@@ -138,10 +138,17 @@ public enum AppInventoryCollector {
         let version = (info["CFBundleShortVersionString"] as? String)
             ?? (info["CFBundleVersion"] as? String)
         let executable = info["CFBundleExecutable"] as? String
+        let resolvedPath = url.resolvingSymlinksInPath().path
         let isSystemPath = url.path.hasPrefix("/System/")
+            || resolvedPath.hasPrefix("/System/")
         let isApple = isSystemPath || (bundleIdentifier?.hasPrefix("com.apple.") ?? false)
         let isOwnBundle = url.lastPathComponent == "Kancerbero.app"
-        let isProtected = isApple || isOwnBundle || KBPathPolicy.isProtected(url.path)
+        // SIP protects /System, not /Applications: Apple apps installed there
+        // (Xcode, Developer…) are removable with administrator rights. Safari
+        // is a symlink into /System/Cryptexes and stays protected.
+        let isProtected = isOwnBundle
+            || KBPathPolicy.isProtected(url.path)
+            || KBPathPolicy.isProtected(resolvedPath)
 
         return KBAppBundle(
             path: url.path,

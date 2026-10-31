@@ -135,8 +135,28 @@ Pendiente para producción:
   desarrollo, no una frontera de seguridad.
 - Cada ruta se revalida en el daemon: absoluta, padre resuelto con `realpath`, componente final
   verbatim (un symlink se mueve, nunca se sigue su destino), dentro de `KBPathPolicy` y fuera de
-  sus raíces protegidas. El bundle id se re-deriva del `Info.plist`/firma y se rechazan bundles
-  Apple/SIP; el `bundleIdentifier` del payload no se usa para autorizar.
+  sus raíces protegidas. El `bundleIdentifier` del payload no se usa para autorizar.
+- La protección de bundles sigue a SIP, no a la firma: las apps Apple instaladas en
+  `/Applications` (Xcode, Developer…) se pueden mover con permisos de administrador; `/System` y
+  los bundles cuyo destino resuelto cae en `/System` (por ejemplo `Safari.app`, symlink a
+  `/System/Cryptexes`) siguen rechazados. También se rechazan el propio `Kancerbero.app`/daemon y
+  cualquier bundle que sea un symlink.
+- `KBCapabilities.trash` distingue un daemon actualizado de uno anterior. Si el cliente necesita
+  privilegios y el daemon conectado no anuncia la capacidad, `AppModel.restartDaemonService()`
+  pide al propio daemon que se detenga (`daemonAction` → `launchctl kill SIGTERM system/…`) y
+  reconecta durante un máximo de 15 s. `KeepAlive.SuccessfulExit=false` hace que launchd lo
+  relance con el binario instalado, así que el reinicio no pide contraseña. Cada conexión lleva
+  una generación; los callbacks de una conexión vieja se descartan para no pisar a la nueva.
+- El primer intento de borrado es local cuando `KBPathPolicy.requiresPrivilege` lo permite. Si
+  `FileManager.trashItem` falla por permisos, el ítem se reenvía al daemon root en el mismo lote
+  y el resultado privilegiado reemplaza al local. Esto cubre datos de otras apps protegidos por
+  TCC (`kTCCServiceSystemPolicyAppDataDetailed`), como `~/Library/Containers`; la lista blanca y
+  la revalidación del daemon no cambian.
+- TCC se aplica también a procesos root: si el daemon tampoco tiene Acceso Total al Disco, el
+  reintento falla con `code == "permission"`. La app no intenta `removeItem` ni ninguna vía que
+  evite TCC; muestra la ruta afectada y ofrece abrir Ajustes del Sistema → Privacidad y seguridad
+  → Acceso Total al Disco. Una concesión para `uno.kayros.kancerbero` cubre app y daemon porque
+  comparten identificador y `AssociatedBundleIdentifiers`.
 - El movimiento va a `~usuario/.Trash` con el uid tomado de la conexión XPC (nunca del payload),
   nombre único, `chown` recursivo al usuario, limpieza de `UF_IMMUTABLE` y `launchctl bootout` de
   LaunchAgents/Daemons antes de mover.
