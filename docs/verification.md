@@ -350,6 +350,12 @@ $K --screenshot /tmp/kb-cpu-selected.png --section cpu \
 - Comparar CPU por núcleo con `top` (±1–2%) y el agregado con la suma ponderada por ticks, no
   con la media de porcentajes. Comparar load con `uptime` (±0,01), uptime con `uptime` (±1 s) y
   swap con `sysctl -n vm.swapusage`.
+- La card Cores es un muro ecualizador `C1..C8` con barritas rectangulares del histórico reciente
+  (16 en la card, 30 en el popover), color por carga, grupos P/E y uso/temperatura al pie. Con
+  intervalo de 2 s dejar ~35 s para llenar la ventana
+  (`$K --screenshot /tmp/kb-cpu-cores.png --section cpu --screenshot-delay 35`); bajo carga
+  (`yes > /dev/null` por core) las barras deben subir y pasar a naranja/rojo. Con la ventana
+  mínima o más de 8 cores se usa el fallback de filas con etiquetas C y medidores rectangulares.
 - RSS de procesos propios con `ps -o rss`; con `sudo`, para todos. La memoria “used” puede diferir
   de `top`/Activity Monitor por definición (`active + wired + compressed`); documentar la cifra.
 - Sin daemon root la tabla solo enumera procesos del uid actual y muestra “your processes only”.

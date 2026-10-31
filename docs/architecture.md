@@ -81,9 +81,11 @@
   (rangos enteros para los enums y centinelas para valores ausentes); el criterio vive en
   `DaemonsUIState.sortOrder` y, sin orden elegido, se conserva el del deduplicador.
 - `CPUView`: dashboard tipo `htop`. Cuatro `SummaryCard` (CPU, load, tareas/hilos, memoria) con
-  `Sparkline`; tarjeta de núcleos agrupada por clúster Performance/Efficiency
-  (`CPUTopology`), con `SegmentedMeter` (user/system/nice/idle), uso, temperatura por core y
-  temperatura de paquete (IOHID); uptime; tarjeta
+  `Sparkline`; tarjeta de núcleos tipo muro ecualizador (`C1..CN`, `CoreLoadBars` sobre
+  `AppModel.coreUsageHistory`, grupos Performance/Efficiency, uso y temperatura por core, y
+  temperatura de paquete IOHID). Con ancho suficiente y ≤8 cores usa una fila de columnas con
+  barritas; en ventanas estrechas o Macs con más cores cae a la rejilla de filas con medidores
+  rectangulares. Uptime; tarjeta
   de memoria/swap con segmentos Active/Wired/Compressed/Cached/Free y `CapacityBar`; tabla de
   procesos `CPUProcessTable` (PID, USER, PRI/NI, VIRT, RES, S/THR, CPU%, MEM%, TIME+, Command)
   ordenable, con búsqueda, selección persistida e inspector. `CPUProcessRow` añade claves de
