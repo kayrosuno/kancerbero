@@ -14,7 +14,8 @@ struct MeterSegment: Identifiable {
 
 /// Proportional segmented bar used by the per-core CPU meters and the memory
 /// breakdown. Values are normalised by their sum; a zero total leaves the
-/// background visible.
+/// background visible. The bar is rectangular with a 1 pt corner so it reads
+/// as a hard-edged meter next to the per-core bar history.
 struct SegmentedMeter: View {
     let segments: [MeterSegment]
     var height: CGFloat = 8
@@ -27,7 +28,7 @@ struct SegmentedMeter: View {
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
-                Capsule()
+                RoundedRectangle(cornerRadius: 1, style: .continuous)
                     .fill(.quaternary.opacity(0.3))
                 if total > 0 {
                     HStack(spacing: 0) {
@@ -37,7 +38,7 @@ struct SegmentedMeter: View {
                                 .frame(width: proxy.size.width * segment.value / total)
                         }
                     }
-                    .clipShape(Capsule())
+                    .clipShape(RoundedRectangle(cornerRadius: 1, style: .continuous))
                 }
             }
         }

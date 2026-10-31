@@ -25,6 +25,24 @@ enum KBTheme {
         }
     }
 
+    /// Load heat ramp for the per-core bar history: cool blue at idle through
+    /// green, yellow and orange to red at saturation.
+    static func loadHeat(_ percent: Double) -> Color {
+        guard percent.isFinite else { return .secondary }
+        switch percent {
+        case ..<25:
+            return Color(red: 0.16, green: 0.62, blue: 0.94)
+        case ..<50:
+            return Color(red: 0.20, green: 0.72, blue: 0.52)
+        case ..<70:
+            return Color(red: 0.92, green: 0.74, blue: 0.24)
+        case ..<85:
+            return Color(red: 0.95, green: 0.56, blue: 0.18)
+        default:
+            return Color(red: 0.92, green: 0.30, blue: 0.26)
+        }
+    }
+
     static let summaryCardMinWidth: CGFloat = 170
     static let summaryGridSpacing: CGFloat = 10
     static let summaryColumns = [GridItem(.adaptive(minimum: 170), spacing: 10)]

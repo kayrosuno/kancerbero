@@ -217,7 +217,7 @@ struct CPUView: View {
             coresCompactCard(cpu)
         }
         .buttonStyle(.plain)
-        .help("Per-core usage and temperature")
+        .help("Per-core load history and temperature")
         .popover(isPresented: $showCoresDetails, arrowEdge: .bottom) {
             coresDetails
                 .padding(16)
@@ -225,21 +225,30 @@ struct CPUView: View {
         }
     }
 
+    private var coresIcon: some View {
+        Image(systemName: "cpu")
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 18, height: 18)
+            .background {
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(KBTheme.gradient(cpuTint))
+            }
+    }
+
     private func coresCompactCard(_ cpu: KBCPUStats?) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
-                Image(systemName: "cpu")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 18, height: 18)
-                    .background {
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(KBTheme.gradient(cpuTint))
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 5) {
+                        coresIcon
+                        Text("Cores")
+                            .font(.system(size: 12, weight: .semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                     }
-                Text("Cores")
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    coresIcon
+                }
                 Spacer(minLength: 2)
                 if let cpu {
                     ViewThatFits(in: .horizontal) {
@@ -262,8 +271,21 @@ struct CPUView: View {
             }
 
             if let cpu {
-                coreClusters(cpu)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                GeometryReader { proxy in
+                    let size = proxy.size
+                    if cpu.cores.isEmpty {
+                        Text("Waiting for per-core metrics…")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    } else if size.width >= 300, cpu.cores.count <= 8 {
+                        coreEqualizer(cpu, available: size)
+                    } else {
+                        coreClusters(cpu,
+                                     contentHeight: size.height,
+                                     narrow: size.width < 160)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             } else {
                 Spacer(minLength: 0)
             }
@@ -308,10 +330,136 @@ struct CPUView: View {
                             .map { KBFormat.temperature($0) } ?? "unavailable")
     }
 
-    /// Core grid grouped by performance level. Rows get a fixed height derived
-    /// from the card strip so the performance and efficiency clusters line up
-    /// even though they contain a different number of cores.
-    private func coreClusters(_ cpu: KBCPUStats) -> some View {
+    /// One-row equalizer used for up to eight cores: each core is a column of
+    /// recent load bars, grouped by performance level.
+    private func coreEqualizer(_ cpu: KBCPUStats, available: CGSize) -> some View {
+        let visible = Array(cpu.cores.prefix(8))
+        let split = CPUTopology.performanceCoreCount
+            .map { min(max($0, 0), visible.count) } ?? 0
+        var groups: [(title: String?, cores: [KBCoreCPU])]
+        if split > 0, split < visible.count {
+            groups = [("PERFORMANCE", Array(visible[0..<split])),
+                      ("EFFICIENCY", Array(visible[split...]))]
+        } else {
+            groups = [(nil, visible)]
+        }
+
+        let metrics = CoreWallMetrics(
+            width: available.width,
+            groupCounts: groups.map { $0.cores.count },
+            cellGap: 3,
+            groupGap: 8,
+            divider: 0.5
+        )
+        let headerBlock: CGFloat = groups.count > 1 ? 14 : 0
+        let cellHeight = max(40, available.height - headerBlock)
+        let showsTemperature = visible.contains { $0.temperatureCelsius != nil }
+
+        return HStack(alignment: .top, spacing: 0) {
+            ForEach(groups.indices, id: \.self) { index in
+                let group = groups[index]
+                VStack(alignment: .leading, spacing: 3) {
+                    if let title = group.title {
+                        clusterHeader(String(title.prefix(1)),
+                                      count: group.cores.count)
+                    }
+                    HStack(spacing: 3) {
+                        ForEach(group.cores) { core in
+                            equalizerCell(core,
+                                          showsTemperature: showsTemperature)
+                                .frame(width: metrics.columnWidth)
+                        }
+                    }
+                    .frame(height: cellHeight, alignment: .top)
+                }
+                .frame(width: metrics.groupWidths[index], alignment: .leading)
+
+                if index < groups.count - 1 {
+                    Rectangle()
+                        .fill(.quaternary.opacity(0.5))
+                        .frame(width: 0.5, height: available.height)
+                        .padding(.horizontal, 8)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func equalizerCell(_ core: KBCoreCPU,
+                               showsTemperature: Bool) -> some View {
+        let history = coreHistory(core)
+        return VStack(spacing: 2) {
+            Text("C\(core.index + 1)")
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .frame(height: 10)
+                .frame(maxWidth: .infinity)
+
+            CoreLoadBars(values: history.isEmpty ? [core.usagePercent] : history,
+                         maxBars: 16)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            equalizerFooter(core, showsTemperature: showsTemperature)
+                .frame(height: 12)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Core C\(core.index + 1)")
+        .accessibilityValue(coreAccessibilityValue(core))
+    }
+
+    private func equalizerFooter(_ core: KBCoreCPU,
+                                 showsTemperature: Bool) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 2) {
+                usageLabel(core, compact: false)
+                if showsTemperature {
+                    TemperatureLabel(celsius: core.temperatureCelsius,
+                                     fontSize: 8,
+                                     compact: true)
+                }
+            }
+            .fixedSize(horizontal: true, vertical: false)
+
+            HStack(spacing: 2) {
+                usageLabel(core, compact: true)
+                if showsTemperature {
+                    TemperatureLabel(celsius: core.temperatureCelsius,
+                                     fontSize: 8,
+                                     compact: true)
+                }
+            }
+            .fixedSize(horizontal: true, vertical: false)
+
+            usageLabel(core, compact: false)
+                .fixedSize(horizontal: true, vertical: false)
+
+            usageLabel(core, compact: true)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func usageLabel(_ core: KBCoreCPU, compact: Bool) -> some View {
+        Text(compact
+             ? "\(Int(core.usagePercent.rounded()))%"
+             : KBFormat.usagePercent(core.usagePercent))
+            .font(.system(size: 9, weight: .medium, design: .rounded))
+            .monospacedDigit()
+            .foregroundStyle(core.usagePercent > 85 ? .orange : .secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .contentTransition(.numericText())
+    }
+
+    private func coreHistory(_ core: KBCoreCPU) -> [Double] {
+        guard model.coreUsageHistory.indices.contains(core.index) else { return [] }
+        return model.coreUsageHistory[core.index]
+    }
+
+    /// Fallback grid for narrow cards or Macs with more than eight cores.
+    private func coreClusters(_ cpu: KBCPUStats,
+                              contentHeight: CGFloat,
+                              narrow: Bool) -> some View {
         let visible = Array(cpu.cores.prefix(24))
         let split = CPUTopology.performanceCoreCount
             .map { min(max($0, 0), visible.count) } ?? 0
@@ -323,7 +471,7 @@ struct CPUView: View {
             groups = [(nil, visible)]
         }
 
-        let columns = visible.count > 16 ? 3 : 2
+        let columns = narrow ? 1 : (visible.count > 16 ? 3 : 2)
         let sectionCount = groups.count
         let labelled = groups.contains { $0.title != nil }
         let totalRows = groups.reduce(0) {
@@ -332,8 +480,6 @@ struct CPUView: View {
         let labelHeight: CGFloat = labelled ? 14 : 0
         let withinSpacing: CGFloat = 3
         let betweenSpacing: CGFloat = 5
-        // Padding (20) + header (18) + header gap (4), from the fixed strip.
-        let contentHeight = KBTheme.cardStripHeight - 42
         let reserved = CGFloat(sectionCount) * labelHeight
             + CGFloat(max(0, sectionCount - 1)) * betweenSpacing
             + CGFloat(max(0, totalRows - sectionCount)) * withinSpacing
@@ -347,7 +493,8 @@ struct CPUView: View {
                 let group = groups[index]
                 VStack(spacing: withinSpacing) {
                     if let title = group.title {
-                        clusterHeader(title, count: group.cores.count)
+                        clusterHeader(narrow ? String(title.prefix(1)) : title,
+                                      count: group.cores.count)
                     }
                     coreRows(group.cores,
                              columns: columns,
@@ -415,7 +562,7 @@ struct CPUView: View {
                 MeterSegment(id: "Idle", value: core.idlePercent, color: idleColor)
             ],
             height: meterHeight,
-            accessibilityLabel: "CPU \(core.index + 1)"
+            accessibilityLabel: "Core C\(core.index + 1)"
         )
         return ViewThatFits(in: .horizontal) {
             HStack(spacing: 4) {
@@ -440,7 +587,7 @@ struct CPUView: View {
             meter
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("CPU core \(core.index + 1)")
+        .accessibilityLabel("Core C\(core.index + 1)")
         .accessibilityValue(coreAccessibilityValue(core))
     }
 
@@ -453,10 +600,10 @@ struct CPUView: View {
     }
 
     private func coreIndexLabel(_ core: KBCoreCPU) -> some View {
-        Text("\(core.index + 1)")
+        Text("C\(core.index + 1)")
             .font(.system(size: 9, weight: .medium, design: .monospaced))
             .foregroundStyle(.secondary)
-            .frame(width: 12, alignment: .trailing)
+            .frame(width: 16, alignment: .trailing)
     }
 
     private func corePercentLabel(_ core: KBCoreCPU) -> some View {
@@ -565,6 +712,8 @@ struct CPUView: View {
             }
 
             if let cpu {
+                coreLoadLegend
+
                 let split = CPUTopology.performanceCoreCount
                     .map { min(max($0, 0), cpu.cores.count) } ?? 0
                 let groups: [(title: String?, cores: [KBCoreCPU])] =
@@ -757,23 +906,46 @@ struct CPUView: View {
         }
     }
 
+    private var coreLoadLegend: some View {
+        let samples = model.coreUsageHistory.map { $0.count }.max() ?? 0
+        return HStack(spacing: 6) {
+            Text("Core load")
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+            LinearGradient(
+                colors: [
+                    KBTheme.loadHeat(10), KBTheme.loadHeat(30),
+                    KBTheme.loadHeat(55), KBTheme.loadHeat(75),
+                    KBTheme.loadHeat(95)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(width: 54, height: 5)
+            .clipShape(RoundedRectangle(cornerRadius: 1, style: .continuous))
+            Text("low → high")
+                .font(.system(size: 8))
+                .foregroundStyle(.tertiary)
+            Spacer()
+            Text(samples > 0 ? "last \(samples) samples" : "collecting…")
+                .font(.system(size: 8))
+                .foregroundStyle(.tertiary)
+        }
+        .accessibilityHidden(true)
+    }
+
     private func coreRow(_ core: KBCoreCPU) -> some View {
-        HStack(spacing: 7) {
-            Text("\(core.index + 1)")
+        let history = coreHistory(core)
+        return HStack(spacing: 7) {
+            Text("C\(core.index + 1)")
                 .font(.system(size: 9, weight: .medium, design: .monospaced))
                 .foregroundStyle(.secondary)
-                .frame(width: 18, alignment: .trailing)
+                .frame(width: 22, alignment: .trailing)
 
-            SegmentedMeter(
-                segments: [
-                    MeterSegment(id: "System", value: core.systemPercent, color: systemColor),
-                    MeterSegment(id: "User", value: core.userPercent, color: userColor),
-                    MeterSegment(id: "Nice", value: core.nicePercent, color: niceColor),
-                    MeterSegment(id: "Idle", value: core.idlePercent, color: idleColor)
-                ],
-                height: 8,
-                accessibilityLabel: "CPU \(core.index + 1)"
-            )
+            CoreLoadBars(values: history.isEmpty ? [core.usagePercent] : history,
+                         maxBars: 30)
+                .frame(maxWidth: .infinity)
+                .frame(height: 16)
 
             Text(KBFormat.usagePercent(core.usagePercent))
                 .font(.system(size: 9, weight: .medium, design: .rounded))
@@ -787,7 +959,7 @@ struct CPUView: View {
                              width: 30)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("CPU core \(core.index + 1)")
+        .accessibilityLabel("Core C\(core.index + 1)")
         .accessibilityValue(coreAccessibilityValue(core))
     }
 
@@ -806,5 +978,26 @@ struct CPUView: View {
                     .strokeBorder(.quaternary.opacity(0.5), lineWidth: 1)
             }
             .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
+    }
+}
+
+/// Pure width math for the per-core equalizer: all columns share one width and
+/// each group is sized from its core count plus its internal gaps.
+private struct CoreWallMetrics {
+    let columnWidth: CGFloat
+    let groupWidths: [CGFloat]
+
+    init(width: CGFloat, groupCounts: [Int],
+         cellGap: CGFloat, groupGap: CGFloat, divider: CGFloat) {
+        let cells = groupCounts.reduce(0, +)
+        let groups = groupCounts.count
+        let innerGaps = groupCounts.reduce(0) { $0 + max(0, $1 - 1) }
+        let chrome = CGFloat(max(0, groups - 1)) * (divider + 2 * groupGap)
+        let gaps = CGFloat(innerGaps) * cellGap
+        let column = max(1, (width - chrome - gaps) / CGFloat(max(cells, 1)))
+        columnWidth = column
+        groupWidths = groupCounts.map {
+            CGFloat($0) * column + CGFloat(max(0, $0 - 1)) * cellGap
+        }
     }
 }

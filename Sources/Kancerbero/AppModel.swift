@@ -64,6 +64,9 @@ final class AppModel {
     var cpuUserHistory: [Double] = []
     var cpuSystemHistory: [Double] = []
     var cpuNiceHistory: [Double] = []
+    /// Recent per-core usage, indexed by `KBCoreCPU.index`. Each row is a
+    /// ring-trimmed history used by the Cores card equalizer.
+    private(set) var coreUsageHistory: [[Double]] = []
     var loadHistory: [Double] = []
     var threadHistory: [Double] = []
     var memoryUsageHistory: [Double] = []
@@ -1114,6 +1117,24 @@ final class AppModel {
             cpuUserHistory.append(host.cpu.userPercent)
             cpuSystemHistory.append(host.cpu.systemPercent)
             cpuNiceHistory.append(host.cpu.nicePercent)
+            if !host.cpu.cores.isEmpty {
+                let usage = host.cpu.cores.map { core -> Double in
+                    let value = core.usagePercent
+                    return value.isFinite ? min(max(value, 0), 100) : 0
+                }
+                var next = coreUsageHistory
+                if next.count > usage.count {
+                    next.removeLast(next.count - usage.count)
+                }
+                while next.count < usage.count {
+                    next.append([])
+                }
+                for index in usage.indices {
+                    next[index].append(usage[index])
+                    trim(&next[index], limit: 30)
+                }
+                coreUsageHistory = next
+            }
             loadHistory.append(host.cpu.load1)
             threadHistory.append(Double(host.cpu.threadCount))
             let memory = host.memory
@@ -1180,6 +1201,7 @@ final class AppModel {
         cpuUserHistory.removeAll()
         cpuSystemHistory.removeAll()
         cpuNiceHistory.removeAll()
+        coreUsageHistory.removeAll()
         loadHistory.removeAll()
         threadHistory.removeAll()
         memoryUsageHistory.removeAll()
