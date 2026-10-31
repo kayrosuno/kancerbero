@@ -51,7 +51,16 @@ enum KBFormat {
 
     /// Compact cumulative packet totals ("1,2 M").
     static func compactTotal(_ value: UInt64) -> String {
-        value.formatted(.number.notation(.compactName))
+        guard value >= 1_000 else { return value.formatted() }
+        let units = ["K", "M", "G", "T", "P"]
+        var scaled = Double(value)
+        var unit = -1
+        while scaled >= 999.95, unit < units.count - 1 {
+            scaled /= 1000
+            unit += 1
+        }
+        let number = scaled.formatted(.number.precision(.fractionLength(0...1)))
+        return "\(number) \(units[unit])"
     }
 
     /// Bytes per second -> human-readable byte rate ("1,2 MB/s").

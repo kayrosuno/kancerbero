@@ -26,12 +26,17 @@ nettop -P -d -L 3 -s 1 -x
   puede diferir entre ambas herramientas si parte de su tráfico lo gestiona un helper XPC; es una
   diferencia de atribución, no de contadores.
 - Comprobado: `ollama`, `2.1.310` y `rapportd` coinciden con `nettop` (±1%).
-- **Card Network y selector Bits/Packets:** capturar
+- **Network totals y selector Bits/Packets:** capturar
   `--section networking --traffic-graph bits` y `--traffic-graph packets`. Las cuatro métricas
-  (Download/Upload en bits/s, Pkts in/out por segundo) no cambian; solo el gráfico y sus etiquetas
-  (bps vs pkt/s). Contrastar tasas con Activity Monitor → Network y totales con `netstat -ib`
-  sumando `en*` y excluyendo `lo0`/`utun`. A 1040×640 comprobar el fallback (Network horizontal
-  debajo) sin recortes y con la tabla visible. `--cards-collapsed` oculta toda la franja.
+  siguen en los chips de Traffic (Download/Upload en bits/s y pkt/s, al mismo tamaño, con el valor
+  del modo activo resaltado) y no cambian al alternar el selector; solo lo hacen el gráfico y sus
+  etiquetas (bps vs pkt/s). La card **Network totals** muestra únicamente los acumulados desde el
+  arranque en dos paneles apilados y sombreados (como las tiles de Activity), Input con los datos
+  y paquetes recibidos encima de Output con los enviados. Contrastar tasas
+  con Activity Monitor → Network y totales con `netstat -ib` sumando `en*` y excluyendo
+  `lo0`/`utun`. A 1040×640 comprobar el fallback (Network totals horizontal debajo) y que los
+  chips sin etiqueta conservan ambos valores al mismo tamaño. `--cards-collapsed` oculta toda la
+  franja.
 - Prueba controlada:
 
 ```bash

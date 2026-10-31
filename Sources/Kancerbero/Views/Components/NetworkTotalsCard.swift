@@ -6,12 +6,34 @@ enum NetworkTotalsLayout: Equatable {
     case horizontal
 }
 
-/// System-wide packet/byte rates and cumulative interface totals, modelled on
-/// Activity Monitor's Network tab.
+/// Cumulative interface totals grouped by direction, modelled on Activity
+/// Monitor's Network tab. The live rates live in the Traffic card chips.
 struct NetworkTotalsCard: View {
-    let rates: KBRates
     let counters: KBCounters
     var layout: NetworkTotalsLayout = .vertical
+
+    private enum Direction {
+        case input
+        case output
+
+        var title: String {
+            self == .input ? "Input" : "Output"
+        }
+
+        func values(in counters: KBCounters) -> (bytes: UInt64, packets: UInt64) {
+            self == .input
+                ? (counters.rxBytes, counters.rxPackets)
+                : (counters.txBytes, counters.txPackets)
+        }
+
+        var icon: String {
+            self == .input ? "arrow.down.circle.fill" : "arrow.up.circle.fill"
+        }
+
+        var tint: Color {
+            self == .input ? KBTheme.downloadTint : KBTheme.uploadTint
+        }
+    }
 
     var body: some View {
         content
@@ -19,7 +41,7 @@ struct NetworkTotalsCard: View {
             .frame(maxWidth: .infinity,
                    maxHeight: layout == .vertical ? .infinity : nil,
                    alignment: .topLeading)
-            .frame(height: layout == .horizontal ? 88 : nil)
+            .frame(height: layout == .horizontal ? 72 : nil)
             .background {
                 RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
                     .fill(.regularMaterial)
@@ -38,7 +60,7 @@ struct NetworkTotalsCard: View {
             .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
             .help("Interface counters are cumulative since boot and reset if an interface restarts.")
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Network rates and totals")
+            .accessibilityLabel("Network totals")
             .accessibilityValue(accessibilityValue)
     }
 
@@ -46,43 +68,36 @@ struct NetworkTotalsCard: View {
     private var content: some View {
         switch layout {
         case .vertical:
-            VStack(alignment: .leading, spacing: 4) {
-                header
-                sectionLabel("RATES")
-                valuesGrid(valueSize: 11, cells: rateCells)
-                Divider().opacity(0.35)
-                sectionLabel("TOTALS")
-                valuesGrid(valueSize: 11, cells: totalCells)
-                Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 8) {
+                header(showsBootInline: true)
+                VStack(spacing: 6) {
+                    directionPanel(.input)
+                    directionPanel(.output)
+                }
+                .frame(maxHeight: .infinity)
             }
         case .horizontal:
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    header
+                    header(showsBootInline: false)
                     Text("since boot")
                         .font(.system(size: 8))
                         .foregroundStyle(.tertiary)
                 }
-                .frame(width: 110, alignment: .leading)
+                .frame(width: 130, alignment: .leading)
 
-                Divider().frame(height: 52)
+                Divider().frame(height: 44)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    sectionLabel("RATES")
-                    valuesGrid(valueSize: 12, cells: rateCells)
+                VStack(spacing: 4) {
+                    directionRow(.input)
+                    directionRow(.output)
                 }
-
-                Divider().frame(height: 52)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    sectionLabel("TOTALS")
-                    valuesGrid(valueSize: 12, cells: totalCells)
-                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
 
-    private var header: some View {
+    private func header(showsBootInline: Bool) -> some View {
         HStack(spacing: 5) {
             Image(systemName: "network")
                 .font(.system(size: 9, weight: .semibold))
@@ -92,98 +107,168 @@ struct NetworkTotalsCard: View {
                     RoundedRectangle(cornerRadius: 5, style: .continuous)
                         .fill(KBTheme.brandGradient)
                 }
-            Text("Network")
-                .font(.system(size: 11, weight: .semibold))
-                .lineLimit(1)
-            Spacer(minLength: 2)
-            if layout == .vertical {
-                Text("since boot")
-                    .font(.system(size: 8))
-                    .foregroundStyle(.tertiary)
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 4) {
+                    Text("Network totals")
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                    if showsBootInline {
+                        Spacer(minLength: 2)
+                        Text("since boot")
+                            .font(.system(size: 8))
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                    }
+                }
+                HStack(spacing: 4) {
+                    Text("Network")
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                    if showsBootInline {
+                        Spacer(minLength: 2)
+                        Text("since boot")
+                            .font(.system(size: 8))
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                    }
+                }
+                Text("Network")
+                    .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
             }
         }
         .frame(height: 18)
     }
 
-    private func sectionLabel(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 8, weight: .semibold))
-            .tracking(0.6)
-            .foregroundStyle(.secondary)
-    }
+    /// Static, unselected twin of `MetricTile`: same radius, fill and border,
+    /// but no button, checkmark or focus treatment.
+    private func directionPanel(_ direction: Direction) -> some View {
+        let values = direction.values(in: counters)
 
-    private func valuesGrid(valueSize: CGFloat,
-                            cells: [(icon: String, title: String, value: String, tint: Color)])
-        -> some View {
-        VStack(spacing: 3) {
-            HStack(spacing: 8) {
-                metricCell(cells[0], valueSize: valueSize)
-                metricCell(cells[1], valueSize: valueSize)
-            }
-            HStack(spacing: 8) {
-                metricCell(cells[2], valueSize: valueSize)
-                metricCell(cells[3], valueSize: valueSize)
-            }
-        }
-    }
-
-    private func metricCell(_ cell: (icon: String, title: String, value: String, tint: Color),
-                            valueSize: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 3) {
-                Image(systemName: cell.icon)
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(cell.tint)
-                Text(cell.title)
-                    .font(.system(size: 9, weight: .medium))
+        return VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                Image(systemName: direction.icon)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(direction.tint)
+                Text(direction.title)
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Spacer(minLength: 0)
             }
-            Text(cell.value)
-                .font(.system(size: valueSize, weight: .semibold, design: .rounded))
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(KBFormat.totalBytes(values.bytes))
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .contentTransition(.numericText())
+                Text("data")
+                    .font(.system(size: 8, weight: .medium))
+                    .tracking(0.3)
+                    .foregroundStyle(.tertiary)
+            }
+
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(KBFormat.compactTotal(values.packets))
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .contentTransition(.numericText())
+                Text("packets")
+                    .font(.system(size: 8, weight: .medium))
+                    .tracking(0.3)
+                    .foregroundStyle(.tertiary)
+                Spacer(minLength: 0)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(direction.tint.opacity(0.045))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(direction.tint.opacity(0.18), lineWidth: 1)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(direction == .input ? "Network input" : "Network output")
+        .accessibilityValue(
+            "\(KBFormat.totalBytes(values.bytes)) data, " +
+            "\(KBFormat.compactTotal(values.packets)) packets since boot"
+        )
+    }
+
+    /// Compact single-line variant for the full-width fallback below the strip.
+    private func directionRow(_ direction: Direction) -> some View {
+        let values = direction.values(in: counters)
+
+        return HStack(spacing: 4) {
+            Image(systemName: direction.icon)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(direction.tint)
+            Text(direction.title)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            Text(KBFormat.totalBytes(values.bytes))
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.7)
+                .layoutPriority(1)
                 .contentTransition(.numericText())
+            Text("data")
+                .font(.system(size: 8, weight: .medium))
+                .foregroundStyle(.tertiary)
+            Text("·")
+                .font(.system(size: 7))
+                .foregroundStyle(.tertiary)
+            Text(KBFormat.compactTotal(values.packets))
+                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .layoutPriority(1)
+                .contentTransition(.numericText())
+            Text("pkts")
+                .font(.system(size: 8, weight: .medium))
+                .foregroundStyle(.tertiary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var rateCells: [(icon: String, title: String, value: String, tint: Color)] {
-        [
-            ("arrow.down.circle.fill", "Download",
-             KBFormat.bitRate(rates.rxBytesPerSecond), KBTheme.downloadTint),
-            ("arrow.up.circle.fill", "Upload",
-             KBFormat.bitRate(rates.txBytesPerSecond), KBTheme.uploadTint),
-            ("arrow.down.circle", "Pkts in",
-             KBFormat.packetsRate(rates.rxPacketsPerSecond), KBTheme.downloadTint),
-            ("arrow.up.circle", "Pkts out",
-             KBFormat.packetsRate(rates.txPacketsPerSecond), KBTheme.uploadTint)
-        ]
-    }
-
-    private var totalCells: [(icon: String, title: String, value: String, tint: Color)] {
-        [
-            ("arrow.down.circle", "Data in",
-             KBFormat.totalBytes(counters.rxBytes), KBTheme.downloadTint),
-            ("arrow.up.circle", "Data out",
-             KBFormat.totalBytes(counters.txBytes), KBTheme.uploadTint),
-            ("arrow.down.circle", "Pkts in",
-             KBFormat.compactTotal(counters.rxPackets), KBTheme.downloadTint),
-            ("arrow.up.circle", "Pkts out",
-             KBFormat.compactTotal(counters.txPackets), KBTheme.uploadTint)
-        ]
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(direction.tint.opacity(0.045))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(direction.tint.opacity(0.18), lineWidth: 1)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(direction == .input ? "Network input" : "Network output")
+        .accessibilityValue(
+            "\(KBFormat.totalBytes(values.bytes)) data, " +
+            "\(KBFormat.compactTotal(values.packets)) packets since boot"
+        )
     }
 
     private var accessibilityValue: String {
-        "Download \(KBFormat.bitRate(rates.rxBytesPerSecond)), " +
-            "upload \(KBFormat.bitRate(rates.txBytesPerSecond)), " +
-            "packets in \(KBFormat.packetsRate(rates.rxPacketsPerSecond)) per second, " +
-            "packets out \(KBFormat.packetsRate(rates.txPacketsPerSecond)) per second. " +
-            "Total data received \(KBFormat.totalBytes(counters.rxBytes)), " +
-            "sent \(KBFormat.totalBytes(counters.txBytes)), " +
-            "packets in \(KBFormat.compactTotal(counters.rxPackets)), " +
-            "out \(KBFormat.compactTotal(counters.txPackets)) since boot."
+        "Input \(KBFormat.totalBytes(counters.rxBytes)) data, " +
+            "\(KBFormat.compactTotal(counters.rxPackets)) packets. " +
+            "Output \(KBFormat.totalBytes(counters.txBytes)) data, " +
+            "\(KBFormat.compactTotal(counters.txPackets)) packets since boot."
     }
 }
