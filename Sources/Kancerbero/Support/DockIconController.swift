@@ -481,7 +481,7 @@ final class DockIconView: NSView {
         let stepX = rect.width / CGFloat(lower.count - 1)
         func point(_ index: Int, _ value: Double) -> NSPoint {
             let normalized = min(max(value, 0), 100) / 100
-            return NSPoint(x: rect.minX + CGFloat(index) * stepX,
+            return NSPoint(x: rect.maxX - CGFloat(index) * stepX,
                            y: rect.maxY - CGFloat(normalized) * rect.height)
         }
         let path = NSBezierPath()
@@ -508,9 +508,9 @@ final class DockIconView: NSView {
         let stepX = rect.width / CGFloat(max(1, data.count - 1))
         let line = NSBezierPath()
         let area = NSBezierPath()
-        area.move(to: NSPoint(x: rect.minX, y: rect.maxY))
+        area.move(to: NSPoint(x: rect.maxX, y: rect.maxY))
         for (index, value) in data.enumerated() {
-            let x = rect.minX + CGFloat(index) * stepX
+            let x = rect.maxX - CGFloat(index) * stepX
             let y = rect.maxY - CGFloat(min(max(value, 0), peak) / peak) * rect.height
             let point = NSPoint(x: x, y: y)
             if index == 0 {
@@ -521,7 +521,7 @@ final class DockIconView: NSView {
                 area.line(to: point)
             }
         }
-        area.line(to: NSPoint(x: rect.maxX, y: rect.maxY))
+        area.line(to: NSPoint(x: rect.minX, y: rect.maxY))
         area.close()
         color.withAlphaComponent(0.22).setFill()
         area.fill()
@@ -562,9 +562,9 @@ final class DockIconView: NSView {
         let stepX = rect.width / CGFloat(values.count - 1)
         let line = NSBezierPath()
         let area = NSBezierPath()
-        area.move(to: NSPoint(x: rect.minX, y: baseline))
+        area.move(to: NSPoint(x: rect.maxX, y: baseline))
         for (index, value) in values.enumerated() {
-            let x = rect.minX + CGFloat(index) * stepX
+            let x = rect.maxX - CGFloat(index) * stepX
             let normalized = CGFloat(min(max(value, 0), peak) / peak)
             let y = baseline + direction * normalized * halfHeight
             let point = NSPoint(x: x, y: y)
@@ -576,7 +576,7 @@ final class DockIconView: NSView {
                 area.line(to: point)
             }
         }
-        area.line(to: NSPoint(x: rect.maxX, y: baseline))
+        area.line(to: NSPoint(x: rect.minX, y: baseline))
         area.close()
         color.withAlphaComponent(0.22).setFill()
         area.fill()
@@ -597,10 +597,10 @@ final class DockIconView: NSView {
         let stepX = rect.width / CGFloat(count - 1)
         let line = NSBezierPath()
         let area = NSBezierPath()
-        area.move(to: NSPoint(x: rect.minX, y: rect.maxY))
+        area.move(to: NSPoint(x: rect.maxX, y: rect.maxY))
         for index in 0..<count {
             let percent = min(max(Double(values[index]), 0), 100) / 100
-            let point = NSPoint(x: rect.minX + CGFloat(index) * stepX,
+            let point = NSPoint(x: rect.maxX - CGFloat(index) * stepX,
                                 y: rect.maxY - CGFloat(percent) * rect.height)
             if index == 0 {
                 line.move(to: point)
@@ -610,7 +610,7 @@ final class DockIconView: NSView {
                 area.line(to: point)
             }
         }
-        area.line(to: NSPoint(x: rect.maxX, y: rect.maxY))
+        area.line(to: NSPoint(x: rect.minX, y: rect.maxY))
         area.close()
         let color = pressureColor(levels.last ?? 0)
         color.withAlphaComponent(0.20).setFill()

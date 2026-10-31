@@ -178,9 +178,9 @@ struct TrafficChart: View {
         let y = plot.maxY + Self.axisHeight / 2
         let color = Color.secondary.opacity(colorScheme == .dark ? 0.7 : 0.6)
         let entries: [(String, CGFloat, UnitPoint)] = [
-            ("-" + KBFormat.shortDuration(window), plot.minX, .leading),
+            ("now", plot.minX, .leading),
             ("-" + KBFormat.shortDuration(window / 2), plot.midX, .center),
-            ("now", plot.maxX, .trailing)
+            ("-" + KBFormat.shortDuration(window), plot.maxX, .trailing)
         ]
 
         for (label, x, anchor) in entries {
@@ -203,7 +203,7 @@ struct TrafficChart: View {
 
         let usable = max(plot.width - 2 * Self.seriesInset, 0)
         let step = usable / CGFloat(Self.window - 1)
-        let startX = plot.maxX - Self.seriesInset - CGFloat(values.count - 1) * step
+        let startX = plot.minX + Self.seriesInset
         // Position samples by their timestamp when available so a cadence
         // change keeps the retained history honest on the time axis.
         let useTime = dates.count == values.count && dates.count >= 2
@@ -218,9 +218,9 @@ struct TrafficChart: View {
             let x: CGFloat
             if useTime, let lastDate {
                 let age = lastDate.timeIntervalSince(dates[index])
-                x = plot.maxX - Self.seriesInset - CGFloat(age / window) * usable
+                x = plot.minX + Self.seriesInset + CGFloat(age / window) * usable
             } else {
-                x = startX + CGFloat(index) * step
+                x = startX + CGFloat(values.count - 1 - index) * step
             }
             points.append(CGPoint(
                 x: x,

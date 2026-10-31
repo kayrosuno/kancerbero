@@ -43,15 +43,15 @@ struct BatteryChargeChart: View {
 
         let points = chargePoints(size: size)
         guard points.count >= 2 else { return }
-        // Activity Monitor strokes a closed polygon: baseline, left edge and
+        // Activity Monitor strokes a closed polygon: baseline, right edge and
         // the charge curve drawn on top of it.
         var path = Path()
-        path.move(to: CGPoint(x: 0, y: size.height))
+        path.move(to: CGPoint(x: size.width, y: size.height))
         path.addLine(to: points[0])
         for point in points.dropFirst() {
             path.addLine(to: point)
         }
-        path.addLine(to: CGPoint(x: size.width, y: size.height))
+        path.addLine(to: CGPoint(x: 0, y: size.height))
         path.closeSubpath()
         context.stroke(path,
                        with: .color(Color(nsColor: .systemCyan)),
@@ -59,9 +59,9 @@ struct BatteryChargeChart: View {
     }
 
     /// Charge samples across the fixed 12 h window, oldest first. Activity
-    /// Monitor keeps the newest sample before the window as a left anchor;
-    /// the first point is pinned to the left edge and the last level extends
-    /// to the right edge. A single sample therefore draws a flat line.
+    /// Monitor keeps the oldest sample before the window as a right anchor;
+    /// the first point is pinned to the right edge and the last level extends
+    /// to the left edge. A single sample therefore draws a flat line.
     private func chargePoints(size: CGSize) -> [CGPoint] {
         let samples = chargeSamples()
         guard !samples.isEmpty else { return [] }
@@ -69,11 +69,11 @@ struct BatteryChargeChart: View {
         var points: [CGPoint] = []
         points.reserveCapacity(samples.count + 1)
         for (index, sample) in samples.enumerated() {
-            let x = index == 0 ? 0 : xPosition(sample.time, width: size.width)
+            let x = index == 0 ? size.width : xPosition(sample.time, width: size.width)
             points.append(CGPoint(x: x, y: yPosition(sample.level, height: size.height)))
         }
         if let last = samples.last {
-            points.append(CGPoint(x: size.width,
+            points.append(CGPoint(x: 0,
                                   y: yPosition(last.level, height: size.height)))
         }
         return points
@@ -100,31 +100,33 @@ struct BatteryChargeChart: View {
     }
 
     /// Full-height bands for the AC intervals. The state just before the
-    /// window anchors the left edge; the current state owns everything up to
-    /// the right edge.
+    /// window anchors the right edge; the current state owns everything up to
+    /// the left edge.
     private func acRegions(size: CGSize) -> [CGRect] {
         let entries = stateEntries()
         guard let first = entries.first else { return [] }
 
         var regions: [CGRect] = []
         var previous = first.onAC
-        var start: CGFloat = 0
+        var start = size.width
         for (index, entry) in entries.enumerated() {
-            let x = index == 0 ? 0 : xPosition(entry.time, width: size.width)
+            let x = index == 0 ? size.width : xPosition(entry.time, width: size.width)
             if entry.onAC != previous {
                 if entry.onAC {
                     start = x
                 } else {
-                    regions.append(CGRect(x: start, y: 0,
-                                          width: max(0, x - start),
+                    let left = min(start, x)
+                    let right = max(start, x)
+                    regions.append(CGRect(x: left, y: 0,
+                                          width: max(0, right - left),
                                           height: size.height))
                 }
                 previous = entry.onAC
             }
         }
         if previous {
-            regions.append(CGRect(x: start, y: 0,
-                                  width: max(0, size.width - start),
+            regions.append(CGRect(x: 0, y: 0,
+                                  width: max(0, start),
                                   height: size.height))
         }
         return regions
@@ -152,7 +154,7 @@ struct BatteryChargeChart: View {
     }
 
     private func xPosition(_ secondsAgo: Double, width: CGFloat) -> CGFloat {
-        let fraction = min(max(1 - secondsAgo / Self.window, 0), 1)
+        let fraction = min(max(secondsAgo / Self.window, 0), 1)
         return width * fraction
     }
 

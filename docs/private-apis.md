@@ -228,7 +228,7 @@ pestaña Energy no es una serie que calcule la app: viene de `libsystemstats`.
 | Función | Mecanismo | Evidencia |
 |---|---|---|
 | Datos | `systemstats_get_battery_charge_graph` importado de `/usr/lib/libsystemstats.dylib` (dyld cache); devuelve un `CFDictionary` con `charge_times`, `charge_levels`, `battery_times` y `battery_states` | `otool -L`, `dyld_info -imports`; `_refreshBatteryGraph:` 0x10000dbf0 → 0x10000dcfc |
-| Ventana | 12 h = 43 200 s; `x = ancho · (1 − t/43200)`; descarta `t >> 6 ≥ 675` | `_processChargeTimes:` 0x10000d8bc; `_processBatteryStates:` 0x10000d40c |
+| Ventana | 12 h = 43 200 s; `x = ancho · (t/43200)`; descarta `t >> 6 ≥ 675` | `_processChargeTimes:` 0x10000d8bc; `_processBatteryStates:` 0x10000d40c |
 | Estados | `battery_states`: **0 = en AC**, 1 = batería; las bandas AC salen de las transiciones | `_processBatteryStates:` (`TIME_ON_AC` cuando el último estado es 0) |
 | Dibujo | rejilla discontinua `[6,3]` al 25/50/75 % en ambos ejes; bandas verdes (`systemGreen` α 0,3) a altura completa; polígono cerrado cian (`systemCyan`, 1 pt) con el nivel de carga | `BatteryGraphView::drawRect:` 0x100044a9c |
 
@@ -242,9 +242,9 @@ En macOS 27.2 sobre un M1 Pro la misma llamada devolvió **una sola muestra**:
 REA/Ghidra 12.2 confirma que Activity Monitor la sigue dibujando: `_processChargeTimes:`
 (`0x10000d8bc`) arranca en la primera muestra dentro de 12 h (o en la más reciente si no hay
 ninguna), toma opcionalmente la muestra inmediatamente anterior como ancla, fija el primer punto a
-`x = 0` y **siempre añade un punto final en `x = ancho`** con el último nivel, así que una muestra
+`x = ancho` y **siempre añade un punto final en `x = 0`** con el último nivel, así que una muestra
 produce una línea plana. `_processBatteryStates:` (`0x10000d40c`) extiende el estado actual hasta el
-borde derecho y calcula «Time on AC/Time on Battery» con `battery_times` del inicio del tramo de
+borde izquierdo y calcula «Time on AC/Time on Battery» con `battery_times` del inicio del tramo de
 estado actual. kancerbero replica ambas cosas y acepta `>= 1` muestra.
 
 kancerbero replica el gráfico en la card Battery: `kb_battery_graph.c` carga la librería con

@@ -71,7 +71,9 @@ struct DiskIOChart: View {
 
                 guard n > 1 else { return }
 
-                func x(_ index: Int) -> CGFloat { CGFloat(index) * stepX }
+                func x(_ index: Int) -> CGFloat {
+                    size.width - CGFloat(index) * stepX
+                }
                 func topY(_ value: Double) -> CGFloat {
                     mid - CGFloat(min(max(value, 0), ceiling) / ceiling) * half
                 }
@@ -85,7 +87,7 @@ struct DiskIOChart: View {
                             color: Color) {
                     var line = Path()
                     var area = Path()
-                    area.move(to: CGPoint(x: 0, y: base))
+                    area.move(to: CGPoint(x: x(0), y: base))
                     for (index, value) in values.enumerated() {
                         let point = CGPoint(x: x(index), y: y(value))
                         if index == 0 {
@@ -96,8 +98,7 @@ struct DiskIOChart: View {
                             area.addLine(to: point)
                         }
                     }
-                    area.addLine(to: CGPoint(x: CGFloat(values.count - 1) * stepX,
-                                             y: base))
+                    area.addLine(to: CGPoint(x: x(values.count - 1), y: base))
                     area.closeSubpath()
                     context.fill(area, with: .color(color.opacity(0.18)))
                     context.stroke(line, with: .color(color),
