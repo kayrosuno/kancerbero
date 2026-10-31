@@ -221,7 +221,7 @@ struct CPUView: View {
         .popover(isPresented: $showCoresDetails, arrowEdge: .bottom) {
             coresDetails
                 .padding(16)
-                .frame(width: 560)
+                .frame(width: 1120, height: 600, alignment: .topLeading)
         }
     }
 
@@ -303,21 +303,24 @@ struct CPUView: View {
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    private func packageTemperatureBadge(_ cpu: KBCPUStats) -> some View {
+    private func packageTemperatureBadge(_ cpu: KBCPUStats,
+                                         large: Bool = false) -> some View {
         let tint = KBTheme.temperatureTint(cpu.packageTemperatureCelsius)
         let value = cpu.packageTemperatureCelsius.map {
             "\(Int($0.rounded()))°C"
         } ?? "—"
-        return HStack(spacing: 3) {
+        return HStack(spacing: large ? 4 : 3) {
             Image(systemName: "thermometer.medium")
-                .font(.system(size: 8, weight: .semibold))
+                .font(.system(size: large ? 10 : 8, weight: .semibold))
             Text(value)
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .font(.system(size: large ? 12 : 10,
+                              weight: .semibold,
+                              design: .rounded))
                 .monospacedDigit()
         }
         .foregroundStyle(tint)
-        .padding(.horizontal, 5)
-        .padding(.vertical, 2)
+        .padding(.horizontal, large ? 7 : 5)
+        .padding(.vertical, large ? 3 : 2)
         .background(Capsule().fill(tint.opacity(0.12)))
         .overlay(Capsule().strokeBorder(tint.opacity(0.25), lineWidth: 0.5))
         .lineLimit(1)
@@ -698,15 +701,15 @@ struct CPUView: View {
 
     private var coresDetails: some View {
         let cpu = model.hostMetrics?.cpu
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text("CPU cores")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                 Spacer()
                 if let cpu {
-                    packageTemperatureBadge(cpu)
+                    packageTemperatureBadge(cpu, large: true)
                     Text("\(cpu.coreCount) cores")
-                        .font(.system(size: 10))
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -724,24 +727,24 @@ struct CPUView: View {
 
                 ForEach(groups.indices, id: \.self) { index in
                     let group = groups[index]
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 8) {
                         if let title = group.title {
-                            HStack(spacing: 5) {
+                            HStack(spacing: 6) {
                                 Text(title)
-                                    .font(.system(size: 9, weight: .semibold))
+                                    .font(.system(size: 11, weight: .semibold))
                                     .tracking(0.6)
                                     .foregroundStyle(.secondary)
                                 Text("· \(group.cores.count)")
-                                    .font(.system(size: 9, design: .rounded))
+                                    .font(.system(size: 10, design: .rounded))
                                     .foregroundStyle(.tertiary)
                                 Rectangle()
                                     .fill(.quaternary.opacity(0.45))
                                     .frame(height: 0.5)
                             }
                         }
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 12)],
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 500), spacing: 16)],
                                   alignment: .leading,
-                                  spacing: 6) {
+                                  spacing: 10) {
                             ForEach(group.cores) { core in
                                 coreRow(core)
                             }
@@ -750,9 +753,9 @@ struct CPUView: View {
                 }
 
                 if cpu.packageTemperatureCelsius != nil {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "thermometer.medium")
-                            .font(.system(size: 9))
+                            .font(.system(size: 10))
                         Text("\(KBFormat.temperature(cpu.packageTemperatureCelsius)) package")
                         if let source = cpu.temperatureSource {
                             Text("· \(source)")
@@ -761,11 +764,11 @@ struct CPUView: View {
                         Text("per-core values are mapped from the available sensors, like btop")
                             .foregroundStyle(.tertiary)
                     }
-                    .font(.system(size: 9))
+                    .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                 } else {
                     Text("Temperature unavailable on this Mac. Intel Macs and some virtual machines do not expose IOHID temperature sensors.")
-                        .font(.system(size: 9))
+                        .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -773,7 +776,7 @@ struct CPUView: View {
                 if cpu.threadsRestricted > 0 {
                     Label("\(cpu.threadsRestricted) restricted",
                           systemImage: "lock.fill")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.orange)
                         .help("Threads of other users require the root daemon.")
                 }
@@ -789,7 +792,7 @@ struct CPUView: View {
                                     color: niceColor),
                     MeterLegendItem("Idle", value: KBFormat.usagePercent(cpu.idlePercent),
                                     color: idleColor)
-                ], minItemWidth: 110)
+                ], minItemWidth: 150)
 
                 HStack {
                     Label("Uptime \(KBFormat.uptime(cpu.uptimeSeconds))",
@@ -797,7 +800,7 @@ struct CPUView: View {
                     Spacer()
                     Text("\(cpu.taskCount) tasks · \(cpu.threadCount) threads")
                 }
-                .font(.system(size: 10))
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             } else {
                 Text("Waiting for metrics…")
@@ -908,9 +911,9 @@ struct CPUView: View {
 
     private var coreLoadLegend: some View {
         let samples = model.coreUsageHistory.map { $0.count }.max() ?? 0
-        return HStack(spacing: 6) {
+        return HStack(spacing: 8) {
             Text("Core load")
-                .font(.system(size: 9))
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             LinearGradient(
                 colors: [
@@ -921,14 +924,14 @@ struct CPUView: View {
                 startPoint: .leading,
                 endPoint: .trailing
             )
-            .frame(width: 54, height: 5)
+            .frame(width: 80, height: 7)
             .clipShape(RoundedRectangle(cornerRadius: 1, style: .continuous))
             Text("low → high")
-                .font(.system(size: 8))
+                .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
             Spacer()
             Text(samples > 0 ? "last \(samples) samples" : "collecting…")
-                .font(.system(size: 8))
+                .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
         }
         .accessibilityHidden(true)
@@ -936,27 +939,27 @@ struct CPUView: View {
 
     private func coreRow(_ core: KBCoreCPU) -> some View {
         let history = coreHistory(core)
-        return HStack(spacing: 7) {
+        return HStack(spacing: 10) {
             Text("C\(core.index + 1)")
-                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
                 .foregroundStyle(.secondary)
-                .frame(width: 22, alignment: .trailing)
+                .frame(width: 30, alignment: .trailing)
 
             CoreLoadBars(values: history.isEmpty ? [core.usagePercent] : history,
                          maxBars: 30)
                 .frame(maxWidth: .infinity)
-                .frame(height: 16)
+                .frame(height: 68)
 
             Text(KBFormat.usagePercent(core.usagePercent))
-                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .font(.system(size: 11, weight: .medium, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(core.usagePercent > 85 ? .orange : .secondary)
-                .frame(width: 42, alignment: .trailing)
+                .frame(width: 54, alignment: .trailing)
 
             TemperatureLabel(celsius: core.temperatureCelsius,
-                             fontSize: 9,
+                             fontSize: 10,
                              compact: true,
-                             width: 30)
+                             width: 40)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Core C\(core.index + 1)")
