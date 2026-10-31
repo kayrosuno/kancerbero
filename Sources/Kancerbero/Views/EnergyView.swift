@@ -6,6 +6,7 @@ import KancerberoCore
 /// list ordered by energy.
 struct EnergyView: View {
     @Environment(AppModel.self) private var model
+    @Environment(UIState.self) private var ui
 
     private let energyTint = Color(red: 0.95, green: 0.72, blue: 0.20)
     private let wakeupTint = KBTheme.uploadTint
@@ -17,12 +18,18 @@ struct EnergyView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            SectionHeader(title: "Energy",
-                          subtitle: "Battery, energy and wake-ups")
+            CollapsibleSectionHeader(
+                section: .energy,
+                title: "Energy",
+                subtitle: "Battery, energy and wake-ups"
+            )
 
             VStack(spacing: 14) {
-                topGroups
-                    .frame(height: KBTheme.cardStripHeight)
+                if !ui.cardsCollapsed(for: .energy) {
+                    topGroups
+                        .frame(height: KBTheme.cardStripHeight)
+                        .transition(.opacity)
+                }
                 processCard
                     .frame(maxHeight: .infinity)
             }

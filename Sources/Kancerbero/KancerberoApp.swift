@@ -85,6 +85,13 @@ struct KancerberoApp: App {
                 }
             }
 
+            CommandGroup(after: .sidebar) {
+                Button("Toggle Dashboard Cards") {
+                    NotificationCenter.default.post(name: .kbToggleAllCards, object: nil)
+                }
+                .keyboardShortcut("h", modifiers: [.command, .shift])
+            }
+
             CommandGroup(after: .newItem) {
                 Button("Refresh Now") {
                     model.refreshNow()

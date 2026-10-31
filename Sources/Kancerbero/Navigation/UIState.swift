@@ -17,6 +17,56 @@ final class UIState {
     var energy = EnergyUIState()
     var filter = FilterUIState()
 
+    /// Dashboard sections whose top cards are hidden. Session-only: the
+    /// collapsed state is intentionally not persisted across launches.
+    private(set) var collapsedCardSections: Set<AppSection> = []
+
+    var allCardsCollapsed: Bool {
+        AppSection.allCases.allSatisfy { collapsedCardSections.contains($0) }
+    }
+
+    func cardsCollapsed(for section: AppSection) -> Bool {
+        collapsedCardSections.contains(section)
+    }
+
+    func toggleCards(for section: AppSection) {
+        if collapsedCardSections.contains(section) {
+            collapsedCardSections.remove(section)
+        } else {
+            collapsedCardSections.insert(section)
+            resetHiddenOnlyFilters(for: section)
+        }
+    }
+
+    /// Global control: mixed or expanded → collapse everything; fully
+    /// collapsed → expand everything.
+    func setAllCardsCollapsed(_ collapsed: Bool) {
+        guard collapsed else {
+            collapsedCardSections.removeAll()
+            return
+        }
+        collapsedCardSections = Set(AppSection.allCases)
+        for section in AppSection.allCases {
+            resetHiddenOnlyFilters(for: section)
+        }
+    }
+
+    /// Clears controls that live only inside the hidden cards, so the table
+    /// that remains is not filtered with no visible way to change it.
+    private func resetHiddenOnlyFilters(for section: AppSection) {
+        switch section {
+        case .networking:
+            networking.focus = nil
+        case .disk:
+            disk.volumesFocus = nil
+            if disk.analyzerFocus != .scanned {
+                disk.analyzerFocus = .scanned
+            }
+        default:
+            break
+        }
+    }
+
     init(arguments: [String] = CommandLine.arguments) {
         if let focus = Self.value(for: "--networking-focus", in: arguments)
             .flatMap({ NetworkingFocus(rawValue: $0.lowercased()) }) {
@@ -115,6 +165,28 @@ final class UIState {
         energy.search = Self.value(for: "--energy-search", in: arguments) ?? ""
         energy.pendingSelectionPID = Self.value(for: "--energy-selected", in: arguments)
             .flatMap(Int32.init)
+
+        // Screenshot-only overrides, applied after the focus flags so a
+        // collapsed capture also exercises the hidden-filter reset.
+        if arguments.contains("--cards-expanded") {
+            setAllCardsCollapsed(false)
+        }
+        if arguments.contains("--cards-collapsed") {
+            setAllCardsCollapsed(true)
+        }
+        if let raw = Self.value(for: "--cards-collapsed-sections", in: arguments) {
+            let sections = Set(raw.split(separator: ",").compactMap { token in
+                AppSection(rawValue: token
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .lowercased())
+            })
+            if !sections.isEmpty {
+                collapsedCardSections = sections
+                for section in sections {
+                    resetHiddenOnlyFilters(for: section)
+                }
+            }
+        }
     }
 
     private static func value(for flag: String, in arguments: [String]) -> String? {

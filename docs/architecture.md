@@ -158,6 +158,15 @@
   `--disk-io-search`, `--disk-io-selected`, `--disk-io-graph`, `--cpu-search`,
   `--cpu-selected`, `--memory-search`, `--memory-selected`, `--energy-search` y
   `--energy-selected` se aplican una sola vez al crear `UIState`.
+- Tarjetas colapsables: `UIState.collapsedCardSections` guarda las secciones cuyo dashboard está
+  oculto (solo sesión). El botón global del toolbar, delante del selector de intervalo, aplica
+  “todo o nada” a las 7 secciones y `CollapsibleSectionHeader` añade un control `Hide/Show cards`
+  a cada cabecera para cambiar solo esa pestaña; `Cmd+Shift+H` alterna el global. Cada vista
+  envuelve su bloque de tarjetas en `if !ui.cardsCollapsed(for:)` con `.transition(.opacity)`; la
+  tabla permanece fuera del condicional y absorbe el espacio. Al colapsar se resetean los filtros
+  que solo viven en las tarjetas: `networking.focus`, `disk.volumesFocus` y
+  `disk.analyzerFocus` a `.scanned`. Los overrides `--cards-collapsed`, `--cards-expanded` y
+  `--cards-collapsed-sections` permiten capturar los estados sin tocar `UserDefaults`.
 - Settings: `KancerberoApp` añade una escena nativa `Settings` con `SettingsView`. El toggle
   “Animate tab changes” persiste en `@AppStorage("tabAnimationsEnabled")` (por defecto `true`) y
   condiciona únicamente las transiciones de cambio de pestaña: `RootView` (secciones),

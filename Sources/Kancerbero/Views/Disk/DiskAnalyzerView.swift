@@ -42,7 +42,10 @@ struct DiskAnalyzerView: View {
             }
 
             if let snapshot = disk.activeSnapshot {
-                cards(snapshot)
+                if !ui.cardsCollapsed(for: .disk) {
+                    cards(snapshot)
+                        .transition(.opacity)
+                }
                 if snapshot.cancelled {
                     banner("Scan cancelled. Showing partial results.",
                            icon: "stop.circle", tint: Color.secondary)

@@ -23,8 +23,11 @@ struct DiskView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            SectionHeader(title: "Disk",
-                          subtitle: "Volumes, analysis and disk I/O")
+            CollapsibleSectionHeader(
+                section: .disk,
+                title: "Disk",
+                subtitle: "Volumes, analysis and disk I/O"
+            )
 
             HStack(spacing: 12) {
                 PillTabBar(selection: $tab, selectionAnimation: pillAnimation)

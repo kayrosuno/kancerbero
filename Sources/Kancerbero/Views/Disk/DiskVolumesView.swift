@@ -16,7 +16,10 @@ struct DiskVolumesView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            cards
+            if !ui.cardsCollapsed(for: .disk) {
+                cards
+                    .transition(.opacity)
+            }
 
             HStack(spacing: 12) {
                 treeCard

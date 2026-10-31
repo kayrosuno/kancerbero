@@ -82,6 +82,9 @@ capturar su propia ventana con AppKit sin ese permiso:
 ```bash
 build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   --screenshot /tmp/kancerbero-ui.png \
+  [--cards-collapsed] [--cards-expanded] \
+  [--cards-collapsed-sections networking,cpu,...] \
+  [--screenshot-size <ancho>x<alto>] \
   [--section networking|disk|daemons|cpu|memory|energy] \
   [--tab interfaces|connections|processes] \
   [--disk-tab volumes|analyzer|io] \
@@ -101,6 +104,12 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--networking-process-socket stream|dgram|raw|seqpacket|other[,..]|all] \
   [--sidebar-collapsed]
 ```
+
+Los flags **sin valor** (`--cards-collapsed`, `--cards-expanded`, `--sidebar-collapsed`,
+`--disk-scan`, `--show-status`) deben ir al final de la línea de argumentos; si quedan en medio,
+macOS puede abrir la app sin ventana principal y la captura no se genera. `--cards-collapsed` /
+`--cards-expanded` fuerzan todas las tarjetas colapsadas/expandidas, `--cards-collapsed-sections`
+un estado mixto y `--screenshot-size 1040x640` fija el tamaño de la ventana.
 
 `--section` selecciona la sección de primer nivel, `--tab` la subpestaña de Networking,
 `--disk-tab` la de Disk, `--disk-path`/`--disk-scan` lanzan el analizador sobre una ruta y
@@ -139,6 +148,38 @@ do
     --screenshot "/tmp/kb-$(echo $args | tr ' /' '__').png" $args
 done
 ```
+
+## Tarjetas colapsadas
+
+El botón global del toolbar (delante del selector de intervalo) colapsa/expande las tarjetas de
+todas las secciones; el botón `Hide cards`/`Show cards` de cada cabecera cambia solo esa pestaña y
+`Cmd+Shift+H` alterna el global. El estado es **solo de sesión**.
+
+```bash
+K=./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
+$K --screenshot /tmp/kb-col-cpu.png --section cpu --screenshot-delay 4 --cards-collapsed
+$K --screenshot /tmp/kb-col-memory.png --section memory --screenshot-delay 4 --cards-collapsed
+$K --screenshot /tmp/kb-col-energy.png --section energy --screenshot-delay 4 --cards-collapsed
+$K --screenshot /tmp/kb-col-networking.png --section networking --screenshot-delay 4 --cards-collapsed
+$K --screenshot /tmp/kb-col-daemons.png --section daemons --screenshot-delay 4 --cards-collapsed
+$K --screenshot /tmp/kb-col-applications.png --section applications --screenshot-delay 4 --cards-collapsed
+$K --screenshot /tmp/kb-col-disk-volumes.png --section disk --disk-tab volumes --screenshot-delay 4 --cards-collapsed
+$K --screenshot /tmp/kb-col-disk-io.png --section disk --disk-tab io --screenshot-delay 5 --cards-collapsed
+$K --screenshot /tmp/kb-col-disk-analyzer.png --section disk --disk-tab analyzer --screenshot-delay 5 --cards-collapsed
+```
+
+- En todas: título/subtítulo y botón `Show cards` visibles; tarjetas ocultas; filtros, controles,
+  banners, árbol/mapa y tabla intactos; la tabla ocupa el espacio liberado sin recortes.
+- Reset de filtros ocultos: `--section disk --disk-tab volumes --volumes-focus capacity
+  --screenshot-delay 4 --cards-collapsed` muestra el árbol jerárquico (no la lista plana de
+  capacidad); `--section networking --tab interfaces --networking-focus connections
+  --screenshot-delay 4 --cards-collapsed` muestra «N interfaces», no «N of M».
+- Estado mixto: `--cards-collapsed-sections networking,disk,daemons,memory,energy,applications`
+  con `--section cpu` deja las tarjetas de CPU visibles y el resto ocultas. El botón global pasa a
+  «Hide all»; al pulsarlo colapsa todas («Show all»); `Show cards` en CPU expande solo CPU.
+- Ventana mínima: `--screenshot-size 1040x640`; el botón de cabecera y el global caben sin truncar.
+- Reduce Motion o “Animate tab changes” desactivado: el cambio es instantáneo. El estado no se
+  guarda en `UserDefaults` y desaparece al reiniciar.
 
 ## Daemons
 
@@ -324,10 +365,11 @@ $K --screenshot /tmp/kb-cpu-selected.png --section cpu \
 - Para fugas: dejar la pestaña abierta varios minutos con intervalo de 0,5 s y comprobar que el
   RSS de Kancerbero se mantiene estable (`ps -o rss`, `leaks`). El sampler libera el array de
   `host_processor_info` y el puerto Mach en cada tick.
-- Altura de las cards: al maximizar o estirar la ventana, la franja superior de CPU, Memory,
-  Energy, Disk → I/O y Networking se mantiene en 190 pt (`KBTheme.cardStripHeight`, Traffic 190,
-  Activity 100 + Protocols 80) y todo el espacio extra lo absorbe la tabla de procesos. Comparar
-  una captura a 1440×860 con otra de ventana más alta.
+- Altura de las cards: al maximizar o estirar la ventana, con las tarjetas visibles la franja
+  superior de CPU, Memory, Energy, Disk → I/O y Networking se mantiene en 190 pt
+  (`KBTheme.cardStripHeight`, Traffic 190, Activity 100 + Protocols 80) y todo el espacio extra lo
+  absorbe la tabla de procesos. Con las tarjetas colapsadas la franja desaparece y la tabla ocupa
+  todo el alto. Comparar una captura a 1440×860 con otra de ventana más alta.
 - Temperaturas: `$P symbols` debe informar `Thermal: available`; `$P thermal --seconds 5
   --interval 1` muestra paquete, fuente (`PMU tdie` en Apple Silicon; `eACC/pACC` o `SOC MTR` como
   respaldo) y temperatura por core, y `$P cpu --interval 1` añade `temp=` a cada `cpuN`.

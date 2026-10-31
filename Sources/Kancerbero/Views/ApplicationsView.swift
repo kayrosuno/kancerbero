@@ -5,6 +5,7 @@ import KancerberoCore
 struct ApplicationsView: View {
     @Environment(ApplicationsModel.self) private var model
     @Environment(AppModel.self) private var appModel
+    @Environment(UIState.self) private var ui
     @State private var confirming = false
     @State private var resultMessage: String?
     @State private var permissionHint = false
@@ -13,14 +14,20 @@ struct ApplicationsView: View {
     var body: some View {
         @Bindable var model = model
         VStack(spacing: 14) {
-            SectionHeader(title: "Applications",
-                          subtitle: "Apps, widgets & plugins")
+            CollapsibleSectionHeader(
+                section: .applications,
+                title: "Applications",
+                subtitle: "Apps, widgets & plugins"
+            )
 
             if appModel.fullDiskAccess == .denied {
                 fullDiskAccessBanner
             }
 
-            summary
+            if !ui.cardsCollapsed(for: .applications) {
+                summary
+                    .transition(.opacity)
+            }
 
             controls
 

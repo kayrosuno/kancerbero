@@ -6,6 +6,7 @@ import KancerberoCore
 /// values and a process list ordered by resident memory.
 struct MemoryView: View {
     @Environment(AppModel.self) private var model
+    @Environment(UIState.self) private var ui
 
     private let memoryTint = Color(red: 0.20, green: 0.70, blue: 0.62)
     private let appColor = KBTheme.downloadTint
@@ -21,12 +22,18 @@ struct MemoryView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            SectionHeader(title: "Memory",
-                          subtitle: "Pressure, breakdown and processes")
+            CollapsibleSectionHeader(
+                section: .memory,
+                title: "Memory",
+                subtitle: "Pressure, breakdown and processes"
+            )
 
             VStack(spacing: 14) {
-                topGroups
-                    .frame(height: KBTheme.cardStripHeight)
+                if !ui.cardsCollapsed(for: .memory) {
+                    topGroups
+                        .frame(height: KBTheme.cardStripHeight)
+                        .transition(.opacity)
+                }
                 processCard
                     .frame(maxHeight: .infinity)
             }

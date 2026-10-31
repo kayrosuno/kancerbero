@@ -201,4 +201,5 @@ enum DiskTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
 
 extension Notification.Name {
     static let kbSelectSection = Notification.Name("kancerbero.selectSection")
+    static let kbToggleAllCards = Notification.Name("kancerbero.toggleAllCards")
 }

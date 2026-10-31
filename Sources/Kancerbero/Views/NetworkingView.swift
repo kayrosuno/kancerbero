@@ -62,44 +62,50 @@ struct NetworkingView: View {
                                                           search: processSearch)
 
         VStack(spacing: 14) {
-            SectionHeader(title: "Networking",
-                          subtitle: "Live traffic, sockets and process inventory")
+            CollapsibleSectionHeader(
+                section: .networking,
+                title: "Networking",
+                subtitle: "Live traffic, sockets and process inventory"
+            )
 
-            HStack(alignment: .top, spacing: KBTheme.summaryGridSpacing) {
-                TrafficCard(
-                    downloadBytesPerSecond: rates.rxBytesPerSecond,
-                    uploadBytesPerSecond: rates.txBytesPerSecond,
-                    downloadHistory: model.rxHistory,
-                    uploadHistory: model.txHistory,
-                    sampleDates: model.sampleDates,
-                    focus: ui.networking.focus,
-                    sampleInterval: model.interval,
-                    onToggle: toggleFocus
-                )
-                .frame(minWidth: 400, maxWidth: .infinity)
-
-                VStack(spacing: KBTheme.summaryGridSpacing) {
-                    ActivityCard(
-                        connectionsCount: activityConnections,
-                        processesCount: activityProcesses,
-                        connectionsFiltered: protocolFilter.isActive
-                            || connectionStates != NetworkingConnectionState.all
-                            || !connectionSearch
-                                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                        processesFiltered: tab == .processes
-                            && (ui.networking.processFacetsFiltered
-                                || !processSearch
-                                    .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
+            if !ui.cardsCollapsed(for: .networking) {
+                HStack(alignment: .top, spacing: KBTheme.summaryGridSpacing) {
+                    TrafficCard(
+                        downloadBytesPerSecond: rates.rxBytesPerSecond,
+                        uploadBytesPerSecond: rates.txBytesPerSecond,
+                        downloadHistory: model.rxHistory,
+                        uploadHistory: model.txHistory,
+                        sampleDates: model.sampleDates,
                         focus: ui.networking.focus,
+                        sampleInterval: model.interval,
                         onToggle: toggleFocus
                     )
+                    .frame(minWidth: 400, maxWidth: .infinity)
 
-                    ProtocolCard(
-                        counts: protocolCounts,
-                        ipVersions: ui.networking.ipVersions
-                    )
+                    VStack(spacing: KBTheme.summaryGridSpacing) {
+                        ActivityCard(
+                            connectionsCount: activityConnections,
+                            processesCount: activityProcesses,
+                            connectionsFiltered: protocolFilter.isActive
+                                || connectionStates != NetworkingConnectionState.all
+                                || !connectionSearch
+                                    .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                            processesFiltered: tab == .processes
+                                && (ui.networking.processFacetsFiltered
+                                    || !processSearch
+                                        .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
+                            focus: ui.networking.focus,
+                            onToggle: toggleFocus
+                        )
+
+                        ProtocolCard(
+                            counts: protocolCounts,
+                            ipVersions: ui.networking.ipVersions
+                        )
+                    }
+                    .frame(minWidth: 232, idealWidth: 248, maxWidth: 256)
                 }
-                .frame(minWidth: 232, idealWidth: 248, maxWidth: 256)
+                .transition(.opacity)
             }
 
             HStack(spacing: 12) {

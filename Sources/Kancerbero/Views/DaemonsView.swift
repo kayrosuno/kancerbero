@@ -57,10 +57,17 @@ struct DaemonsView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            SectionHeader(title: "Daemons",
-                          subtitle: "launchd services, agents and daemons")
+            CollapsibleSectionHeader(
+                section: .daemons,
+                title: "Daemons",
+                subtitle: "launchd services, agents and daemons"
+            )
 
-            cards
+            if !ui.cardsCollapsed(for: .daemons) {
+                cards
+                    .transition(.opacity)
+            }
+
             controls
             HStack(spacing: 12) {
                 tableCard
