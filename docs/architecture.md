@@ -19,12 +19,14 @@
 - `SidebarView`: selección propia con `matchedGeometryEffect` para Networking / Disk / Daemons /
   CPU / Memory / Energy / Applications; cabecera con marca y estado live, pie con fuente (daemon/local), privcheck
   y hora.
-- `NetworkingView`: `TrafficCard` ancha con Download/Upload en la cabecera y `TrafficChart`
+- `NetworkingView`: columna izquierda con `ActivityCard` (Connections+Processes) y `ProtocolCard`
+  (desglose por `protocolBucket`); card `NetworkTotalsCard` (tasas de bytes/paquetes y totales
+  acumulados de las interfaces) y `TrafficCard` con selector Bits/Packets y `TrafficChart`
   (gráfico espejado, escala compartida con techo 1/2/5×10^n, cuadrícula, niveles y eje temporal;
-  ventana de 60 muestras anclada a la derecha). Debajo, `PillTabBar` y las tablas
-  (`NetworkingTables.swift`). La columna derecha agrupa `ActivityCard` (Connections+Processes) y
-  `ProtocolCard` (desglose por `protocolBucket`). `NetworkingUIState` guarda, por un lado, los
-  filtros de Connections —`transports: Set<NetworkingTransport>`, `ipVersions:
+  ventana de 60 muestras anclada a la derecha). El selector cambia solo las unidades e historiales
+  del gráfico; las cuatro métricas muestran siempre bits para download/upload y paquetes in/out.
+  Debajo, `PillTabBar` y las tablas (`NetworkingTables.swift`). `NetworkingUIState` guarda, por un
+  lado, los filtros de Connections —`transports: Set<NetworkingTransport>`, `ipVersions:
   Set<NetworkingIPVersion>` y `connectionStates: Set<NetworkingConnectionState>`— y, por otro,
   los de Processes —`processIPVersions`, `processProtocolKinds: Set<ProcessProtocolKind>` (TCP,
   UDP, RAW, UNIX, OTHER; cada uno agrupa sus variantes v4/v6) y `processSocketTypes:

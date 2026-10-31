@@ -23,6 +23,11 @@ struct NetworkingView: View {
             : .identity
     }
 
+    private var trafficGraphMode: Binding<TrafficGraphMode> {
+        Binding(get: { ui.networking.trafficGraphMode },
+                set: { ui.networking.trafficGraphMode = $0 })
+    }
+
     var body: some View {
         let rates = model.systemRates
         let protocolFilter = ui.networking.protocolFilter
@@ -61,6 +66,50 @@ struct NetworkingView: View {
                                                           socketTypes: processSockets,
                                                           search: processSearch)
 
+        let activityColumn = VStack(spacing: KBTheme.summaryGridSpacing) {
+            ActivityCard(
+                connectionsCount: activityConnections,
+                processesCount: activityProcesses,
+                connectionsFiltered: protocolFilter.isActive
+                    || connectionStates != NetworkingConnectionState.all
+                    || !connectionSearch
+                        .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                processesFiltered: tab == .processes
+                    && (ui.networking.processFacetsFiltered
+                        || !processSearch
+                            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
+                focus: ui.networking.focus,
+                onToggle: toggleFocus
+            )
+            ProtocolCard(
+                counts: protocolCounts,
+                ipVersions: ui.networking.ipVersions
+            )
+        }
+        .frame(minWidth: 232, idealWidth: 248, maxWidth: 256)
+
+        let traffic = TrafficCard(
+            downloadBytesPerSecond: rates.rxBytesPerSecond,
+            uploadBytesPerSecond: rates.txBytesPerSecond,
+            downloadPacketsPerSecond: rates.rxPacketsPerSecond,
+            uploadPacketsPerSecond: rates.txPacketsPerSecond,
+            downloadHistory: model.rxHistory,
+            uploadHistory: model.txHistory,
+            downloadPacketHistory: model.rxPacketHistory,
+            uploadPacketHistory: model.txPacketHistory,
+            sampleDates: model.sampleDates,
+            focus: ui.networking.focus,
+            sampleInterval: model.interval,
+            graphMode: trafficGraphMode,
+            onToggle: toggleFocus
+        )
+
+        let counters = model.systemCounters
+        let networkVertical = NetworkTotalsCard(rates: rates, counters: counters,
+                                                layout: .vertical)
+        let networkHorizontal = NetworkTotalsCard(rates: rates, counters: counters,
+                                                  layout: .horizontal)
+
         VStack(spacing: 14) {
             CollapsibleSectionHeader(
                 section: .networking,
@@ -69,41 +118,27 @@ struct NetworkingView: View {
             )
 
             if !ui.cardsCollapsed(for: .networking) {
-                HStack(alignment: .top, spacing: KBTheme.summaryGridSpacing) {
-                    VStack(spacing: KBTheme.summaryGridSpacing) {
-                        ActivityCard(
-                            connectionsCount: activityConnections,
-                            processesCount: activityProcesses,
-                            connectionsFiltered: protocolFilter.isActive
-                                || connectionStates != NetworkingConnectionState.all
-                                || !connectionSearch
-                                    .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                            processesFiltered: tab == .processes
-                                && (ui.networking.processFacetsFiltered
-                                    || !processSearch
-                                        .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
-                            focus: ui.networking.focus,
-                            onToggle: toggleFocus
-                        )
-
-                        ProtocolCard(
-                            counts: protocolCounts,
-                            ipVersions: ui.networking.ipVersions
-                        )
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: KBTheme.summaryGridSpacing) {
+                        activityColumn
+                        networkVertical
+                            .frame(width: 176)
+                        traffic
+                            .frame(minWidth: 340, maxWidth: .infinity)
                     }
-                    .frame(minWidth: 232, idealWidth: 248, maxWidth: 256)
+                    .frame(height: KBTheme.cardStripHeight)
+                    .frame(minWidth: 820)
 
-                    TrafficCard(
-                        downloadBytesPerSecond: rates.rxBytesPerSecond,
-                        uploadBytesPerSecond: rates.txBytesPerSecond,
-                        downloadHistory: model.rxHistory,
-                        uploadHistory: model.txHistory,
-                        sampleDates: model.sampleDates,
-                        focus: ui.networking.focus,
-                        sampleInterval: model.interval,
-                        onToggle: toggleFocus
-                    )
-                    .frame(minWidth: 400, maxWidth: .infinity)
+                    VStack(spacing: KBTheme.summaryGridSpacing) {
+                        HStack(alignment: .top, spacing: KBTheme.summaryGridSpacing) {
+                            activityColumn
+                            traffic
+                                .frame(minWidth: 400, maxWidth: .infinity)
+                        }
+                        .frame(height: KBTheme.cardStripHeight)
+
+                        networkHorizontal
+                    }
                 }
                 .transition(.opacity)
             }

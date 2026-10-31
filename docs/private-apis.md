@@ -119,6 +119,25 @@ kancerbero no lee SMC: usa los servicios de temperatura HID del sistema, la mism
 - Macs Intel y algunas VMs no publican estos servicios: `valid = 0` y la card muestra `—`. La
   ruta SMC (`TC0P`/`TC0c`) de btop para Intel queda fuera de alcance.
 
+## Pestaña Network (Activity Monitor)
+
+Análisis con REA/Hopper sobre la build actual (arm64e, sha256 `2c5fddfd…`). El gráfico de red no
+usa NetworkStatistics para el gráfico global: `SMNetworkGraphController` mantiene dos gráficos
+espejados y selecciona la fuente según un popup `graphType`.
+
+| Función | Mecanismo | Evidencia |
+|---|---|---|
+| Selector | `graphType` (popup) 0 = paquetes, 1 = datos; persiste en `NetworkGraphType` | `-[SMNetworkGraphController graphTypeChanged:]` 0x10000fce0 |
+| Series | `packetsInRateHistory`/`packetsOutRateHistory` → top/bottom graph; o `dataReceivedSpeedHistory`/`dataSentSpeedHistory` | `-[SMNetworkGraphController didReceiveSystemStatisticsUpdateNotification:]` 0x100010288 |
+| Etiquetas | `packetsInRateLabel`, `packetsOutRateLabel`, `dataReceivedSpeedLabel`, `dataSentSpeedLabel` | outlets del controlador; `-[SMUtility networkSpeedFormatter]`, `-[SMNetworkSpeedFormatter stringFromBytesPerSecond:]` |
+| Datos | `SMSystemStatistics`: `networkPacketsIn/OutCount`, `networkDataReceived/SentSize`, `networkPacketsIn/OutRate`, `networkDataReceived/SentSpeed` | propiedades del modelo 0x10000b408-0x10000b46c |
+
+kancerbero replica el modelo con las interfaces IFMIB: `AppModel.systemRates` agrega tasas de bytes
+y paquetes (sin loopback/túnel), `systemCounters` agrega los contadores acumulados y
+`rxPacketHistory`/`txPacketHistory` guardan el histórico de paquetes. La card `Network` muestra
+tasas y totales; el selector Bits/Packets de `TrafficCard` cambia solo el gráfico, como el popup de
+Activity Monitor.
+
 ## Disk Inspector y Disk Utility (pestaña Disk)
 
 Análisis REA (Hopper) de `/Applications/Disk Inspector.app` (`com.nektony.diskinspector`, que se

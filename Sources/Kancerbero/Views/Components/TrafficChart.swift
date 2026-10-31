@@ -1,5 +1,30 @@
 import SwiftUI
 
+/// Units for the traffic graph. `bits` consumes byte-rate histories and
+/// `packets` consumes packet-rate histories; only the chart changes.
+enum TrafficGraphMode: String, CaseIterable, Identifiable, Equatable {
+    case bits
+    case packets
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .bits: return "Bits"
+        case .packets: return "Packets"
+        }
+    }
+
+    /// Formats a value in the mode's stored unit (bytes/s for bits,
+    /// packets/s for packets).
+    func format(_ value: Double) -> String {
+        switch self {
+        case .bits: return KBFormat.bitRate(value)
+        case .packets: return KBFormat.packetsRate(value)
+        }
+    }
+}
+
 /// Mirrored traffic chart: download grows above the center line and upload
 /// below it, both on a shared, rounded scale, with grid and level labels.
 struct TrafficChart: View {
@@ -11,6 +36,7 @@ struct TrafficChart: View {
     /// the X axis is laid out in real time, so history can survive an interval
     /// change without lying about the time span.
     var sampleDates: [Date] = []
+    var mode: TrafficGraphMode = .bits
     var downloadTint: Color = KBTheme.downloadTint
     var uploadTint: Color = KBTheme.uploadTint
 
@@ -18,7 +44,7 @@ struct TrafficChart: View {
 
     private static let window = 60
     private static let axisHeight: CGFloat = 14
-    private static let gutter: CGFloat = 50
+    private static let gutter: CGFloat = 54
     private static let rightInset: CGFloat = 1
     private static let verticalInset: CGFloat = 8
     private static let seriesInset: CGFloat = 2
@@ -29,7 +55,7 @@ struct TrafficChart: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Traffic history")
+        .accessibilityLabel("Traffic history, \(mode.title.lowercased())")
         .accessibilityValue(accessibilityValue)
     }
 
@@ -45,9 +71,9 @@ struct TrafficChart: View {
     private var accessibilityValue: String {
         let peak = max(max(download.max() ?? 0, upload.max() ?? 0), 0)
         let windowText = KBFormat.shortDuration(span)
-        return "Peak \(KBFormat.bitRate(peak)) over the last \(windowText). " +
-            "Download \(KBFormat.bitRate(download.last ?? 0)), " +
-            "upload \(KBFormat.bitRate(upload.last ?? 0))"
+        return "Peak \(mode.format(peak)) over the last \(windowText). " +
+            "Download \(mode.format(download.last ?? 0)), " +
+            "upload \(mode.format(upload.last ?? 0))"
     }
 
     private func draw(context: inout GraphicsContext, size: CGSize) {
@@ -67,22 +93,22 @@ struct TrafficChart: View {
 
         let rx = sanitized(download)
         let tx = sanitized(upload)
-        let peakBytes = max(rx.max() ?? 0, tx.max() ?? 0)
-        let ceilingBits = peakBytes > 0
-            ? Self.niceCeiling(peakBytes * 8)
-            : 1_000
-        let ceilingBytes = ceilingBits / 8
+        let peak = max(rx.max() ?? 0, tx.max() ?? 0)
+        let scale = mode == .bits ? 8.0 : 1.0
+        let ceilingValue = peak > 0
+            ? Self.niceCeiling(peak * scale) / scale
+            : (mode == .bits ? 125.0 : 10.0)
 
         drawGrid(context: &context, plot: plot, midY: midY, half: half)
-        drawSeries(values: rx, dates: sampleDates, peakBytes: ceilingBytes, plot: plot,
+        drawSeries(values: rx, dates: sampleDates, ceiling: ceilingValue, plot: plot,
                    midY: midY, half: half, tint: downloadTint, upward: true,
                    opacity: focus == .upload ? 0.25 : 1, context: &context)
-        drawSeries(values: tx, dates: sampleDates, peakBytes: ceilingBytes, plot: plot,
+        drawSeries(values: tx, dates: sampleDates, ceiling: ceilingValue, plot: plot,
                    midY: midY, half: half, tint: uploadTint, upward: false,
                    opacity: focus == .download ? 0.25 : 1, context: &context)
         drawBaseline(context: &context, plot: plot, midY: midY)
         drawLevelLabels(context: &context, midY: midY, half: half,
-                        ceilingBits: ceilingBits)
+                        ceiling: ceilingValue)
         drawTimeAxis(context: &context, plot: plot)
     }
 
@@ -125,7 +151,7 @@ struct TrafficChart: View {
     }
 
     private func drawLevelLabels(context: inout GraphicsContext,
-                                 midY: CGFloat, half: CGFloat, ceilingBits: Double) {
+                                 midY: CGFloat, half: CGFloat, ceiling: Double) {
         let topColor = downloadTint.opacity(0.85)
         let bottomColor = uploadTint.opacity(0.85)
         let zeroColor = Color.secondary.opacity(colorScheme == .dark ? 0.75 : 0.65)
@@ -136,9 +162,9 @@ struct TrafficChart: View {
 
         for (fraction, color) in entries {
             let y = midY - CGFloat(fraction) * half
-            let bits = ceilingBits * abs(fraction)
+            let value = ceiling * abs(fraction)
             let text = context.resolve(
-                Text(KBFormat.bitRate(bits / 8))
+                Text(mode.format(value))
                     .font(.system(size: 8, design: .rounded))
                     .monospacedDigit()
                     .foregroundColor(color)
@@ -169,7 +195,7 @@ struct TrafficChart: View {
 
     // MARK: - Series
 
-    private func drawSeries(values: [Double], dates: [Date], peakBytes: Double, plot: CGRect,
+    private func drawSeries(values: [Double], dates: [Date], ceiling: Double, plot: CGRect,
                             midY: CGFloat, half: CGFloat, tint: Color,
                             upward: Bool, opacity: Double,
                             context: inout GraphicsContext) {
@@ -187,7 +213,7 @@ struct TrafficChart: View {
         var points: [CGPoint] = []
         points.reserveCapacity(values.count)
         for (index, value) in values.enumerated() {
-            let normalized = min(max(value / peakBytes, 0), 1)
+            let normalized = min(max(value / ceiling, 0), 1)
             let offset = CGFloat(normalized) * half
             let x: CGFloat
             if useTime, let lastDate {
@@ -248,12 +274,13 @@ struct TrafficChart: View {
         Array(values.suffix(Self.window)).map { $0.isFinite ? max($0, 0) : 0 }
     }
 
-    /// 1/2/5 × 10^n in bits, so labels stay stable as samples change.
-    private static func niceCeiling(_ bits: Double) -> Double {
-        guard bits.isFinite, bits > 0 else { return 1 }
-        let exponent = floor(log10(bits))
+    /// 1/2/5 × 10^n in the mode's display units, so labels stay stable as
+    /// samples change.
+    private static func niceCeiling(_ value: Double) -> Double {
+        guard value.isFinite, value > 0 else { return 1 }
+        let exponent = floor(log10(value))
         let magnitude = pow(10.0, exponent)
-        let fraction = bits / magnitude
+        let fraction = value / magnitude
         let nice: Double
         if fraction <= 1.0001 {
             nice = 1
