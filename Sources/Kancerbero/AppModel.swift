@@ -46,6 +46,9 @@ final class AppModel {
     private(set) var fullDiskAccess: KBFullDiskAccessStatus = .unknown
     var rxHistory: [Double] = []
     var txHistory: [Double] = []
+    /// Packet-rate histories, aligned tick-by-tick with the byte histories.
+    var rxPacketHistory: [Double] = []
+    var txPacketHistory: [Double] = []
     /// Timestamps of the traffic samples, parallel to `rxHistory`/`txHistory`.
     var sampleDates: [Date] = []
     var systemDaemons: [KBDaemonService] = []
@@ -280,6 +283,17 @@ final class AppModel {
                 result.rxPacketsPerSecond += rate.rxPacketsPerSecond
                 result.txPacketsPerSecond += rate.txPacketsPerSecond
             }
+        }
+        return result
+    }
+
+    /// Cumulative interface counters over the same interface set as
+    /// `systemRates` (no loopback or tunnels). Use the rate deltas, never these
+    /// totals, to compute speeds.
+    var systemCounters: KBCounters {
+        var result = KBCounters.zero
+        for item in interfaces where !item.isLoopback && item.kind != .tunnel {
+            result = result + item.counters
         }
         return result
     }
@@ -1110,6 +1124,8 @@ final class AppModel {
         let rates = systemRates
         rxHistory.append(rates.rxBytesPerSecond)
         txHistory.append(rates.txBytesPerSecond)
+        rxPacketHistory.append(rates.rxPacketsPerSecond)
+        txPacketHistory.append(rates.txPacketsPerSecond)
         sampleDates.append(lastUpdate ?? Date())
 
         if let host = hostMetrics {
@@ -1168,6 +1184,8 @@ final class AppModel {
         let limit = 60
         trim(&rxHistory, limit: limit)
         trim(&txHistory, limit: limit)
+        trim(&rxPacketHistory, limit: limit)
+        trim(&txPacketHistory, limit: limit)
         trim(&sampleDates, limit: limit)
         trim(&cpuUsageHistory, limit: limit)
         trim(&cpuUserHistory, limit: limit)
@@ -1196,6 +1214,8 @@ final class AppModel {
     func clearHistories() {
         rxHistory.removeAll()
         txHistory.removeAll()
+        rxPacketHistory.removeAll()
+        txPacketHistory.removeAll()
         sampleDates.removeAll()
         cpuUsageHistory.removeAll()
         cpuUserHistory.removeAll()

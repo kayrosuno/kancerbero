@@ -26,6 +26,12 @@ nettop -P -d -L 3 -s 1 -x
   puede diferir entre ambas herramientas si parte de su tráfico lo gestiona un helper XPC; es una
   diferencia de atribución, no de contadores.
 - Comprobado: `ollama`, `2.1.310` y `rapportd` coinciden con `nettop` (±1%).
+- **Card Network y selector Bits/Packets:** capturar
+  `--section networking --traffic-graph bits` y `--traffic-graph packets`. Las cuatro métricas
+  (Download/Upload en bits/s, Pkts in/out por segundo) no cambian; solo el gráfico y sus etiquetas
+  (bps vs pkt/s). Contrastar tasas con Activity Monitor → Network y totales con `netstat -ib`
+  sumando `en*` y excluyendo `lo0`/`utun`. A 1040×640 comprobar el fallback (Network horizontal
+  debajo) sin recortes y con la tabla visible. `--cards-collapsed` oculta toda la franja.
 - Prueba controlada:
 
 ```bash
@@ -102,6 +108,7 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--networking-process-ip ipv4|ipv6[,..]|all] \
   [--networking-process-protocol tcp|udp|raw|unix|other[,..]|all] \
   [--networking-process-socket stream|dgram|raw|seqpacket|other[,..]|all] \
+  [--traffic-graph bits|packets] \
   [--sidebar-collapsed]
 ```
 
@@ -112,6 +119,7 @@ macOS puede abrir la app sin ventana principal y la captura no se genera. `--car
 un estado mixto y `--screenshot-size 1040x640` fija el tamaño de la ventana.
 
 `--section` selecciona la sección de primer nivel, `--tab` la subpestaña de Networking,
+`--traffic-graph bits|packets` cambia solo las unidades del gráfico de Traffic,
 `--disk-tab` la de Disk, `--disk-path`/`--disk-scan` lanzan el analizador sobre una ruta y
 `--disk-item` preselecciona un dispositivo en Volumes. `--disk-tab io` abre la pestaña de
 actividad; `--disk-io-search`/`--disk-io-selected` filtran y preseleccionan procesos y

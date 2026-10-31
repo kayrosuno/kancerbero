@@ -3,6 +3,7 @@ import SwiftUI
 enum MetricTileLayout {
     case inline
     case stacked
+    case compact
 }
 
 struct MetricTile: View {
@@ -93,6 +94,20 @@ struct MetricTile: View {
                         .minimumScaleFactor(0.85)
                 }
                 Spacer(minLength: 0)
+            }
+        case .compact:
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: iconSize, weight: .semibold))
+                    .foregroundStyle(tint)
+                Text(title)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 2)
+                valueText
+                    .layoutPriority(1)
             }
         }
     }

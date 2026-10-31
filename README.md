@@ -33,10 +33,13 @@ El detalle de binarios, permisos, instalación y librerías está en
 
 `NavigationSplitView` con panel lateral colapsable:
 
-- **Networking** — tarjeta **Traffic** ancha con Download/Upload en la cabecera y un gráfico
-  espejado (download arriba, upload abajo) con cuadrícula, niveles y eje temporal. Al lado, una
-  tarjeta **Activity** que agrupa Connections y Processes, y una tarjeta **Protocols** con el
-  desglose TCP4/TCP6/UDP4/UDP6/UNIX/OTHER. Una **barra de filtros** entre las pills y la tarjeta
+- **Networking** — a la izquierda, una tarjeta **Activity** que agrupa Connections y Processes y
+  una tarjeta **Protocols** con el desglose TCP4/TCP6/UDP4/UDP6/UNIX/OTHER; en medio, una tarjeta
+  **Network** con las tasas de Download/Upload, paquetes in/out y los totales acumulados de datos y
+  paquetes; a la derecha, la tarjeta **Traffic** con un selector **Bits/Packets** que cambia solo el
+  gráfico, cuatro métricas (Download y Upload en bits/s, Pkts in/out por segundo) sobre un gráfico
+  espejado (download arriba, upload abajo) con cuadrícula, niveles y eje temporal. Una **barra de
+  filtros** entre las pills y la tarjeta
   de la tabla reúne los grupos de checkboxes multiselección en cápsulas. En Connections:
   **IP** (IPv4/IPv6), **Transport** (TCP/UDP/Other) y **State** (Established, Listening,
   Connecting (SYN), Closing (Close/Fin/Time Wait), Other); en Processes: **IP**,
@@ -237,6 +240,7 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--show-status] \
   [--screenshot-dock <ruta>] [--dock-style <estilo|all>] \
   [--networking-focus download|upload|connections|processes] \
+  [--traffic-graph bits|packets] \
   [--networking-transport tcp|udp|other[,..]|all] \
   [--networking-ip ipv4|ipv6[,..]|all] \
   [--networking-state established|listening|connecting|closing|other[,..]|all] \

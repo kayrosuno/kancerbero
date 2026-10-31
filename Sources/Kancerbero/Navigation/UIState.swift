@@ -90,6 +90,10 @@ final class UIState {
         networking.connectionSearch = Self.value(for: "--networking-connection-search",
                                                  in: arguments) ?? ""
         networking.processSearch = Self.value(for: "--networking-search", in: arguments) ?? ""
+        if let raw = Self.value(for: "--traffic-graph", in: arguments),
+           let mode = TrafficGraphMode(rawValue: raw.lowercased()) {
+            networking.trafficGraphMode = mode
+        }
         if let ipVersions = Self.filterSelection(
             for: "--networking-process-ip", in: arguments,
             parse: { NetworkingIPVersion(cliValue: $0) }) {
@@ -231,6 +235,9 @@ final class UIState {
 
 struct NetworkingUIState: Equatable {
     var focus: NetworkingFocus?
+    /// Units for the Traffic graph only; the card metrics always show both
+    /// bits for download/upload and packets for in/out.
+    var trafficGraphMode: TrafficGraphMode = .bits
     /// Every case pressed means "no filter"; an empty group matches nothing.
     var transports: Set<NetworkingTransport> = Set(NetworkingTransport.allCases)
     var ipVersions: Set<NetworkingIPVersion> = Set(NetworkingIPVersion.allCases)

@@ -27,6 +27,33 @@ enum KBFormat {
         return "\(number) \(bitUnits[unit])"
     }
 
+    private static let packetUnits = ["pkt/s", "K pkt/s", "M pkt/s", "G pkt/s"]
+
+    /// Packets per second -> human-readable decimal packet rate.
+    static func packetsRate(_ packetsPerSecond: Double) -> String {
+        guard packetsPerSecond.isFinite, packetsPerSecond >= 0.05 else {
+            return "0 pkt/s"
+        }
+        var value = packetsPerSecond
+        var unit = 0
+        while value >= 999.95, unit < packetUnits.count - 1 {
+            value /= 1000
+            unit += 1
+        }
+        let number = value.formatted(.number.precision(.fractionLength(0...1)))
+        return "\(number) \(packetUnits[unit])"
+    }
+
+    /// Cumulative byte totals; unlike `bytes`, zero renders as "0 B".
+    static func totalBytes(_ value: UInt64) -> String {
+        value == 0 ? "0 B" : bytes(value)
+    }
+
+    /// Compact cumulative packet totals ("1,2 M").
+    static func compactTotal(_ value: UInt64) -> String {
+        value.formatted(.number.notation(.compactName))
+    }
+
     /// Bytes per second -> human-readable byte rate ("1,2 MB/s").
     static func byteRate(_ bytesPerSecond: Double) -> String {
         guard bytesPerSecond.isFinite, bytesPerSecond >= 1 else { return "0 B/s" }
