@@ -121,9 +121,11 @@ la última actualización de la fuente correspondiente y el posible error. Pulsa
 Daemon connected** en el footer del sidebar, el pill **Local / Daemon** de la barra inferior o el
 icono de Kancerbero en la cabecera del sidebar abre la ventana **System status** con un checklist
 de la app, el helper, la colección, los
-privilegios, el registro SMAppService, la aprobación en Login Items, la conexión XPC y los
-servicios legacy. Incluye explicaciones, los pasos para habilitar el acceso completo y acciones
-para activar, abrir Login Items, reintentar, reparar/re-registrar, refrescar o revelar la app.
+privilegios, el acceso total al disco (FDA), el registro SMAppService, la aprobación en Login
+Items, la conexión XPC y los servicios legacy. Incluye explicaciones, los pasos para habilitar el acceso completo y acciones
+para activar, abrir Login Items, reintentar, reparar/re-registrar, refrescar o revelar la app. Si
+falta Acceso Total al Disco, la fila correspondiente abre una guía paso a paso y la pestaña
+Applications muestra un aviso para desbloquear los contenedores de otras apps.
 
 La pestaña **Filter** muestra los flujos que ve la Network Extension (proceso, endpoints,
 protocolo, RX/TX por flujo y estado). En **Processes**, el escudo de cada fila marca un proceso
@@ -216,6 +218,7 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--energy-search <texto>] [--energy-selected <pid>] \
   [--applications-search <texto>] [--applications-selected <bundle-id>] \
   [--applications-scope user|system] \
+  [--show-status] \
   [--screenshot-dock <ruta>] [--dock-style <estilo|all>] \
   [--networking-focus download|upload|connections|processes] \
   [--networking-transport tcp|udp|other[,..]|all] \

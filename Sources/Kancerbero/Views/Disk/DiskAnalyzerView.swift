@@ -5,6 +5,7 @@ import KancerberoCore
 struct DiskAnalyzerView: View {
     @Environment(DiskModel.self) private var disk
     @Environment(UIState.self) private var ui
+    @Environment(AppModel.self) private var appModel
 
     private var pathDraft: Binding<String> {
         Binding(
@@ -358,9 +359,7 @@ struct DiskAnalyzerView: View {
                 .foregroundStyle(.secondary)
             Spacer()
             Button("Open Settings") {
-                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
-                    NSWorkspace.shared.open(url)
-                }
+                appModel.openFullDiskAccessSettings()
             }
             .buttonStyle(.link)
             .font(.system(size: 10))
