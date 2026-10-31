@@ -3,6 +3,7 @@ import KancerberoCore
 
 struct CPUView: View {
     @Environment(AppModel.self) private var model
+    @Environment(UIState.self) private var ui
 
     private let cpuTint = Color(red: 0.20, green: 0.72, blue: 0.52)
     private let loadTint = Color(red: 0.94, green: 0.56, blue: 0.18)
@@ -19,12 +20,18 @@ struct CPUView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            SectionHeader(title: "CPU",
-                          subtitle: "Cores, load, memory and processes")
+            CollapsibleSectionHeader(
+                section: .cpu,
+                title: "CPU",
+                subtitle: "Cores, load, memory and processes"
+            )
 
             VStack(spacing: 14) {
-                topGroups
-                    .frame(height: KBTheme.cardStripHeight)
+                if !ui.cardsCollapsed(for: .cpu) {
+                    topGroups
+                        .frame(height: KBTheme.cardStripHeight)
+                        .transition(.opacity)
+                }
                 processCard
                     .frame(maxHeight: .infinity)
             }

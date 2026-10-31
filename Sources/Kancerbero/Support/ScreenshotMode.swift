@@ -78,7 +78,10 @@ enum ScreenshotMode {
             fail("no visible window after 5s")
         }
         window.makeKeyAndOrderFront(nil)
-        if wantsStatus {
+        if let size = Self.screenshotSize(arguments) {
+            window.setContentSize(size)
+            window.center()
+        } else if wantsStatus {
             // Wide enough for the logo rail and the three status columns.
             window.setContentSize(NSSize(width: 1180, height: 820))
         } else {
@@ -109,6 +112,22 @@ enum ScreenshotMode {
             return value
         }
         return seconds
+    }
+
+    /// `--screenshot-size 1040x640` for deterministic captures at the minimum
+    /// window size.
+    private static func screenshotSize(_ arguments: [String]) -> NSSize? {
+        guard let raw = value(for: "--screenshot-size", in: arguments) else {
+            return nil
+        }
+        let parts = raw.lowercased().split(separator: "x")
+        guard parts.count == 2,
+              let width = Double(parts[0]),
+              let height = Double(parts[1]),
+              width >= 200, height >= 200 else {
+            return nil
+        }
+        return NSSize(width: width, height: height)
     }
 
     private static func value(for flag: String, in arguments: [String]) -> String? {

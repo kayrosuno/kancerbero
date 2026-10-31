@@ -35,4 +35,9 @@ enum KBPreferences {
             ? .snappy(duration: duration)
             : nil
     }
+
+    /// Shared duration for collapsing/expanding dashboard cards.
+    static func collapseAnimation(stored: Bool, reduceMotion: Bool) -> Animation? {
+        tabAnimation(stored: stored, reduceMotion: reduceMotion, duration: 0.25)
+    }
 }

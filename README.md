@@ -149,6 +149,13 @@ toolbar cambia el intervalo solo durante la sesión y no modifica la preferencia
 El panel se oculta con el toggle de la toolbar o `Cmd+Ctrl+S`; `Cmd+1/2/3/4/5/6/7` cambia de sección
 (Networking, Disk, Daemons, CPU, Memory, Energy, Applications).
 
+Las tarjetas de dashboard se pueden colapsar para dejar solo la cabecera, los filtros y la tabla.
+El botón de la toolbar (delante del selector de intervalo) colapsa o expande **todas** las
+secciones; el botón `Hide cards`/`Show cards` de cada cabecera cambia solo esa pestaña;
+`Cmd+Shift+H` alterna el estado global. El estado es solo de la sesión. Al colapsar se resetean los
+filtros que solo existen dentro de las tarjetas (foco de descarga/subida en Networking y foco de
+volumen/analizador en Disk) para no dejar tablas filtradas sin control visible.
+
 ## Compilar
 
 ```bash
@@ -214,6 +221,9 @@ Captura de la UI sin permisos de Grabación de pantalla (la app se dibuja a sí 
 build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   --screenshot /tmp/kancerbero-ui.png \
   [--section networking|disk|daemons|cpu|memory|energy|applications] \
+  [--cards-collapsed | --cards-expanded] \
+  [--cards-collapsed-sections networking,cpu,...] \
+  [--screenshot-size <ancho>x<alto>] \
   [--tab interfaces|connections|processes] \
   [--disk-tab volumes|analyzer|io] \
   [--disk-path=<carpeta>] [--disk-scan] [--disk-item <diskXsY>] \
@@ -243,6 +253,13 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--daemon-domain system|gui|user] [--daemon-selected <label>] \
   [--sidebar-collapsed]
 ```
+
+`--cards-collapsed`/`--cards-expanded` fuerzan todas las tarjetas colapsadas/expandidas y
+`--cards-collapsed-sections` un estado mixto (lista de secciones); `--screenshot-size 1040x640`
+fija el tamaño de la ventana. Los flags **sin valor** (`--cards-collapsed`, `--cards-expanded`,
+`--sidebar-collapsed`, `--disk-scan`, `--show-status`) deben ir al final de la línea de
+argumentos; si quedan en medio, macOS puede abrir la app sin ventana principal y la captura no se
+genera.
 
 ## Daemon
 

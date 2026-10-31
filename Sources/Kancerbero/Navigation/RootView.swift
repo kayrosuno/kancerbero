@@ -6,6 +6,7 @@ struct RootView: View {
     @Environment(DiskModel.self) private var disk
     @Environment(ApplicationsModel.self) private var applications
     @Environment(FilterModel.self) private var filter
+    @Environment(UIState.self) private var ui
     @Environment(\.openWindow) private var openWindow
     @AppStorage("selectedSection") private var sectionRaw = AppSection.networking.rawValue
     @AppStorage("networkingTab") private var tabRaw = NetworkingTab.interfaces.rawValue
@@ -45,6 +46,11 @@ struct RootView: View {
             ? .asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
                           removal: .opacity)
             : .identity
+    }
+
+    private var cardsAnimation: Animation? {
+        KBPreferences.collapseAnimation(stored: tabAnimations,
+                                        reduceMotion: reduceMotion)
     }
 
     private var selection: Binding<AppSection?> {
@@ -121,6 +127,19 @@ struct RootView: View {
         .navigationSplitViewStyle(.balanced)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+                Button(action: toggleAllCards) {
+                    Image(systemName: ui.allCardsCollapsed
+                          ? "rectangle.expand.vertical"
+                          : "rectangle.compress.vertical")
+                }
+                .help(ui.allCardsCollapsed
+                      ? "Show all dashboard cards"
+                      : "Hide all dashboard cards")
+                .accessibilityLabel(ui.allCardsCollapsed
+                                    ? "Show all dashboard cards"
+                                    : "Hide all dashboard cards")
+                .accessibilityIdentifier("toolbar.cards")
+
                 Picker("Interval", selection: $model.interval) {
                     Text("0.5 s").tag(0.5)
                     Text("1 s").tag(1.0)
@@ -170,6 +189,15 @@ struct RootView: View {
             withAnimation(sectionAnimation) {
                 sectionRaw = section.rawValue
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .kbToggleAllCards)) { _ in
+            toggleAllCards()
+        }
+    }
+
+    private func toggleAllCards() {
+        withAnimation(cardsAnimation) {
+            ui.setAllCardsCollapsed(!ui.allCardsCollapsed)
         }
     }
 

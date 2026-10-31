@@ -11,13 +11,16 @@ struct DiskIOView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            HStack(alignment: .top, spacing: 14) {
-                activityCard
-                    .frame(maxWidth: .infinity)
-                statsCard
-                    .frame(width: 300)
+            if !ui.cardsCollapsed(for: .disk) {
+                HStack(alignment: .top, spacing: 14) {
+                    activityCard
+                        .frame(maxWidth: .infinity)
+                    statsCard
+                        .frame(width: 300)
+                }
+                .frame(height: KBTheme.cardStripHeight)
+                .transition(.opacity)
             }
-            .frame(height: KBTheme.cardStripHeight)
 
             processCard
                 .frame(maxHeight: .infinity)
