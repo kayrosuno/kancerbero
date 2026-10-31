@@ -170,6 +170,33 @@ private func printThermal(seconds: Int, interval: Double, coreCount: Int) {
     }
 }
 
+private func printBatteryGraph() {
+    guard let graph = BatteryChargeGraphReader.current() else {
+        write("battery-graph: unavailable or malformed\n")
+        return
+    }
+    write("battery-graph: available charges=\(graph.chargeLevels.count) states=\(graph.onAC.count)\n")
+    for (index, sample) in zip(graph.chargeTimes, graph.chargeLevels).enumerated() {
+        write(String(format: "  charge[%d] ago=%.1fs level=%.1f%%\n",
+                     index, sample.0, sample.1))
+    }
+    for (index, entry) in zip(graph.stateTimes, graph.onAC).enumerated() {
+        write(String(format: "  state[%d] ago=%.1fs source=%@\n",
+                     index, entry.0,
+                     (entry.1 ? "AC" : "Battery") as NSString))
+    }
+    let states = zip(graph.stateTimes, graph.onAC).sorted { $0.0 > $1.0 }
+    if let current = states.last {
+        var start = current.0
+        for entry in states.reversed() {
+            guard entry.1 == current.1 else { break }
+            start = entry.0
+        }
+        let total = Int(max(0, start))
+        write("  time_on_source label=\(current.1 ? "Time on AC" : "Time on Battery") value=\(total / 3600)h \((total % 3600) / 60)m\n")
+    }
+}
+
 private func printApps() {
     let inventory = AppInventoryCollector.snapshot()
     write("apps: \(inventory.bundles.count)\n")
@@ -530,6 +557,8 @@ case "thermal":
     printThermal(seconds: integerOption("--seconds", default: 3),
                  interval: doubleOption("--interval", default: 1),
                  coreCount: integerOption("--core-count", default: 0))
+case "battery-graph":
+    printBatteryGraph()
 case "apps":
     printApps()
 case "fda":
@@ -608,5 +637,5 @@ case "all":
     printInterfaces()
     printNStat(seconds: integerOption("--seconds", default: 3))
 default:
-    fail("unknown command '\(command)'. Use: version|symbols|procs [--cpu]|cpu|thermal|apps|fda|ifaces|sockets <pid>|sockets-summary [pid...]|files <pid>|daemons|disk|nstat|all")
+    fail("unknown command '\(command)'. Use: version|symbols|procs [--cpu]|cpu|thermal|battery-graph|apps|fda|ifaces|sockets <pid>|sockets-summary [pid...]|files <pid>|daemons|disk|nstat|all")
 }

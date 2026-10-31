@@ -107,9 +107,9 @@ El detalle de binarios, permisos, instalación y librerías está en
   ordenada por memoria residente (Command, Memory, MEM%, Threads, PID, USER) con búsqueda,
   selección e inspector.
 - **Energy** — panel tipo Activity Monitor: estado de batería (carga, tiempo restante, cargando,
-  conector), consumo por proceso en vatios y wake-ups inactivos con histórico, procesos que
-  impiden dormir, y tabla ordenada por energía (Command, Energy, Impact, Wake-ups, CPU%, PID,
-  USER, Preventing Sleep).
+  conector) con el gráfico de 12 h de carga, bandas verdes del tiempo en AC y «Time on AC/Battery»,
+  consumo por proceso en vatios y wake-ups inactivos con histórico, procesos que impiden dormir, y
+  tabla ordenada por energía (Command, Energy, Impact, Wake-ups, CPU%, PID, USER, Preventing Sleep).
 
 **Dock icon** — el menú `Dock Icon` (y Ajustes → Dock) cambia el icono del Dock por gráficos en
 vivo, igual que Activity Monitor: aplicación, uso e histórico de CPU, uso de red, actividad de
@@ -153,6 +153,9 @@ El panel se oculta con el toggle de la toolbar o `Cmd+Ctrl+S`; `Cmd+1/2/3/4/5/6/
 
 ```bash
 ./scripts/build.sh                 # Debug: app, probe y daemon
+./scripts/clean.sh                 # borra build/ (DerivedData local)
+./scripts/clean.sh --debug         # borra build/ y compila Debug limpio
+./scripts/clean.sh --release       # borra build/ y compila Release con build-release.sh
 # o
 xcodebuild -project Kancerbero.xcodeproj -scheme Kancerbero \
   -configuration Debug -derivedDataPath build build \
@@ -199,6 +202,7 @@ un icono antiguo, es caché de LaunchServices: copia la app a otra ruta o reinic
 open build/Build/Products/Debug/Kancerbero.app
 ./build/Build/Products/Debug/KancerberoProbe all --seconds 3
 ./build/Build/Products/Debug/KancerberoProbe cpu --interval 1
+./build/Build/Products/Debug/KancerberoProbe battery-graph
 ./build/Build/Products/Debug/KancerberoProbe procs --cpu --limit 20
 ```
 

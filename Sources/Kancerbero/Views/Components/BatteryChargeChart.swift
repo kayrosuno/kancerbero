@@ -58,53 +58,68 @@ struct BatteryChargeChart: View {
                        style: StrokeStyle(lineWidth: 1, lineCap: .round, lineJoin: .round))
     }
 
-    /// Charge samples across the fixed 12 h window. The first in-window point
-    /// is pinned to the left edge and the last level extends to the right
-    /// edge, like Activity Monitor.
+    /// Charge samples across the fixed 12 h window, oldest first. Activity
+    /// Monitor keeps the newest sample before the window as a left anchor;
+    /// the first point is pinned to the left edge and the last level extends
+    /// to the right edge. A single sample therefore draws a flat line.
     private func chargePoints(size: CGSize) -> [CGPoint] {
-        let samples = zip(graph.chargeTimes, graph.chargeLevels)
-            .filter { $0.0 >= 0 && $0.0 < Self.window }
-            .sorted { $0.0 > $1.0 }
-        guard samples.count >= 2 else { return [] }
+        let samples = chargeSamples()
+        guard !samples.isEmpty else { return [] }
 
         var points: [CGPoint] = []
         points.reserveCapacity(samples.count + 1)
         for (index, sample) in samples.enumerated() {
-            let x = index == 0 ? 0 : xPosition(sample.0, width: size.width)
-            points.append(CGPoint(x: x, y: yPosition(sample.1, height: size.height)))
+            let x = index == 0 ? 0 : xPosition(sample.time, width: size.width)
+            points.append(CGPoint(x: x, y: yPosition(sample.level, height: size.height)))
         }
         if let last = samples.last {
             points.append(CGPoint(x: size.width,
-                                  y: yPosition(last.1, height: size.height)))
+                                  y: yPosition(last.level, height: size.height)))
         }
         return points
     }
 
-    /// Full-height bands for the AC intervals. The first in-window state owns
-    /// the left edge; the latest state owns everything up to the right edge.
-    private func acRegions(size: CGSize) -> [CGRect] {
-        guard !graph.onAC.isEmpty, graph.onAC.count == graph.stateTimes.count else {
-            return []
-        }
-        let entries = zip(graph.stateTimes, graph.onAC)
-            .filter { $0.0 >= 0 && $0.0 < Self.window }
+    private typealias ChargeSample = (time: Double, level: Double)
+
+    private func chargeSamples() -> [ChargeSample] {
+        let all = zip(graph.chargeTimes, graph.chargeLevels)
+            .filter { $0.0.isFinite && $0.1.isFinite && $0.0 >= 0 }
             .sorted { $0.0 > $1.0 }
+            .map { (time: $0.0, level: $0.1) }
+        guard !all.isEmpty else { return [] }
+        guard let firstInside = all.firstIndex(where: { $0.0 < Self.window }) else {
+            // No sample inside the window: Activity Monitor still draws the
+            // newest one, extended flat to the right edge.
+            return [all[all.count - 1]]
+        }
+        var samples = Array(all[firstInside...])
+        if firstInside > 0 {
+            samples.insert(all[firstInside - 1], at: 0)
+        }
+        return samples
+    }
+
+    /// Full-height bands for the AC intervals. The state just before the
+    /// window anchors the left edge; the current state owns everything up to
+    /// the right edge.
+    private func acRegions(size: CGSize) -> [CGRect] {
+        let entries = stateEntries()
         guard let first = entries.first else { return [] }
 
         var regions: [CGRect] = []
-        var previous = first.1
+        var previous = first.onAC
         var start: CGFloat = 0
-        for entry in entries {
-            let x = xPosition(entry.0, width: size.width)
-            if entry.1 != previous {
-                if entry.1 {
+        for (index, entry) in entries.enumerated() {
+            let x = index == 0 ? 0 : xPosition(entry.time, width: size.width)
+            if entry.onAC != previous {
+                if entry.onAC {
                     start = x
                 } else {
                     regions.append(CGRect(x: start, y: 0,
                                           width: max(0, x - start),
                                           height: size.height))
                 }
-                previous = entry.1
+                previous = entry.onAC
             }
         }
         if previous {
@@ -113,6 +128,27 @@ struct BatteryChargeChart: View {
                                   height: size.height))
         }
         return regions
+    }
+
+    private typealias StateEntry = (time: Double, onAC: Bool)
+
+    private func stateEntries() -> [StateEntry] {
+        guard !graph.onAC.isEmpty, graph.onAC.count == graph.stateTimes.count else {
+            return []
+        }
+        let all = zip(graph.stateTimes, graph.onAC)
+            .filter { $0.0.isFinite && $0.0 >= 0 }
+            .sorted { $0.0 > $1.0 }
+            .map { (time: $0.0, onAC: $0.1) }
+        guard !all.isEmpty else { return [] }
+        guard let firstInside = all.firstIndex(where: { $0.0 < Self.window }) else {
+            return [all[all.count - 1]]
+        }
+        var entries = Array(all[firstInside...])
+        if firstInside > 0 {
+            entries.insert(all[firstInside - 1], at: 0)
+        }
+        return entries
     }
 
     private func xPosition(_ secondsAgo: Double, width: CGFloat) -> CGFloat {

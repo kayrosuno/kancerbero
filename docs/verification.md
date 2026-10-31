@@ -3,6 +3,7 @@
 ## Build y probe
 
 ```bash
+./scripts/clean.sh --debug        # build limpio (borra build/ antes de compilar)
 ./scripts/build.sh
 ./build/Build/Products/Debug/KancerberoProbe symbols
 ./build/Build/Products/Debug/KancerberoProbe procs --limit 10
@@ -359,6 +360,7 @@ Pestaña Energy:
 P=./build/Build/Products/Debug/KancerberoProbe
 K=./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
 $P cpu --interval 1 | grep -E "energy|power|preventingSleep"
+$P battery-graph
 pmset -g batt
 pmset -g assertions | grep -E "pid [0-9]+" | head
 $K --screenshot /tmp/kb-energy.png --section energy --screenshot-delay 6
@@ -380,8 +382,14 @@ $K --screenshot /tmp/kb-energy-filter.png --section energy \
   nivel, bandas verdes del periodo en AC y rejilla discontinua. Comparar la forma y la ventana con
   Activity Monitor y la fuente con `pmset -g batt`. Al enchufar/desenchufar, la banda verde cambia
   en el siguiente refresco (≤60 s) o al abrir el popover.
-- Sin batería, o si `systemstats_get_battery_charge_graph` no está disponible en el sistema, la
-  card vuelve a la barra de capacidad sin errores ni avisos (ver `docs/private-apis.md`).
+- `$P battery-graph` debe imprimir `charges`/`states` y `time_on_source`. En macOS 27.2 / M1 Pro la
+  API devuelve una sola muestra (`charges=1 states=1`, `level=100`, `source=AC`); la card debe
+  dibujar igualmente una banda verde a todo el ancho y una línea cian plana al 100 % (inset de
+  2 pt), y «Time on AC» debe coincidir con Activity Monitor (±1 min). Un gráfico vacío o «—»
+  indica que se sigue descartando la muestra única.
+- Sin batería, o si `systemstats_get_battery_charge_graph` no está disponible o el diccionario es
+  inconsistente, la card vuelve a la barra de capacidad sin errores ni avisos (ver
+  `docs/private-apis.md`).
 
 Icono del Dock:
 

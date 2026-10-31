@@ -108,8 +108,10 @@
   carga, tiempo restante, cargando/conector), el consumo total en vatios de los procesos
   visibles y los wake-ups inactivos, cada uno con `Sparkline` de su histórico. La card Battery
   muestra además el gráfico de 12 h de `libsystemstats` (`BatteryChargeChart`: línea cian, bandas
-  verdes del periodo en AC y rejilla discontinua); si la API privada no está disponible vuelve a
-  la barra de capacidad. Debajo, el resto
+  verdes del periodo en AC y rejilla discontinua) y «Time on AC/Battery» a partir de
+  `battery_times`/`battery_states`. Con una sola muestra el gráfico se dibuja como línea plana
+  (como Activity Monitor); solo si la API privada no está disponible o el diccionario está
+  malformado vuelve a la barra de capacidad. Debajo, el resto
   del alto, `EnergyProcessTable` ordena por `ri_energy_nj`/s con impacto relativo, wake-ups, CPU%,
   PID, USER y `Preventing Sleep` (assertions `PreventUserIdleSystemSleep`/`PreventSystemSleep`
   vía `IOPMCopyAssertionsByProcess`). Energía y wake-ups son acumulativos en `rusage_info_v6` y

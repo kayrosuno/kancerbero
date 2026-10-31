@@ -21,17 +21,18 @@ public struct KBBatteryChargeGraph: Sendable, Equatable {
 
 public enum BatteryChargeGraphReader {
     /// Returns nil when the private symbol is unavailable or the data is
-    /// malformed; callers then keep the static capacity bar.
+    /// malformed; callers then keep the static capacity bar. A single sample
+    /// is valid: Activity Monitor draws it as a flat line across the window.
     public static func current() -> KBBatteryChargeGraph? {
         var raw = kb_battery_charge_graph()
         guard kb_battery_charge_graph_read(&raw) != 0 else { return nil }
         defer { kb_battery_charge_graph_free(&raw) }
 
         let count = raw.charge_count
-        guard count > 1 else { return nil }
+        guard count > 0 else { return nil }
         let times = buffer(raw.charge_times, count)
         let levels = buffer(raw.charge_levels, count)
-        guard times.count == levels.count else { return nil }
+        guard times.count == count, levels.count == count else { return nil }
 
         var stateTimes = buffer(raw.state_times, raw.state_count)
         var onAC = buffer(raw.on_ac, raw.state_count).map { $0 != 0 }
