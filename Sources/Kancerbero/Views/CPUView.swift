@@ -51,7 +51,7 @@ struct CPUView: View {
                 cpuCard
                     .frame(minWidth: 165, idealWidth: 180, maxWidth: 195)
                 loadTasksCard
-                    .frame(minWidth: 110, idealWidth: 120, maxWidth: 140)
+                    .frame(minWidth: 92, idealWidth: 100, maxWidth: 112)
                 coresCard
             }
             .frame(maxWidth: .infinity)
@@ -72,6 +72,9 @@ struct CPUView: View {
                                          systemImage: String,
                                          tint: Color,
                                          accessory: String? = nil,
+                                         titleSize: CGFloat = 12,
+                                         captionSize: CGFloat = 11,
+                                         showsInfo: Bool = true,
                                          @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
@@ -84,13 +87,15 @@ struct CPUView: View {
                             .fill(KBTheme.gradient(tint))
                     }
                 Text(title)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: titleSize, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 Spacer(minLength: 2)
-                Image(systemName: "info.circle")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
+                if showsInfo {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tertiary)
+                }
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -113,10 +118,10 @@ struct CPUView: View {
 
             if let caption {
                 Text(caption)
-                    .font(.system(size: 11))
+                    .font(.system(size: captionSize))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    .minimumScaleFactor(0.8)
             }
 
             content()
@@ -185,21 +190,41 @@ struct CPUView: View {
                             "5m \(KBFormat.load($0.load5)) · 15m \(KBFormat.load($0.load15))"
                         } ?? "—",
                         systemImage: "waveform.path",
-                        tint: loadTint) {
+                        tint: loadTint,
+                        titleSize: 11,
+                        captionSize: 10,
+                        showsInfo: false) {
             if let cpu {
+                let restrictedHelp = "\(cpu.threadsRestricted) processes belong to other users or come from a daemon that predates the full process enumeration. Their CPU, memory and thread counters are unavailable; installing the current build and repairing the background service restores them."
+                let threadsLabel = Text("\(cpu.threadCount.formatted()) threads")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("\(cpu.taskCount.formatted()) tasks")
                         .font(.system(size: 16, weight: .semibold))
-                    HStack(spacing: 4) {
-                        Text("\(cpu.threadCount.formatted()) threads")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
-                        if cpu.threadsRestricted > 0 {
-                            Text("partial")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.orange)
-                                .help("\(cpu.threadsRestricted) processes belong to other users or come from a daemon that predates the full process enumeration. Their CPU, memory and thread counters are unavailable; installing the current build and repairing the background service restores them.")
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 4) {
+                            threadsLabel
+                            if cpu.threadsRestricted > 0 {
+                                Text("partial")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(.orange)
+                                    .help(restrictedHelp)
+                            }
                         }
+                        HStack(spacing: 3) {
+                            threadsLabel
+                            if cpu.threadsRestricted > 0 {
+                                Image(systemName: "lock.fill")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(.orange)
+                                    .help(restrictedHelp)
+                                    .accessibilityLabel("partial thread data")
+                            }
+                        }
+                        threadsLabel
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
