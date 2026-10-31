@@ -23,6 +23,18 @@ struct TrafficCard: View {
             self == .bytes ? "Bytes" : "Packets"
         }
 
+        var groupWidth: CGFloat {
+            self == .bytes ? 196 : 208
+        }
+
+        var titleWidth: CGFloat {
+            self == .bytes ? 34 : 46
+        }
+
+        var valueWidth: CGFloat {
+            56
+        }
+
         func value(for direction: NetworkingFocus, in rates: KBRates) -> String {
             let isDownload = direction == .download
             switch self {
@@ -76,7 +88,7 @@ struct TrafficCard: View {
                 Spacer(minLength: 8)
                 TrafficModeSelector(mode: $graphMode)
             }
-            .frame(minWidth: 480)
+            .frame(minWidth: 630)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
@@ -123,19 +135,19 @@ struct TrafficCard: View {
     private func rateGroup(_ metric: RateMetric) -> some View {
         let active = (metric == .bytes) == (graphMode == .bits)
 
-        return VStack(alignment: .leading, spacing: 2) {
+        return HStack(spacing: 4) {
             Text(metric.title)
-                .font(.system(size: 9, weight: .semibold))
+                .font(.system(size: 11.5, weight: .semibold))
                 .foregroundStyle(active ? Color.primary : Color.secondary)
                 .lineLimit(1)
+                .frame(width: metric.titleWidth, alignment: .leading)
 
-            HStack(spacing: 3) {
-                rateItem(metric, .download, active: active)
-                rateItem(metric, .upload, active: active)
-            }
+            rateItem(metric, .download, active: active)
+            rateItem(metric, .upload, active: active)
         }
-        .padding(.horizontal, 5)
+        .padding(.horizontal, 6)
         .padding(.vertical, 3)
+        .frame(width: metric.groupWidth, alignment: .leading)
         .background {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(active ? Color.accentColor.opacity(0.12)
@@ -164,18 +176,20 @@ struct TrafficCard: View {
         } label: {
             HStack(spacing: 3) {
                 Image(systemName: isDownload ? "arrow.down" : "arrow.up")
-                    .font(.system(size: 7, weight: .semibold))
+                    .font(.system(size: 8, weight: .semibold))
                     .foregroundStyle(tint)
+                    .frame(width: 8)
                     .accessibilityHidden(true)
                 Text(value)
-                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(active ? Color.primary : Color.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+                    .frame(width: metric.valueWidth, alignment: .leading)
                     .contentTransition(.numericText())
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 2)
             .padding(.vertical, 1)
             .background {
                 if selected {
