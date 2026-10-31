@@ -1,14 +1,15 @@
 import AppKit
 import ServiceManagement
 import SwiftUI
+import KancerberoCore
 
-/// The two macOS approvals Kancerbero can need. Each guide mirrors what
-/// LaunchControl shows when its helper needs approval: an illustration of the
-/// relevant System Settings pane, the exact list to look for, and a button that
-/// opens Settings.
+/// The macOS approvals Kancerbero can need. Each guide shows the exact
+/// System Settings place to change, the list to look for, and a button that
+/// opens the right pane.
 enum ActivationGuide: String, Identifiable, CaseIterable {
     case networkExtension
     case backgroundService
+    case fullDiskAccess
 
     var id: String { rawValue }
 
@@ -16,6 +17,7 @@ enum ActivationGuide: String, Identifiable, CaseIterable {
         switch self {
         case .networkExtension: return "How to activate the network extension"
         case .backgroundService: return "How to activate the background service"
+        case .fullDiskAccess: return "How to activate Full Disk Access"
         }
     }
 
@@ -27,13 +29,17 @@ enum ActivationGuide: String, Identifiable, CaseIterable {
         case .backgroundService:
             return "macOS manages background helpers under Login Items & Extensions, "
                 + "not inside Kancerbero."
+        case .fullDiskAccess:
+            return "macOS manages Full Disk Access under Privacy & Security, "
+                + "not inside Kancerbero."
         }
     }
 
-    var highlight: SettingsMockupView.Highlight {
+    var mockupHighlight: SettingsMockupView.Highlight? {
         switch self {
         case .networkExtension: return .networkExtensions
         case .backgroundService: return .allowInTheBackground
+        case .fullDiskAccess: return nil
         }
     }
 
@@ -53,13 +59,22 @@ enum ActivationGuide: String, Identifiable, CaseIterable {
                 "Under “Allow in the Background”, turn on Kancerbero.",
                 "Return to Kancerbero and click Retry connection."
             ]
+        case .fullDiskAccess:
+            return [
+                "Open System Settings → Privacy & Security.",
+                "Choose Full Disk Access.",
+                "Turn on Kancerbero. If it is not listed, click + and add Kancerbero from /Applications.",
+                "Quit Kancerbero completely (⌘Q) and reopen it so macOS applies the new "
+                    + "authorization. The background helper uses the same grant.",
+                "Open System status. The row should read Granted; if not, click Check again."
+            ]
         }
     }
 }
 
-/// Sheet showing how to approve the network extension or the background
-/// service. All actions use public SMAppService/NetworkExtension APIs; nothing
-/// here runs sudo.
+/// Sheet showing how to approve the network extension, the background service
+/// or Full Disk Access. All actions use public SMAppService/AppKit APIs;
+/// nothing here runs sudo.
 struct ActivationGuideView: View {
     let guide: ActivationGuide
     @Environment(AppModel.self) private var model
@@ -69,7 +84,11 @@ struct ActivationGuideView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
-            SettingsMockupView(highlight: guide.highlight)
+            if let highlight = guide.mockupHighlight {
+                SettingsMockupView(highlight: highlight)
+            } else {
+                fullDiskAccessPathCard
+            }
             steps
             currentState
             Divider()
@@ -78,6 +97,37 @@ struct ActivationGuideView: View {
         .padding(18)
         .frame(width: 520)
         .fixedSize(horizontal: false, vertical: true)
+        .onAppear {
+            if guide == .fullDiskAccess {
+                model.refreshFullDiskAccess(force: true)
+            }
+        }
+    }
+
+    private var fullDiskAccessPathCard: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "lock.shield")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("System Settings → Privacy & Security → Full Disk Access")
+                    .font(.system(size: 11, weight: .semibold))
+                Text("Find Kancerbero in the app list and turn it on. "
+                     + "macOS remembers the grant for the background helper too.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(11)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.07),
+                    in: RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
+                .strokeBorder(Color.orange.opacity(0.25), lineWidth: 1)
+        }
     }
 
     // MARK: - Header
@@ -167,6 +217,8 @@ struct ActivationGuideView: View {
             @unknown default:
                 return ("Unknown", .secondary)
             }
+        case .fullDiskAccess:
+            return (model.fullDiskAccessValue, model.fullDiskAccessTint)
         }
     }
 
@@ -175,7 +227,12 @@ struct ActivationGuideView: View {
     private var actions: some View {
         HStack(spacing: 10) {
             Button("Open System Settings") {
-                model.openLoginItemsSettings()
+                switch guide {
+                case .fullDiskAccess:
+                    model.openFullDiskAccessSettings()
+                case .networkExtension, .backgroundService:
+                    model.openLoginItemsSettings()
+                }
             }
             .buttonStyle(.borderedProminent)
 
@@ -202,6 +259,8 @@ struct ActivationGuideView: View {
                 || model.legacyServiceDetected
                 || !model.daemonHelperPresent
                 || !model.daemonPlistPresent
+        case .fullDiskAccess:
+            return false
         }
     }
 
@@ -227,6 +286,11 @@ struct ActivationGuideView: View {
                 return ("Retry connection", { model.retryDaemonConnection() })
             }
             return nil
+        case .fullDiskAccess:
+            if model.fullDiskAccess == .granted {
+                return nil
+            }
+            return ("Check again", { model.refreshFullDiskAccess(force: true) })
         }
     }
 }

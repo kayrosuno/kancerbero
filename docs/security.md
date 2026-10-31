@@ -163,3 +163,22 @@ Pendiente para producción:
 - Límites: 32 ítems por lote, 256 por petición, 6 peticiones/minuto con una en vuelo y resultado
   por ruta. Las rutas escribibles del usuario no pasan por el daemon: la app usa
   `FileManager.trashItem`.
+
+## Acceso Total al Disco (FDA)
+
+- macOS no ofrece una API pública para consultar si la app tiene FDA. `KBFullDiskAccessProbe`
+  hace una comprobación heurística: abre en solo lectura (`open(O_RDONLY)`, sin leer contenido ni
+  enumerar directorios) rutas que TCC protege con `SystemPolicyAllFiles`: `~/Library/Safari/History.db`,
+  `Bookmarks.plist`, `~/Library/Messages/chat.db`, `~/Library/Mail`, el group container de Notes y
+  el `TCC.db` de usuario en macOS antiguos. Un `open` correcto demuestra el permiso; `EPERM`/`EACCES`
+  (clasificado con `KBTrashError.isPermissionDenied`) lo deniega; si ninguna ruta existe, el estado
+  es `unknown` y la UI no afirma que falte.
+- La sonda no usa APIs privadas, no genera prompts, no ejecuta comandos y no lee datos. Se ejecuta
+  fuera del main actor y `AppModel` la limita (una comprobación por segundo como máximo, con guarda
+  de petición en vuelo).
+- El estado aparece en **System status** (Data access → Full Disk Access) y en un banner de
+  **Applications**. La guía abre Privacidad y seguridad → Acceso Total al Disco con URLs públicas
+  (formato macOS 26 y fallback al anterior); nunca se usa `sudo`.
+- No se consulta el daemon: FDA está ligada a la identidad de firma `uno.kayros.kancerbero`, que
+  comparten app y helper, y TCC también se aplica a root. `hasFullDataAccess` (acceso root del
+  daemon) y FDA son conceptos distintos; la UI los presenta por separado.

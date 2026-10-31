@@ -491,6 +491,8 @@ case "cpu":
     printCPU(interval: doubleOption("--interval", default: 1))
 case "apps":
     printApps()
+case "fda":
+    write(KBFullDiskAccessProbe.current().rawValue + "\n")
 case "ifaces":
     printInterfaces()
 case "sockets":
@@ -565,5 +567,5 @@ case "all":
     printInterfaces()
     printNStat(seconds: integerOption("--seconds", default: 3))
 default:
-    fail("unknown command '\(command)'. Use: version|symbols|procs [--cpu]|cpu|apps|ifaces|sockets <pid>|sockets-summary [pid...]|files <pid>|daemons|disk|nstat|all")
+    fail("unknown command '\(command)'. Use: version|symbols|procs [--cpu]|cpu|apps|fda|ifaces|sockets <pid>|sockets-summary [pid...]|files <pid>|daemons|disk|nstat|all")
 }

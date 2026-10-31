@@ -41,6 +41,9 @@ final class AppModel {
     /// The connected daemon advertises `trashItems`. Older daemons decode the
     /// capability as nil, which reads as false here.
     var daemonSupportsTrash = false
+    /// TCC Full Disk Access for this process. Independent from `hasFullDataAccess`
+    /// (which describes root/daemon access) and refreshed on demand.
+    private(set) var fullDiskAccess: KBFullDiskAccessStatus = .unknown
     var rxHistory: [Double] = []
     var txHistory: [Double] = []
     /// Timestamps of the traffic samples, parallel to `rxHistory`/`txHistory`.
@@ -152,6 +155,11 @@ final class AppModel {
     private var previousTimestamp: UInt64 = 0
     private var daemonConnecting = false
     private var lastDaemonAttempt = Date.distantPast
+    private var lastFullDiskAccessProbe = Date.distantPast
+    private var fullDiskAccessProbeInFlight = false
+    /// Set when a trash attempt was directly denied by macOS. Keeps the state
+    /// at `.denied` if the heuristic probe cannot find a test path.
+    private var observedFullDiskAccessDenial = false
     /// Incremented whenever the daemon connection is replaced so late callbacks
     /// from the previous connection cannot overwrite the new one.
     private var daemonGeneration = 0
@@ -163,6 +171,8 @@ final class AppModel {
     /// automatic recovery on launch does not override that decision.
     private static let autoRegisterDisabledKey = "daemon.autoRegisterDisabled"
     private let logger = Logger(subsystem: "uno.kayros.kancerbero", category: "daemon.lifecycle")
+    private let permissionsLogger = Logger(subsystem: "uno.kayros.kancerbero",
+                                           category: "permissions")
 
     var isRoot: Bool { geteuid() == 0 }
 
@@ -274,6 +284,7 @@ final class AppModel {
     func start() {
         guard task == nil else { return }
         refreshServiceStatus()
+        refreshFullDiskAccess(force: true)
         task = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
@@ -343,6 +354,49 @@ final class AppModel {
         legacyDaemonDetected = FileManager.default.fileExists(
             atPath: "/Library/LaunchDaemons/uno.kayros.kancerbero.daemon.plist")
         updateDaemonProcessState()
+    }
+
+    /// Refreshes the TCC Full Disk Access state off the main actor. The probe is
+    /// heuristic (see `KBFullDiskAccessProbe`) and throttled so repeated view
+    /// appearances do not cause extra TCC checks.
+    func refreshFullDiskAccess(force: Bool = false) {
+        guard !fullDiskAccessProbeInFlight else { return }
+        let now = Date()
+        guard force || now.timeIntervalSince(lastFullDiskAccessProbe) >= 1 else { return }
+        lastFullDiskAccessProbe = now
+        fullDiskAccessProbeInFlight = true
+
+        Task { [weak self] in
+            let status = await Task.detached(priority: .utility) {
+                KBFullDiskAccessProbe.current()
+            }.value
+            guard let self else { return }
+            self.fullDiskAccessProbeInFlight = false
+
+            // A real trash denial is stronger evidence than an inconclusive
+            // probe on a profile without Safari/Mail/Messages data.
+            let resolved: KBFullDiskAccessStatus =
+                status == .unknown && self.observedFullDiskAccessDenial ? .denied : status
+            if resolved == .granted {
+                self.observedFullDiskAccessDenial = false
+            }
+            if self.fullDiskAccess != resolved {
+                self.fullDiskAccess = resolved
+                self.permissionsLogger.notice(
+                    "full disk access: \(resolved.rawValue, privacy: .public)")
+            }
+        }
+    }
+
+    /// Called when a trash operation is denied by macOS even through the root
+    /// helper. The probe may not find a test path, but the denial is definitive.
+    func noteFullDiskAccessDenied() {
+        observedFullDiskAccessDenial = true
+        lastFullDiskAccessProbe = .distantPast
+        if fullDiskAccess != .denied {
+            fullDiskAccess = .denied
+            permissionsLogger.notice("full disk access: denied (observed)")
+        }
     }
 
     /// The daemon runs as root, so `launchctl print system/<label>` is not
@@ -534,6 +588,20 @@ final class AppModel {
 
     func openLoginItemsSettings() {
         SMAppService.openSystemSettingsLoginItems()
+    }
+
+    func openFullDiskAccessSettings() {
+        // Let the next activation refresh run immediately after Settings closes.
+        lastFullDiskAccessProbe = .distantPast
+        let candidates = [
+            "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension"
+                + "?Privacy_AllFiles",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
+        ]
+        for raw in candidates {
+            guard let url = URL(string: raw) else { continue }
+            if NSWorkspace.shared.open(url) { return }
+        }
     }
 
     func revealAppInFinder() {

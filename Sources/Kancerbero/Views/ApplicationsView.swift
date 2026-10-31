@@ -16,6 +16,10 @@ struct ApplicationsView: View {
             SectionHeader(title: "Applications",
                           subtitle: "Apps, widgets & plugins")
 
+            if appModel.fullDiskAccess == .denied {
+                fullDiskAccessBanner
+            }
+
             summary
 
             controls
@@ -36,9 +40,14 @@ struct ApplicationsView: View {
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .task {
+            appModel.refreshFullDiskAccess()
             if model.bundles.isEmpty {
                 await model.refresh()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSApplication.didBecomeActiveNotification)) { _ in
+            appModel.refreshFullDiskAccess()
         }
         .sheet(isPresented: $confirming) { confirmation }
         .alert("Removal finished", isPresented: Binding(
@@ -49,16 +58,45 @@ struct ApplicationsView: View {
                 Button("Open Full Disk Access") {
                     resultMessage = nil
                     permissionHint = false
-                    if let url = URL(string: "x-apple.systempreferences:"
-                                     + "com.apple.settings.PrivacySecurity.extension"
-                                     + "?Privacy_AllFiles") {
-                        NSWorkspace.shared.open(url)
-                    }
+                    appModel.openFullDiskAccessSettings()
                 }
             }
             Button("OK") { resultMessage = nil; permissionHint = false }
         } message: {
             Text(resultMessage ?? "")
+        }
+    }
+
+    private var fullDiskAccessBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "lock.shield.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.orange)
+
+            Text("Full Disk Access is off. Other apps' containers can't be removed "
+                 + "until you enable it.")
+                .font(.system(size: 11))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .help(appModel.fullDiskAccessBannerDetail)
+
+            Spacer(minLength: 6)
+
+            Button("Open Full Disk Access") {
+                appModel.openFullDiskAccessSettings()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 38)
+        .background {
+            RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
+                .fill(Color.orange.opacity(0.08))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
+                .strokeBorder(Color.orange.opacity(0.35), lineWidth: 1)
         }
     }
 
@@ -304,6 +342,9 @@ struct ApplicationsView: View {
             $0.code == KBTrashError.permissionCode
                 && isProtectedAppDataPath($0.path)
         }
+        if permissionHint {
+            appModel.noteFullDiskAccessDenied()
+        }
         if failed.isEmpty {
             resultMessage = "Moved \(results.count) items to the Trash."
         } else {
@@ -313,9 +354,7 @@ struct ApplicationsView: View {
             var message = "\(results.count - failed.count) moved, "
                 + "\(failed.count) failed.\n\(details)"
             if permissionHint {
-                message += "\n\nmacOS protects other apps' data. Allow Kancerbero "
-                    + "in System Settings → Privacy & Security → Full Disk Access "
-                    + "and try again."
+                message += "\n\n" + appModel.fullDiskAccessAlertGuidance
             }
             resultMessage = message
         }

@@ -863,3 +863,37 @@ $K --screenshot /tmp/kb-apps-claude.png --section applications \
   completarse y el contenedor aparecer en `~/.Trash` con propietario del usuario.
 - Comprobar `tccd` (`log show --predicate 'process == "tccd"'`) para ver la petición de la app
   (`euid 501`) y la del daemon (`euid 0`) cuando el fallback se ejecuta.
+
+## Acceso Total al Disco (FDA)
+
+```bash
+P=./build/Build/Products/Debug/KancerberoProbe
+K=./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
+$P fda
+for p in "$HOME/Library/Safari/History.db" "$HOME/Library/Messages/chat.db"; do
+  head -c 1 "$p" >/dev/null 2>&1 && echo "$p: readable" || echo "$p: denied"
+done
+```
+
+- Sin FDA, `fda` debe imprimir `denied` y las rutas protegidas deben dar `Operation not permitted`.
+  `$P fda` refleja el proceso del probe, no la app: seguirá en `denied` aunque se conceda FDA solo
+  a Kancerbero.app. Para ver `granted`, usar la app instalada firmada (o una build firmada con el
+  mismo Team ID) y su fila de System status.
+- `Kancerbero --screenshot /tmp/kb-fda-status.png --show-status --screenshot-delay 6`: la card
+  **Data access** debe mostrar `Full Disk Access   Not granted` (o `Granted`) con el detalle y la
+  acción `How to activate…` / `Open Settings`.
+- `Kancerbero --screenshot /tmp/kb-fda-apps.png --section applications --screenshot-delay 6`: con
+  FDA denegado debe verse el banner compacto «Full Disk Access is off» y el botón
+  `Open Full Disk Access`; sin FDA concedido el banner desaparece. El banner debe ser de una línea
+  y altura fija para no alterar el layout de la tabla.
+- Abrir la guía desde la fila: título «How to activate Full Disk Access», tarjeta con la ruta del
+  ajuste, cinco pasos (incluido salir y reabrir), estado actual, y botones `Open System Settings`,
+  `Check again` y `Done`. `Open System Settings` debe abrir Privacidad y seguridad → Acceso Total
+  al Disco.
+- Volver de Ajustes sin conceder debe mantener `Not granted`; conceder y pulsar `Refresh status`
+  debe pasar a `Granted` y quitar el banner. Si el estado no cambia, cerrar y reabrir Kancerbero.
+- El estado `unknown` (perfil sin Mail/Safari/Messages/Notes) no muestra banner y ofrece abrir el
+  ajuste sin afirmar que falte el permiso.
+- La fila FDA no debe confundirse con `Privileged data / Full access`, que describe el acceso root
+  del daemon. Sin FDA, el banner global puede seguir diciendo «Full access» y el contenedor de otra
+  app debe seguir fallando con el aviso de permisos.

@@ -44,6 +44,7 @@ struct SystemStatusView: View {
         .frame(minWidth: 1080, idealWidth: 1180, minHeight: 620, maxHeight: .infinity)
         .onAppear {
             model.refreshServiceStatus()
+            model.refreshFullDiskAccess(force: true)
             // Do not recompute over a transient state: refresh() would erase
             // the activation error or the approval instruction.
             switch filter.controller.state {
@@ -60,6 +61,10 @@ struct SystemStatusView: View {
                     }
                 }
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSApplication.didBecomeActiveNotification)) { _ in
+            model.refreshFullDiskAccess()
         }
         .sheet(item: $guide) { guide in
             ActivationGuideView(guide: guide)
@@ -309,6 +314,7 @@ struct SystemStatusView: View {
                     dataCollectionRow
                     trafficAttributionRow
                     privilegedRow
+                    fullDiskAccessRow
                 }
             }
             .frame(maxWidth: .infinity, alignment: .top)
@@ -459,6 +465,34 @@ struct SystemStatusView: View {
                          title: "Privileged data",
                          value: full ? "Full access" : "Your user only",
                          detail: detail)
+    }
+
+    private var fullDiskAccessRow: some View {
+        let level: StatusLevel
+        let actionTitle: String
+        let action: () -> Void
+
+        switch model.fullDiskAccess {
+        case .granted:
+            level = .ok
+            actionTitle = "Open Settings"
+            action = { model.openFullDiskAccessSettings() }
+        case .denied:
+            level = .warning
+            actionTitle = "How to activate…"
+            action = { guide = .fullDiskAccess }
+        case .unknown:
+            level = .info
+            actionTitle = "Open Settings"
+            action = { model.openFullDiskAccessSettings() }
+        }
+
+        return statusRow(level,
+                         title: "Full Disk Access",
+                         value: model.fullDiskAccessValue,
+                         detail: model.fullDiskAccessDetail,
+                         actionTitle: actionTitle,
+                         action: action)
     }
 
     private var serviceRow: some View {
@@ -851,6 +885,7 @@ struct SystemStatusView: View {
 
                 Button("Refresh status") {
                     model.refreshServiceStatus()
+                    model.refreshFullDiskAccess(force: true)
                 }
                 .buttonStyle(.bordered)
 
