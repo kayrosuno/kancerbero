@@ -25,16 +25,17 @@
   Output (enviados), y `TrafficCard` con selector Bits/Packets y `TrafficChart` (gráfico espejado,
   escala compartida con techo
   1/2/5×10^n, cuadrícula, niveles y eje temporal; ventana de 60 muestras anclada a la derecha). El
-  selector cambia solo las unidades e historiales del gráfico; dos chips centrados en la cabecera
-  agrupan Download+Pkts in y Upload+Pkts out (bits/s y pkt/s al mismo tamaño, resaltando el valor
-  del modo activo), y el chip completo alterna el foco.
+  selector cambia solo las unidades e historiales del gráfico; dos chips alineados a la izquierda
+  junto al título agrupan Download+Pkts in y Upload+Pkts out (bits/s y pkt/s al mismo tamaño,
+  resaltando el valor del modo activo), y el chip completo alterna el foco.
   Debajo, `PillTabBar` y las tablas (`NetworkingTables.swift`). `NetworkingUIState` guarda, por un
   lado, los filtros de Connections —`transports: Set<NetworkingTransport>`, `ipVersions:
   Set<NetworkingIPVersion>` y `connectionStates: Set<NetworkingConnectionState>`— y, por otro,
   los de Processes —`processIPVersions`, `processProtocolKinds: Set<ProcessProtocolKind>` (TCP,
   UDP, RAW, UNIX, OTHER; cada uno agrupa sus variantes v4/v6) y `processSocketTypes:
   Set<ProcessSocketType>` (stream, dgram, raw, seqpacket, other)—. Todos los valores están
-  marcados por defecto. `NetworkingProtocolFilter` combina transport/IP y `filteredSources` los
+  marcados por defecto salvo `connectionStates.other`, desmarcado al iniciar.
+  `NetworkingProtocolFilter` combina transport/IP y `filteredSources` los
   aplica solo a Connections; `filteredProcessRows` recibe sus propios facetas
   (`ipVersions:protocolKinds:socketTypes:`) y es independiente de los de Connections. Los grupos
   viven en `NetworkingFilterBar`, una barra a todo el ancho entre `PillTabBar` y la tarjeta de la
