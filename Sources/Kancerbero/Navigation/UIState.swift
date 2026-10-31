@@ -82,7 +82,14 @@ final class UIState {
             parse: { NetworkingIPVersion(cliValue: $0) }) {
             networking.ipVersions = ipVersions
         }
-        if let states = Self.filterSelection(
+        if let raw = Self.value(for: "--networking-state", in: arguments),
+           raw.split(separator: ",").contains(where: {
+               $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "all"
+           }) {
+            // "all" means no state filter, including the Other bucket that is
+            // unchecked by default.
+            networking.connectionStates = NetworkingConnectionState.all
+        } else if let states = Self.filterSelection(
             for: "--networking-state", in: arguments,
             parse: { NetworkingConnectionState(cliValue: $0) }) {
             networking.connectionStates = states
@@ -241,7 +248,10 @@ struct NetworkingUIState: Equatable {
     /// Every case pressed means "no filter"; an empty group matches nothing.
     var transports: Set<NetworkingTransport> = Set(NetworkingTransport.allCases)
     var ipVersions: Set<NetworkingIPVersion> = Set(NetworkingIPVersion.allCases)
-    var connectionStates: Set<NetworkingConnectionState> = NetworkingConnectionState.all
+    /// `Other` starts unchecked so the Connections table opens without the
+    /// long tail of unclassified TCP states.
+    var connectionStates: Set<NetworkingConnectionState> =
+        NetworkingConnectionState.all.subtracting([.other])
     var connectionSearch = ""
     var processSearch = ""
     var processIPVersions: Set<NetworkingIPVersion> = NetworkingIPVersion.all

@@ -54,28 +54,36 @@ struct TrafficCard: View {
         .accessibilityElement(children: .contain)
     }
 
-    /// Title and unit selector with the two direction chips centered in the
-    /// same top line. In narrow cards the chips move to a second row.
+    /// Title and unit selector with the direction chips left-aligned next to
+    /// the title. In narrow cards the chips move to a second row, also
+    /// left-aligned.
     private var header: some View {
         ViewThatFits(in: .horizontal) {
-            ZStack {
-                titleAndSelector
+            HStack(spacing: 12) {
+                titleBlock
                 directionChips(showsLabel: true)
+                Spacer(minLength: 8)
+                unitSelector
             }
-            .frame(height: 24)
+            .frame(height: 26)
             .frame(minWidth: 700)
 
             VStack(spacing: 4) {
-                titleAndSelector
-                    .frame(height: 22)
+                HStack(spacing: 6) {
+                    titleBlock
+                    Spacer(minLength: 4)
+                    unitSelector
+                }
+                .frame(height: 22)
+
                 directionChips(showsLabel: false)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: 24)
             }
         }
     }
 
-    private var titleAndSelector: some View {
+    private var titleBlock: some View {
         HStack(spacing: 6) {
             Image(systemName: "chart.line.uptrend.xyaxis")
                 .font(.system(size: 9, weight: .semibold))
@@ -93,21 +101,21 @@ struct TrafficCard: View {
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-
-            Spacer(minLength: 4)
-
-            Picker("Traffic graph units", selection: $graphMode) {
-                ForEach(TrafficGraphMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .controlSize(.small)
-            .frame(width: 124)
-            .accessibilityLabel("Traffic graph units")
-            .help("Show the graph in bits per second or packets per second")
         }
+    }
+
+    private var unitSelector: some View {
+        Picker("Traffic graph units", selection: $graphMode) {
+            ForEach(TrafficGraphMode.allCases) { mode in
+                Text(mode.title).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .controlSize(.small)
+        .frame(width: 124)
+        .accessibilityLabel("Traffic graph units")
+        .help("Show the graph in bits per second or packets per second")
     }
 
     private func directionChips(showsLabel: Bool) -> some View {
@@ -133,47 +141,53 @@ struct TrafficCard: View {
         return Button {
             onToggle(direction)
         } label: {
-            HStack(spacing: 3) {
-                Image(systemName: isDownload
-                      ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(tint)
-                if showsLabel {
-                    Text(label)
-                        .font(.system(size: 8, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+            HStack(spacing: 0) {
+                HStack(spacing: 4) {
+                    Image(systemName: isDownload
+                          ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(tint)
+                    if showsLabel {
+                        Text(label)
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(Color.primary.opacity(0.78))
+                            .lineLimit(1)
+                            .frame(width: 54, alignment: .leading)
+                    }
                 }
-                Text(bits)
-                    .font(.system(size: 10,
-                                  weight: bitsActive ? .semibold : .medium,
-                                  design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(bitsActive
-                                     ? Color.primary
-                                     : Color.secondary.opacity(0.55))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .layoutPriority(1)
-                Text("·")
-                    .font(.system(size: 7))
-                    .foregroundStyle(.tertiary)
-                Text(packets)
-                    .font(.system(size: 10,
-                                  weight: bitsActive ? .medium : .semibold,
-                                  design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(bitsActive
-                                     ? Color.secondary.opacity(0.55)
-                                     : Color.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .layoutPriority(1)
+
+                HStack(spacing: 3) {
+                    Text(bits)
+                        .font(.system(size: 11,
+                                      weight: bitsActive ? .semibold : .medium,
+                                      design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(bitsActive
+                                         ? Color.primary
+                                         : Color.secondary.opacity(0.85))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                        .frame(width: 58, alignment: .leading)
+                    Text("·")
+                        .font(.system(size: 7))
+                        .foregroundStyle(.tertiary)
+                    Text(packets)
+                        .font(.system(size: 11,
+                                      weight: bitsActive ? .medium : .semibold,
+                                      design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(bitsActive
+                                         ? Color.secondary.opacity(0.85)
+                                         : Color.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                        .frame(width: 68, alignment: .leading)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
             }
             .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .frame(width: showsLabel ? 214 : 160, height: 20, alignment: .leading)
+            .padding(.vertical, 3)
+            .frame(width: showsLabel ? 232 : 172, height: 24, alignment: .leading)
             .background {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .fill(tint.opacity(selected ? 0.14 : 0.045))

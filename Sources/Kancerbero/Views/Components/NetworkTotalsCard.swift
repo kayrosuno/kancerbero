@@ -141,6 +141,26 @@ struct NetworkTotalsCard: View {
         .frame(height: 18)
     }
 
+    /// Both totals share size, colour and a fixed value slot, so the labels do
+    /// not jump when a longer byte or packet total arrives.
+    private func metricRow(_ value: String, label: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+            Text(value)
+                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(Color.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(width: 80, alignment: .leading)
+                .contentTransition(.numericText())
+            Text(label)
+                .font(.system(size: 8, weight: .medium))
+                .tracking(0.3)
+                .foregroundStyle(.tertiary)
+            Spacer(minLength: 0)
+        }
+    }
+
     /// Static, unselected twin of `MetricTile`: same radius, fill and border,
     /// but no button, checkmark or focus treatment.
     private func directionPanel(_ direction: Direction) -> some View {
@@ -159,38 +179,13 @@ struct NetworkTotalsCard: View {
                 Spacer(minLength: 0)
             }
 
-            VStack(alignment: .leading, spacing: 0) {
-                Text(KBFormat.totalBytes(values.bytes))
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .contentTransition(.numericText())
-                Text("data")
-                    .font(.system(size: 8, weight: .medium))
-                    .tracking(0.3)
-                    .foregroundStyle(.tertiary)
-            }
-
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text(KBFormat.compactTotal(values.packets))
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .contentTransition(.numericText())
-                Text("packets")
-                    .font(.system(size: 8, weight: .medium))
-                    .tracking(0.3)
-                    .foregroundStyle(.tertiary)
-                Spacer(minLength: 0)
-            }
+            metricRow(KBFormat.totalBytes(values.bytes), label: "data")
+            metricRow(KBFormat.compactTotal(values.packets), label: "packets")
 
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.vertical, 3)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -222,7 +217,7 @@ struct NetworkTotalsCard: View {
                 .lineLimit(1)
             Spacer(minLength: 4)
             Text(KBFormat.totalBytes(values.bytes))
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -235,8 +230,8 @@ struct NetworkTotalsCard: View {
                 .font(.system(size: 7))
                 .foregroundStyle(.tertiary)
             Text(KBFormat.compactTotal(values.packets))
-                .font(.system(size: 9, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary)
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.primary)
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)

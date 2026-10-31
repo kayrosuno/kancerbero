@@ -29,7 +29,8 @@ nettop -P -d -L 3 -s 1 -x
 - **Network totals y selector Bits/Packets:** capturar
   `--section networking --traffic-graph bits` y `--traffic-graph packets`. Las cuatro métricas
   siguen en los chips de Traffic (Download/Upload en bits/s y pkt/s, al mismo tamaño, con el valor
-  del modo activo resaltado) y no cambian al alternar el selector; solo lo hacen el gráfico y sus
+  del modo activo resaltado), alineados a la izquierda junto al título y con huecos fijos para que
+  los valores no se desplacen al crecer; no cambian al alternar el selector, solo el gráfico y sus
   etiquetas (bps vs pkt/s). La card **Network totals** muestra únicamente los acumulados desde el
   arranque en dos paneles apilados y sombreados (como las tiles de Activity), Input con los datos
   y paquetes recibidos encima de Output con los enviados. Contrastar tasas
@@ -518,10 +519,12 @@ $APP --screenshot /tmp/kb-net-process-independent.png --section networking \
   la leyenda de los seis tipos; el filtro IP de Connections reduce el desglose, el Transport no.
 - La cabecera de Connections agrupa en cápsulas los checkboxes **IP** (IPv4/IPv6), **Transport**
   (TCP/UDP/Other) y **State** (Established, Listening, Connecting (SYN), Closing
-  (Close/Fin/Time Wait), Other), todos marcados por defecto, más `Filter process`. Desmarcar un
-  valor excluye sus filas; desmarcar todo un grupo deja “0 of M connections” (Activity 0). Con el
-  grupo State completo las filas UDP siguen visibles; con un subconjunto se ocultan. La familia de
-  dirección desconocida se excluye cuando el grupo IP no está completo.
+  (Close/Fin/Time Wait), Other), todos marcados por defecto salvo **State › Other**, que arranca
+  desmarcado, más `Filter process`. Desmarcar un valor excluye sus filas; desmarcar todo un grupo
+  deja “0 of M connections” (Activity 0). Con el grupo State completo las filas UDP siguen
+  visibles; con un subconjunto se ocultan, así que al arrancar (Other desmarcado) las conexiones
+  sin estado tampoco aparecen hasta volver a marcar Other. La familia de dirección desconocida se
+  excluye cuando el grupo IP no está completo.
 - La cabecera de Processes añade en cápsulas **IP** (IPv4/IPv6), **Protocols**
   (TCP/UDP/RAW/UNIX/OTHER) y **Socket type** (stream/dgram/raw/seqpacket/other). Un IP parcial
   exige algún badge de la familia marcada y excluye las filas solo-UNIX/OTHER; un Socket type

@@ -38,7 +38,7 @@ El detalle de binarios, permisos, instalación y librerías está en
   **Network totals** con los acumulados de datos y paquetes desde el arranque en dos paneles
   apilados y sombreados, **Input** (recibidos) sobre **Output** (enviados); a la derecha, la
   tarjeta **Traffic** con un selector **Bits/Packets** que cambia solo el gráfico y dos chips
-  centrados en la cabecera que agrupan
+  alineados a la izquierda junto al título que agrupan
   **Download+Pkts in** y **Upload+Pkts out** (bits/s y pkt/s, ambos al mismo tamaño y con el valor
   del modo activo resaltado) sobre un gráfico espejado (download arriba, upload abajo) con
   cuadrícula, niveles y eje temporal. Una **barra de filtros** entre las pills y la tarjeta
@@ -46,8 +46,8 @@ El detalle de binarios, permisos, instalación y librerías está en
   **IP** (IPv4/IPv6), **Transport** (TCP/UDP/Other) y **State** (Established, Listening,
   Connecting (SYN), Closing (Close/Fin/Time Wait), Other); en Processes: **IP**,
   **Protocols** (TCP/UDP/RAW/UNIX/OTHER) y **Socket type** (stream/dgram/raw/seqpacket/other).
-  Todos los valores están marcados por defecto; desmarcar excluye y un grupo sin nada marcado no
-  muestra filas. Con el grupo State completo las filas UDP (sin estado) siguen visibles; con un
+  Todos los valores están marcados por defecto salvo **State › Other**, que arranca desmarcado;
+  desmarcar excluye y un grupo sin nada marcado no muestra filas. Con el grupo State completo las filas UDP (sin estado) siguen visibles; con un
   subconjunto se ocultan. La cabecera de la tarjeta conserva solo el título, **Filter process**
   en Connections / **Filter processes** en Processes (nombre o PID; en Processes también ruta y
   usuario) e **Inspect**. La tabla de Connections muestra Process, PID, Local, Remote, Proto, RX,
