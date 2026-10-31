@@ -28,7 +28,8 @@
   a la derecha de una cabecera con dos grupos de tasas, **Bytes** y **Packets**, ambos visibles;
   el grupo del modo activo se resalta y el otro queda atenuado. Cada tasa es un botón que alterna
   el foco Download/Upload. `TrafficChart` dibuja el gráfico espejado, escala compartida con techo
-  1/2/5×10^n, cuadrícula, niveles y eje temporal; ventana de 60 muestras anclada a la derecha.
+  1/2/5×10^n, cuadrícula, niveles y eje temporal; ventana de 60 muestras con el dato más reciente
+  a la izquierda (`now` → `-60 s`).
   Debajo, `PillTabBar` y las tablas (`NetworkingTables.swift`). `NetworkingUIState` guarda, por un
   lado, los filtros de Connections —`transports: Set<NetworkingTransport>`, `ipVersions:
   Set<NetworkingIPVersion>` y `connectionStates: Set<NetworkingConnectionState>`— y, por otro,

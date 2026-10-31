@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Per-core load history drawn as a dense wall of rectangular bars. Bars are
-/// right-aligned (newest at the right), colored by load, and the latest sample
+/// left-aligned (newest at the left), colored by load, and the latest sample
 /// gets a bright cap. The faint tracks keep the grid visible while the history
 /// warms up.
 struct CoreLoadBars: View {
@@ -36,7 +36,7 @@ struct CoreLoadBars: View {
 
             if let latest = samples.last {
                 let heat = KBTheme.loadHeat(latest)
-                let x = CGFloat(maxBars - 1) * slot + (slot - barWidth) / 2
+                let x = (slot - barWidth) / 2
                 let glow = CGRect(x: x - 1,
                                   y: 0,
                                   width: barWidth + 2,
@@ -45,10 +45,11 @@ struct CoreLoadBars: View {
             }
 
             if !samples.isEmpty {
-                let start = maxBars - samples.count
+                let start = 0
                 for (offset, value) in samples.enumerated() {
                     let height = max(value > 0 ? 1 : 0, chartHeight * value / 100)
-                    let x = CGFloat(start + offset) * slot + (slot - barWidth) / 2
+                    let slotIndex = samples.count - 1 - offset
+                    let x = CGFloat(start + slotIndex) * slot + (slot - barWidth) / 2
                     let rect = CGRect(x: x,
                                       y: chartHeight - height,
                                       width: barWidth,
@@ -62,7 +63,7 @@ struct CoreLoadBars: View {
 
                 if let latest = samples.last, chartHeight * latest / 100 >= 2 {
                     let height = chartHeight * latest / 100
-                    let x = CGFloat(maxBars - 1) * slot + (slot - barWidth) / 2
+                    let x = (slot - barWidth) / 2
                     let cap = CGRect(x: x,
                                      y: chartHeight - height - 1,
                                      width: barWidth,

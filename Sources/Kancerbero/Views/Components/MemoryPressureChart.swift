@@ -28,7 +28,7 @@ struct MemoryPressureChart: View {
 
                 func point(_ index: Int) -> CGPoint {
                     let percent = min(max(Double(values[index]), 0), 100) / 100
-                    return CGPoint(x: CGFloat(index) * stepX,
+                    return CGPoint(x: size.width - CGFloat(index) * stepX,
                                    y: canvasSize.height - CGFloat(percent) * canvasSize.height)
                 }
 
@@ -42,12 +42,12 @@ struct MemoryPressureChart: View {
 
                 // Soft area under the line in the current band colour.
                 var area = Path()
-                area.move(to: CGPoint(x: 0, y: canvasSize.height))
+                area.move(to: CGPoint(x: size.width, y: canvasSize.height))
                 area.addLine(to: point(0))
                 for index in 1..<n {
                     area.addLine(to: point(index))
                 }
-                area.addLine(to: CGPoint(x: CGFloat(n - 1) * stepX,
+                area.addLine(to: CGPoint(x: size.width - CGFloat(n - 1) * stepX,
                                          y: canvasSize.height))
                 area.closeSubpath()
                 context.fill(area, with: .color(color(for: levels[n - 1]).opacity(0.10)))

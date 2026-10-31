@@ -330,6 +330,10 @@ log stream --predicate 'subsystem == "uno.kayros.kancerbero"' --info --debug
 - Comprobar la cadencia real por la hora de “Updated” y el avance de los sparklines: a 0,5 s la
   ventana de 60 muestras abarca ~30 s; a 5 s, ~5 min. Los historiales se conservan al cambiar el
   intervalo y el eje temporal usa las marcas de `sampleDates`, así que no mezcla cadencias.
+- Todos los gráficos temporales (Traffic, CPU, Disk I/O, memoria, batería, sparklines y core bars,
+  además de los estilos del icono del Dock) dibujan el dato más reciente a la izquierda. En
+  Traffic el eje lee `now → -30s → -60s`; en Battery el ancla antigua queda a la derecha y la
+  muestra nueva en el borde izquierdo. Los gráficos de composición no cambian.
 - Regresión de cadencia lenta: con **5 s**, las gráficas y cifras basadas en tasas (tráfico de
   red, Disk → I/O y columnas de CPU%, energía, wakeups e I/O por proceso) deben seguir avanzando
   cada ~5 s, no quedarse a 0. Pausar más que `max(5 s, 2,5 × cadencia)` y reanudar debe producir
@@ -511,8 +515,8 @@ $APP --screenshot /tmp/kb-net-process-independent.png --section networking \
 ```
 
 - Traffic: Download/Upload en la cabecera, gráfico espejado con cuadrícula, etiquetas Y en
-  `bps/Kbps/Mbps/Gbps` y eje temporal `-60s/-30s/now` (con el intervalo de 1 s). Sin salto de
-  layout entre 0,3 s y 5 s.
+  `bps/Kbps/Mbps/Gbps` y eje temporal `now/-30s/-60s` (con el intervalo de 1 s; el dato más
+  reciente entra por la izquierda). Sin salto de layout entre 0,3 s y 5 s.
 - Activity: agrupa Connections y Processes; los números ignoran el foco y aplican los filtros de
   la pestaña activa. En Connections, protocolo (Transport/IP), State y búsqueda de conexión; en
   Processes, sus facetas (IP, Protocolos, Socket type) y su búsqueda. Protocols muestra la barra y

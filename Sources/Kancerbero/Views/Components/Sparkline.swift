@@ -41,7 +41,7 @@ struct Sparkline: View {
         let stepX = size.width / CGFloat(data.count - 1)
         return data.enumerated().map { index, value in
             let normalized = min(max(value / peak, 0), 1)
-            return CGPoint(x: CGFloat(index) * stepX,
+            return CGPoint(x: size.width - CGFloat(index) * stepX,
                            y: size.height - CGFloat(normalized) * size.height)
         }
     }

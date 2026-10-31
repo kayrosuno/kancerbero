@@ -60,13 +60,13 @@ struct CPUHistoryChart: View {
 
                 func band(lower: [Double], upper: [Double]) -> Path {
                     var path = Path()
-                    path.move(to: CGPoint(x: 0, y: y(lower[0])))
+                    path.move(to: CGPoint(x: size.width, y: y(lower[0])))
                     for index in 1..<n {
-                        path.addLine(to: CGPoint(x: CGFloat(index) * stepX,
+                        path.addLine(to: CGPoint(x: size.width - CGFloat(index) * stepX,
                                                  y: y(lower[index])))
                     }
                     for index in stride(from: n - 1, through: 0, by: -1) {
-                        path.addLine(to: CGPoint(x: CGFloat(index) * stepX,
+                        path.addLine(to: CGPoint(x: size.width - CGFloat(index) * stepX,
                                                  y: y(upper[index])))
                     }
                     path.closeSubpath()
@@ -75,9 +75,9 @@ struct CPUHistoryChart: View {
 
                 func topLine(_ values: [Double]) -> Path {
                     var path = Path()
-                    path.move(to: CGPoint(x: 0, y: y(values[0])))
+                    path.move(to: CGPoint(x: size.width, y: y(values[0])))
                     for index in 1..<n {
-                        path.addLine(to: CGPoint(x: CGFloat(index) * stepX,
+                        path.addLine(to: CGPoint(x: size.width - CGFloat(index) * stepX,
                                                  y: y(values[index])))
                     }
                     return path
