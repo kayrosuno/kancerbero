@@ -12,7 +12,8 @@ public enum KBCapabilitiesProbe {
             root: root,
             statisticsPrivcheck: Int(privcheck),
             libprocAllUsers: root,
-            interfaceSplits: true
+            interfaceSplits: true,
+            trash: true
         )
     }
 }

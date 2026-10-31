@@ -150,6 +150,35 @@ public struct KBTrashResult: Codable, Sendable {
     }
 }
 
+public enum KBTrashError {
+    /// Result code used when the file system (or TCC) refused a trash move.
+    public static let permissionCode = "permission"
+
+    /// True for a Cocoa write/read permission error or a POSIX EPERM/EACCES,
+    /// including the underlying error Foundation wraps in `NSUnderlyingErrorKey`.
+    public static func isPermissionDenied(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        if nsError.domain == NSCocoaErrorDomain,
+           nsError.code == CocoaError.Code.fileWriteNoPermission.rawValue
+               || nsError.code == CocoaError.Code.fileReadNoPermission.rawValue {
+            return true
+        }
+        if isPosixPermission(nsError) {
+            return true
+        }
+        if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError,
+           isPosixPermission(underlying) {
+            return true
+        }
+        return false
+    }
+
+    private static func isPosixPermission(_ error: NSError) -> Bool {
+        error.domain == NSPOSIXErrorDomain
+            && (error.code == Int(EPERM) || error.code == Int(EACCES))
+    }
+}
+
 public struct KBTrashResponsePayload: Codable, Sendable {
     public var results: [KBTrashResult]
 

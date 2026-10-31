@@ -182,11 +182,26 @@ struct LeftoversPanel: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 8) {
-            Text("1 app + \(model.selectedLeftovers.count) files · "
-                 + KBFormat.bytes(model.selectedBytes))
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+        let bundle = model.selectedBundle
+        let appCount = bundle?.isProtected == false ? 1 : 0
+        return HStack(spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white)
+                Text("\(appCount) app + \(model.selectedLeftovers.count) files selected")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text(KBFormat.bytes(model.selectedBytes))
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.95))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background {
+                Capsule().fill(KBTheme.gradient(Color.accentColor))
+            }
 
             Spacer(minLength: 4)
 
@@ -201,6 +216,7 @@ struct LeftoversPanel: View {
 
             Button("Move to Trash", action: onTrash)
                 .buttonStyle(.borderedProminent)
+                .tint(.red)
                 .disabled(model.isTrashing || model.selectedBundle == nil)
         }
     }

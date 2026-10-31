@@ -77,8 +77,9 @@ final class ApplicationsModel {
     }
 
     var selectedBytes: Int64 {
-        (selectedBundle?.sizeBytes ?? 0)
-            + selectedLeftovers.reduce(0) { $0 + ($1.sizeBytes ?? 0) }
+        let appSize = selectedBundle?.isProtected == false
+            ? (selectedBundle?.sizeBytes ?? 0) : 0
+        return appSize + selectedLeftovers.reduce(0) { $0 + ($1.sizeBytes ?? 0) }
     }
 
     var applicationCount: Int {
@@ -118,10 +119,7 @@ final class ApplicationsModel {
            }) {
             self.pendingSelection = nil
             await select(match.path)
-        } else if selectedPath == nil {
-            selectedPath = visibleBundles.first?.path
-            await loadLeftovers()
-        } else if !leftovers.isEmpty {
+        } else if selectedPath != nil {
             await loadLeftovers()
         }
     }

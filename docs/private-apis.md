@@ -213,13 +213,27 @@ privadas del sistema; su lógica es NSFileManager + launchctl + un helper propio
 | Leftovers | `fetchRelatedFiles` agrega preferencesFiles, miscFiles, containersFiles, savedStateFiles, agentsAndDaemonsFiles y logsFiles | `-[ACBundle fetchRelatedFiles]` 0x10001e550 |
 | Misc | `libraryPaths`/`appSupportPaths`, PreferencePanes, Services, Safari/Extensions, `/Users/Shared`; con bundle id ≥ 8: Cookies, HTTPStorages, WebKit y ApplicationRecentDocuments | `-[ACBundle miscFiles]` 0x10001e990 |
 | Contenedores | Containers + Application Scripts; `com.apple.security.application-groups` de los entitlements (scripts de grupo seleccionados, Group Containers no) | `-[ACBundle containersFiles]` 0x10001efc0 |
-| Coincidencia | último componente normalizado; bundle id y variantes de `bundleName`/`bundleDisplayName` (sin espacios, sin dígitos finales); al coincidir una carpeta no desciende | `relatedFilesInDirectories:maxDepth:matching:` 0x100020920 |
+| Coincidencia | último componente normalizado; bundle id por `contains`/prefijo sin distinguir mayúsculas; nombres por **prefijo** (regex sensible a mayúsculas) de las variantes de `bundleName`/`bundleDisplayName`; al coincidir una carpeta no desciende | `relatedFilesInDirectories:maxDepth:matching:` 0x100020920 |
 | Tamaños | `getAllocatedSize:ofItemAtURL:options:error:` | `-[ACFile fetchSize]` 0x100014810 |
 | Borrado | descarga LaunchAgents, limpia `UF_IMMUTABLE`, `trashItemAtURL:` y, si falla por permisos, `ACHelperClient` privilegiado | `-[ACBundle recycle]` 0x100020f88 |
 
-kancerbero replica las categorías y la coincidencia exacta, sin helper propio: las rutas del
-usuario se mueven con `FileManager.trashItem` y las de `/Library`/`/Applications` se envían al
-daemon root (`trashItems`), con lista blanca y revalidación descritas en `docs/security.md`.
+kancerbero replica las categorías, la coincidencia y el fallback de borrado: las rutas del
+usuario se intentan con `FileManager.trashItem` y las de `/Library`/`/Applications` se envían al
+daemon root (`trashItems`). Si `trashItem` falla por permisos (`NSFileWriteNoPermissionError` o
+`EPERM`/`EACCES`, incluido el subyacente), el mismo ítem se reintenta en el lote del daemon y,
+si este lo mueve, su resultado reemplaza al fallo local. Es el equivalente al
+`ACPrivilegedTask`/`AuthorizationExecuteWithPrivileges` de AppCleaner
+(`-[ACHelperClient moveFilesToTrash:reply:]`), sin diálogo de contraseña; el daemon de kancerbero
+ya corre como root y se autodetuvo/relanzó vía launchd cuando el binario en ejecución era anterior
+a `trashItems`. El handshake anuncia `trash` en `KBCapabilities` para que el cliente no envíe
+peticiones a un daemon antiguo.
+
+Los contenedores de otras apps (`~/Library/Containers`, group containers y application scripts)
+están protegidos por TCC aunque el usuario sea el propietario. La app los intenta primero y, si
+macOS la deniega, el daemon root reintenta; TCC también se aplica a root, así que sin Acceso Total
+al Disco el reintento devuelve `code == "permission"` y la app ofrece abrir ese ajuste. Conceder
+Acceso Total al Disco a `uno.kayros.kancerbero` cubre app y daemon (mismo identificador y
+`AssociatedBundleIdentifiers`).
 
 Rutas y matcher concretos: `Resources/BundlePaths.plist` define `System/User Applications`
 (`/Applications`, `~/Applications`), `System/User Plugins` (Contextual Menu Items, InputManagers,
@@ -227,8 +241,11 @@ Internet Plug-Ins, Mail/Bundles, PreferencePanes, QuickLook, QuickTime, Screen S
 `System/User Widgets` (`/Library/Widgets`, `~/Library/Widgets`). `relatedFilesInDirectories:` invoca
 la variante con `maxDepth:0` (profundidad ilimitada) sobre todo `~/Library` y `/Library`; el matcher
 acepta el bundle id por `contains` (≥8 caracteres) o prefijo (≥4, sin distinguir mayúsculas) y los
-nombres por variantes de `bundleName`/`bundleDisplayName` sin extensión (sensibles a mayúsculas), y
-al coincidir un directorio no desciende. En este Mac, Antigravity produce 4 relacionadas
+nombres por **prefijo** de las variantes de `bundleName`/`bundleDisplayName` sin extensión (regex
+sensible a mayúsculas), y al coincidir un directorio no desciende. Por eso Claude suma, además de
+sus preferencias/caches/logs, los tres workflows `Claude - …` de `~/Library/Services` y
+`Developer/Xcode/CodingAssistant/ClaudeAgentConfig`: 12 relacionadas + el bundle = 13 entradas,
+como en AppCleaner. En este Mac, Antigravity produce 4 relacionadas
 (`Application Support/Antigravity`, `Application Support/Logi/.../com.google.antigravity.png`,
 `Preferences/com.google.antigravity.plist`, `Logs/Antigravity`) y, con el bundle de la app, las 5
 entradas que muestra la app.

@@ -385,14 +385,18 @@ public struct KBCapabilities: Codable, Sendable {
     public var statisticsPrivcheck: Int
     public var libprocAllUsers: Bool
     public var interfaceSplits: Bool
+    /// The daemon handles `trashItems`. Optional so an older daemon decodes as nil.
+    public var trash: Bool?
 
     public init(nstat: Bool = false, root: Bool = false, statisticsPrivcheck: Int = 0,
-                libprocAllUsers: Bool = false, interfaceSplits: Bool = false) {
+                libprocAllUsers: Bool = false, interfaceSplits: Bool = false,
+                trash: Bool? = nil) {
         self.nstat = nstat
         self.root = root
         self.statisticsPrivcheck = statisticsPrivcheck
         self.libprocAllUsers = libprocAllUsers
         self.interfaceSplits = interfaceSplits
+        self.trash = trash
     }
 }
 
