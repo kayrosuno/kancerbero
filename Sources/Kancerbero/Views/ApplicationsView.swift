@@ -132,18 +132,23 @@ struct ApplicationsView: View {
     // MARK: - Controls
 
     private var controls: some View {
-        @Bindable var model = model
-        return HStack(spacing: 8) {
-            kindChip(.application, "Applications")
-            kindChip(.widget, "Widgets")
-            kindChip(.plugin, "Plugins")
+        HStack(spacing: 10) {
+            MultiSelectChipBar(
+                selection: kindSelection,
+                label: "Type",
+                options: [.application, .widget, .plugin],
+                title: { $0.pluralTitle },
+                tint: { _ in AppSection.applications.tint }
+            )
+            MultiSelectChipBar(
+                selection: scopeSelection,
+                label: "Scope",
+                options: [.system, .user],
+                title: { $0.title },
+                tint: { _ in AppSection.applications.tint }
+            )
 
-            Divider().frame(height: 14).opacity(0.4)
-
-            scopeChip(.system, "System")
-            scopeChip(.user, "User")
-
-            Spacer()
+            Spacer(minLength: 8)
 
             if model.isScanning || model.isTrashing {
                 ProgressView().controlSize(.small)
@@ -157,50 +162,24 @@ struct ApplicationsView: View {
         }
     }
 
-    private func scopeChip(_ scope: KBAppScope, _ title: String) -> some View {
-        let selected = model.scopeFilter.contains(scope)
-        return Button {
-            if selected, model.scopeFilter.count > 1 {
-                model.scopeFilter.remove(scope)
-            } else {
-                model.scopeFilter.insert(scope)
+    private var kindSelection: Binding<Set<KBAppKind>> {
+        Binding(
+            get: { model.kindFilter },
+            set: { next in
+                guard !next.isEmpty else { return }
+                model.kindFilter = next
             }
-        } label: {
-            Text(title)
-                .font(.system(size: 10, weight: .medium))
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4)
-                .background {
-                    Capsule().fill(selected
-                        ? Color.secondary.opacity(0.20)
-                        : Color.secondary.opacity(0.08))
-                }
-                .foregroundStyle(selected ? .primary : .secondary)
-        }
-        .buttonStyle(.plain)
+        )
     }
 
-    private func kindChip(_ kind: KBAppKind, _ title: String) -> some View {
-        let selected = model.kindFilter.contains(kind)
-        return Button {
-            if selected, model.kindFilter.count > 1 {
-                model.kindFilter.remove(kind)
-            } else {
-                model.kindFilter.insert(kind)
+    private var scopeSelection: Binding<Set<KBAppScope>> {
+        Binding(
+            get: { model.scopeFilter },
+            set: { next in
+                guard !next.isEmpty else { return }
+                model.scopeFilter = next
             }
-        } label: {
-            Text(title)
-                .font(.system(size: 10, weight: .medium))
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4)
-                .background {
-                    Capsule().fill(selected
-                        ? Color.accentColor.opacity(0.18)
-                        : Color.secondary.opacity(0.10))
-                }
-                .foregroundStyle(selected ? Color.accentColor : .secondary)
-        }
-        .buttonStyle(.plain)
+        )
     }
 
     private var daemonReady: Bool {

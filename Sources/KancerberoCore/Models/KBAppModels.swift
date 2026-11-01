@@ -1,9 +1,11 @@
 import Foundation
 
-public enum KBAppKind: String, Codable, Sendable, CaseIterable, Hashable {
+public enum KBAppKind: String, Codable, Sendable, CaseIterable, Hashable, Identifiable {
     case application
     case widget
     case plugin
+
+    public var id: String { rawValue }
 
     public var title: String {
         switch self {
@@ -25,9 +27,11 @@ public enum KBAppKind: String, Codable, Sendable, CaseIterable, Hashable {
 /// Where the bundle is installed, following AppCleaner's BundlePaths.plist:
 /// `/Applications` and `/Library` entries are system-wide, the `~/Applications`
 /// and `~/Library` counterparts belong to the current user.
-public enum KBAppScope: String, Codable, Sendable, CaseIterable, Hashable {
+public enum KBAppScope: String, Codable, Sendable, CaseIterable, Hashable, Identifiable {
     case user
     case system
+
+    public var id: String { rawValue }
 
     public var title: String {
         switch self {
