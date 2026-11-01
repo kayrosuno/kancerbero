@@ -536,9 +536,10 @@ $APP --screenshot /tmp/kb-net-process-independent.png --section networking \
   (TCP/UDP/Other), **TCP State** (Established, Listening, Connecting (SYN), Closing
   (Close/Fin/Time Wait)) y **Other** en su propia cápsula (UDP y estados no clasificados), todos
   marcados por defecto, más `Filter process`. Desmarcar un valor excluye sus filas; desmarcar todo
-  un grupo deja “0 of M connections”. Desmarcar **Other** oculta las filas UDP/sin estado;
-  desmarcar un estado TCP no las oculta. La familia de dirección desconocida se excluye cuando el
-  grupo IP no está completo.
+  un grupo deja “0 of M connections”. La cápsula **Other** muestra solo el checkbox y controla los
+  estados TCP no clasificados: desmarcarla no oculta las filas UDP, que dependen de
+  **Transport › UDP** (desmarcar UDP las elimina). La familia de dirección desconocida se excluye
+  cuando el grupo IP no está completo.
 - Para comprobar la ventana de 10 s: lanzar una descarga, ver cómo el flujo aparece en el filtro
   Active, pararla y comprobar que sigue activo ~10 s y después desaparece del filtro (el
   contador Active baja).

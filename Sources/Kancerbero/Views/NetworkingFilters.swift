@@ -196,9 +196,9 @@ enum NetworkingConnectionState: String, CaseIterable, Identifiable, Hashable, Se
         }
     }
 
-    /// Empty states (UDP) match no category here; the Connections matcher
-    /// treats them as `other` so the Other checkbox controls them. Every
-    /// non-empty unrecognized state (Closed, Unknown, …) belongs to `other`.
+    /// Empty states (UDP) match no category; the Connections matcher leaves
+    /// them to the Transport filter. Every non-empty unrecognized state
+    /// (Closed, Unknown, …) belongs to `other`.
     static func category(for rawState: String) -> NetworkingConnectionState? {
         let value = normalized(rawState)
         guard !value.isEmpty else { return nil }
@@ -240,7 +240,7 @@ extension NetworkingConnectionState {
         case .closing:
             return "Close wait, FIN wait, closing, time wait and last ack"
         case .other:
-            return "UDP flows and TCP states not classified above"
+            return "TCP states not classified above"
         }
     }
 }
@@ -382,11 +382,11 @@ extension AppModel {
         }
         if states != NetworkingConnectionState.all {
             base = base.filter {
-                // UDP and sources with no TCP state belong to Other, so the
-                // Other checkbox controls them instead of every subset hiding
-                // them.
-                let category = NetworkingConnectionState.category(for: $0.tcpState)
-                return states.contains(category ?? .other)
+                // Sources without a TCP state (UDP) are left to the Transport
+                // filter: unchecking Other must not hide them.
+                guard let category = NetworkingConnectionState.category(for: $0.tcpState)
+                else { return true }
+                return states.contains(category)
             }
         }
         guard let focus else { return base }

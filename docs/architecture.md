@@ -47,9 +47,10 @@
   `CheckboxFilterGroup` (nativo `.toggleStyle(.checkbox)`) dentro de una cápsula neutra: todo
   marcado equivale a sin filtro, desmarcar excluye y un grupo vacío no coincide con ninguna fila.
   El filtro de estados se divide en **TCP State** (Established, Listening, Connecting, Closing) y
-  **Other** en su propia cápsula; `NetworkingConnectionState.category(for:)` clasifica el
-  `tcpState` crudo de NStat y las filas UDP/no clasificadas (categoría `nil`) cuentan como
-  `.other`: desmarcar Other las oculta y desmarcar un estado TCP no. La tabla de Interfaces tiene
+  **Other** en su propia cápsula (solo el checkbox). `NetworkingConnectionState.category(for:)`
+  clasifica el `tcpState` crudo de NStat; `.other` agrupa solo estados TCP no clasificados,
+  mientras que las filas sin estado (UDP) pasan el filtro de estados y las controla Transport
+  (desmarcar Other no las oculta). La tabla de Interfaces tiene
   búsqueda propia (`interfaceSearch`) y ordena por todas sus columnas, incluidas RX/TX bit/s
   mediante la fila derivada `InterfaceRow` (`interfaceSortOrder`). En Processes, un IP parcial exige algún badge
   de la familia marcada (UNIX/OTHER quedan fuera), el filtro de protocolo cruza los `tags` del
