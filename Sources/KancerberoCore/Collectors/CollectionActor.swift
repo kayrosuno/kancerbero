@@ -42,7 +42,8 @@ public actor CollectionActor {
     private var lastSourceCounters: [String: KBCounters] = [:]
     private var lastInterfaceCounters: [UInt32: KBCounters] = [:]
     private var lastInterfaceRates: [UInt32: KBRates] = [:]
-    private var lastSampleNanoseconds: UInt64 = 0
+    private var lastProcessSampleNanoseconds: UInt64 = 0
+    private var lastCounterSampleNanoseconds: UInt64 = 0
     private var privcheck: Int32 = -1
     private var socketInventory: KBSocketInventory?
     private var socketScanTask: Task<Void, Never>?
@@ -54,7 +55,7 @@ public actor CollectionActor {
 
     public func refresh(timeoutMilliseconds: Int32 = 250,
                         cadence: Double? = nil) -> KBCollectionSnapshot {
-        let now = KBInterop.monotonicNanoseconds()
+        let start = KBInterop.monotonicNanoseconds()
         var errorMessage: String?
 
         var statisticsPrivcheck: Int32 = -1
@@ -91,17 +92,32 @@ public actor CollectionActor {
             if errorMessage == nil { errorMessage = error.localizedDescription }
         }
 
-        maybeStartSocketScan(processes: processes, sources: sources, now: now)
+        // Interface/flow counters were just read; timestamp that moment so the
+        // rate divisor matches the counter interval even when the earlier
+        // nstat/process collection takes a variable amount of time.
+        let counterNow = KBInterop.monotonicNanoseconds()
 
-        let elapsed = lastSampleNanoseconds == 0
+        maybeStartSocketScan(processes: processes, sources: sources, now: counterNow)
+
+        let processElapsed = lastProcessSampleNanoseconds == 0
             ? 0
-            : Double(now &- lastSampleNanoseconds) / 1_000_000_000.0
-        let validInterval = RateTiming.isValidGap(elapsed, cadence: cadence)
+            : start > lastProcessSampleNanoseconds
+                ? Double(start - lastProcessSampleNanoseconds) / 1_000_000_000.0
+                : 0
+        let validProcessInterval = RateTiming.isValidGap(processElapsed,
+                                                         cadence: cadence)
+
+        let rateElapsed = lastCounterSampleNanoseconds == 0
+            ? 0
+            : counterNow > lastCounterSampleNanoseconds
+                ? Double(counterNow - lastCounterSampleNanoseconds) / 1_000_000_000.0
+                : 0
+        let validRateInterval = RateTiming.isValidGap(rateElapsed, cadence: cadence)
 
         let host = hostSampler.sample(processes: processes)
         if let host {
             processCPUTracker.annotate(&processes,
-                                       elapsed: validInterval ? elapsed : 0,
+                                       elapsed: validProcessInterval ? processElapsed : 0,
                                        totalMemoryBytes: host.memory.totalBytes,
                                        coreCount: host.cpu.coreCount,
                                        cadence: cadence)
@@ -116,27 +132,27 @@ public actor CollectionActor {
         }
 
         var interfaceRates: [UInt32: KBRates] = [:]
-        if validInterval {
+        if validRateInterval {
             for index in sources.indices {
                 let id = sources[index].id
                 if let previous = lastSourceCounters[id] {
-                    let delta = subtract(sources[index].counters, previous)
+                    let delta = sources[index].counters.positiveDelta(from: previous)
                     sources[index].rates = KBRates(
-                        rxBytesPerSecond: Double(delta.rxBytes) / elapsed,
-                        txBytesPerSecond: Double(delta.txBytes) / elapsed,
-                        rxPacketsPerSecond: Double(delta.rxPackets) / elapsed,
-                        txPacketsPerSecond: Double(delta.txPackets) / elapsed
+                        rxBytesPerSecond: Double(delta.rxBytes) / rateElapsed,
+                        txBytesPerSecond: Double(delta.txBytes) / rateElapsed,
+                        rxPacketsPerSecond: Double(delta.rxPackets) / rateElapsed,
+                        txPacketsPerSecond: Double(delta.txPackets) / rateElapsed
                     )
                 }
             }
             for item in interfaces {
                 if let previous = lastInterfaceCounters[item.id] {
-                    let delta = subtract(item.counters, previous)
+                    let delta = item.counters.positiveDelta(from: previous)
                     interfaceRates[item.id] = KBRates(
-                        rxBytesPerSecond: Double(delta.rxBytes) / elapsed,
-                        txBytesPerSecond: Double(delta.txBytes) / elapsed,
-                        rxPacketsPerSecond: Double(delta.rxPackets) / elapsed,
-                        txPacketsPerSecond: Double(delta.txPackets) / elapsed
+                        rxBytesPerSecond: Double(delta.rxBytes) / rateElapsed,
+                        txBytesPerSecond: Double(delta.txBytes) / rateElapsed,
+                        rxPacketsPerSecond: Double(delta.rxPackets) / rateElapsed,
+                        txPacketsPerSecond: Double(delta.txPackets) / rateElapsed
                     )
                 }
             }
@@ -150,7 +166,8 @@ public actor CollectionActor {
         for item in interfaces { interfaceCounters[item.id] = item.counters }
         lastInterfaceCounters = interfaceCounters
         lastInterfaceRates = interfaceRates
-        lastSampleNanoseconds = now
+        lastProcessSampleNanoseconds = start
+        lastCounterSampleNanoseconds = counterNow
 
         let mode: KBMode
         if nstatStarted {
@@ -168,7 +185,7 @@ public actor CollectionActor {
             isRoot: geteuid() == 0,
             error: errorMessage,
             generatedAt: Date(),
-            monotonicNanoseconds: now,
+            monotonicNanoseconds: counterNow,
             socketInventory: socketInventory,
             hostMetrics: host
         )
@@ -222,14 +239,5 @@ public actor CollectionActor {
         socketScanTask = nil
         nstat.stop()
         nstatStarted = false
-    }
-
-    private func subtract(_ current: KBCounters, _ previous: KBCounters) -> KBCounters {
-        KBCounters(
-            rxBytes: current.rxBytes >= previous.rxBytes ? current.rxBytes - previous.rxBytes : current.rxBytes,
-            txBytes: current.txBytes >= previous.txBytes ? current.txBytes - previous.txBytes : current.txBytes,
-            rxPackets: current.rxPackets >= previous.rxPackets ? current.rxPackets - previous.rxPackets : current.rxPackets,
-            txPackets: current.txPackets >= previous.txPackets ? current.txPackets - previous.txPackets : current.txPackets
-        )
     }
 }

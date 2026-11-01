@@ -13,9 +13,19 @@ public enum RateTiming {
     /// CLI de KancerberoProbe): sigue descartando bases realmente obsoletas.
     private static let fallbackMaximumGap: Double = 30
 
-    /// Mismo criterio que `AppModel.isLive`: permite 2,5 ticks, nunca menos de 5 s.
+    /// Hueco mínimo fiable: evita dividir un delta real por una ventana casi
+    /// nula (pushes duplicados, cruces local↔daemon o refrescos inmediatos).
+    public static func minimumGap(cadence: Double? = nil) -> Double {
+        guard let cadence, cadence.isFinite, cadence > 0 else { return 0.2 }
+        return max(0.2, cadence * 0.25)
+    }
+
+    /// Mismo criterio que `AppModel.isLive`: permite 2,5 ticks, nunca menos de 5 s,
+    /// y exige el hueco mínimo fiable.
     public static func isValidGap(_ elapsed: Double, cadence: Double? = nil) -> Bool {
-        guard elapsed.isFinite, elapsed > 0 else { return false }
+        guard elapsed.isFinite, elapsed >= minimumGap(cadence: cadence) else {
+            return false
+        }
         guard let cadence, cadence.isFinite, cadence > 0 else {
             return elapsed <= fallbackMaximumGap
         }

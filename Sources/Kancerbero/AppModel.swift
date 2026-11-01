@@ -156,9 +156,15 @@ final class AppModel {
     private var daemonService: SMAppService {
         .daemon(plistName: Self.daemonServicePlist)
     }
+    private enum SampleSource {
+        case local
+        case daemon
+    }
+
     private var previousSourceCounters: [String: KBCounters] = [:]
     private var previousInterfaceCounters: [UInt32: KBCounters] = [:]
     private var previousTimestamp: UInt64 = 0
+    private var lastSampleSource: SampleSource?
     private var daemonConnecting = false
     private var lastDaemonAttempt = Date.distantPast
     private var lastFullDiskAccessProbe = Date.distantPast
@@ -653,7 +659,20 @@ final class AppModel {
     }
 
     func refreshNow() {
-        Task { await refreshOnce() }
+        if usingDaemon, let source = daemonSource {
+            let generation = daemonGeneration
+            Task {
+                let snapshot = await Task.detached(priority: .userInitiated) {
+                    try? source.requestSnapshot()
+                }.value
+                guard let snapshot,
+                      self.daemonGeneration == generation,
+                      self.usingDaemon else { return }
+                self.apply(snapshot, source: .daemon)
+            }
+        } else {
+            Task { await refreshOnce() }
+        }
     }
 
     func refreshDaemons() async {
@@ -775,7 +794,7 @@ final class AppModel {
                     guard let self, self.daemonGeneration == generation,
                           !self.isPaused else { return }
                     self.usingDaemon = true
-                    self.apply(snapshot)
+                    self.apply(snapshot, source: .daemon)
                 }
             }
             source.onInvalidate = { [weak self] in
@@ -891,14 +910,29 @@ final class AppModel {
 
     private func refreshOnce() async {
         let snapshot = await collector.refresh(cadence: interval)
-        apply(snapshot)
+        // The daemon may have connected while the local collection was running;
+        // never mix a local baseline into the daemon stream.
+        guard !usingDaemon else { return }
+        apply(snapshot, source: .local)
     }
 
-    private func apply(_ snapshot: KBCollectionSnapshot) {
+    private func apply(_ snapshot: KBCollectionSnapshot, source: SampleSource) {
+        if lastSampleSource != source {
+            // Local and daemon snapshots are independent sample streams. Sharing
+            // their counter baselines at launch can make a delta negative and
+            // turn one tick into a GB/s spike.
+            previousTimestamp = 0
+            previousSourceCounters = [:]
+            previousInterfaceCounters = [:]
+            previousProcessEnergy = [:]
+            previousProcessIO = [:]
+            lastSampleSource = source
+        }
+
         let now = snapshot.monotonicNanoseconds
-        let elapsed = previousTimestamp == 0
+        let elapsed = previousTimestamp == 0 || now <= previousTimestamp
             ? 0
-            : Double(now &- previousTimestamp) / 1_000_000_000.0
+            : Double(now - previousTimestamp) / 1_000_000_000.0
         let validInterval = RateTiming.isValidGap(elapsed, cadence: interval)
 
         if let io = DiskIOReader.current() {
@@ -931,7 +965,7 @@ final class AppModel {
             for index in sources.indices {
                 let id = sources[index].id
                 if let previous = previousSourceCounters[id] {
-                    let delta = subtract(sources[index].counters, previous)
+                    let delta = sources[index].counters.positiveDelta(from: previous)
                     sources[index].rates = KBRates(
                         rxBytesPerSecond: Double(delta.rxBytes) / elapsed,
                         txBytesPerSecond: Double(delta.txBytes) / elapsed,
@@ -942,7 +976,7 @@ final class AppModel {
             }
             for item in snapshot.interfaces {
                 if let previous = previousInterfaceCounters[item.id] {
-                    let delta = subtract(item.counters, previous)
+                    let delta = item.counters.positiveDelta(from: previous)
                     rates[item.id] = KBRates(
                         rxBytesPerSecond: Double(delta.rxBytes) / elapsed,
                         txBytesPerSecond: Double(delta.txBytes) / elapsed,
@@ -1022,6 +1056,13 @@ final class AppModel {
                 patchedProcesses[index].usage = usage
             }
             previousProcessIO = ioBaseline
+        }
+        if !validInterval {
+            // Baselines only advance inside a valid window; clear them after a
+            // pause or source switch so the next real tick cannot divide a
+            // multi-second delta by one cadence.
+            previousProcessEnergy = [:]
+            previousProcessIO = [:]
         }
         if patchedProcesses.contains(where: {
             $0.usage != nil && $0.usage?.preventingSleep == nil
@@ -1277,14 +1318,5 @@ final class AppModel {
 
     func userName(for uid: UInt32) -> String {
         userNames[uid] ?? String(uid)
-    }
-
-    private func subtract(_ current: KBCounters, _ previous: KBCounters) -> KBCounters {
-        KBCounters(
-            rxBytes: current.rxBytes >= previous.rxBytes ? current.rxBytes - previous.rxBytes : current.rxBytes,
-            txBytes: current.txBytes >= previous.txBytes ? current.txBytes - previous.txBytes : current.txBytes,
-            rxPackets: current.rxPackets >= previous.rxPackets ? current.rxPackets - previous.rxPackets : current.rxPackets,
-            txPackets: current.txPackets >= previous.txPackets ? current.txPackets - previous.txPackets : current.txPackets
-        )
     }
 }

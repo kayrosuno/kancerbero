@@ -350,13 +350,18 @@
 - **Permisos:** CPU global, memoria, swap, load, uptime y procesos propios no requieren root.
   Task info de otros uid y la enumeración de sus PIDs requieren el daemon root; sin él la tabla
   solo lista el uid actual y lo indica. No se usan entitlements privados ni `task_for_pid`.
-- **Ventana de tasas:** un delta de contadores solo se convierte en tasa si `elapsed > 0` y
-  `elapsed <= max(5 s, 2,5 × cadencia)` (`RateTiming`). El bucle duerme después de recolectar, así
-  que el hueco real es cadencia + duración de la recolección; el criterio descarta bases obsoletas
-  (pausa, desconexión, suspensión) sin anular los 5 s del selector ni los 10 s que acepta el
-  daemon. Se aplica en `AppModel.apply`, `CollectionActor.refresh` y
-  `ProcessCPUTracker.annotate`; cuando la cadencia es desconocida (petición puntual al daemon,
-  `KancerberoProbe`) el límite es 30 s.
+- **Ventana de tasas:** un delta de contadores solo se convierte en tasa si
+  `elapsed >= max(0,2 s, 0,25 × cadencia)` y `elapsed <= max(5 s, 2,5 × cadencia)`
+  (`RateTiming`). El mínimo descarta pushes duplicados, cruces local↔daemon y refrescos
+  inmediatos; el máximo descarta bases obsoletas (pausa, desconexión, suspensión) sin anular los
+  5 s del selector ni los 10 s que acepta el daemon. Se aplica en `AppModel.apply`,
+  `CollectionActor.refresh` y `ProcessCPUTracker.annotate`; cuando la cadencia es desconocida
+  (petición puntual al daemon, `KancerberoProbe`) el rango es 0,2–30 s.
+- **Baselines:** cada snapshot lleva su procedencia (local o daemon); al cambiar de fuente se
+  vacían los baselines de red y de proceso. `KBCounters.positiveDelta(from:)` devuelve 0 cuando un
+  contador retrocede, nunca el acumulado completo. Así el primer sample de una fuente solo siembra
+  baseline y no puede producir el pico de GB/s del arranque. El reloj de las tasas se toma tras leer
+  las interfaces; el de CPU de procesos conserva su propio inicio de recolección.
 
 ## XPC
 
