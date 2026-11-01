@@ -750,6 +750,22 @@ int kb_nstat_poll(int timeout_ms)
         for (size_t i = 0; i < count; i++) {
             g.query_counts(refs[i]);
         }
+
+        /* The batch belongs to this block: the caller may have timed out and
+           returned while these queries were still running, so neither the
+           retained sources nor the array can be released there. */
+        for (size_t i = 0; i < count; i++) {
+            CFRelease(refs[i]);
+        }
+        free(refs);
+
+        /* The block also owns the poll claim, so a late callback cannot
+           complete a newer batch and no two batches overlap. */
+        pthread_mutex_lock(&g.mutex);
+        g.poll_active = 0;
+        g.poll_pending = 0;
+        pthread_cond_broadcast(&g.poll_cond);
+        pthread_mutex_unlock(&g.mutex);
     });
 
     struct timespec deadline;
@@ -770,14 +786,10 @@ int kb_nstat_poll(int timeout_ms)
             break;
         }
     }
-    g.poll_active = 0;
-    g.poll_pending = 0;
+    /* The dispatch block releases the batch and clears the claim when it
+       finishes; on a timeout the caller returns a partial result while the
+       next polls report busy. Never release refs or reset the claim here. */
     pthread_mutex_unlock(&g.mutex);
-
-    for (size_t i = 0; i < count; i++) {
-        CFRelease(refs[i]);
-    }
-    free(refs);
 
     return timed_out ? 1 : 0;
 }
