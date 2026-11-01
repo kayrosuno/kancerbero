@@ -43,6 +43,7 @@ public enum SocketSummaryCollector {
             guard let process = byPID[raw.pid] else { continue }
             if raw.restricted != 0 { restrictedProcesses += 1 }
             if raw.truncated != 0 { truncated = true }
+            let sigs = signatures(from: raw)
             summaries.append(KBProcessSocketSummary(
                 key: process.id,
                 buckets: KBSocketBucketCounts(
@@ -67,7 +68,9 @@ public enum SocketSummaryCollector {
                 restricted: raw.restricted != 0,
                 truncated: raw.truncated != 0,
                 otherFamilies: otherFamilies(from: raw.other_families),
-                otherProtocols: otherProtocols(from: raw.inet_protocols)
+                otherProtocols: otherProtocols(from: raw.inet_protocols),
+                signatures: sigs,
+                signaturesTruncated: sigs == nil ? nil : (raw.signatures_truncated != 0)
             ))
         }
 
@@ -78,6 +81,27 @@ public enum SocketSummaryCollector {
             restrictedProcesses: restrictedProcesses,
             truncated: truncated
         )
+    }
+
+    /// Reads the fixed C array of distinct (family, type, protocol) triples.
+    /// nil means there is no usable scan (older daemon or fully restricted);
+    /// an empty array means the process was scanned and had no sockets.
+    private static func signatures(from raw: kb_socket_summary) -> [KBSocketSignature]? {
+        guard raw.restricted == 0 || raw.total > 0 else { return nil }
+        let count = Int(raw.signature_count)
+        guard count > 0 else { return [] }
+        return withUnsafeBytes(of: raw.signatures) { bytes in
+            let entries = bytes.bindMemory(to: kb_socket_signature.self)
+            return entries.prefix(min(count, entries.count)).map { entry in
+                KBSocketSignature(family: entry.family,
+                                  type: entry.type,
+                                  protocolNumber: entry.protocol_number)
+            }.sorted { lhs, rhs in
+                if lhs.family != rhs.family { return lhs.family < rhs.family }
+                if lhs.type != rhs.type { return lhs.type < rhs.type }
+                return lhs.protocolNumber < rhs.protocolNumber
+            }
+        }
     }
 
     /// Expands the AF-number bitmask into the families that fell into `other`.

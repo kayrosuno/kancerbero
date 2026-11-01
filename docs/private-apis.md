@@ -64,7 +64,19 @@ Para el resumen de sockets se usa `PROC_PIDLISTFDS` + `PROC_PIDFDSOCKETINFO` por
 `soi_type` (stream/dgram/raw/seqpacket) y `soi_protocol` (TCP/UDP/raw). `soi_so` es el handle
 opaco del socket y se usa solo para deduplicar FDs duplicados dentro del mismo PID; no se
 persiste ni viaja por XPC. `pri_un` permite identificar AF_UNIX. El inventario expone únicamente
-conteos agregados, no direcciones ni rutas.
+conteos agregados y firmas `(domain, type, protocol)`, no direcciones ni rutas.
+
+Clasificación de sockets (verificada en el árbol de referencia xnu `darwin-xnu-main`):
+`socket(domain, type, protocol)` resuelve el protocolo en `socreate_internal`
+(`bsd/kern/uipc_socket.c`): con `proto != 0` usa `pffindproto(dom, proto, type)`; con `0`,
+`pffindtype(dom, type)` (primer `protosw` del dominio con ese tipo, y exige `pr_type == type`).
+AF_INET resuelve por defecto DGRAM→UDP, STREAM→TCP y RAW→IPPROTO_RAW (`bsd/netinet/in_proto.c`),
+pero un protocolo explícito (ICMP, SCTP…) es válido; AF_UNIX solo tiene STREAM/DGRAM con
+protocolo 0 (`bsd/kern/uipc_proto.c`). libproc devuelve el resultado real en `soi_family`
+(dominio), `soi_type` (`so->so_type`) y `soi_protocol` (`SOCK_PROTO(so)`, protocolo resuelto),
+según `bsd/kern/socket_info.c`. kancerbero guarda por proceso el conjunto de firmas
+`(family, type, protocol_number)` para que los filtros de Processes crucen las tres facetas sobre
+el mismo socket; los contadores agregados antiguos se mantienen como fallback.
 
 ### sysctl
 

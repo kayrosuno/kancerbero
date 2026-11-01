@@ -442,6 +442,28 @@ static struct proc_fdinfo *kb_open_fd_list_status(int32_t pid, size_t *count,
     return fds;
 }
 
+static void kb_socket_record_signature(kb_socket_summary *summary,
+                                       int32_t family, int32_t type,
+                                       int32_t protocol)
+{
+    for (uint32_t i = 0; i < summary->signature_count; i++) {
+        const kb_socket_signature *seen = &summary->signatures[i];
+        if (seen->family == family && seen->type == type
+            && seen->protocol_number == protocol) {
+            return;
+        }
+    }
+    if (summary->signature_count >= KB_SOCKET_MAX_SIGNATURES) {
+        summary->signatures_truncated = 1;
+        return;
+    }
+    kb_socket_signature *sig =
+        &summary->signatures[summary->signature_count++];
+    sig->family = family;
+    sig->type = type;
+    sig->protocol_number = protocol;
+}
+
 static void kb_classify_socket(const struct socket_fdinfo *info,
                                kb_socket_summary *summary)
 {
@@ -449,6 +471,12 @@ static void kb_classify_socket(const struct socket_fdinfo *info,
     int kind = info->psi.soi_kind;
     int type = info->psi.soi_type;
     int protocol = info->psi.soi_protocol;
+
+    /* Record the real triple before the family normalization below: the UI
+       filters domain/type/protocol independently and needs AF_INET/AF_INET6,
+       not the 4/6 bucket. */
+    kb_socket_record_signature(summary, info->psi.soi_family,
+                               info->psi.soi_type, info->psi.soi_protocol);
 
     if (kind == SOCKINFO_TCP) {
         family = (info->psi.soi_proto.pri_tcp.tcpsi_ini.insi_vflag & INI_IPV6) ? 6 : 4;
@@ -550,6 +578,7 @@ int kb_socket_summary_all(const int32_t *pids, size_t pid_count,
         kb_token_set seen;
         if (kb_token_set_init(&seen, fd_count) != 0) {
             summary->truncated = 1;
+            summary->signatures_truncated = 1;
             free(fds);
             continue;
         }
@@ -586,6 +615,9 @@ int kb_socket_summary_all(const int32_t *pids, size_t pid_count,
 
         kb_token_set_free(&seen);
         free(fds);
+        if (summary->truncated) {
+            summary->signatures_truncated = 1;
+        }
     }
 
     *out = items;

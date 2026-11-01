@@ -112,8 +112,9 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--networking-state established|listening|connecting|closing|other[,..]|all] \
   [--networking-connection-search <texto>] [--networking-interface-search <texto>] \
   [--networking-search <texto>] \
+  [--networking-process-domain inet|inet6|unix|other[,..]|all] \
   [--networking-process-ip ipv4|ipv6[,..]|all] \
-  [--networking-process-protocol tcp|udp|raw|unix|other[,..]|all] \
+  [--networking-process-protocol tcp|udp|icmp|icmpv6|sctp|gre|esp|raw|other[,..]|all] \
   [--networking-process-socket stream|dgram|raw|seqpacket|other[,..]|all] \
   [--traffic-graph bits|packets] \
   [--sidebar-collapsed]
@@ -140,8 +141,11 @@ hacen lo mismo en la tabla de Memory, `--energy-search`/`--energy-selected` en l
 marcan solo esos checkboxes (lista con comas; `all` equivale a todos), `--networking-state` marca
 solo esas categorías de estado TCP, `--networking-connection-search` el filtro de proceso de
 Connections y `--networking-search` el de la tabla de procesos. Los flags
-`--networking-process-ip`/`--networking-process-protocol`/`--networking-process-socket` marcan los
-grupos propios de Processes (misma sintaxis de lista). `--sidebar-collapsed`
+`--networking-process-domain`/`--networking-process-protocol`/`--networking-process-socket`
+marcan los grupos propios de Processes (misma sintaxis de lista);
+`--networking-process-ip ipv4|ipv6` queda como alias de domain (inet/inet6) y
+`--networking-process-protocol unix` se sustituye por `--networking-process-domain unix`.
+`--sidebar-collapsed`
 captura el panel lateral oculto. El PNG se escribe a escala de backing (2x en Retina) y la app
 termina con código 0.
 
@@ -512,11 +516,16 @@ $APP --screenshot /tmp/kb-net-state-combined.png --section networking \
 $APP --screenshot /tmp/kb-net-process-search.png --section networking \
   --tab processes --networking-search rapportd --screenshot-delay 5
 $APP --screenshot /tmp/kb-net-process-proto.png --section networking \
-  --tab processes --networking-process-protocol tcp,unix --screenshot-delay 12
+  --tab processes --networking-process-protocol tcp,icmp --screenshot-delay 12
+$APP --screenshot /tmp/kb-net-process-domain.png --section networking \
+  --tab processes --networking-process-domain unix,inet6 --screenshot-delay 12
 $APP --screenshot /tmp/kb-net-process-socket.png --section networking \
   --tab processes --networking-process-socket stream,dgram --screenshot-delay 12
 $APP --screenshot /tmp/kb-net-process-ip.png --section networking \
   --tab processes --networking-process-ip ipv4 --screenshot-delay 12
+$APP --screenshot /tmp/kb-net-process-cross.png --section networking \
+  --tab processes --networking-process-domain unix \
+  --networking-process-protocol icmp --screenshot-delay 12
 $APP --screenshot /tmp/kb-net-process-independent.png --section networking \
   --tab processes --networking-transport udp --screenshot-delay 12
 ```
@@ -558,8 +567,22 @@ $APP --screenshot /tmp/kb-net-process-independent.png --section networking \
 - Processes muestra en su cabecera `Filter processes` y filtra por nombre, ruta, PID o usuario,
   igual que CPU. El contador “N of M” refleja sus facetas y la búsqueda. La columna Protocols
   muestra todos los badges (sin `+N`) y Sockets todos sus tipos.
+- Filtros de Processes: **Domain** (AF_INET/AF_INET6/AF_UNIX/Other), **Protocols**
+  (TCP/UDP/ICMP/ICMPv6/SCTP/GRE/ESP/RAW/Other) y **Socket type** (stream/dgram/raw/seqpacket/other).
+  Las tres facetas se cruzan sobre la misma firma `(AF_*, SOCK_*, IPPROTO)` del inventario libproc;
+  un protocolo seleccionado exige familia AF_INET/AF_INET6. Los badges y el tooltip de Protocols
+  muestran las firmas reales (p. ej. `AF_INET · SOCK_DGRAM · ICMP` para ping).
+  Comprobaciones:
+  - `ping 127.0.0.1` en marcha + `--networking-process-protocol icmp` → solo el proceso `ping`,
+    con badge `ICMP` y Sockets `1 dgram`.
+  - `--networking-process-domain unix --networking-process-protocol icmp` → “0 of M” (ninguna
+    firma puede ser AF_UNIX y protocolo ICMP a la vez).
+  - `--networking-process-domain inet --networking-process-protocol icmp --networking-process-socket dgram`
+    → el `ping`; un proceso con TCP y UNIX pero sin ICMP no aparece.
+  - `--networking-process-ip ipv4` y `--networking-process-domain inet` dan las mismas filas.
+  - Con un daemon antiguo (sin firmas) se usa el fallback agregado; el tooltip de Sockets lo avisa.
 - CLI: `--networking-transport`/`--networking-ip`/`--networking-state` marcan los grupos de
-  Connections y `--networking-process-ip`/`--networking-process-protocol`/
+  Connections y `--networking-process-domain`/`--networking-process-protocol`/
   `--networking-process-socket` los de Processes; `all`, una lista sin valores válidos o un valor
   desconocido no filtran.
 

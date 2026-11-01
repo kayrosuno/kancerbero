@@ -34,13 +34,17 @@
   Debajo, `PillTabBar` y las tablas (`NetworkingTables.swift`). `NetworkingUIState` guarda, por un
   lado, los filtros de Connections —`transports: Set<NetworkingTransport>`, `ipVersions:
   Set<NetworkingIPVersion>` y `connectionStates: Set<NetworkingConnectionState>`— y, por otro,
-  los de Processes —`processIPVersions`, `processProtocolKinds: Set<ProcessProtocolKind>` (TCP,
-  UDP, RAW, UNIX, OTHER; cada uno agrupa sus variantes v4/v6) y `processSocketTypes:
-  Set<ProcessSocketType>` (stream, dgram, raw, seqpacket, other)—. Todos los valores están
-  marcados por defecto, incluido `connectionStates.other`.
+  los de Processes —`processDomains: Set<ProcessDomain>` (AF_INET, AF_INET6, AF_UNIX, Other),
+  `processProtocols: Set<ProcessProtocolCategory>` (TCP, UDP, ICMP, ICMPv6, SCTP, GRE, ESP, RAW,
+  Other) y `processSocketTypes: Set<ProcessSocketType>` (stream, dgram, raw, seqpacket, other)—.
+  Todos los valores están marcados por defecto, incluido `connectionStates.other`.
   `NetworkingProtocolFilter` combina transport/IP y `filteredSources` los
   aplica solo a Connections; `filteredProcessRows` recibe sus propios facetas
-  (`ipVersions:protocolKinds:socketTypes:`) y es independiente de los de Connections. Los grupos
+  (`domains:protocols:socketTypes:`) y es independiente de los de Connections. Esas facetas se
+  cruzan sobre **la misma firma** `(AF_*, SOCK_*, IPPROTO)` del inventario libproc
+  (`ProcessInventoryRow.socketSignatures`); un protocolo seleccionado exige familia AF_INET o
+  AF_INET6. Sin firmas (daemon antiguo o proceso restringido) se usa el fallback agregado por
+  badges y contadores. Los grupos
   viven en `NetworkingFilterBar`, una barra a todo el ancho entre `PillTabBar` y la tarjeta de la
   tabla (la tarjeta conserva el título, la búsqueda y el botón Inspect junto a ella, y el
   contador de filas a la derecha), y se dibujan con
@@ -52,9 +56,9 @@
   mientras que las filas sin estado (UDP) pasan el filtro de estados y las controla Transport
   (desmarcar Other no las oculta). La tabla de Interfaces tiene
   búsqueda propia (`interfaceSearch`) y ordena por todas sus columnas, incluidas RX/TX bit/s
-  mediante la fila derivada `InterfaceRow` (`interfaceSortOrder`). En Processes, un IP parcial exige algún badge
-  de la familia marcada (UNIX/OTHER quedan fuera), el filtro de protocolo cruza los `tags` del
-  tipo y el de socket exige datos de sockets (`socketTypes != nil`). La tabla de Processes añade
+  mediante la fila derivada `InterfaceRow` (`interfaceSortOrder`). En Processes, el fallback sin
+  firmas usa los `tags`/`socketTypes` agregados y `otherProtocols` para aproximar la
+  combinación. La tabla de Processes añade
   `Filter processes` en su cabecera, reutilizando `KBProcessInfo.matchesSearch` (nombre, ruta,
   PID o usuario). Connections ordena por cualquier columna (`Table` + `KeyPathComparator`) y
   muestra Process, PID, Local, Remote, Proto, RX, TX, Rate, State e Iface.
@@ -171,7 +175,8 @@
   `--networking-transport`, `--networking-ip` y `--networking-state` (listas separadas por comas;
   `all` o un valor desconocido no filtran), `--networking-connection-search`,
   `--networking-interface-search`,
-  `--networking-process-ip`, `--networking-process-protocol`, `--networking-process-socket`,
+  `--networking-process-domain`, `--networking-process-ip` (alias ipv4/ipv6),
+  `--networking-process-protocol`, `--networking-process-socket`,
   `--networking-search`, `--daemon-*`, `--volumes-focus`, `--analyzer-focus`,
   `--disk-io-search`, `--disk-io-selected`, `--disk-io-graph`, `--cpu-search`,
   `--cpu-selected`, `--memory-search`, `--memory-selected`, `--energy-search` y
@@ -203,8 +208,9 @@
   completo.
 - Captura interna para verificación: `--screenshot`, `--section`, `--tab`, `--disk-tab`,
   `--networking-focus`, `--networking-transport`, `--networking-ip`, `--networking-state`,
-  `--networking-connection-search`, `--networking-process-ip`,
-  `--networking-process-protocol`, `--networking-process-socket`, `--networking-search`,
+  `--networking-connection-search`, `--networking-process-domain`,
+  `--networking-process-ip` (alias ipv4/ipv6), `--networking-process-protocol`,
+  `--networking-process-socket`, `--networking-search`,
   `--volumes-focus`, `--analyzer-focus`, `--disk-io-search`, `--disk-io-selected`,
   `--disk-io-graph`, `--cpu-search`, `--cpu-selected`, `--memory-search`,
   `--memory-selected`, `--energy-search`, `--energy-selected`, `--screenshot-dock`,

@@ -39,13 +39,13 @@ struct NetworkingFilterBar: View {
     private var processFilters: some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 12) {
-                processIPGroup
+                processDomainGroup
                 processProtocolGroup
                 processSocketGroup
             }
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 12) {
-                    processIPGroup
+                    processDomainGroup
                     processProtocolGroup
                 }
                 processSocketGroup
@@ -84,16 +84,18 @@ struct NetworkingFilterBar: View {
                             optionHelp: { $0.checkboxHelp })
     }
 
-    private var processIPGroup: some View {
-        CheckboxFilterGroup("IP",
-                            selection: processIPVersions,
-                            optionTitle: { $0.title })
+    private var processDomainGroup: some View {
+        CheckboxFilterGroup("Domain",
+                            selection: processDomains,
+                            options: [.inet, .inet6, .unix, .other],
+                            optionTitle: { $0.title },
+                            optionHelp: { $0.checkboxHelp })
     }
 
     private var processProtocolGroup: some View {
         CheckboxFilterGroup("Protocols",
-                            selection: processProtocolKinds,
-                            options: [.tcp, .udp, .raw, .unix, .other],
+                            selection: processProtocols,
+                            options: [.tcp, .udp, .icmp, .icmpv6, .sctp, .gre, .esp, .raw, .other],
                             optionTitle: { $0.title })
     }
 
@@ -126,17 +128,17 @@ struct NetworkingFilterBar: View {
         )
     }
 
-    private var processIPVersions: Binding<Set<NetworkingIPVersion>> {
+    private var processDomains: Binding<Set<ProcessDomain>> {
         Binding(
-            get: { ui.networking.processIPVersions },
-            set: { ui.networking.processIPVersions = $0 }
+            get: { ui.networking.processDomains },
+            set: { ui.networking.processDomains = $0 }
         )
     }
 
-    private var processProtocolKinds: Binding<Set<ProcessProtocolKind>> {
+    private var processProtocols: Binding<Set<ProcessProtocolCategory>> {
         Binding(
-            get: { ui.networking.processProtocolKinds },
-            set: { ui.networking.processProtocolKinds = $0 }
+            get: { ui.networking.processProtocols },
+            set: { ui.networking.processProtocols = $0 }
         )
     }
 

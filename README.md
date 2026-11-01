@@ -47,11 +47,14 @@ El detalle de binarios, permisos, instalación y librerías está en
   tarjeta de la tabla reúne los grupos de checkboxes multiselección en cápsulas. En Connections:
   **IP** (IPv4/IPv6), **Transport** (TCP/UDP/Other), **TCP State** (Established, Listening,
   Connecting (SYN), Closing (Close/Fin/Time Wait)) y **Other** en su propia cápsula (solo el
-  checkbox, estados TCP no clasificados); en Processes: **IP**,
-  **Protocols** (TCP/UDP/RAW/UNIX/OTHER) y **Socket type** (stream/dgram/raw/seqpacket/other).
-  Todos los valores están marcados por defecto, incluido **Other**; desmarcar excluye y un grupo
-  sin nada marcado no muestra filas. Other afecta solo a estados TCP no clasificados: desmarcarlo
-  no oculta las filas UDP, que dependen de **Transport › UDP**. La cabecera de la tarjeta
+  checkbox, estados TCP no clasificados); en Processes: **Domain** (AF_INET, AF_INET6, AF_UNIX,
+  Other), **Protocols** (TCP/UDP/ICMP/ICMPv6/SCTP/GRE/ESP/RAW/Other) y **Socket type**
+  (stream/dgram/raw/seqpacket/other). Las tres facetas de Processes se cruzan sobre **el mismo
+  socket** usando las firmas `(domain, type, protocol)` de libproc; un protocolo seleccionado
+  exige familia AF_INET/AF_INET6. Todos los valores están marcados por defecto, incluido
+  **Other**; desmarcar excluye y un grupo sin nada marcado no muestra filas. Other afecta solo a
+  estados TCP no clasificados: desmarcarlo no oculta las filas UDP, que dependen de
+  **Transport › UDP**. La cabecera de la tarjeta
   conserva el título, **Filter process**
   en Connections / **Filter processes** en Processes (nombre o PID; en Processes también ruta y
   usuario), el botón **Inspect** junto al filtro y, a la derecha, el contador de filas.
@@ -255,8 +258,9 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--networking-state established|listening|connecting|closing|other[,..]|all] \
   [--networking-connection-search <texto>] [--networking-interface-search <texto>] \
   [--networking-search <texto>] \
+  [--networking-process-domain inet|inet6|unix|other[,..]|all] \
   [--networking-process-ip ipv4|ipv6[,..]|all] \
-  [--networking-process-protocol tcp|udp|raw|unix|other[,..]|all] \
+  [--networking-process-protocol tcp|udp|icmp|icmpv6|sctp|gre|esp|raw|other[,..]|all] \
   [--networking-process-socket stream|dgram|raw|seqpacket|other[,..]|all] \
   [--volumes-focus disks|volumes|capacity|free] \
   [--analyzer-focus scanned|files|folders|denied] \

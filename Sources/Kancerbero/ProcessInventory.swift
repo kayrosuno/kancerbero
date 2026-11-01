@@ -85,17 +85,27 @@ struct ProcessInventoryRow: Identifiable, Equatable, Sendable {
     /// Real protocols behind the RAW badges (ICMP, SCTP, GRE…). Empty when the
     /// scanner did not report them, in which case the RAW4/RAW6 badges stay.
     var rawProtocolLabels: [String]
+    /// Distinct socket(domain, type, protocol) triples. nil when the scanner or
+    /// an older daemon did not provide them; [] when scanned with no sockets.
+    var socketSignatures: [KBSocketSignature]?
+    var socketSignaturesTruncated: Bool
+    /// IPPROTO numbers behind the raw buckets, for the aggregate fallback.
+    var rawProtocolNumbers: Set<Int32>
 
     var id: KBProcessKey { process.id }
 
     var totalBytes: UInt64 { counters.rxBytes &+ counters.txBytes }
 
     var protocolSortRank: Int {
-        protocols.map(\.sortRank).min() ?? Int.max
+        badgeProtocols.map(\.sortRank).min() ?? Int.max
     }
 
     var hasSocketData: Bool {
         buckets != nil || socketTypes != nil
+    }
+
+    var hasExactSocketSignatures: Bool {
+        !(socketSignatures?.isEmpty ?? true)
     }
 }
 
@@ -196,6 +206,12 @@ enum ProcessInventoryBuilder {
                 .map { KBIPProtocol.name(for: Int32($0)) }
                 .sorted()
 
+            let signatures = hasSocketCounts ? socketSummary?.signatures : nil
+            let signaturesTruncated = hasSocketCounts
+                && (socketSummary?.signaturesTruncated ?? false)
+            let rawProtocolNumbers = Set((socketSummary?.otherProtocols ?? [])
+                .map { Int32($0) })
+
             rows.append(ProcessInventoryRow(
                 process: process,
                 protocols: protocols,
@@ -209,7 +225,10 @@ enum ProcessInventoryBuilder {
                 restricted: socketSummary?.restricted ?? false,
                 truncated: socketSummary?.truncated ?? false,
                 otherProtocolLabels: otherLabels.sorted(),
-                rawProtocolLabels: rawLabels
+                rawProtocolLabels: rawLabels,
+                socketSignatures: signatures,
+                socketSignaturesTruncated: signaturesTruncated,
+                rawProtocolNumbers: rawProtocolNumbers
             ))
         }
 

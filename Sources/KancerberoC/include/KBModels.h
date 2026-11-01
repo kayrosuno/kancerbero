@@ -189,6 +189,19 @@ typedef struct {
     uint32_t remote_scope;
 } kb_socket;
 
+/* Distinct socket(domain, type, protocol) triples seen for one process.
+   domain is the real AF_* (AF_INET=2, AF_INET6=30, AF_UNIX=1, …), type the
+   SOCK_* (STREAM=1, DGRAM=2, RAW=3, SEQPACKET=5) and protocol_number the
+   resolved IPPROTO (0 for AF_UNIX). The array is fixed so the summary stays
+   a POD value that calloc/free can manage without nested allocations. */
+#define KB_SOCKET_MAX_SIGNATURES 16
+
+typedef struct {
+    int32_t family;
+    int32_t type;
+    int32_t protocol_number;
+} kb_socket_signature;
+
 typedef struct {
     int32_t pid;
     uint32_t total;       /* unique sockets (deduped by soi_so) */
@@ -210,6 +223,9 @@ typedef struct {
     uint32_t other_type;
     uint8_t restricted;   /* PROC_PIDLISTFDS failed (permissions/gone) */
     uint8_t truncated;    /* per-PID socket cap reached */
+    uint32_t signature_count;      /* distinct signatures recorded */
+    uint8_t signatures_truncated;  /* array full or scan truncated */
+    kb_socket_signature signatures[KB_SOCKET_MAX_SIGNATURES];
 } kb_socket_summary;
 
 typedef struct {
