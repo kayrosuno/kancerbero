@@ -334,6 +334,12 @@ log stream --predicate 'subsystem == "uno.kayros.kancerbero"' --info --debug
   además de los estilos del icono del Dock) dibujan el dato más reciente a la izquierda. En
   Traffic el eje lee `now → -30s → -60s`; en Battery el ancla antigua queda a la derecha y la
   muestra nueva en el borde izquierdo. Los gráficos de composición no cambian.
+- Arranque limpio: capturar Networking a 1, 2, 4 y 6 s no debe mostrar ningún pico GB/s ni un techo
+  desproporcionado; la primera muestra es 0 y las siguientes se estabilizan. Repetir en Disk →
+  I/O (Data/Operations) y Energy (sparklines de Energy y Wake-ups) y con `--screenshot-dock
+  --dock-style all`: `.networkUsage`, `.diskActivity` y `.energyUsage` tampoco deben mostrar el
+  triángulo de una muestra. CPU, cores, memoria, GPU y batería son valores absolutos y no cambian
+  por este fix. Probar también Refresh manual, pausa/reanudar y el cambio local↔daemon.
 - Regresión de cadencia lenta: con **5 s**, las gráficas y cifras basadas en tasas (tráfico de
   red, Disk → I/O y columnas de CPU%, energía, wakeups e I/O por proceso) deben seguir avanzando
   cada ~5 s, no quedarse a 0. Pausar más que `max(5 s, 2,5 × cadencia)` y reanudar debe producir

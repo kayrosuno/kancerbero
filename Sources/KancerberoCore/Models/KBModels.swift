@@ -43,6 +43,18 @@ public struct KBCounters: Codable, Sendable, Hashable {
                    rxPackets: lhs.rxPackets &+ rhs.rxPackets,
                    txPackets: lhs.txPackets &+ rhs.txPackets)
     }
+
+    /// Non-negative delta between cumulative counters. A decrease (counter
+    /// reset or a crossed sample) contributes zero; returning the full
+    /// cumulative value would turn it into a one-tick GB/s spike.
+    public func positiveDelta(from previous: KBCounters) -> KBCounters {
+        KBCounters(
+            rxBytes: rxBytes >= previous.rxBytes ? rxBytes - previous.rxBytes : 0,
+            txBytes: txBytes >= previous.txBytes ? txBytes - previous.txBytes : 0,
+            rxPackets: rxPackets >= previous.rxPackets ? rxPackets - previous.rxPackets : 0,
+            txPackets: txPackets >= previous.txPackets ? txPackets - previous.txPackets : 0
+        )
+    }
 }
 
 public struct KBRates: Codable, Sendable, Hashable {
