@@ -25,8 +25,9 @@ struct ApplicationsTable: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 4) {
-                        ForEach(model.visibleBundles) { bundle in
-                            row(bundle)
+                        ForEach(Array(model.visibleBundles.enumerated()),
+                                id: \.element.id) { index, bundle in
+                            row(bundle, shaded: index.isMultiple(of: 2))
                         }
                     }
                     .padding(8)
@@ -80,7 +81,7 @@ struct ApplicationsTable: View {
         .padding(.vertical, 9)
     }
 
-    private func row(_ bundle: KBAppBundle) -> some View {
+    private func row(_ bundle: KBAppBundle, shaded: Bool) -> some View {
         Button {
             Task { await model.select(bundle.path) }
         } label: {
@@ -133,7 +134,7 @@ struct ApplicationsTable: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(selection == bundle.path
                         ? Color.accentColor.opacity(0.16)
-                        : Color.clear)
+                        : shaded ? Color.primary.opacity(0.04) : Color.clear)
             }
             .contentShape(Rectangle())
         }
