@@ -20,8 +20,9 @@
   CPU / Memory / Energy / Applications; cabecera con marca y estado live, engranaje de Settings
   sobre el separador de estado y pie con fuente (daemon/local), privcheck y hora.
 - `NetworkingView`: franja superior como un único `HStack` sin `ViewThatFits`: columna
-  `ActivityCard` (procesos con sockets, conexiones totales y conexiones activas en 10 s, las
-  dos últimas como filtro todas/activas) + `ProtocolCard`, `NetworkTotalsCard` fijo y
+  `ActivityCard` (procesos con sockets, conexiones totales y conexiones activas dentro de la
+  ventana configurada —10 s por defecto—, las dos últimas como filtro todas/activas) +
+  `ProtocolCard`, `NetworkTotalsCard` fijo y
   `TrafficCard` con mínimo 260. Network siempre queda en la franja. `NetworkTotalsCard` recibe
   solo contadores: dos grupos apilados y sombreados, **Bytes** encima de **Packets**, cada uno
   con filas Input/Output y su total acumulado. `TrafficCard` recibe las tasas y usa
@@ -206,6 +207,12 @@
   El picker “Startup interval” persiste en `@AppStorage("startupSamplingInterval")` (por defecto
   `2` s) y solo fija el valor inicial de `AppModel.interval`: el selector del toolbar cambia la
   cadencia de la sesión actual sin modificar esa preferencia.
+  El picker “Active connections window” persiste en
+  `@AppStorage("activeConnectionWindowSeconds")` (por defecto `10` s; opciones 5/10/20/30/60/120;
+  cualquier otro valor cae al default) y fija la ventana que `AppModel` usa para
+  `activeSourceIDs`, el tile Active y su filtro. `AppModel` lee `UserDefaults` en cada tick: subir
+  la ventana reincorpora flujos aún presentes en `lastActivityNanoseconds` y bajarla los descarta
+  en el siguiente refresco; la caption/hint del tile se actualizan en vivo vía `@AppStorage`.
   Sparklines, hover, paneles de detalle, filtros/foco y LiveDot no se tocan.
 - Disk → Volumes mantiene `expanded` y `volumesFocus` en `UIState`. La expansión inicial se hace
   una sola vez (`didExpandVolumesOnce`); los refrescos de inventario solo podan ids obsoletos, así

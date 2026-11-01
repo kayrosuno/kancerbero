@@ -9,7 +9,17 @@ struct SettingsView: View {
     private var startupInterval = KBPreferences.startupIntervalDefault
     @AppStorage(KBPreferences.dockIconStyleKey)
     private var dockIconStyle = KBPreferences.dockIconStyleDefault
+    @AppStorage(KBPreferences.activeWindowKey)
+    private var activeWindowSeconds = KBPreferences.activeWindowDefault
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Keeps the picker and the stored value on one of the supported windows.
+    private var activeWindowSelection: Binding<Int> {
+        Binding(
+            get: { KBPreferences.activeWindow(stored: activeWindowSeconds) },
+            set: { activeWindowSeconds = KBPreferences.activeWindow(stored: $0) }
+        )
+    }
 
     var body: some View {
         Form {
@@ -28,6 +38,22 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             } header: {
                 Text("Sampling")
+            }
+
+            Section {
+                Picker("Active connections window", selection: activeWindowSelection) {
+                    ForEach(KBPreferences.activeWindowOptions, id: \.self) { seconds in
+                        Text("\(seconds) s").tag(seconds)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Text("A connection counts as active while it has moved data within this window. It drives the Active metric and the Active filter in Networking.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } header: {
+                Text("Network activity")
             }
 
             Section {

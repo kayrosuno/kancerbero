@@ -534,8 +534,9 @@ $APP --screenshot /tmp/kb-net-process-independent.png --section networking \
   `bps/Kbps/Mbps/Gbps` y eje temporal `now/-30s/-60s` (con el intervalo de 1 s; el dato más
   reciente entra por la izquierda). Sin salto de layout entre 0,3 s y 5 s.
 - Activity muestra tres métricas: **processes** con sockets (total de la tabla Processes),
-  **Connections** totales (`sources.count`) y **Active** (flujos con tráfico RX+TX en los últimos
-  10 s). Los tres son totales y no dependen de los filtros. Connections filtra a todas las
+  **Connections** totales (`sources.count`) y **Active** (flujos con tráfico RX+TX dentro de la
+  ventana configurada, 10 s por defecto). Los tres son totales y no dependen de los filtros.
+  Connections filtra a todas las
   conexiones y Active a solo las activas; el tile seleccionado queda resaltado. Con
   `--networking-focus active` el número de Active y el numerador de «N of M connections»
   coinciden si los checkboxes están por defecto.
@@ -549,9 +550,18 @@ $APP --screenshot /tmp/kb-net-process-independent.png --section networking \
   estados TCP no clasificados: desmarcarla no oculta las filas UDP, que dependen de
   **Transport › UDP** (desmarcar UDP las elimina). La familia de dirección desconocida se excluye
   cuando el grupo IP no está completo.
-- Para comprobar la ventana de 10 s: lanzar una descarga, ver cómo el flujo aparece en el filtro
-  Active, pararla y comprobar que sigue activo ~10 s y después desaparece del filtro (el
-  contador Active baja).
+- Ventana configurable: en **Settings → Network activity** el picker “Active connections
+  window” ofrece 5/10/20/30/60/120 s (10 por defecto). Al cambiarlo, la caption del tile pasa a
+  «last N s» y el hint se actualiza; el contador y el filtro Active usan la nueva ventana en el
+  siguiente refresco. Lanzar una descarga, pararla y comprobar que el flujo sigue activo hasta que
+  expira la ventana elegida.
+  Para probarlo sin la UI:
+  ```bash
+  defaults write uno.kayros.kancerbero activeConnectionWindowSeconds -int 30
+  defaults read uno.kayros.kancerbero activeConnectionWindowSeconds
+  defaults delete uno.kayros.kancerbero activeConnectionWindowSeconds   # vuelve a 10
+  defaults write uno.kayros.kancerbero activeConnectionWindowSeconds -int 3  # cae al default 10
+  ```
 - La cabecera de Processes añade en cápsulas **Socket domain** (AF_INET/AF_INET6/AF_UNIX/Other),
   **Socket protocols** (TCP/UDP/ICMP/ICMPv6/SCTP/GRE/ESP/RAW/Other) y **Socket type**
   (stream/dgram/raw/seqpacket/other). Un dominio parcial exige alguna firma de esa familia; un

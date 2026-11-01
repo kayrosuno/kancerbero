@@ -9,6 +9,8 @@ struct NetworkingView: View {
     @Environment(FilterModel.self) private var filterModel
     @AppStorage(KBPreferences.tabAnimationsKey)
     private var tabAnimations = KBPreferences.tabAnimationsDefault
+    @AppStorage(KBPreferences.activeWindowKey)
+    private var activeWindowSeconds = KBPreferences.activeWindowDefault
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var pillAnimation: Animation? {
@@ -65,6 +67,7 @@ struct NetworkingView: View {
                 processesCount: model.processInventory.count,
                 connectionsCount: model.sources.count,
                 activeCount: model.activeSourceIDs.count,
+                activeWindowSeconds: KBPreferences.activeWindow(stored: activeWindowSeconds),
                 focus: ui.networking.focus,
                 onToggle: toggleFocus
             )

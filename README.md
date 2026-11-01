@@ -158,7 +158,8 @@ sesi贸n; al reiniciar la app se vuelven a los valores iniciales. **Kancerbero 鈫
 bot贸n **Settings** (engranaje) al pie del sidebar permiten ajustar las animaciones de cambio de
 secci贸n/subpesta帽a y del resaltado del sidebar y las p铆ldoras, las animaciones de los valores de
 la barra de estado (desactivadas por defecto), el intervalo de muestreo con el que arranca la app
-(2 s por defecto) y el icono del Dock. Todo se guarda en `UserDefaults` y las animaciones respetan
+(2 s por defecto), la ventana de conexiones activas (10 s por defecto; 5/10/20/30/60/120) y el
+icono del Dock. Todo se guarda en `UserDefaults` y las animaciones respetan
 Reduce Motion de
 macOS. El selector del toolbar cambia el intervalo solo durante la sesi贸n y no modifica la
 preferencia de arranque.
