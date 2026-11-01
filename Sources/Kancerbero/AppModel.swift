@@ -169,7 +169,7 @@ final class AppModel {
     /// on KBNStatSource, so local and daemon snapshots share the same policy
     /// without touching the wire format or the schema.
     private var lastActivityNanoseconds: [String: UInt64] = [:]
-    /// Sources that moved data in the last 10 seconds.
+    /// Sources that moved data within the configured active window.
     private(set) var activeSourceIDs: Set<String> = []
     private var daemonConnecting = false
     private var lastDaemonAttempt = Date.distantPast
@@ -970,7 +970,8 @@ final class AppModel {
         var rates: [UInt32: KBRates] = [:]
 
         // Activity is tracked independently of the rate window: a flow that
-        // moved bytes during a pause is still "active" for its 10 s window.
+        // moved bytes during a pause is still "active" for the configured
+        // active window.
         for index in sources.indices {
             let id = sources[index].id
             guard let previous = previousSourceCounters[id] else { continue }
@@ -1014,7 +1015,8 @@ final class AppModel {
         for source in sources { sourceCounters[source.id] = source.counters }
         previousSourceCounters = sourceCounters
 
-        let activeWindow: UInt64 = 10_000_000_000
+        let activeWindow =
+            UInt64(KBPreferences.activeWindowSeconds) * 1_000_000_000
         lastActivityNanoseconds = lastActivityNanoseconds.filter {
             sourceCounters[$0.key] != nil
         }

@@ -7,7 +7,7 @@ enum NetworkingFocus: String, CaseIterable, Identifiable, Sendable {
     case upload
     /// Every connection that survives the other filters.
     case connections
-    /// Only connections that moved bytes in the last 10 seconds.
+    /// Only connections that moved bytes within the configured active window.
     case active
     case processes
 

@@ -4,6 +4,7 @@ struct ActivityCard: View {
     let processesCount: Int
     let connectionsCount: Int
     let activeCount: Int
+    let activeWindowSeconds: Int
     let focus: NetworkingFocus?
     let onToggle: (NetworkingFocus) -> Void
 
@@ -66,8 +67,9 @@ struct ActivityCard: View {
                     value: KBFormat.compactCount(activeCount),
                     icon: "bolt.fill",
                     tint: KBTheme.activeTint,
-                    caption: "last 10 s",
-                    hint: "Show connections that moved data in the last 10 seconds",
+                    caption: "last \(activeWindowSeconds) s",
+                    hint: "Show connections that moved data in the last "
+                        + "\(activeWindowSeconds) seconds",
                     isSelected: focus == .active,
                     valueSize: 20,
                     iconSize: 9,
