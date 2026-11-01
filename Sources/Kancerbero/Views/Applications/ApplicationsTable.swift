@@ -47,13 +47,11 @@ struct ApplicationsTable: View {
 
     private var searchBar: some View {
         @Bindable var model = model
-        return HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+        return HStack(spacing: 10) {
             TextField("Filter applications", text: $model.searchText)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13))
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 220)
+                .help("Filter by name, bundle identifier or path")
             Spacer(minLength: 8)
             Text("\(model.visibleBundles.count) of \(model.bundles.count)")
                 .font(.system(size: 11))

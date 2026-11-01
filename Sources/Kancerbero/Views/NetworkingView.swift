@@ -125,13 +125,6 @@ struct NetworkingView: View {
             HStack(spacing: 12) {
                 PillTabBar(selection: $tab, selectionAnimation: pillAnimation)
                 Spacer(minLength: 8)
-                Text(contextLabel(interfaces: matchingInterfaces,
-                                  sources: matchingSources,
-                                  processes: matchingProcesses))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .contentTransition(.numericText())
             }
 
             if tab == .connections || tab == .processes {
@@ -190,15 +183,18 @@ struct NetworkingView: View {
     private func tableCard(interfaces: [KBInterfaceInfo],
                            sources: [KBNStatSource],
                            processes: [ProcessInventoryRow]) -> some View {
-        VStack(spacing: 0) {
+        let context = contextLabel(interfaces: interfaces,
+                                   sources: sources,
+                                   processes: processes)
+        return VStack(spacing: 0) {
             Group {
                 switch tab {
                 case .interfaces:
-                    InterfacesView(items: interfaces)
+                    InterfacesView(items: interfaces, context: context)
                 case .connections:
-                    ConnectionsView(rows: sources)
+                    ConnectionsView(rows: sources, context: context)
                 case .processes:
-                    ProcessesView(rows: processes)
+                    ProcessesView(rows: processes, context: context)
                 case .filter:
                     FilterView()
                 }

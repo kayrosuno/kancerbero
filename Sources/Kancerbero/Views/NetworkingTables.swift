@@ -5,10 +5,25 @@ import KancerberoFilterContract
 
 struct InterfacesView: View {
     let items: [KBInterfaceInfo]
+    let context: String
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Table(items) {
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Text("Interfaces")
+                    .font(.system(size: 12, weight: .semibold))
+
+                Spacer(minLength: 8)
+
+                Text(context)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .contentTransition(.numericText())
+            }
+
+            Table(items) {
             TableColumn("Interface") { item in
                 Text(item.name).monospaced()
             }
@@ -41,6 +56,7 @@ struct InterfacesView: View {
                 Text("\(item.mtu)").monospacedDigit()
             }
             .width(min: 50, ideal: 60)
+            }
         }
     }
 
@@ -52,6 +68,7 @@ struct InterfacesView: View {
 
 struct ConnectionsView: View {
     let rows: [KBNStatSource]
+    let context: String
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
     @State private var inspected: KBProcessInfo?
@@ -99,14 +116,20 @@ struct ConnectionsView: View {
                     .frame(width: 180)
                     .help("Filter by process name or PID")
 
-                Spacer(minLength: 8)
-
                 Button("Inspect Process") {
                     if let source = selectedSource {
                         inspected = process(for: source)
                     }
                 }
                 .disabled(selectedSource == nil)
+
+                Spacer(minLength: 8)
+
+                Text(context)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .contentTransition(.numericText())
             }
 
             Table(displayRows, selection: selection, sortOrder: sortOrder) {
@@ -272,6 +295,7 @@ private struct EndpointComparator: SortComparator {
 
 struct ProcessesView: View {
     let rows: [ProcessInventoryRow]
+    let context: String
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
     @Environment(FilterModel.self) private var filterModel
@@ -315,12 +339,18 @@ struct ProcessesView: View {
                     .frame(width: 220)
                     .help("Filter by name, path, PID or user")
 
-                Spacer()
-
                 Button("Inspect Selected") {
                     inspected = selectedRow?.process
                 }
                 .disabled(selectedRow == nil)
+
+                Spacer()
+
+                Text(context)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .contentTransition(.numericText())
             }
 
             Table(displayRows, selection: selection, sortOrder: sortOrder) {
