@@ -105,7 +105,7 @@ struct MetricTile: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 Text(value)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .font(.system(size: valueSize, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .contentTransition(.numericText())
                     .lineLimit(1)
