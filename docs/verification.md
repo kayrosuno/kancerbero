@@ -552,11 +552,11 @@ $APP --screenshot /tmp/kb-net-process-independent.png --section networking \
 - Para comprobar la ventana de 10 s: lanzar una descarga, ver cómo el flujo aparece en el filtro
   Active, pararla y comprobar que sigue activo ~10 s y después desaparece del filtro (el
   contador Active baja).
-- La cabecera de Processes añade en cápsulas **IP** (IPv4/IPv6), **Protocols**
-  (TCP/UDP/RAW/UNIX/OTHER) y **Socket type** (stream/dgram/raw/seqpacket/other). Un IP parcial
-  exige algún badge de la familia marcada y excluye las filas solo-UNIX/OTHER; un Socket type
-  activo exige datos de sockets y oculta las filas con Sockets «—»; todo marcado = sin filtro y un
-  grupo vacío no muestra filas.
+- La cabecera de Processes añade en cápsulas **Socket domain** (AF_INET/AF_INET6/AF_UNIX/Other),
+  **Socket protocols** (TCP/UDP/ICMP/ICMPv6/SCTP/GRE/ESP/RAW/Other) y **Socket type**
+  (stream/dgram/raw/seqpacket/other). Un dominio parcial exige alguna firma de esa familia; un
+  Socket type activo exige datos de sockets y oculta las filas con Type «—»; todo marcado = sin
+  filtro y un grupo vacío no muestra filas.
 - Los filtros son **independientes por subpestaña**: marcar/desmarcar en Connections no altera la
   tabla ni el contador de Processes (ni al revés). Se conservan al cambiar de pestaña.
 - Los grupos aparecen en una **barra a todo el ancho entre las pills y la tarjeta** de la tabla;
@@ -565,10 +565,12 @@ $APP --screenshot /tmp/kb-net-process-independent.png --section networking \
   su cabecera; ni ella ni Filter tienen barra (sin hueco extra). A 1040×640 la barra cae a dos
   líneas sin recortarse.
 - Processes muestra en su cabecera `Filter processes` y filtra por nombre, ruta, PID o usuario,
-  igual que CPU. El contador “N of M” refleja sus facetas y la búsqueda. La columna Protocols
-  muestra todos los badges (sin `+N`) y Sockets todos sus tipos.
-- Filtros de Processes: **Domain** (AF_INET/AF_INET6/AF_UNIX/Other), **Protocols**
-  (TCP/UDP/ICMP/ICMPv6/SCTP/GRE/ESP/RAW/Other) y **Socket type** (stream/dgram/raw/seqpacket/other).
+  igual que CPU. El contador “N of M” refleja sus facetas y la búsqueda. La columna **Domain**
+  muestra las familias, **Protocols** solo los protocolos IP (sin `+N`) y **Type** todos los tipos
+  de socket.
+- Filtros de Processes: **Socket domain** (AF_INET/AF_INET6/AF_UNIX/Other),
+  **Socket protocols** (TCP/UDP/ICMP/ICMPv6/SCTP/GRE/ESP/RAW/Other) y **Socket type**
+  (stream/dgram/raw/seqpacket/other).
   Las tres facetas se cruzan sobre la misma firma `(AF_*, SOCK_*, IPPROTO)` del inventario libproc;
   un protocolo seleccionado exige familia AF_INET/AF_INET6. Los badges y el tooltip de Protocols
   muestran las firmas reales (p. ej. `AF_INET · SOCK_DGRAM · ICMP` para ping).
@@ -593,7 +595,8 @@ $APP --screenshot /tmp/kb-connections-columns.png --section networking \
   --tab connections --screenshot-delay 5
 ```
 
-- Orden de columnas: Process, PID, Local, Remote, Proto, RX, TX, Rate, State e Iface.
+- Orden de columnas: Process, PID, Local, Remote, Proto, State, RX, TX, Rate e Iface.
+  Los flujos UDP muestran `Datagram` en State (no tienen estado TCP).
 - La columna Rate muestra la suma RX+TX del intervalo en bits/s (`KBFormat.bitRate`); en reposo
   `0 bps`, y con una descarga activa el flujo debe subir a Mbps y coincidir en orden de magnitud
   con la tarjeta Traffic y `nettop`. Ordenar por Rate deja arriba la conexión con más caudal.
@@ -633,23 +636,23 @@ $APP --screenshot /tmp/kb-processes.png --section networking --tab processes \
 
 - La tabla solo lista procesos con flujos TCP/UDP o sockets (UNIX/RAW incluidos). Comparar los
   tipos y conteos con `lsof -nP -i`/`netstat` y con el inspector del proceso.
-- Comprobar todos los badges de protocolo (TCP4/TCP6/UDP4/UDP6/UNIX/RAW4/RAW6/OTHER) sin `+N`,
-  los tipos de socket (stream/dgram/raw/seqpacket/other), Flows, RX/TX (Bytes), Rate (bits/s,
-  suma de sus flujos) y “—” en procesos solo-locales. Con 8 badges la columna Protocols llega a su ancho ideal y la tabla puede requerir
-  scroll horizontal en ventanas estrechas.
-- En modo local, los procesos de otros uid pueden mostrar Protocols/Flows/RX/TX pero Sockets
+- Comprobar las etiquetas separadas: **Domain** (INET/INET6/UNIX/SYSTEM…, tooltip con `AF_*`),
+  **Protocols** (TCP/UDP/ICMP/ICMPv6/SCTP/GRE/ESP/RAW…) y **Type**
+  (stream/dgram/raw/seqpacket/other), más Flows, RX/TX (Bytes), Rate (bits/s, suma de sus flujos)
+  y “—” en procesos solo-locales. Con varias familias la tabla puede requerir scroll horizontal
+  en ventanas estrechas.
+- En modo local, los procesos de otros uid pueden mostrar Domain/Protocols/Flows/RX/TX pero Type
   “—” (restringido); con el daemon root deben mostrar también sus sockets. Con un Socket type
   activo esas filas «—» desaparecen; con el grupo completo siguen visibles.
-- Probar los tres grupos de la cabecera en cápsula: IP, Protocols y Socket type. Desmarcar todo un
-  grupo deja “0 of M networked processes”; desmarcar `UNIX`/`RAW` oculta los procesos que solo
-  tienen esos badges; con IP parcial desaparecen los solo-UNIX/OTHER.
-- En Protocols, un proceso con sockets de familia especial debe mostrar el valor real en gris
-  (`AF_SYSTEM`, `AF_NDRV`, `AF_VSOCK`…) en vez de `OTHER`; un provider NStat no TCP/UDP debe
-  mostrarse tal cual. Ninguna familia definida en `sys/socket.h` (3–25, 27–38, 40) debe salir como
-  `AF_<n>`; solo 26 y 39, que no existen en Darwin. Un flujo TCP/UDP cuya versión IP no se conoce
-  se etiqueta `TCP`/`UDP`, no `AF_UNSPEC`. OTHER queda solo como reserva sin detalle.
-- Los badges `RAW4`/`RAW6` deben ceder su sitio al protocolo real: un `ping` en marcha muestra
-  `ICMP`, y SCTP/GRE/ESP/… muestran su nombre; `RAW` queda para `SOCK_RAW`. La columna Proto del
+- Probar los tres grupos de la cabecera en cápsula: Socket domain, Socket protocols y Socket
+  type. Desmarcar todo un grupo deja “0 of M networked processes”; desmarcar AF_UNIX oculta los
+  procesos que solo tienen sockets UNIX; con un dominio parcial desaparecen las demás familias.
+- En **Domain**, un proceso con sockets de familia especial debe mostrar el valor real
+  (`SYSTEM`, `NDRV`, `VSOCK`…; el tooltip conserva `AF_*`) en vez de Other. Ninguna familia
+  definida en `sys/socket.h` (3–25, 27–38, 40) debe salir como `AF_<n>`; solo 26 y 39, que no
+  existen en Darwin.
+- En **Protocols** deben verse los protocolos reales: un `ping` en marcha muestra `ICMP`, y
+  SCTP/GRE/ESP/… su nombre; `RAW` queda para `IPPROTO_RAW`. La columna Proto del
   inspector (doble clic en la fila) debe coincidir. Se puede comprobar sin GUI:
 
   ```bash

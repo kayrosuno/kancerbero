@@ -202,6 +202,10 @@ struct ConnectionsView: View {
                     Text(source.connectionProtocol.displayName).monospaced()
                 }
                 .width(min: 45, ideal: 50)
+                TableColumn("State", value: \.stateDisplay) { source in
+                    Text(source.stateDisplay)
+                }
+                .width(min: 75, ideal: 80)
                 TableColumn("RX", value: \.counters.rxBytes) { source in
                     Text(KBFormat.bytes(source.counters.rxBytes)).monospacedDigit()
                 }
@@ -217,10 +221,6 @@ struct ConnectionsView: View {
                               + "TX \(KBFormat.bitRate(source.rates.txBytesPerSecond))")
                 }
                 .width(min: 80, ideal: 96)
-                TableColumn("State", value: \.tcpState) { source in
-                    Text(source.tcpState.isEmpty ? "—" : source.tcpState)
-                }
-                .width(min: 75, ideal: 80)
                 TableColumn("Iface", value: \.interfaceName) { source in
                     Text(source.interfaceName.isEmpty ? "—" : source.interfaceName).monospaced()
                 }
@@ -262,6 +262,15 @@ private extension KBNStatSource {
         case .udp6: return 3
         case .unix: return 4
         case .other: return 5
+        }
+    }
+
+    /// TCP flows show their state; UDP has no TCP state, so show the transport.
+    var stateDisplay: String {
+        if !tcpState.isEmpty { return tcpState }
+        switch connectionProtocol {
+        case .udp4, .udp6: return "Datagram"
+        default: return "—"
         }
     }
 }
@@ -375,6 +384,68 @@ struct ProcessesView: View {
             : rows.sorted(using: ui.networking.processSortOrder)
     }
 
+    @TableColumnBuilder<ProcessInventoryRow, KeyPathComparator<ProcessInventoryRow>>
+    private var processColumns: some TableColumnContent<ProcessInventoryRow,
+                                                        KeyPathComparator<ProcessInventoryRow>> {
+        Group {
+            TableColumn("Process", value: \ProcessInventoryRow.process.name) { row in
+                ProcessNameCell(name: displayName(row))
+            }
+            .width(min: 110, ideal: 150)
+            TableColumn("PID", value: \ProcessInventoryRow.process.pid) { row in
+                Text("\(row.process.pid)").monospacedDigit()
+            }
+            .width(min: 50, ideal: 60)
+            TableColumn("Guard") { row in
+                guardButton(for: row)
+            }
+            .width(min: 46, ideal: 54)
+        }
+        Group {
+            TableColumn("Domain", value: \ProcessInventoryRow.domainSortRank) { row in
+                SocketBadges(labels: row.domainBadgeLabels,
+                             details: row.signatureDetails.isEmpty
+                                ? row.domainLabels : row.signatureDetails,
+                             kind: .domain)
+            }
+            .width(min: 100, ideal: 140)
+            TableColumn("Protocols", value: \ProcessInventoryRow.protocolSortRank) { row in
+                SocketBadges(labels: row.protocolLabels,
+                             details: row.signatureDetails,
+                             kind: .protocolKind)
+            }
+            .width(min: 80, ideal: 120)
+            TableColumn("Type", value: \ProcessInventoryRow.socketCount) { row in
+                SocketTypeCell(row: row)
+            }
+            .width(min: 140, ideal: 175)
+            TableColumn("Flows", value: \ProcessInventoryRow.connectionCount) { row in
+                FlowsCell(row: row)
+            }
+            .width(min: 50, ideal: 60)
+        }
+        Group {
+            TableColumn("RX", value: \ProcessInventoryRow.counters.rxBytes) { row in
+                ByteCounterCell(text: row.connectionCount > 0
+                                ? KBFormat.bytes(row.counters.rxBytes) : "—")
+            }
+            .width(min: 75, ideal: 90)
+            TableColumn("TX", value: \ProcessInventoryRow.counters.txBytes) { row in
+                ByteCounterCell(text: row.connectionCount > 0
+                                ? KBFormat.bytes(row.counters.txBytes) : "—")
+            }
+            .width(min: 75, ideal: 90)
+            TableColumn("Rate", value: \ProcessInventoryRow.rates.totalBytesPerSecond) { row in
+                ProcessRateCell(row: row)
+            }
+            .width(min: 70, ideal: 80)
+            TableColumn("Path", value: \ProcessInventoryRow.process.path) { row in
+                ProcessPathCell(path: row.process.path)
+            }
+            .width(min: 120, ideal: 130)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 10) {
@@ -401,72 +472,7 @@ struct ProcessesView: View {
             }
 
             Table(displayRows, selection: selection, sortOrder: sortOrder) {
-                TableColumn("Process", value: \.process.name) { row in
-                    Text(displayName(row))
-                        .lineLimit(1)
-                        .help(displayName(row))
-                }
-                .width(min: 110, ideal: 150)
-                TableColumn("PID", value: \.process.pid) { row in
-                    Text("\(row.process.pid)").monospacedDigit()
-                }
-                .width(min: 50, ideal: 60)
-                TableColumn("Guard") { row in
-                    guardButton(for: row)
-                }
-                .width(min: 46, ideal: 54)
-                TableColumn("Protocols", value: \.protocolSortRank) { row in
-                    ProcessProtocolBadges(tags: row.badgeProtocols,
-                                          otherLabels: row.badgeOtherLabels,
-                                          rawLabels: row.badgeRawLabels,
-                                          details: row.signatureDetails)
-                }
-                .width(min: 150, ideal: 230)
-                TableColumn("Sockets", value: \.socketCount) { row in
-                    Text(socketText(row))
-                        .font(.system(size: 10))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .foregroundStyle(row.hasSocketData ? .primary : .secondary)
-                        .help(socketHelp(row))
-                }
-                .width(min: 140, ideal: 175)
-                TableColumn("Flows", value: \.connectionCount) { row in
-                    Text(row.connectionCount > 0 ? "\(row.connectionCount)" : "—")
-                        .monospacedDigit()
-                        .help(row.listeningCount > 0
-                              ? "\(row.listeningCount) listening" : "")
-                }
-                .width(min: 50, ideal: 60)
-                TableColumn("RX", value: \.counters.rxBytes) { row in
-                    Text(row.connectionCount > 0
-                         ? KBFormat.bytes(row.counters.rxBytes) : "—")
-                        .monospacedDigit()
-                }
-                .width(min: 75, ideal: 90)
-                TableColumn("TX", value: \.counters.txBytes) { row in
-                    Text(row.connectionCount > 0
-                         ? KBFormat.bytes(row.counters.txBytes) : "—")
-                        .monospacedDigit()
-                }
-                .width(min: 75, ideal: 90)
-                TableColumn("Rate", value: \.rates.totalBytesPerSecond) { row in
-                    Text(row.connectionCount > 0
-                         ? KBFormat.bitRate(row.rates.totalBytesPerSecond) : "—")
-                        .monospacedDigit()
-                        .help(row.connectionCount > 0
-                              ? "RX \(KBFormat.bitRate(row.rates.rxBytesPerSecond)) · "
-                                + "TX \(KBFormat.bitRate(row.rates.txBytesPerSecond))"
-                              : "")
-                }
-                .width(min: 70, ideal: 80)
-                TableColumn("Path", value: \.process.path) { row in
-                    Text(row.process.path.isEmpty ? "—" : row.process.path)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .help(row.process.path)
-                }
-                .width(min: 120, ideal: 130)
+                processColumns
             }
             .contextMenu(forSelectionType: KBProcessKey.self) { keys in
                 if let key = keys.first,
@@ -542,8 +548,11 @@ struct ProcessesView: View {
         row.process.name.isEmpty ? "Process \(row.process.pid)" : row.process.name
     }
 
-    private func socketText(_ row: ProcessInventoryRow) -> String {
-        guard let types = row.socketTypes else { return "—" }
+}
+
+private extension ProcessInventoryRow {
+    var socketTypeText: String {
+        guard let types = socketTypes else { return "—" }
         var parts: [String] = []
         if types.stream > 0 { parts.append("\(types.stream) stream") }
         if types.dgram > 0 { parts.append("\(types.dgram) dgram") }
@@ -553,73 +562,144 @@ struct ProcessesView: View {
         return parts.isEmpty ? "0" : parts.joined(separator: " · ")
     }
 
-    private func socketHelp(_ row: ProcessInventoryRow) -> String {
-        guard row.hasSocketData else {
-            return row.restricted
+    var socketTypeHelp: String {
+        guard hasSocketData else {
+            return restricted
                 ? "Socket details unavailable (permissions)"
                 : "Socket scan not available yet"
         }
-        if row.restricted { return "Partial: some sockets were not readable" }
-        if row.truncated { return "Truncated at the per-process socket cap" }
-        if row.socketSignaturesTruncated {
-            return "\(row.socketCount) unique sockets; some distinct socket "
+        if restricted { return "Partial: some sockets were not readable" }
+        if truncated { return "Truncated at the per-process socket cap" }
+        if socketSignaturesTruncated {
+            return "\(socketCount) unique sockets; some distinct socket "
                 + "signatures were not recorded"
         }
-        if row.socketSignatures == nil {
-            return "\(row.socketCount) unique sockets (signature detail "
+        if socketSignatures == nil {
+            return "\(socketCount) unique sockets (signature detail "
                 + "unavailable; filters use aggregate counts)"
         }
-        return "\(row.socketCount) unique sockets"
+        return "\(socketCount) unique sockets"
     }
 }
 
-private struct ProcessProtocolBadges: View {
-    let tags: Set<ProcessProtocolTag>
-    /// Unmasked values behind OTHER (socket families and NStat providers).
-    var otherLabels: [String] = []
-    /// Real protocols behind the RAW badges (ICMP, SCTP, GRE…).
-    var rawLabels: [String] = []
-    /// Exact AF_* · SOCK_* · IPPROTO_* lines when signatures are available.
-    var details: [String] = []
-
-    private static let otherColor = Color(red: 0.55, green: 0.57, blue: 0.63)
-    private static let rawColor = KBTheme.processesTint
+private struct ProcessNameCell: View {
+    let name: String
 
     var body: some View {
-        let fixed = tags.filter { $0 != .other && $0 != .raw4 && $0 != .raw6 }
-            .sorted { $0.sortRank < $1.sortRank }
-        let raw = tags.contains(.raw4) || tags.contains(.raw6)
-            ? (rawLabels.isEmpty
-                ? [ProcessProtocolTag.raw4, .raw6].filter(tags.contains).map(\.title)
-                : rawLabels)
-            : []
-        let others = tags.contains(.other)
-            ? (otherLabels.isEmpty ? ["Other"] : otherLabels)
-            : []
-        if fixed.isEmpty && raw.isEmpty && others.isEmpty {
+        Text(name)
+            .lineLimit(1)
+            .help(name)
+    }
+}
+
+private struct SocketTypeCell: View {
+    let row: ProcessInventoryRow
+
+    var body: some View {
+        Text(row.socketTypeText)
+            .font(.system(size: 10))
+            .monospacedDigit()
+            .lineLimit(1)
+            .foregroundStyle(row.hasSocketData ? .primary : .secondary)
+            .help(row.socketTypeHelp)
+    }
+}
+
+private struct FlowsCell: View {
+    let row: ProcessInventoryRow
+
+    var body: some View {
+        Text(row.connectionCount > 0 ? "\(row.connectionCount)" : "—")
+            .monospacedDigit()
+            .help(row.listeningCount > 0 ? "\(row.listeningCount) listening" : "")
+    }
+}
+
+private struct ByteCounterCell: View {
+    let text: String
+
+    var body: some View {
+        Text(text).monospacedDigit()
+    }
+}
+
+private struct ProcessRateCell: View {
+    let row: ProcessInventoryRow
+
+    var body: some View {
+        Text(row.connectionCount > 0
+             ? KBFormat.bitRate(row.rates.totalBytesPerSecond) : "—")
+            .monospacedDigit()
+            .help(row.connectionCount > 0
+                  ? "RX \(KBFormat.bitRate(row.rates.rxBytesPerSecond)) · "
+                    + "TX \(KBFormat.bitRate(row.rates.txBytesPerSecond))"
+                  : "")
+    }
+}
+
+private struct ProcessPathCell: View {
+    let path: String
+
+    var body: some View {
+        Text(path.isEmpty ? "—" : path)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .help(path)
+    }
+}
+
+private enum SocketBadgeKind {
+    case domain
+    case protocolKind
+}
+
+private struct SocketBadges: View {
+    let labels: [String]
+    var details: [String] = []
+    let kind: SocketBadgeKind
+
+    var body: some View {
+        content
+            .help(details.isEmpty
+                  ? labels.joined(separator: ", ")
+                  : details.joined(separator: "\n"))
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if labels.isEmpty {
             Text("—").foregroundStyle(.secondary)
         } else {
             HStack(spacing: 3) {
-                ForEach(fixed) { tag in
-                    badge(tag.title, color: color(tag))
-                }
-                ForEach(raw, id: \.self) { label in
-                    badge(label, color: Self.rawColor)
-                }
-                ForEach(others, id: \.self) { label in
-                    badge(label, color: Self.otherColor)
+                ForEach(labels, id: \.self) { label in
+                    badge(label, color: color(for: label))
                 }
             }
-            .help(details.isEmpty
-                  ? (fixed.map(\.title) + raw + others).joined(separator: ", ")
-                  : details.joined(separator: "\n"))
+        }
+    }
+
+    private func color(for label: String) -> Color {
+        switch kind {
+        case .domain:
+            switch label {
+            case "INET", "AF_INET": return KBTheme.downloadTint
+            case "INET6", "AF_INET6": return KBTheme.uploadTint
+            case "UNIX", "AF_UNIX": return KBTheme.processesTint
+            default: return Color(red: 0.62, green: 0.64, blue: 0.70)
+            }
+        case .protocolKind:
+            switch label {
+            case "TCP": return KBTheme.downloadTint
+            case "UDP": return KBTheme.connectionsTint
+            default: return KBTheme.processesTint
+            }
         }
     }
 
     private func badge(_ title: String, color: Color) -> some View {
         Text(title)
-            .font(.system(size: 8, weight: .semibold))
-            .padding(.horizontal, 4)
+            .font(.system(size: 7.5, weight: .semibold))
+            .padding(.horizontal, 3)
             .padding(.vertical, 1)
             .lineLimit(1)
             .background {
@@ -627,17 +707,6 @@ private struct ProcessProtocolBadges: View {
             }
             .foregroundStyle(color)
     }
-
-    private func color(_ tag: ProcessProtocolTag) -> Color {
-        switch tag {
-        case .tcp4: return KBTheme.downloadTint
-        case .tcp6: return Color(red: 0.35, green: 0.70, blue: 0.95)
-        case .udp4: return KBTheme.connectionsTint
-        case .udp6: return Color(red: 0.40, green: 0.80, blue: 0.72)
-        case .unix: return KBTheme.uploadTint
-        case .raw4: return KBTheme.processesTint
-        case .raw6: return Color(red: 0.90, green: 0.42, blue: 0.25)
-        case .other: return Self.otherColor
-        }
-    }
 }
+
+

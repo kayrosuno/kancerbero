@@ -47,9 +47,9 @@ El detalle de binarios, permisos, instalación y librerías está en
   tarjeta de la tabla reúne los grupos de checkboxes multiselección en cápsulas. En Connections:
   **IP** (IPv4/IPv6), **Transport** (TCP/UDP/Other), **TCP State** (Established, Listening,
   Connecting (SYN), Closing (Close/Fin/Time Wait)) y **Other** en su propia cápsula (solo el
-  checkbox, estados TCP no clasificados); en Processes: **Domain** (AF_INET, AF_INET6, AF_UNIX,
-  Other), **Protocols** (TCP/UDP/ICMP/ICMPv6/SCTP/GRE/ESP/RAW/Other) y **Socket type**
-  (stream/dgram/raw/seqpacket/other). Las tres facetas de Processes se cruzan sobre **el mismo
+  checkbox, estados TCP no clasificados); en Processes: **Socket domain** (AF_INET, AF_INET6,
+  AF_UNIX, Other), **Socket protocols** (TCP/UDP/ICMP/ICMPv6/SCTP/GRE/ESP/RAW/Other) y
+  **Socket type** (stream/dgram/raw/seqpacket/other). Las tres facetas de Processes se cruzan sobre **el mismo
   socket** usando las firmas `(domain, type, protocol)` de libproc; un protocolo seleccionado
   exige familia AF_INET/AF_INET6. Todos los valores están marcados por defecto, incluido
   **Other**; desmarcar excluye y un grupo sin nada marcado no muestra filas. Other afecta solo a
@@ -58,15 +58,17 @@ El detalle de binarios, permisos, instalación y librerías está en
   conserva el título, **Filter process**
   en Connections / **Filter processes** en Processes (nombre o PID; en Processes también ruta y
   usuario), el botón **Inspect** junto al filtro y, a la derecha, el contador de filas.
-  La tabla de Connections muestra Process, PID, Local, Remote, Proto, RX,
-  TX, Rate (bits/s), State e Iface, y permite ordenar por cualquier columna.
+  La tabla de Connections muestra Process, PID, Local, Remote, Proto, State, RX,
+  TX, Rate (bits/s) e Iface, y permite ordenar por cualquier columna. Los flujos
+  UDP, que no tienen estado TCP, muestran **Datagram** en State.
   La tabla de Processes lista solo procesos con flujos TCP/UDP o sockets (incluye UNIX y RAW vía
-  libproc), con todos los badges de protocolo (sin `+N`), tipos de socket (stream/dgram/raw),
-  número de flujos, RX/TX acumulados, Rate (bits/s) y Path. Los badges `RAW4`/`RAW6` se sustituyen por el
-  protocolo real de cada socket (`ICMP`, `ICMPv6`, `SCTP`, `GRE`, `ESP`, `RAW`…), y el genérico
-  **OTHER** por la familia real (`AF_SYSTEM`, `AF_NDRV`, `AF_VSOCK`…, con la tabla de
-  `sys/socket.h` completa) o por el provider de NStat cuando no es TCP/UDP (o `TCP`/`UDP` si el
-  flujo lo es pero se desconoce la versión IP). RAW4/RAW6 y OTHER solo quedan si no hay detalle
+  libproc) y muestra Process, PID, Guard, **Domain**, **Protocols**, **Type**, Flows, RX, TX,
+  Rate y Path. Domain lista las familias (`INET`, `INET6`, `UNIX`, `SYSTEM`…; el tooltip conserva
+  el nombre `AF_*` completo) y Protocols solo los protocolos IP reales (`TCP`, `UDP`, `ICMP`,
+  `ICMPv6`, `SCTP`, `GRE`, `ESP`, `RAW`…), sin `+N`. Type muestra el desglose
+  stream/dgram/raw/seqpacket/other. El tooltip de ambas columnas detalla cada firma
+  `AF_* · SOCK_* · IPPROTO_*`. Sin escaneo se usan las etiquetas agregadas y el detalle de
+  `RAW4`/`RAW6`/`OTHER` como antes.
   (p. ej. daemon antiguo o sockets restringidos). El inspector de proceso muestra la misma etiqueta
   en su columna Proto. Los filtros de cada subpestaña son independientes. Ambas
   tablas se pueden ordenar por cualquier columna. Sin root solo se leen sockets del propio

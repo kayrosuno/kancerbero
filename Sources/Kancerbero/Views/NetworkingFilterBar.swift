@@ -85,7 +85,7 @@ struct NetworkingFilterBar: View {
     }
 
     private var processDomainGroup: some View {
-        CheckboxFilterGroup("Domain",
+        CheckboxFilterGroup("Socket domain",
                             selection: processDomains,
                             options: [.inet, .inet6, .unix, .other],
                             optionTitle: { $0.title },
@@ -93,7 +93,7 @@ struct NetworkingFilterBar: View {
     }
 
     private var processProtocolGroup: some View {
-        CheckboxFilterGroup("Protocols",
+        CheckboxFilterGroup("Socket protocols",
                             selection: processProtocols,
                             options: [.tcp, .udp, .icmp, .icmpv6, .sctp, .gre, .esp, .raw, .other],
                             optionTitle: { $0.title })
