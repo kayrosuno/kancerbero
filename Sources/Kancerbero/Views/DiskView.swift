@@ -4,7 +4,6 @@ import KancerberoCore
 struct DiskView: View {
     @Binding var tab: DiskTab
     @Environment(DiskModel.self) private var disk
-    @Environment(AppModel.self) private var model
     @AppStorage(KBPreferences.tabAnimationsKey)
     private var tabAnimations = KBPreferences.tabAnimationsDefault
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -32,10 +31,12 @@ struct DiskView: View {
             HStack(spacing: 12) {
                 PillTabBar(selection: $tab, selectionAnimation: pillAnimation)
                 Spacer()
-                Text(contextLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .contentTransition(.numericText())
+                if let label = contextLabel {
+                    Text(label)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.numericText())
+                }
             }
 
             Group {
@@ -68,7 +69,7 @@ struct DiskView: View {
         }
     }
 
-    private var contextLabel: String {
+    private var contextLabel: String? {
         switch tab {
         case .volumes:
             let count = disk.inventory?.mountedVolumes.count ?? 0
@@ -85,7 +86,7 @@ struct DiskView: View {
             }
             return "Not scanned"
         case .io:
-            return "Read \(KBFormat.byteRate(model.diskReadRate)) · Write \(KBFormat.byteRate(model.diskWriteRate))"
+            return nil
         }
     }
 }
