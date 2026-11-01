@@ -77,7 +77,7 @@ struct NetworkingFilterBar: View {
     /// `Other` is not a TCP state: it groups UDP flows and unclassified
     /// states, so it lives in its own group with its own checkbox.
     private var otherStateGroup: some View {
-        CheckboxFilterGroup("Other",
+        CheckboxFilterGroup("",
                             selection: connectionStates,
                             options: [.other],
                             optionTitle: { $0.title },

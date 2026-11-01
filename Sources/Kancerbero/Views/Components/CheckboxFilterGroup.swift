@@ -27,11 +27,13 @@ struct CheckboxFilterGroup<Option: CaseIterable & Identifiable & Hashable>: View
 
     var body: some View {
         HStack(spacing: 6) {
-            Text(label)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .fixedSize()
+            if !label.isEmpty {
+                Text(label)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
 
             ForEach(items) { option in
                 Toggle(optionTitle(option), isOn: binding(for: option))
