@@ -416,9 +416,10 @@ struct ProcessesView: View {
                 }
                 .width(min: 46, ideal: 54)
                 TableColumn("Protocols", value: \.protocolSortRank) { row in
-                    ProcessProtocolBadges(tags: row.protocols,
-                                          otherLabels: row.otherProtocolLabels,
-                                          rawLabels: row.rawProtocolLabels)
+                    ProcessProtocolBadges(tags: row.badgeProtocols,
+                                          otherLabels: row.badgeOtherLabels,
+                                          rawLabels: row.badgeRawLabels,
+                                          details: row.signatureDetails)
                 }
                 .width(min: 150, ideal: 230)
                 TableColumn("Sockets", value: \.socketCount) { row in
@@ -560,6 +561,14 @@ struct ProcessesView: View {
         }
         if row.restricted { return "Partial: some sockets were not readable" }
         if row.truncated { return "Truncated at the per-process socket cap" }
+        if row.socketSignaturesTruncated {
+            return "\(row.socketCount) unique sockets; some distinct socket "
+                + "signatures were not recorded"
+        }
+        if row.socketSignatures == nil {
+            return "\(row.socketCount) unique sockets (signature detail "
+                + "unavailable; filters use aggregate counts)"
+        }
         return "\(row.socketCount) unique sockets"
     }
 }
@@ -570,6 +579,8 @@ private struct ProcessProtocolBadges: View {
     var otherLabels: [String] = []
     /// Real protocols behind the RAW badges (ICMP, SCTP, GRE…).
     var rawLabels: [String] = []
+    /// Exact AF_* · SOCK_* · IPPROTO_* lines when signatures are available.
+    var details: [String] = []
 
     private static let otherColor = Color(red: 0.55, green: 0.57, blue: 0.63)
     private static let rawColor = KBTheme.processesTint
@@ -599,7 +610,9 @@ private struct ProcessProtocolBadges: View {
                     badge(label, color: Self.otherColor)
                 }
             }
-            .help((fixed.map(\.title) + raw + others).joined(separator: ", "))
+            .help(details.isEmpty
+                  ? (fixed.map(\.title) + raw + others).joined(separator: ", ")
+                  : details.joined(separator: "\n"))
         }
     }
 

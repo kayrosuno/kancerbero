@@ -36,10 +36,10 @@ struct NetworkingView: View {
         let connectionSearch = tab == .connections ? ui.networking.connectionSearch : ""
         let interfaceSearch = tab == .interfaces ? ui.networking.interfaceSearch : ""
         let processSearch = tab == .processes ? ui.networking.processSearch : ""
-        let processIPs = tab == .processes ? ui.networking.processIPVersions
-                                           : NetworkingIPVersion.all
-        let processKinds = tab == .processes ? ui.networking.processProtocolKinds
-                                             : ProcessProtocolKind.all
+        let processDomains = tab == .processes ? ui.networking.processDomains
+                                               : ProcessDomain.all
+        let processProtocols = tab == .processes ? ui.networking.processProtocols
+                                                 : ProcessProtocolCategory.all
         let processSockets = tab == .processes ? ui.networking.processSocketTypes
                                                : ProcessSocketType.all
         let ipOnly = NetworkingProtocolFilter(ipVersions: ui.networking.ipVersions)
@@ -55,8 +55,8 @@ struct NetworkingView: View {
                                                     states: connectionStates,
                                                     search: connectionSearch)
         let matchingProcesses = model.filteredProcessRows(ui.networking.focus,
-                                                          ipVersions: processIPs,
-                                                          protocolKinds: processKinds,
+                                                          domains: processDomains,
+                                                          protocols: processProtocols,
                                                           socketTypes: processSockets,
                                                           search: processSearch)
 

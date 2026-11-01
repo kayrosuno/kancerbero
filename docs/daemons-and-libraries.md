@@ -442,7 +442,7 @@ NetworkStatistics y de `net.statistics_privcheck`.
 | `battery-graph` | Muestras del gráfico de batería de 12 h, estados AC/batería y tiempo en la fuente actual | — |
 | `ifaces` | Contadores de interfaz (IFMIB) | — |
 | `sockets <pid>` | Sockets del proceso | — |
-| `sockets-summary [pid...]` | Resumen de sockets por protocolo/tipo; sin PIDs usa todos | — |
+| `sockets-summary [pid...]` | Resumen de sockets por protocolo/tipo y firmas `(domain,type,protocol)`; sin PIDs usa todos | — |
 | `files <pid>` | Ficheros abiertos (libproc) | — |
 | `daemons [system\|gui\|user]` | Inventario launchd del dominio | `system` |
 | `disk volumes` | Inventario de discos y volúmenes | — |

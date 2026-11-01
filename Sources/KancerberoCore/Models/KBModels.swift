@@ -514,6 +514,19 @@ public enum KBSocketFamily {
     }
 }
 
+/// Darwin socket type names, from <sys/socket.h>.
+public enum KBSocketType {
+    public static func name(for type: Int32) -> String {
+        switch type {
+        case SOCK_STREAM: return "SOCK_STREAM"
+        case SOCK_DGRAM: return "SOCK_DGRAM"
+        case SOCK_RAW: return "SOCK_RAW"
+        case SOCK_SEQPACKET: return "SOCK_SEQPACKET"
+        default: return "SOCK_\(type)"
+        }
+    }
+}
+
 /// IP protocol names for sockets that are neither TCP nor UDP.
 public enum KBIPProtocol {
     public static func name(for number: Int32) -> String {
@@ -630,6 +643,19 @@ public struct KBSocketTypeCounts: Codable, Sendable, Hashable {
     }
 }
 
+/// One distinct socket(domain, type, protocol) triple reported by libproc.
+public struct KBSocketSignature: Codable, Sendable, Hashable {
+    public var family: Int32
+    public var type: Int32
+    public var protocolNumber: Int32
+
+    public init(family: Int32, type: Int32, protocolNumber: Int32) {
+        self.family = family
+        self.type = type
+        self.protocolNumber = protocolNumber
+    }
+}
+
 public struct KBProcessSocketSummary: Codable, Sendable, Identifiable, Hashable {
     public var key: KBProcessKey
     public var buckets: KBSocketBucketCounts
@@ -645,6 +671,12 @@ public struct KBProcessSocketSummary: Codable, Sendable, Identifiable, Hashable 
     /// the UI can show ICMP, SCTP… instead of the generic RAW badge. nil when
     /// the scanner (or an older daemon) did not report them.
     public var otherProtocols: [UInt8]?
+    /// Distinct (family, type, protocol) triples. nil when the scanner or an
+    /// older daemon did not report them; an empty array means "scanned, no
+    /// sockets". Optional so old payloads keep decoding without a schema bump.
+    public var signatures: [KBSocketSignature]?
+    /// True when the fixed signature array filled up or the scan truncated.
+    public var signaturesTruncated: Bool?
 
     public var id: KBProcessKey { key }
 
@@ -652,7 +684,9 @@ public struct KBProcessSocketSummary: Codable, Sendable, Identifiable, Hashable 
                 types: KBSocketTypeCounts, socketFDs: Int, uniqueSockets: Int,
                 restricted: Bool, truncated: Bool,
                 otherFamilies: [UInt32]? = nil,
-                otherProtocols: [UInt8]? = nil) {
+                otherProtocols: [UInt8]? = nil,
+                signatures: [KBSocketSignature]? = nil,
+                signaturesTruncated: Bool? = nil) {
         self.key = key
         self.buckets = buckets
         self.types = types
@@ -662,6 +696,8 @@ public struct KBProcessSocketSummary: Codable, Sendable, Identifiable, Hashable 
         self.truncated = truncated
         self.otherFamilies = otherFamilies
         self.otherProtocols = otherProtocols
+        self.signatures = signatures
+        self.signaturesTruncated = signaturesTruncated
     }
 }
 

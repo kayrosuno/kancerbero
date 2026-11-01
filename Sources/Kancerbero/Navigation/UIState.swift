@@ -102,15 +102,25 @@ final class UIState {
            let mode = TrafficGraphMode(rawValue: raw.lowercased()) {
             networking.trafficGraphMode = mode
         }
-        if let ipVersions = Self.filterSelection(
-            for: "--networking-process-ip", in: arguments,
-            parse: { NetworkingIPVersion(cliValue: $0) }) {
-            networking.processIPVersions = ipVersions
+        // The explicit domain flag wins; the legacy --networking-process-ip
+        // flag still maps ipv4/ipv6 to AF_INET/AF_INET6.
+        if Self.value(for: "--networking-process-domain", in: arguments) == nil,
+           let ips = Self.filterSelection(
+               for: "--networking-process-ip", in: arguments,
+               parse: { NetworkingIPVersion(cliValue: $0) }) {
+            networking.processDomains = Set(ips.map {
+                $0 == .ipv4 ? ProcessDomain.inet : ProcessDomain.inet6
+            })
         }
-        if let kinds = Self.filterSelection(
+        if let domains = Self.filterSelection(
+            for: "--networking-process-domain", in: arguments,
+            parse: { ProcessDomain(cliValue: $0) }) {
+            networking.processDomains = domains
+        }
+        if let protocols = Self.filterSelection(
             for: "--networking-process-protocol", in: arguments,
-            parse: { ProcessProtocolKind(cliValue: $0) }) {
-            networking.processProtocolKinds = kinds
+            parse: { ProcessProtocolCategory(cliValue: $0) }) {
+            networking.processProtocols = protocols
         }
         if let socketTypes = Self.filterSelection(
             for: "--networking-process-socket", in: arguments,
@@ -254,8 +264,8 @@ struct NetworkingUIState: Equatable {
     var connectionSearch = ""
     var interfaceSearch = ""
     var processSearch = ""
-    var processIPVersions: Set<NetworkingIPVersion> = NetworkingIPVersion.all
-    var processProtocolKinds: Set<ProcessProtocolKind> = ProcessProtocolKind.all
+    var processDomains: Set<ProcessDomain> = ProcessDomain.all
+    var processProtocols: Set<ProcessProtocolCategory> = ProcessProtocolCategory.all
     var processSocketTypes: Set<ProcessSocketType> = ProcessSocketType.all
     var selectedConnection: String?
     var selectedProcess: KBProcessKey?
@@ -263,11 +273,11 @@ struct NetworkingUIState: Equatable {
     var interfaceSortOrder: [KeyPathComparator<InterfaceRow>] = []
     var processSortOrder: [KeyPathComparator<ProcessInventoryRow>] = []
 
-    var processIPFiltered: Bool { processIPVersions != NetworkingIPVersion.all }
-    var processProtocolKindFiltered: Bool { processProtocolKinds != ProcessProtocolKind.all }
+    var processDomainFiltered: Bool { processDomains != ProcessDomain.all }
+    var processProtocolFiltered: Bool { processProtocols != ProcessProtocolCategory.all }
     var processSocketTypeFiltered: Bool { processSocketTypes != ProcessSocketType.all }
     var processFacetsFiltered: Bool {
-        processIPFiltered || processProtocolKindFiltered || processSocketTypeFiltered
+        processDomainFiltered || processProtocolFiltered || processSocketTypeFiltered
     }
 }
 

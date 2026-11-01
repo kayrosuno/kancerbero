@@ -326,12 +326,27 @@ private func printSocketSummary(_ inventory: KBSocketInventory) {
         let protos = (item.otherProtocols ?? [])
             .map { KBIPProtocol.name(for: Int32($0)) }
             .sorted()
-        write(String(format: "  pid=%-7d sockets=%-4d tcp4=%d tcp6=%d udp4=%d udp6=%d unix=%d raw4=%d raw6=%d other=%d types=[stream=%d dgram=%d raw=%d seq=%d other=%d] inet-protos=[%@] restricted=%d truncated=%d\n",
+        let sigText: String
+        if let signatures = item.signatures {
+            sigText = signatures.isEmpty ? "[]" : signatures.map { signature in
+                let family = KBSocketFamily.name(for: UInt32(max(signature.family, 0)))
+                let type = KBSocketType.name(for: signature.type)
+                let proto = signature.protocolNumber == 0
+                    ? "IPPROTO_0"
+                    : KBIPProtocol.name(for: signature.protocolNumber)
+                return "\(family):\(type):\(proto)"
+            }.joined(separator: ",")
+        } else {
+            sigText = "nil"
+        }
+        write(String(format: "  pid=%-7d sockets=%-4d tcp4=%d tcp6=%d udp4=%d udp6=%d unix=%d raw4=%d raw6=%d other=%d types=[stream=%d dgram=%d raw=%d seq=%d other=%d] inet-protos=[%@] restricted=%d truncated=%d signatures=[%@] sig-truncated=%d\n",
                      item.key.pid, item.uniqueSockets,
                      b.tcp4, b.tcp6, b.udp4, b.udp6, b.unix, b.raw4, b.raw6, b.other,
                      t.stream, t.dgram, t.raw, t.seqpacket, t.otherType,
                      (protos.isEmpty ? "-" : protos.joined(separator: ",")) as NSString,
-                     item.restricted ? 1 : 0, item.truncated ? 1 : 0))
+                     item.restricted ? 1 : 0, item.truncated ? 1 : 0,
+                     sigText as NSString,
+                     (item.signaturesTruncated ?? false) ? 1 : 0))
     }
 }
 
