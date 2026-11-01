@@ -37,7 +37,7 @@ struct ActivityCard: View {
                     caption: "with sockets",
                     hint: "Show processes with sockets",
                     isSelected: focus == .processes,
-                    valueSize: 16,
+                    valueSize: 20,
                     iconSize: 9,
                     verticalPadding: 4
                 ) {
@@ -53,7 +53,7 @@ struct ActivityCard: View {
                     caption: "total",
                     hint: "Show all connections",
                     isSelected: focus == .connections,
-                    valueSize: 16,
+                    valueSize: 20,
                     iconSize: 9,
                     verticalPadding: 4
                 ) {
@@ -69,7 +69,7 @@ struct ActivityCard: View {
                     caption: "last 10 s",
                     hint: "Show connections that moved data in the last 10 seconds",
                     isSelected: focus == .active,
-                    valueSize: 16,
+                    valueSize: 20,
                     iconSize: 9,
                     verticalPadding: 4
                 ) {
