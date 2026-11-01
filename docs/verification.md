@@ -110,7 +110,8 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--networking-transport tcp|udp|other[,..]|all] \
   [--networking-ip ipv4|ipv6[,..]|all] \
   [--networking-state established|listening|connecting|closing|other[,..]|all] \
-  [--networking-connection-search <texto>] [--networking-search <texto>] \
+  [--networking-connection-search <texto>] [--networking-interface-search <texto>] \
+  [--networking-search <texto>] \
   [--networking-process-ip ipv4|ipv6[,..]|all] \
   [--networking-process-protocol tcp|udp|raw|unix|other[,..]|all] \
   [--networking-process-socket stream|dgram|raw|seqpacket|other[,..]|all] \
@@ -523,18 +524,24 @@ $APP --screenshot /tmp/kb-net-process-independent.png --section networking \
 - Traffic: Download/Upload en la cabecera, gráfico espejado con cuadrícula, etiquetas Y en
   `bps/Kbps/Mbps/Gbps` y eje temporal `now/-30s/-60s` (con el intervalo de 1 s; el dato más
   reciente entra por la izquierda). Sin salto de layout entre 0,3 s y 5 s.
-- Activity: agrupa Connections y Processes; los números ignoran el foco y aplican los filtros de
-  la pestaña activa. En Connections, protocolo (Transport/IP), State y búsqueda de conexión; en
-  Processes, sus facetas (IP, Protocolos, Socket type) y su búsqueda. Protocols muestra la barra y
-  la leyenda de los seis tipos; el filtro IP de Connections reduce el desglose, el Transport no.
+- Activity muestra tres métricas: **processes** con sockets (total de la tabla Processes),
+  **Connections** totales (`sources.count`) y **Active** (flujos con tráfico RX+TX en los últimos
+  10 s). Los tres son totales y no dependen de los filtros. Connections filtra a todas las
+  conexiones y Active a solo las activas; el tile seleccionado queda resaltado. Con
+  `--networking-focus active` el número de Active y el numerador de «N of M connections»
+  coinciden si los checkboxes están por defecto.
+- Protocols muestra la barra y la leyenda de los seis tipos; el filtro IP de Connections reduce
+  el desglose, el Transport no.
 - La cabecera de Connections agrupa en cápsulas los checkboxes **IP** (IPv4/IPv6), **Transport**
-  (TCP/UDP/Other) y **State** (Established, Listening, Connecting (SYN), Closing
-  (Close/Fin/Time Wait), Other), todos marcados por defecto salvo **State › Other**, que arranca
-  desmarcado, más `Filter process`. Desmarcar un valor excluye sus filas; desmarcar todo un grupo
-  deja “0 of M connections” (Activity 0). Con el grupo State completo las filas UDP siguen
-  visibles; con un subconjunto se ocultan, así que al arrancar (Other desmarcado) las conexiones
-  sin estado tampoco aparecen hasta volver a marcar Other. La familia de dirección desconocida se
-  excluye cuando el grupo IP no está completo.
+  (TCP/UDP/Other), **TCP State** (Established, Listening, Connecting (SYN), Closing
+  (Close/Fin/Time Wait)) y **Other** en su propia cápsula (UDP y estados no clasificados), todos
+  marcados por defecto, más `Filter process`. Desmarcar un valor excluye sus filas; desmarcar todo
+  un grupo deja “0 of M connections”. Desmarcar **Other** oculta las filas UDP/sin estado;
+  desmarcar un estado TCP no las oculta. La familia de dirección desconocida se excluye cuando el
+  grupo IP no está completo.
+- Para comprobar la ventana de 10 s: lanzar una descarga, ver cómo el flujo aparece en el filtro
+  Active, pararla y comprobar que sigue activo ~10 s y después desaparece del filtro (el
+  contador Active baja).
 - La cabecera de Processes añade en cápsulas **IP** (IPv4/IPv6), **Protocols**
   (TCP/UDP/RAW/UNIX/OTHER) y **Socket type** (stream/dgram/raw/seqpacket/other). Un IP parcial
   exige algún badge de la familia marcada y excluye las filas solo-UNIX/OTHER; un Socket type
@@ -575,6 +582,21 @@ $APP --screenshot /tmp/kb-connections-columns.png --section networking \
   orden se conservan (estado de sesión en `UIState`). Si el filtro hace desaparecer la fila, la
   selección se limpia.
 - Comprobar direcciones IPv6 largas (truncadas con tooltip) y el scroll horizontal a 1040×640.
+
+Tabla de Interfaces (orden y filtro):
+
+```bash
+$APP --screenshot /tmp/kb-interfaces.png --section networking --tab interfaces \
+  --networking-interface-search en --screenshot-delay 5
+```
+
+- El campo «Filter interfaces» filtra por nombre, tipo (`Ethernet`, `Wi-Fi`, …) o estado
+  (`Up`/`Dormant`/`Down`) y el contador de la cabecera pasa a «N of M interfaces».
+- Orden de columnas: Interface, Type, State, Received, Sent, RX bit/s, TX bit/s y MTU. Pulsar cada
+  cabecera debe mostrar el indicador de orden; State ordena Up → Dormant → Down, y las tasas se
+  ordenan numéricamente (`KBFormat.bitRate`).
+- Con `--networking-focus active` la tabla muestra solo las interfaces usadas por conexiones
+  activas.
 
 Tabla de Processes (flujos + sockets):
 

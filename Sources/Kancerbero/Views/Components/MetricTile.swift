@@ -3,6 +3,9 @@ import SwiftUI
 enum MetricTileLayout {
     case inline
     case stacked
+    /// Narrow variant for cards that must fit three metrics side by side:
+    /// no icon or checkmark, tighter padding and a smaller value.
+    case compact
 }
 
 struct MetricTile: View {
@@ -27,7 +30,7 @@ struct MetricTile: View {
     var body: some View {
         Button(action: action) {
             content
-                .padding(.horizontal, 8)
+                .padding(.horizontal, layout == .compact ? 5 : 8)
                 .padding(.vertical, verticalPadding)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background {
@@ -91,6 +94,29 @@ struct MetricTile: View {
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
+                }
+                Spacer(minLength: 0)
+            }
+        case .compact:
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(value)
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .lineLimit(1)
+                    .frame(minWidth: valueMinWidth ?? 0, alignment: .leading)
+                    .minimumScaleFactor(valueScales ? 0.65 : 1)
+                if let caption {
+                    Text(caption)
+                        .font(.system(size: 8.5))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
                 Spacer(minLength: 0)
             }

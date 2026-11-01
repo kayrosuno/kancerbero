@@ -33,8 +33,10 @@ El detalle de binarios, permisos, instalación y librerías está en
 
 `NavigationSplitView` con panel lateral colapsable:
 
-- **Networking** — a la izquierda, una tarjeta **Activity** que agrupa Connections y Processes y
-  una tarjeta **Protocols** con el desglose TCP4/TCP6/UDP4/UDP6/UNIX/OTHER; en medio, la tarjeta
+- **Networking** — a la izquierda, una tarjeta **Activity** con tres métricas —procesos con
+  sockets, conexiones totales y conexiones activas (con tráfico en los últimos 10 s)— donde las
+  dos de conexiones actúan como filtro (todas / solo activas), y una tarjeta **Protocols** con el
+  desglose TCP4/TCP6/UDP4/UDP6/UNIX/OTHER; en medio, la tarjeta
   **Network totals**, siempre visible en la franja, con dos grupos apilados y sombreados,
   **Bytes** sobre **Packets**; cada grupo muestra las filas **Input**/**Output** y su total
   acumulado desde el arranque. A la derecha, la tarjeta **Traffic** se adapta hasta un mínimo y
@@ -43,12 +45,13 @@ El detalle de binarios, permisos, instalación y librerías está en
   clicable para filtrar por dirección. El gráfico espejado (download arriba, upload abajo)
   conserva cuadrícula, niveles y eje temporal. Una **barra de filtros** entre las pills y la
   tarjeta de la tabla reúne los grupos de checkboxes multiselección en cápsulas. En Connections:
-  **IP** (IPv4/IPv6), **Transport** (TCP/UDP/Other) y **State** (Established, Listening,
-  Connecting (SYN), Closing (Close/Fin/Time Wait), Other); en Processes: **IP**,
+  **IP** (IPv4/IPv6), **Transport** (TCP/UDP/Other), **TCP State** (Established, Listening,
+  Connecting (SYN), Closing (Close/Fin/Time Wait)) y **Other** en su propia cápsula (UDP y
+  estados no clasificados); en Processes: **IP**,
   **Protocols** (TCP/UDP/RAW/UNIX/OTHER) y **Socket type** (stream/dgram/raw/seqpacket/other).
-  Todos los valores están marcados por defecto salvo **State › Other**, que arranca desmarcado;
-  desmarcar excluye y un grupo sin nada marcado no muestra filas. Con el grupo State completo las
-  filas UDP (sin estado) siguen visibles; con un subconjunto se ocultan. La cabecera de la tarjeta
+  Todos los valores están marcados por defecto, incluido **Other**; desmarcar excluye y un grupo
+  sin nada marcado no muestra filas. Other controla las filas UDP/sin estado: desmarcarlo las
+  oculta y desmarcar un estado TCP no las oculta. La cabecera de la tarjeta
   conserva el título, **Filter process**
   en Connections / **Filter processes** en Processes (nombre o PID; en Processes también ruta y
   usuario), el botón **Inspect** junto al filtro y, a la derecha, el contador de filas.
@@ -245,12 +248,13 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--applications-scope user|system] \
   [--show-status] \
   [--screenshot-dock <ruta>] [--dock-style <estilo|all>] \
-  [--networking-focus download|upload|connections|processes] \
+  [--networking-focus download|upload|connections|active|processes] \
   [--traffic-graph bits|packets] \
   [--networking-transport tcp|udp|other[,..]|all] \
   [--networking-ip ipv4|ipv6[,..]|all] \
   [--networking-state established|listening|connecting|closing|other[,..]|all] \
-  [--networking-connection-search <texto>] [--networking-search <texto>] \
+  [--networking-connection-search <texto>] [--networking-interface-search <texto>] \
+  [--networking-search <texto>] \
   [--networking-process-ip ipv4|ipv6[,..]|all] \
   [--networking-process-protocol tcp|udp|raw|unix|other[,..]|all] \
   [--networking-process-socket stream|dgram|raw|seqpacket|other[,..]|all] \

@@ -34,6 +34,7 @@ struct NetworkingView: View {
         let connectionStates = tab == .connections ? ui.networking.connectionStates
                                                    : NetworkingConnectionState.all
         let connectionSearch = tab == .connections ? ui.networking.connectionSearch : ""
+        let interfaceSearch = tab == .interfaces ? ui.networking.interfaceSearch : ""
         let processSearch = tab == .processes ? ui.networking.processSearch : ""
         let processIPs = tab == .processes ? ui.networking.processIPVersions
                                            : NetworkingIPVersion.all
@@ -41,25 +42,14 @@ struct NetworkingView: View {
                                              : ProcessProtocolKind.all
         let processSockets = tab == .processes ? ui.networking.processSocketTypes
                                                : ProcessSocketType.all
-        // The Activity tiles mirror the tables, so they must include the
-        // active focus filter too; otherwise the tile count and the table's
-        // "N of M" disagree while a focus is selected.
-        let activityConnections = model.filteredSources(ui.networking.focus,
-                                                        matching: protocolFilter,
-                                                        states: connectionStates,
-                                                        search: connectionSearch).count
-        let activityProcesses = model.filteredProcessRows(ui.networking.focus,
-                                                          ipVersions: processIPs,
-                                                          protocolKinds: processKinds,
-                                                          socketTypes: processSockets,
-                                                          search: processSearch).count
         let ipOnly = NetworkingProtocolFilter(ipVersions: ui.networking.ipVersions)
         let protocolCounts = Dictionary(
             grouping: model.sources.filter(ipOnly.matches),
             by: \.protocolBucket
         ).mapValues(\.count)
 
-        let matchingInterfaces = model.filteredInterfaces(ui.networking.focus)
+        let matchingInterfaces = model.filteredInterfaces(ui.networking.focus,
+                                                          search: interfaceSearch)
         let matchingSources = model.filteredSources(ui.networking.focus,
                                                     matching: protocolFilter,
                                                     states: connectionStates,
@@ -72,16 +62,9 @@ struct NetworkingView: View {
 
         let activityColumn = VStack(spacing: KBTheme.summaryGridSpacing) {
             ActivityCard(
-                connectionsCount: activityConnections,
-                processesCount: activityProcesses,
-                connectionsFiltered: protocolFilter.isActive
-                    || connectionStates != NetworkingConnectionState.all
-                    || !connectionSearch
-                        .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                processesFiltered: tab == .processes
-                    && (ui.networking.processFacetsFiltered
-                        || !processSearch
-                            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
+                processesCount: model.processInventory.count,
+                connectionsCount: model.sources.count,
+                activeCount: model.activeSourceIDs.count,
                 focus: ui.networking.focus,
                 onToggle: toggleFocus
             )
@@ -151,9 +134,12 @@ struct NetworkingView: View {
         switch tab {
         case .interfaces:
             let total = model.interfaces.count
-            return ui.networking.focus == nil
-                ? "\(total) interfaces"
-                : "\(interfaces.count) of \(total) interfaces"
+            let active = ui.networking.focus != nil
+                || !ui.networking.interfaceSearch
+                    .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return active
+                ? "\(interfaces.count) of \(total) interfaces"
+                : "\(total) interfaces"
         case .connections:
             let total = model.sources.count
             let active = ui.networking.focus != nil

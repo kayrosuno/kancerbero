@@ -165,6 +165,12 @@ final class AppModel {
     private var previousInterfaceCounters: [UInt32: KBCounters] = [:]
     private var previousTimestamp: UInt64 = 0
     private var lastSampleSource: SampleSource?
+    /// Last monotonic time each source moved bytes (RX or TX). Kept here, not
+    /// on KBNStatSource, so local and daemon snapshots share the same policy
+    /// without touching the wire format or the schema.
+    private var lastActivityNanoseconds: [String: UInt64] = [:]
+    /// Sources that moved data in the last 10 seconds.
+    private(set) var activeSourceIDs: Set<String> = []
     private var daemonConnecting = false
     private var lastDaemonAttempt = Date.distantPast
     private var lastFullDiskAccessProbe = Date.distantPast
@@ -926,6 +932,8 @@ final class AppModel {
             previousInterfaceCounters = [:]
             previousProcessEnergy = [:]
             previousProcessIO = [:]
+            lastActivityNanoseconds = [:]
+            activeSourceIDs = []
             lastSampleSource = source
         }
 
@@ -961,6 +969,17 @@ final class AppModel {
         var sources = snapshot.sources
         var rates: [UInt32: KBRates] = [:]
 
+        // Activity is tracked independently of the rate window: a flow that
+        // moved bytes during a pause is still "active" for its 10 s window.
+        for index in sources.indices {
+            let id = sources[index].id
+            guard let previous = previousSourceCounters[id] else { continue }
+            let delta = sources[index].counters.positiveDelta(from: previous)
+            if delta.rxBytes > 0 || delta.txBytes > 0 {
+                lastActivityNanoseconds[id] = now
+            }
+        }
+
         if validInterval {
             for index in sources.indices {
                 let id = sources[index].id
@@ -994,6 +1013,14 @@ final class AppModel {
         var sourceCounters: [String: KBCounters] = [:]
         for source in sources { sourceCounters[source.id] = source.counters }
         previousSourceCounters = sourceCounters
+
+        let activeWindow: UInt64 = 10_000_000_000
+        lastActivityNanoseconds = lastActivityNanoseconds.filter {
+            sourceCounters[$0.key] != nil
+        }
+        activeSourceIDs = Set(lastActivityNanoseconds.compactMap { id, stamp in
+            now >= stamp && now - stamp <= activeWindow ? id : nil
+        })
 
         var interfaceCounters: [UInt32: KBCounters] = [:]
         for item in snapshot.interfaces { interfaceCounters[item.id] = item.counters }
