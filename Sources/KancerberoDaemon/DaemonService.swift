@@ -32,7 +32,9 @@ private final class ClientSink: @unchecked Sendable {
 }
 
 final class DaemonService: NSObject, KancerberoDaemonXPC, @unchecked Sendable {
-    private let collector = CollectionActor()
+    /// Shared with every service so the daemon keeps a single NStatManager
+    /// for its lifetime instead of building a new source table per client.
+    private let collector: CollectionActor
     private let lock = NSLock()
     private weak var connection: NSXPCConnection?
     private var task: Task<Void, Never>?
@@ -46,11 +48,12 @@ final class DaemonService: NSObject, KancerberoDaemonXPC, @unchecked Sendable {
     private var trashInFlight = false
 
     init(peer: PeerIdentity, canControl: Bool, canTrash: Bool,
-         connection: NSXPCConnection) {
+         connection: NSXPCConnection, collector: CollectionActor) {
         self.peer = peer
         self.canControl = canControl
         self.canTrash = canTrash
         self.connection = connection
+        self.collector = collector
         super.init()
     }
 

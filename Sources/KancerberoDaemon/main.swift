@@ -18,7 +18,10 @@ if geteuid() != 0 {
 }
 
 let listener = NSXPCListener(machServiceName: KancerberoXPCNames.machService)
-let delegate = DaemonDelegate()
+// One collector for the daemon's lifetime: it owns the single NStatManager
+// and its source table, so a client reconnect must not start a new one.
+let collector = CollectionActor()
+let delegate = DaemonDelegate(collector: collector)
 listener.delegate = delegate
 listener.resume()
 logger.notice("listening on \(KancerberoXPCNames.machService, privacy: .public)")

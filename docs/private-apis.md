@@ -47,6 +47,13 @@ Hallazgo importante: `NStatSourceCopyProperties` y el description block devuelve
 contadores a 0; los valores reales llegan en el bloque de counts (`NStatSourceQueryCounts`).
 `NStatSourceIdentifier` devolvió punteros no válidos en macOS 27 y no se usa.
 
+Segundo hallazgo: la descripción (extremos, estado TCP, interfaz) queda **cacheada** en la
+fuente desde que se anuncia. El bloque de counts devuelve esa misma descripción cacheada junto a
+los contadores frescos, así que un flujo anunciado durante el handshake se queda en `SynSent`
+(o en `0.0.0.0:0`/`Closed`) indefinidamente. Para refrescarla hay que volver a llamar a
+`NStatSourceQueryDescription`; `kb_nstat_poll` lo hace en cada tick (antes de los counts) para
+que la tabla de Connections vea las transiciones de estado.
+
 ### libproc
 
 `proc_listallpids` devuelve bytes (`proc_listallpids(NULL, 0)` → tamaño necesario), no PIDs.

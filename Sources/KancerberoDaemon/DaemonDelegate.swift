@@ -6,6 +6,13 @@ import os
 private let logger = Logger(subsystem: "uno.kayros.kancerbero", category: "daemon.listener")
 
 final class DaemonDelegate: NSObject, NSXPCListenerDelegate {
+    private let collector: CollectionActor
+
+    init(collector: CollectionActor) {
+        self.collector = collector
+        super.init()
+    }
+
     func listener(_ listener: NSXPCListener,
                   shouldAcceptNewConnection newConnection: NSXPCConnection) -> Bool {
         let pid = newConnection.processIdentifier
@@ -35,7 +42,8 @@ final class DaemonDelegate: NSObject, NSXPCListenerDelegate {
         let service = DaemonService(peer: peer,
                                     canControl: canControl,
                                     canTrash: canTrash,
-                                    connection: newConnection)
+                                    connection: newConnection,
+                                    collector: collector)
         newConnection.exportedInterface = NSXPCInterface(with: KancerberoDaemonXPC.self)
         newConnection.exportedObject = service
         newConnection.remoteObjectInterface = NSXPCInterface(with: KancerberoClientXPC.self)

@@ -140,6 +140,13 @@ struct ConnectionsView: View {
                     Text(KBFormat.bytes(source.counters.txBytes)).monospacedDigit()
                 }
                 .width(min: 75, ideal: 80)
+                TableColumn("Rate", value: \.rates.totalBytesPerSecond) { source in
+                    Text(KBFormat.bitRate(source.rates.totalBytesPerSecond))
+                        .monospacedDigit()
+                        .help("RX \(KBFormat.bitRate(source.rates.rxBytesPerSecond)) · "
+                              + "TX \(KBFormat.bitRate(source.rates.txBytesPerSecond))")
+                }
+                .width(min: 80, ideal: 96)
                 TableColumn("State", value: \.tcpState) { source in
                     Text(source.tcpState.isEmpty ? "—" : source.tcpState)
                 }
@@ -365,13 +372,23 @@ struct ProcessesView: View {
                         .monospacedDigit()
                 }
                 .width(min: 75, ideal: 90)
+                TableColumn("Rate", value: \.rates.totalBytesPerSecond) { row in
+                    Text(row.connectionCount > 0
+                         ? KBFormat.bitRate(row.rates.totalBytesPerSecond) : "—")
+                        .monospacedDigit()
+                        .help(row.connectionCount > 0
+                              ? "RX \(KBFormat.bitRate(row.rates.rxBytesPerSecond)) · "
+                                + "TX \(KBFormat.bitRate(row.rates.txBytesPerSecond))"
+                              : "")
+                }
+                .width(min: 70, ideal: 80)
                 TableColumn("Path", value: \.process.path) { row in
                     Text(row.process.path.isEmpty ? "—" : row.process.path)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .help(row.process.path)
                 }
-                .width(min: 120, ideal: 160)
+                .width(min: 120, ideal: 130)
             }
             .contextMenu(forSelectionType: KBProcessKey.self) { keys in
                 if let key = keys.first,

@@ -52,10 +52,10 @@ El detalle de binarios, permisos, instalación y librerías está en
   conserva solo el título, **Filter process**
   en Connections / **Filter processes** en Processes (nombre o PID; en Processes también ruta y
   usuario) e **Inspect**. La tabla de Connections muestra Process, PID, Local, Remote, Proto, RX,
-  TX, State e Iface, y permite ordenar por cualquier columna.
+  TX, Rate (bits/s), State e Iface, y permite ordenar por cualquier columna.
   La tabla de Processes lista solo procesos con flujos TCP/UDP o sockets (incluye UNIX y RAW vía
   libproc), con todos los badges de protocolo (sin `+N`), tipos de socket (stream/dgram/raw),
-  número de flujos, RX/TX acumulados y Path. Los badges `RAW4`/`RAW6` se sustituyen por el
+  número de flujos, RX/TX acumulados, Rate (bits/s) y Path. Los badges `RAW4`/`RAW6` se sustituyen por el
   protocolo real de cada socket (`ICMP`, `ICMPv6`, `SCTP`, `GRE`, `ESP`, `RAW`…), y el genérico
   **OTHER** por la familia real (`AF_SYSTEM`, `AF_NDRV`, `AF_VSOCK`…, con la tabla de
   `sys/socket.h` completa) o por el provider de NStat cuando no es TCP/UDP (o `TCP`/`UDP` si el
