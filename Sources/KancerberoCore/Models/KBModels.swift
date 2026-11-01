@@ -72,6 +72,11 @@ public struct KBRates: Codable, Sendable, Hashable {
     }
 
     public static let zero = KBRates()
+
+    /// Combined incoming and outgoing throughput for the last sample window.
+    public var totalBytesPerSecond: Double {
+        rxBytesPerSecond + txBytesPerSecond
+    }
 }
 
 public enum KBInterfaceKind: String, Codable, Sendable, CaseIterable {

@@ -561,9 +561,14 @@ $APP --screenshot /tmp/kb-connections-columns.png --section networking \
   --tab connections --screenshot-delay 5
 ```
 
-- Orden de columnas: Process, PID, Local, Remote, Proto, RX, TX, State e Iface.
+- Orden de columnas: Process, PID, Local, Remote, Proto, RX, TX, Rate, State e Iface.
+- La columna Rate muestra la suma RX+TX del intervalo en bits/s (`KBFormat.bitRate`); en reposo
+  `0 bps`, y con una descarga activa el flujo debe subir a Mbps y coincidir en orden de magnitud
+  con la tarjeta Traffic y `nettop`. Ordenar por Rate deja arriba la conexión con más caudal.
+- Un flujo recién creado debe pasar de `SynSent` a `Established` en el siguiente refresco (la
+  descripción de NStat se re-consulta en cada tick); comparar con `lsof -nP -iTCP -a -p <pid>`.
 - Pulsar cada cabecera: debe mostrarse el indicador de orden y alternar ascendente/descendente.
-  Local/Remote ordenan numéricamente (no `10.x` antes que `2.x`); RX/TX/PID numéricamente; el
+  Local/Remote ordenan numéricamente (no `10.x` antes que `2.x`); RX/TX/Rate/PID numéricamente; el
   resto por texto. Process ordena por nombre (con Unknown para PID sin nombre).
 - Seleccionar una fila, ordenar y cambiar de subpestaña/sección: la selección y el criterio de
   orden se conservan (estado de sesión en `UIState`). Si el filtro hace desaparecer la fila, la
@@ -582,8 +587,8 @@ $APP --screenshot /tmp/kb-processes.png --section networking --tab processes \
 - La tabla solo lista procesos con flujos TCP/UDP o sockets (UNIX/RAW incluidos). Comparar los
   tipos y conteos con `lsof -nP -i`/`netstat` y con el inspector del proceso.
 - Comprobar todos los badges de protocolo (TCP4/TCP6/UDP4/UDP6/UNIX/RAW4/RAW6/OTHER) sin `+N`,
-  los tipos de socket (stream/dgram/raw/seqpacket/other), Flows, RX/TX (Bytes) y “—” en procesos
-  solo-locales. Con 8 badges la columna Protocols llega a su ancho ideal y la tabla puede requerir
+  los tipos de socket (stream/dgram/raw/seqpacket/other), Flows, RX/TX (Bytes), Rate (bits/s,
+  suma de sus flujos) y “—” en procesos solo-locales. Con 8 badges la columna Protocols llega a su ancho ideal y la tabla puede requerir
   scroll horizontal en ventanas estrechas.
 - En modo local, los procesos de otros uid pueden mostrar Protocols/Flows/RX/TX pero Sockets
   “—” (restringido); con el daemon root deben mostrar también sus sockets. Con un Socket type
