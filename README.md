@@ -49,9 +49,10 @@ El detalle de binarios, permisos, instalación y librerías está en
   Todos los valores están marcados por defecto salvo **State › Other**, que arranca desmarcado;
   desmarcar excluye y un grupo sin nada marcado no muestra filas. Con el grupo State completo las
   filas UDP (sin estado) siguen visibles; con un subconjunto se ocultan. La cabecera de la tarjeta
-  conserva solo el título, **Filter process**
+  conserva el título, **Filter process**
   en Connections / **Filter processes** en Processes (nombre o PID; en Processes también ruta y
-  usuario) e **Inspect**. La tabla de Connections muestra Process, PID, Local, Remote, Proto, RX,
+  usuario), el botón **Inspect** junto al filtro y, a la derecha, el contador de filas.
+  La tabla de Connections muestra Process, PID, Local, Remote, Proto, RX,
   TX, Rate (bits/s), State e Iface, y permite ordenar por cualquier columna.
   La tabla de Processes lista solo procesos con flujos TCP/UDP o sockets (incluye UNIX y RAW vía
   libproc), con todos los badges de protocolo (sin `+N`), tipos de socket (stream/dgram/raw),
