@@ -41,10 +41,14 @@ struct NetworkingView: View {
                                              : ProcessProtocolKind.all
         let processSockets = tab == .processes ? ui.networking.processSocketTypes
                                                : ProcessSocketType.all
-        let activityConnections = model.filteredSources(nil, matching: protocolFilter,
+        // The Activity tiles mirror the tables, so they must include the
+        // active focus filter too; otherwise the tile count and the table's
+        // "N of M" disagree while a focus is selected.
+        let activityConnections = model.filteredSources(ui.networking.focus,
+                                                        matching: protocolFilter,
                                                         states: connectionStates,
                                                         search: connectionSearch).count
-        let activityProcesses = model.filteredProcessRows(nil,
+        let activityProcesses = model.filteredProcessRows(ui.networking.focus,
                                                           ipVersions: processIPs,
                                                           protocolKinds: processKinds,
                                                           socketTypes: processSockets,
