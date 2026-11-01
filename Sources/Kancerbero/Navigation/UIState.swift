@@ -86,8 +86,7 @@ final class UIState {
            raw.split(separator: ",").contains(where: {
                $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "all"
            }) {
-            // "all" means no state filter, including the Other bucket that is
-            // unchecked by default.
+            // "all" means no state filter, including Other.
             networking.connectionStates = NetworkingConnectionState.all
         } else if let states = Self.filterSelection(
             for: "--networking-state", in: arguments,
@@ -96,6 +95,8 @@ final class UIState {
         }
         networking.connectionSearch = Self.value(for: "--networking-connection-search",
                                                  in: arguments) ?? ""
+        networking.interfaceSearch = Self.value(for: "--networking-interface-search",
+                                                in: arguments) ?? ""
         networking.processSearch = Self.value(for: "--networking-search", in: arguments) ?? ""
         if let raw = Self.value(for: "--traffic-graph", in: arguments),
            let mode = TrafficGraphMode(rawValue: raw.lowercased()) {
@@ -248,11 +249,10 @@ struct NetworkingUIState: Equatable {
     /// Every case pressed means "no filter"; an empty group matches nothing.
     var transports: Set<NetworkingTransport> = Set(NetworkingTransport.allCases)
     var ipVersions: Set<NetworkingIPVersion> = Set(NetworkingIPVersion.allCases)
-    /// `Other` starts unchecked so the Connections table opens without the
-    /// long tail of unclassified TCP states.
-    var connectionStates: Set<NetworkingConnectionState> =
-        NetworkingConnectionState.all.subtracting([.other])
+    /// All states, including Other (UDP flows and unclassified TCP states).
+    var connectionStates: Set<NetworkingConnectionState> = NetworkingConnectionState.all
     var connectionSearch = ""
+    var interfaceSearch = ""
     var processSearch = ""
     var processIPVersions: Set<NetworkingIPVersion> = NetworkingIPVersion.all
     var processProtocolKinds: Set<ProcessProtocolKind> = ProcessProtocolKind.all
@@ -260,6 +260,7 @@ struct NetworkingUIState: Equatable {
     var selectedConnection: String?
     var selectedProcess: KBProcessKey?
     var connectionSortOrder: [KeyPathComparator<KBNStatSource>] = []
+    var interfaceSortOrder: [KeyPathComparator<InterfaceRow>] = []
     var processSortOrder: [KeyPathComparator<ProcessInventoryRow>] = []
 
     var processIPFiltered: Bool { processIPVersions != NetworkingIPVersion.all }

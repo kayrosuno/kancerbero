@@ -3,16 +3,68 @@ import SwiftUI
 import KancerberoCore
 import KancerberoFilterContract
 
+/// Interfaces table row: counters live on KBInterfaceInfo but the rates live
+/// in AppModel, so sorting by RX/TX bit/s needs a wrapper row.
+struct InterfaceRow: Identifiable {
+    let item: KBInterfaceInfo
+    let rxRate: Double
+    let txRate: Double
+
+    var id: UInt32 { item.id }
+    var kindText: String { item.kind.displayName }
+    var stateText: String { item.stateDescription }
+    /// Up first, then Dormant, then Down.
+    var stateRank: Int {
+        if !item.isUp { return 2 }
+        return item.isRunning ? 0 : 1
+    }
+}
+
 struct InterfacesView: View {
     let items: [KBInterfaceInfo]
     let context: String
     @Environment(AppModel.self) private var model
+    @Environment(UIState.self) private var ui
+
+    private var search: Binding<String> {
+        Binding(
+            get: { ui.networking.interfaceSearch },
+            set: { ui.networking.interfaceSearch = $0 }
+        )
+    }
+
+    private var sortOrder: Binding<[KeyPathComparator<InterfaceRow>]> {
+        Binding(
+            get: { ui.networking.interfaceSortOrder },
+            set: { ui.networking.interfaceSortOrder = $0 }
+        )
+    }
+
+    private var rows: [InterfaceRow] {
+        items.map { item in
+            let rates = model.interfaceRates[item.id]
+            return InterfaceRow(item: item,
+                                rxRate: rates?.rxBytesPerSecond ?? 0,
+                                txRate: rates?.txBytesPerSecond ?? 0)
+        }
+    }
+
+    private var displayRows: [InterfaceRow] {
+        ui.networking.interfaceSortOrder.isEmpty
+            ? rows
+            : rows.sorted(using: ui.networking.interfaceSortOrder)
+    }
 
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 10) {
                 Text("Interfaces")
                     .font(.system(size: 12, weight: .semibold))
+
+                TextField("Filter interfaces", text: search)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 180)
+                    .help("Filter by name, type or state")
 
                 Spacer(minLength: 8)
 
@@ -23,46 +75,41 @@ struct InterfacesView: View {
                     .contentTransition(.numericText())
             }
 
-            Table(items) {
-            TableColumn("Interface") { item in
-                Text(item.name).monospaced()
-            }
-            .width(min: 80, ideal: 100)
-            TableColumn("Type") { item in
-                Text(item.kind.displayName)
-            }
-            .width(min: 70, ideal: 90)
-            TableColumn("State") { item in
-                Text(state(item))
-            }
-            .width(min: 60, ideal: 80)
-            TableColumn("Received") { item in
-                Text(KBFormat.bytes(item.counters.rxBytes)).monospacedDigit()
-            }
-            .width(min: 90, ideal: 110)
-            TableColumn("Sent") { item in
-                Text(KBFormat.bytes(item.counters.txBytes)).monospacedDigit()
-            }
-            .width(min: 90, ideal: 110)
-            TableColumn("RX bit/s") { item in
-                Text(KBFormat.bitRate(model.interfaceRates[item.id]?.rxBytesPerSecond ?? 0)).monospacedDigit()
-            }
-            .width(min: 90, ideal: 110)
-            TableColumn("TX bit/s") { item in
-                Text(KBFormat.bitRate(model.interfaceRates[item.id]?.txBytesPerSecond ?? 0)).monospacedDigit()
-            }
-            .width(min: 90, ideal: 110)
-            TableColumn("MTU") { item in
-                Text("\(item.mtu)").monospacedDigit()
-            }
-            .width(min: 50, ideal: 60)
+            Table(displayRows, sortOrder: sortOrder) {
+                TableColumn("Interface", value: \.item.name) { row in
+                    Text(row.item.name).monospaced()
+                }
+                .width(min: 80, ideal: 100)
+                TableColumn("Type", value: \.kindText) { row in
+                    Text(row.kindText)
+                }
+                .width(min: 70, ideal: 90)
+                TableColumn("State", value: \.stateRank) { row in
+                    Text(row.stateText)
+                }
+                .width(min: 60, ideal: 80)
+                TableColumn("Received", value: \.item.counters.rxBytes) { row in
+                    Text(KBFormat.bytes(row.item.counters.rxBytes)).monospacedDigit()
+                }
+                .width(min: 90, ideal: 110)
+                TableColumn("Sent", value: \.item.counters.txBytes) { row in
+                    Text(KBFormat.bytes(row.item.counters.txBytes)).monospacedDigit()
+                }
+                .width(min: 90, ideal: 110)
+                TableColumn("RX bit/s", value: \.rxRate) { row in
+                    Text(KBFormat.bitRate(row.rxRate)).monospacedDigit()
+                }
+                .width(min: 90, ideal: 110)
+                TableColumn("TX bit/s", value: \.txRate) { row in
+                    Text(KBFormat.bitRate(row.txRate)).monospacedDigit()
+                }
+                .width(min: 90, ideal: 110)
+                TableColumn("MTU", value: \.item.mtu) { row in
+                    Text("\(row.item.mtu)").monospacedDigit()
+                }
+                .width(min: 50, ideal: 60)
             }
         }
-    }
-
-    private func state(_ item: KBInterfaceInfo) -> String {
-        if !item.isUp { return "Down" }
-        return item.isRunning ? "Up" : "Dormant"
     }
 }
 

@@ -20,13 +20,17 @@ struct NetworkingFilterBar: View {
                 ipGroup
                 transportGroup
                 stateGroup
+                otherStateGroup
             }
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 12) {
                     ipGroup
                     transportGroup
                 }
-                stateGroup
+                HStack(spacing: 12) {
+                    stateGroup
+                    otherStateGroup
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -63,9 +67,19 @@ struct NetworkingFilterBar: View {
     }
 
     private var stateGroup: some View {
-        CheckboxFilterGroup("State",
+        CheckboxFilterGroup("TCP State",
                             selection: connectionStates,
-                            options: [.established, .listening, .connecting, .closing, .other],
+                            options: [.established, .listening, .connecting, .closing],
+                            optionTitle: { $0.title },
+                            optionHelp: { $0.checkboxHelp })
+    }
+
+    /// `Other` is not a TCP state: it groups UDP flows and unclassified
+    /// states, so it lives in its own group with its own checkbox.
+    private var otherStateGroup: some View {
+        CheckboxFilterGroup("Other",
+                            selection: connectionStates,
+                            options: [.other],
                             optionTitle: { $0.title },
                             optionHelp: { $0.checkboxHelp })
     }

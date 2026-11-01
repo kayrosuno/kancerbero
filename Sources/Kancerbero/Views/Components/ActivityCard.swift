@@ -1,10 +1,9 @@
 import SwiftUI
 
 struct ActivityCard: View {
-    let connectionsCount: Int
     let processesCount: Int
-    let connectionsFiltered: Bool
-    let processesFiltered: Bool
+    let connectionsCount: Int
+    let activeCount: Int
     let focus: NetworkingFocus?
     let onToggle: (NetworkingFocus) -> Void
 
@@ -28,37 +27,53 @@ struct ActivityCard: View {
             }
             .frame(height: 18)
 
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 MetricTile(
-                    layout: .stacked,
+                    layout: .compact,
+                    title: "Processes",
+                    value: KBFormat.compactCount(processesCount),
+                    icon: "square.stack.3d.up.fill",
+                    tint: KBTheme.processesTint,
+                    caption: "with sockets",
+                    hint: "Show processes with sockets",
+                    isSelected: focus == .processes,
+                    valueSize: 16,
+                    iconSize: 9,
+                    verticalPadding: 4
+                ) {
+                    onToggle(.processes)
+                }
+
+                MetricTile(
+                    layout: .compact,
                     title: "Connections",
                     value: KBFormat.compactCount(connectionsCount),
                     icon: "point.3.connected.trianglepath.dotted",
                     tint: KBTheme.connectionsTint,
-                    caption: connectionsFiltered ? "matching flows" : "active flows",
-                    hint: "Show rows tied to active connections",
+                    caption: "total",
+                    hint: "Show all connections",
                     isSelected: focus == .connections,
-                    valueSize: 18,
-                    iconSize: 10,
+                    valueSize: 16,
+                    iconSize: 9,
                     verticalPadding: 4
                 ) {
                     onToggle(.connections)
                 }
 
                 MetricTile(
-                    layout: .stacked,
-                    title: "Processes",
-                    value: KBFormat.compactCount(processesCount),
-                    icon: "square.stack.3d.up.fill",
-                    tint: KBTheme.processesTint,
-                    caption: processesFiltered ? "matching processes" : "with sockets",
-                    hint: "Show rows attributable to processes",
-                    isSelected: focus == .processes,
-                    valueSize: 18,
-                    iconSize: 10,
+                    layout: .compact,
+                    title: "Active",
+                    value: KBFormat.compactCount(activeCount),
+                    icon: "bolt.fill",
+                    tint: KBTheme.activeTint,
+                    caption: "last 10 s",
+                    hint: "Show connections that moved data in the last 10 seconds",
+                    isSelected: focus == .active,
+                    valueSize: 16,
+                    iconSize: 9,
                     verticalPadding: 4
                 ) {
-                    onToggle(.processes)
+                    onToggle(.active)
                 }
             }
             .frame(maxHeight: .infinity)
@@ -81,6 +96,9 @@ struct ActivityCard: View {
     private var borderStyle: AnyShapeStyle {
         if focus == .connections {
             return AnyShapeStyle(KBTheme.connectionsTint.opacity(0.8))
+        }
+        if focus == .active {
+            return AnyShapeStyle(KBTheme.activeTint.opacity(0.8))
         }
         if focus == .processes {
             return AnyShapeStyle(KBTheme.processesTint.opacity(0.8))

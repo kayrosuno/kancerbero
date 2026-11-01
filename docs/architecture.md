@@ -20,7 +20,8 @@
   CPU / Memory / Energy / Applications; cabecera con marca y estado live, engranaje de Settings
   sobre el separador de estado y pie con fuente (daemon/local), privcheck y hora.
 - `NetworkingView`: franja superior como un único `HStack` sin `ViewThatFits`: columna
-  `ActivityCard` (Connections+Processes) + `ProtocolCard`, `NetworkTotalsCard` fijo y
+  `ActivityCard` (procesos con sockets, conexiones totales y conexiones activas en 10 s, las
+  dos últimas como filtro todas/activas) + `ProtocolCard`, `NetworkTotalsCard` fijo y
   `TrafficCard` con mínimo 260. Network siempre queda en la franja. `NetworkTotalsCard` recibe
   solo contadores: dos grupos apilados y sombreados, **Bytes** encima de **Packets**, cada uno
   con filas Input/Output y su total acumulado. `TrafficCard` recibe las tasas y usa
@@ -36,7 +37,7 @@
   los de Processes —`processIPVersions`, `processProtocolKinds: Set<ProcessProtocolKind>` (TCP,
   UDP, RAW, UNIX, OTHER; cada uno agrupa sus variantes v4/v6) y `processSocketTypes:
   Set<ProcessSocketType>` (stream, dgram, raw, seqpacket, other)—. Todos los valores están
-  marcados por defecto salvo `connectionStates.other`, desmarcado al iniciar.
+  marcados por defecto, incluido `connectionStates.other`.
   `NetworkingProtocolFilter` combina transport/IP y `filteredSources` los
   aplica solo a Connections; `filteredProcessRows` recibe sus propios facetas
   (`ipVersions:protocolKinds:socketTypes:`) y es independiente de los de Connections. Los grupos
@@ -44,9 +45,13 @@
   tabla (la tarjeta conserva el título, la búsqueda y el botón Inspect junto a ella, y el
   contador de filas a la derecha), y se dibujan con
   `CheckboxFilterGroup` (nativo `.toggleStyle(.checkbox)`) dentro de una cápsula neutra: todo
-  marcado equivale a sin filtro, desmarcar excluye y un grupo vacío no coincide con ninguna fila. El filtro State usa `NetworkingConnectionState.category(for:)` sobre el
-  `tcpState` crudo de NStat: con el grupo completo las filas UDP (estado vacío, sin categoría)
-  siguen visibles; con un subconjunto se ocultan. En Processes, un IP parcial exige algún badge
+  marcado equivale a sin filtro, desmarcar excluye y un grupo vacío no coincide con ninguna fila.
+  El filtro de estados se divide en **TCP State** (Established, Listening, Connecting, Closing) y
+  **Other** en su propia cápsula; `NetworkingConnectionState.category(for:)` clasifica el
+  `tcpState` crudo de NStat y las filas UDP/no clasificadas (categoría `nil`) cuentan como
+  `.other`: desmarcar Other las oculta y desmarcar un estado TCP no. La tabla de Interfaces tiene
+  búsqueda propia (`interfaceSearch`) y ordena por todas sus columnas, incluidas RX/TX bit/s
+  mediante la fila derivada `InterfaceRow` (`interfaceSortOrder`). En Processes, un IP parcial exige algún badge
   de la familia marcada (UNIX/OTHER quedan fuera), el filtro de protocolo cruza los `tags` del
   tipo y el de socket exige datos de sockets (`socketTypes != nil`). La tabla de Processes añade
   `Filter processes` en su cabecera, reutilizando `KBProcessInfo.matchesSearch` (nombre, ruta,
@@ -164,6 +169,7 @@
   sección/subpestaña, pero no se guarda en disco. Los overrides `--networking-focus`,
   `--networking-transport`, `--networking-ip` y `--networking-state` (listas separadas por comas;
   `all` o un valor desconocido no filtran), `--networking-connection-search`,
+  `--networking-interface-search`,
   `--networking-process-ip`, `--networking-process-protocol`, `--networking-process-socket`,
   `--networking-search`, `--daemon-*`, `--volumes-focus`, `--analyzer-focus`,
   `--disk-io-search`, `--disk-io-selected`, `--disk-io-graph`, `--cpu-search`,

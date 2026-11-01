@@ -4,7 +4,10 @@ import KancerberoCore
 enum NetworkingFocus: String, CaseIterable, Identifiable, Sendable {
     case download
     case upload
+    /// Every connection that survives the other filters.
     case connections
+    /// Only connections that moved bytes in the last 10 seconds.
+    case active
     case processes
 
     var id: String { rawValue }
@@ -14,6 +17,7 @@ enum NetworkingFocus: String, CaseIterable, Identifiable, Sendable {
         case .download: return "Download"
         case .upload: return "Upload"
         case .connections: return "Connections"
+        case .active: return "Active"
         case .processes: return "Processes"
         }
     }
@@ -192,8 +196,9 @@ enum NetworkingConnectionState: String, CaseIterable, Identifiable, Hashable, Se
         }
     }
 
-    /// Empty states (UDP) match no category. Every non-empty unrecognized
-    /// state (Closed, Unknown, …) belongs to `other`.
+    /// Empty states (UDP) match no category here; the Connections matcher
+    /// treats them as `other` so the Other checkbox controls them. Every
+    /// non-empty unrecognized state (Closed, Unknown, …) belongs to `other`.
     static func category(for rawState: String) -> NetworkingConnectionState? {
         let value = normalized(rawState)
         guard !value.isEmpty else { return nil }
@@ -235,7 +240,7 @@ extension NetworkingConnectionState {
         case .closing:
             return "Close wait, FIN wait, closing, time wait and last ack"
         case .other:
-            return "Any other TCP state not classified above"
+            return "UDP flows and TCP states not classified above"
         }
     }
 }
@@ -321,23 +326,44 @@ extension KBNStatSource {
 }
 
 @MainActor
+extension KBInterfaceInfo {
+    /// Up / Dormant / Down, shared by the Interfaces table and its search.
+    nonisolated var stateDescription: String {
+        if !isUp { return "Down" }
+        return isRunning ? "Up" : "Dormant"
+    }
+}
+
 extension AppModel {
-    func filteredInterfaces(_ focus: NetworkingFocus?) -> [KBInterfaceInfo] {
-        guard let focus else { return interfaces }
+    func filteredInterfaces(_ focus: NetworkingFocus?,
+                            search: String = "") -> [KBInterfaceInfo] {
+        let needle = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        let base = needle.isEmpty ? interfaces : interfaces.filter {
+            $0.name.localizedCaseInsensitiveContains(needle)
+                || $0.kind.displayName.localizedCaseInsensitiveContains(needle)
+                || $0.stateDescription.localizedCaseInsensitiveContains(needle)
+        }
+        guard let focus else { return base }
         let sourcedNames = Set(sources.map(\.interfaceName).filter { !$0.isEmpty })
         switch focus {
         case .download:
-            return interfaces.filter {
+            return base.filter {
                 !$0.isLoopback && $0.kind != .tunnel
                     && (interfaceRates[$0.id]?.rxBytesPerSecond ?? 0) > 0
             }
         case .upload:
-            return interfaces.filter {
+            return base.filter {
                 !$0.isLoopback && $0.kind != .tunnel
                     && (interfaceRates[$0.id]?.txBytesPerSecond ?? 0) > 0
             }
+        case .active:
+            let activeNames = Set(sources.lazy
+                .filter { self.activeSourceIDs.contains($0.id) }
+                .map(\.interfaceName)
+                .filter { !$0.isEmpty })
+            return base.filter { activeNames.contains($0.name) }
         case .connections, .processes:
-            return interfaces.filter { sourcedNames.contains($0.name) }
+            return base.filter { sourcedNames.contains($0.name) }
         }
     }
 
@@ -356,9 +382,11 @@ extension AppModel {
         }
         if states != NetworkingConnectionState.all {
             base = base.filter {
-                guard let category = NetworkingConnectionState.category(for: $0.tcpState)
-                else { return false }
-                return states.contains(category)
+                // UDP and sources with no TCP state belong to Other, so the
+                // Other checkbox controls them instead of every subset hiding
+                // them.
+                let category = NetworkingConnectionState.category(for: $0.tcpState)
+                return states.contains(category ?? .other)
             }
         }
         guard let focus else { return base }
@@ -368,7 +396,9 @@ extension AppModel {
         case .upload:
             return base.filter { $0.rates.txBytesPerSecond > 0 }
         case .connections:
-            return base.filter { ($0.counters.rxBytes &+ $0.counters.txBytes) > 0 }
+            return base
+        case .active:
+            return base.filter { self.activeSourceIDs.contains($0.id) }
         case .processes:
             return base.filter { $0.pid > 0 }
         }
@@ -380,7 +410,10 @@ extension AppModel {
                              socketTypes: Set<ProcessSocketType> = ProcessSocketType.all,
                              search: String = "")
         -> [ProcessInventoryRow] {
-        processInventory.filter { row in
+        let activePIDs: Set<Int32> = focus == .active
+            ? Set(sources.lazy.filter { self.activeSourceIDs.contains($0.id) }.map(\.pid))
+            : []
+        return processInventory.filter { row in
             if ipVersions != NetworkingIPVersion.all {
                 let wanted = ipVersions.reduce(into: Set<ProcessProtocolTag>()) {
                     $0.formUnion($1.processTags)
@@ -406,6 +439,8 @@ extension AppModel {
                 return row.rates.txBytesPerSecond > 0
             case .connections:
                 return row.connectionCount > 0
+            case .active:
+                return activePIDs.contains(row.process.pid)
             case .processes, nil:
                 return true
             }
