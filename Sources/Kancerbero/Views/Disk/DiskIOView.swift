@@ -14,7 +14,7 @@ struct DiskIOView: View {
             if !ui.cardsCollapsed(for: .disk) {
                 HStack(alignment: .top, spacing: 14) {
                     statsCard
-                        .frame(width: 300)
+                        .frame(width: 240)
                     activityCard
                         .frame(maxWidth: .infinity)
                 }
@@ -38,24 +38,7 @@ struct DiskIOView: View {
     private var activityCard: some View {
         let isData = ui.disk.ioGraphMode == .data
         return VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 10) {
-                cardIcon("chart.line.uptrend.xyaxis",
-                         fill: LinearGradient(colors: [readTint, writeTint],
-                                              startPoint: .topLeading,
-                                              endPoint: .bottomTrailing))
-                Text("Disk activity")
-                    .font(.system(size: 12, weight: .semibold))
-                Spacer()
-                Picker("Graph", selection: graphMode) {
-                    ForEach(DiskIOGraphMode.allCases) { mode in
-                        Text(mode.title).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 180)
-                .accessibilityLabel("Disk graph type")
-            }
+            header(isData: isData)
 
             DiskIOChart(mode: ui.disk.ioGraphMode,
                         read: isData ? model.diskReadHistory : model.diskReadOpsHistory,
@@ -63,21 +46,6 @@ struct DiskIOView: View {
                         readColor: readTint,
                         writeColor: writeTint)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            HStack(spacing: 14) {
-                legend("Read", value: isData
-                       ? KBFormat.byteRate(model.diskReadRate)
-                       : KBFormat.opsRate(model.diskReadOpsRate),
-                       color: readTint)
-                legend("Write", value: isData
-                       ? KBFormat.byteRate(model.diskWriteRate)
-                       : KBFormat.opsRate(model.diskWriteOpsRate),
-                       color: writeTint)
-                Spacer()
-                Text("Last \(max(model.diskHistoryCount, 0)) samples")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
-            }
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -88,6 +56,73 @@ struct DiskIOView: View {
         .overlay {
             RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
                 .strokeBorder(.quaternary.opacity(0.5), lineWidth: 1)
+        }
+    }
+
+    private func header(isData: Bool) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                activityTitle
+                legendEntries(isData: isData)
+                Spacer(minLength: 8)
+                sampleCount
+                modePicker
+            }
+            .frame(minWidth: 620)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) {
+                    activityTitle
+                    Spacer(minLength: 4)
+                    sampleCount
+                    modePicker
+                }
+                legendEntries(isData: isData)
+            }
+        }
+    }
+
+    private var activityTitle: some View {
+        HStack(spacing: 6) {
+            cardIcon("chart.line.uptrend.xyaxis",
+                     fill: LinearGradient(colors: [readTint, writeTint],
+                                          startPoint: .topLeading,
+                                          endPoint: .bottomTrailing))
+            Text("Disk activity")
+                .font(.system(size: 12, weight: .semibold))
+        }
+    }
+
+    private var modePicker: some View {
+        Picker("Graph", selection: graphMode) {
+            ForEach(DiskIOGraphMode.allCases) { mode in
+                Text(mode.title).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(width: 180)
+        .accessibilityLabel("Disk graph type")
+    }
+
+    private var sampleCount: some View {
+        Text("Last \(max(model.diskHistoryCount, 0)) samples")
+            .font(.system(size: 9))
+            .foregroundStyle(.tertiary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+    }
+
+    private func legendEntries(isData: Bool) -> some View {
+        HStack(spacing: 14) {
+            legend("Read", value: isData
+                   ? KBFormat.byteRate(model.diskReadRate)
+                   : KBFormat.opsRate(model.diskReadOpsRate),
+                   color: readTint)
+            legend("Write", value: isData
+                   ? KBFormat.byteRate(model.diskWriteRate)
+                   : KBFormat.opsRate(model.diskWriteOpsRate),
+                   color: writeTint)
         }
     }
 
@@ -161,6 +196,7 @@ struct DiskIOView: View {
                 .font(.system(size: 9))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .minimumScaleFactor(0.85)
             Text(value)
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .monospacedDigit()
