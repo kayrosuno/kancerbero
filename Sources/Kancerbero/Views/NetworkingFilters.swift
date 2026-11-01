@@ -436,60 +436,107 @@ extension KBInterfaceInfo {
 }
 
 extension ProcessInventoryRow {
-    /// Badges derived from the real signatures; falls back to the aggregate
-    /// tags when the scanner did not report them.
-    var badgeProtocols: Set<ProcessProtocolTag> {
-        guard let signatures = socketSignatures, !signatures.isEmpty else {
-            return protocols
+    /// Address families behind the process's sockets, sorted AF_INET,
+    /// AF_INET6, AF_UNIX and then the rest.
+    var domainLabels: [String] {
+        if let signatures = socketSignatures, !signatures.isEmpty {
+            let families = signatures.map {
+                KBSocketFamily.name(for: UInt32(max($0.family, 0)))
+            }
+            return sortedLabels(Set(families), rank: Self.domainRank)
         }
-        var result: Set<ProcessProtocolTag> = []
-        for signature in signatures {
-            switch ProcessDomain.category(forFamily: signature.family) {
-            case .inet, .inet6:
-                switch ProcessProtocolCategory.category(forNumber: signature.protocolNumber) {
-                case .tcp:
-                    result.insert(signature.family == AF_INET6 ? .tcp6 : .tcp4)
-                case .udp:
-                    result.insert(signature.family == AF_INET6 ? .udp6 : .udp4)
-                default:
-                    result.insert(signature.family == AF_INET6 ? .raw6 : .raw4)
+        var labels: Set<String> = []
+        if protocols.contains(.tcp4) || protocols.contains(.udp4) || protocols.contains(.raw4) {
+            labels.insert("AF_INET")
+        }
+        if protocols.contains(.tcp6) || protocols.contains(.udp6) || protocols.contains(.raw6) {
+            labels.insert("AF_INET6")
+        }
+        if protocols.contains(.unix) {
+            labels.insert("AF_UNIX")
+        }
+        if protocols.contains(.other) {
+            let families = otherProtocolLabels.filter { $0.hasPrefix("AF_") }
+            labels.formUnion(families.isEmpty ? ["Other"] : families)
+        }
+        return sortedLabels(labels, rank: Self.domainRank)
+    }
+
+    /// IP protocols only; AF_UNIX/other domains have no IPPROTO and are shown
+    /// in the Domain column instead.
+    var protocolLabels: [String] {
+        if let signatures = socketSignatures, !signatures.isEmpty {
+            let labels = signatures.compactMap { signature -> String? in
+                guard ProcessDomain.category(forFamily: signature.family).isInternet else {
+                    return nil
                 }
-            case .unix:
-                result.insert(.unix)
-            case .other:
-                result.insert(.other)
+                return KBIPProtocol.name(for: signature.protocolNumber)
+            }
+            return sortedLabels(Set(labels), rank: Self.protocolRank)
+        }
+        var labels: Set<String> = []
+        if protocols.contains(.tcp4) || protocols.contains(.tcp6) {
+            labels.insert("TCP")
+        }
+        if protocols.contains(.udp4) || protocols.contains(.udp6) {
+            labels.insert("UDP")
+        }
+        if protocols.contains(.raw4) || protocols.contains(.raw6) {
+            if rawProtocolLabels.isEmpty {
+                labels.insert("RAW")
+            } else {
+                labels.formUnion(rawProtocolLabels)
             }
         }
-        return result
+        return sortedLabels(labels, rank: Self.protocolRank)
     }
 
-    var badgeRawLabels: [String] {
-        guard let signatures = socketSignatures, !signatures.isEmpty else {
-            return rawProtocolLabels
+    /// Compact labels for the table column (INET, INET6, UNIX, SYSTEM…); the
+    /// tooltip keeps the full AF_* names.
+    var domainBadgeLabels: [String] {
+        domainLabels.map { label in
+            label.hasPrefix("AF_") ? String(label.dropFirst(3)) : label
         }
-        let labels = signatures.compactMap { signature -> String? in
-            guard ProcessDomain.category(forFamily: signature.family).isInternet else {
-                return nil
-            }
-            switch ProcessProtocolCategory.category(forNumber: signature.protocolNumber) {
-            case .tcp, .udp: return nil
-            default: return KBIPProtocol.name(for: signature.protocolNumber)
-            }
-        }
-        return Array(Set(labels)).sorted()
     }
 
-    var badgeOtherLabels: [String] {
-        guard let signatures = socketSignatures, !signatures.isEmpty else {
-            return otherProtocolLabels
+    var domainSortRank: Int {
+        domainLabels.first.map(Self.domainRank) ?? Int.max
+    }
+
+    var protocolSortRank: Int {
+        protocolLabels.first.map(Self.protocolRank) ?? Int.max
+    }
+
+    static func domainRank(_ label: String) -> Int {
+        switch label {
+        case "AF_INET": return 0
+        case "AF_INET6": return 1
+        case "AF_UNIX": return 2
+        default: return 3
         }
-        let labels = signatures.compactMap { signature -> String? in
-            guard ProcessDomain.category(forFamily: signature.family) == .other else {
-                return nil
-            }
-            return KBSocketFamily.name(for: UInt32(max(signature.family, 0)))
+    }
+
+    static func protocolRank(_ label: String) -> Int {
+        switch label {
+        case "TCP": return 0
+        case "UDP": return 1
+        case "ICMP": return 2
+        case "ICMPv6": return 3
+        case "SCTP": return 4
+        case "GRE": return 5
+        case "ESP": return 6
+        case "RAW": return 7
+        default: return 8
         }
-        return Array(Set(labels)).sorted()
+    }
+
+    private func sortedLabels(_ labels: Set<String>,
+                              rank: (String) -> Int) -> [String] {
+        labels.sorted { lhs, rhs in
+            let lhsRank = rank(lhs)
+            let rhsRank = rank(rhs)
+            return lhsRank == rhsRank ? lhs < rhs : lhsRank < rhsRank
+        }
     }
 
     /// One `AF_* · SOCK_* · IPPROTO_*` line per distinct signature.

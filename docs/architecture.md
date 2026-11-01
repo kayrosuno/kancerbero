@@ -61,11 +61,16 @@
   combinación. La tabla de Processes añade
   `Filter processes` en su cabecera, reutilizando `KBProcessInfo.matchesSearch` (nombre, ruta,
   PID o usuario). Connections ordena por cualquier columna (`Table` + `KeyPathComparator`) y
-  muestra Process, PID, Local, Remote, Proto, RX, TX, Rate, State e Iface.
+  muestra Process, PID, Local, Remote, Proto, State, RX, TX, Rate e Iface; los flujos UDP
+  muestran `Datagram` en State porque no tienen estado TCP.
   Local/Remote usan un comparador numérico de endpoints y el criterio se guarda en
   `connectionSortOrder` dentro de `NetworkingUIState`. La tabla de Processes usa
   `ProcessInventoryRow` (agregado de flujos NStat + inventario de sockets libproc) y ordena con
-  `processSortOrder`. La columna Protocols muestra todos los badges; el cajón RAW se abre con los
+  `processSortOrder`. Las columnas **Domain** y **Protocols** reparten las etiquetas de la misma
+  firma: Domain muestra las familias (`domainBadgeLabels`, con el `AF_*` completo en el tooltip) y
+  Protocols solo los protocolos IP (`protocolLabels`: TCP/UDP/ICMP/ICMPv6/SCTP/GRE/ESP/RAW…); la
+  columna **Type** (antes Sockets) mantiene el desglose stream/dgram/raw/seqpacket/other. El
+  tooltip muestra una línea `AF_* · SOCK_* · IPPROTO_*` por firma. Sin firmas se usan los
   protocolos reales del inventario (`otherProtocols`, un bitset de IPPROTO que rellena
   `kb_classify_socket` y traduce `KBIPProtocol`) en `ProcessInventoryRow.rawProtocolLabels`, y el
   genérico OTHER con las familias reales (`otherFamilies`, bitset de AF traducido por

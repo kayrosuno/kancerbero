@@ -96,10 +96,6 @@ struct ProcessInventoryRow: Identifiable, Equatable, Sendable {
 
     var totalBytes: UInt64 { counters.rxBytes &+ counters.txBytes }
 
-    var protocolSortRank: Int {
-        badgeProtocols.map(\.sortRank).min() ?? Int.max
-    }
-
     var hasSocketData: Bool {
         buckets != nil || socketTypes != nil
     }
