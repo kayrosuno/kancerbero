@@ -235,6 +235,10 @@ $K --screenshot /tmp/kb-col-disk-analyzer.png --section disk --disk-tab analyzer
   completo (sidebar de 252 pt + tabla de Connections) y la columna tiene ancho fijo
   (`KBTheme.sidebarWidth`), así que no queda a medias. Con el botón nativo de la toolbar o Ver >
   Ocultar barra lateral se oculta entera y se restaura con el mismo ancho.
+- Con la sidebar oculta (`--sidebar-collapsed`), el mínimo baja a 1088×700: capturar con
+  `--screenshot-size 1088x700` deja la ventana en 1088 (2176 px de ancho) y el contenido cabe
+  entero, incluidas la columna Iface y la barra de estado. Pedir 1000 se queda también en 1088.
+  Al volver a mostrar la sidebar el mínimo sube de nuevo a 1340.
 - Reduce Motion o “Animate tab changes” desactivado: el cambio es instantáneo. El estado no se
   guarda en `UserDefaults` y desaparece al reiniciar.
 

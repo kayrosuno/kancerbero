@@ -16,8 +16,9 @@
 
 - `RootView`: `NavigationSplitView` con `columnVisibility`; sidebar colapsable con
   `SidebarCommands()` y el toggle nativo de la toolbar. La columna tiene ancho fijo
-  (`KBTheme.sidebarWidth`), y el mínimo de la ventana (1340 pt) cubre el layout completo, de modo
-  que al redimensionar la sidebar nunca se recorta ni se colapsa.
+  (`KBTheme.sidebarWidth`), y el mínimo de la ventana se deriva de la visibilidad: 1340 pt con la
+  sidebar y 1088 pt cuando está oculta (`.detailOnly`), de modo que al redimensionar la sidebar
+  nunca se recorta y, al ocultarla, el contenido aprovecha el espacio liberado.
 - `SidebarView`: selección propia con `matchedGeometryEffect` para Networking / Disk / Daemons /
   CPU / Memory / Energy / Applications; cabecera con marca y estado live, engranaje de Settings
   sobre el separador de estado y pie con fuente (daemon/local), privcheck y hora.

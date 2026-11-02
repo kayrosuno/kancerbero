@@ -19,10 +19,6 @@ struct KancerberoApp: App {
                 .environment(applications)
                 .environment(ui)
                 .environment(filter)
-                // The sidebar, cards and Connections table need this much
-                // before SwiftUI overflows and clips the sidebar at the
-                // window edge. Shrinking below it hides it partially.
-                .frame(minWidth: 1340, minHeight: 640)
                 .task {
                     if CommandLine.arguments.contains("--register-service") {
                         await model.registerDaemonService()
@@ -39,6 +35,7 @@ struct KancerberoApp: App {
         }
         .defaultSize(width: 1440, height: 860)
         .windowStyle(.titleBar)
+        .windowResizability(.contentMinSize)
         .commands {
             SidebarCommands()
 
