@@ -478,10 +478,10 @@ final class DockIconView: NSView {
     private func fillBand(lower: [Double], upper: [Double], in rect: NSRect,
                           color: NSColor) {
         guard lower.count > 1, lower.count == upper.count else { return }
-        let stepX = rect.width / CGFloat(lower.count - 1)
+        let slot = rect.width / CGFloat(Self.historyWindow - 1)
         func point(_ index: Int, _ value: Double) -> NSPoint {
             let normalized = min(max(value, 0), 100) / 100
-            return NSPoint(x: rect.maxX - CGFloat(index) * stepX,
+            return NSPoint(x: rect.minX + CGFloat(lower.count - 1 - index) * slot,
                            y: rect.maxY - CGFloat(normalized) * rect.height)
         }
         let path = NSBezierPath()
@@ -505,12 +505,13 @@ final class DockIconView: NSView {
         }
         let data = Array(suffix60(values))
         let peak = max(data.max() ?? 1, 0.0001)
-        let stepX = rect.width / CGFloat(max(1, data.count - 1))
+        let slot = rect.width / CGFloat(Self.historyWindow - 1)
         let line = NSBezierPath()
         let area = NSBezierPath()
-        area.move(to: NSPoint(x: rect.maxX, y: rect.maxY))
+        area.move(to: NSPoint(x: rect.minX + CGFloat(data.count - 1) * slot,
+                              y: rect.maxY))
         for (index, value) in data.enumerated() {
-            let x = rect.maxX - CGFloat(index) * stepX
+            let x = rect.minX + CGFloat(data.count - 1 - index) * slot
             let y = rect.maxY - CGFloat(min(max(value, 0), peak) / peak) * rect.height
             let point = NSPoint(x: x, y: y)
             if index == 0 {
@@ -559,12 +560,13 @@ final class DockIconView: NSView {
                           direction: CGFloat, halfHeight: CGFloat,
                           peak: Double, color: NSColor, in rect: NSRect) {
         guard values.count > 1, halfHeight > 0 else { return }
-        let stepX = rect.width / CGFloat(values.count - 1)
+        let slot = rect.width / CGFloat(Self.historyWindow - 1)
         let line = NSBezierPath()
         let area = NSBezierPath()
-        area.move(to: NSPoint(x: rect.maxX, y: baseline))
+        area.move(to: NSPoint(x: rect.minX + CGFloat(values.count - 1) * slot,
+                              y: baseline))
         for (index, value) in values.enumerated() {
-            let x = rect.maxX - CGFloat(index) * stepX
+            let x = rect.minX + CGFloat(values.count - 1 - index) * slot
             let normalized = CGFloat(min(max(value, 0), peak) / peak)
             let y = baseline + direction * normalized * halfHeight
             let point = NSPoint(x: x, y: y)
@@ -594,13 +596,14 @@ final class DockIconView: NSView {
         }
         let values = Array(snapshot.memoryPressureHistory.suffix(count))
         let levels = Array(snapshot.memoryPressureLevels.suffix(count))
-        let stepX = rect.width / CGFloat(count - 1)
+        let slot = rect.width / CGFloat(Self.historyWindow - 1)
         let line = NSBezierPath()
         let area = NSBezierPath()
-        area.move(to: NSPoint(x: rect.maxX, y: rect.maxY))
+        area.move(to: NSPoint(x: rect.minX + CGFloat(count - 1) * slot,
+                              y: rect.maxY))
         for index in 0..<count {
             let percent = min(max(Double(values[index]), 0), 100) / 100
-            let point = NSPoint(x: rect.maxX - CGFloat(index) * stepX,
+            let point = NSPoint(x: rect.minX + CGFloat(count - 1 - index) * slot,
                                 y: rect.maxY - CGFloat(percent) * rect.height)
             if index == 0 {
                 line.move(to: point)
@@ -632,13 +635,16 @@ final class DockIconView: NSView {
         Palette.border.setStroke()
         let path = NSBezierPath()
         path.move(to: NSPoint(x: rect.minX, y: rect.maxY - 1))
-        path.line(to: NSPoint(x: rect.maxX, y: rect.maxY - 1))
+        path.line(to: NSPoint(x: rect.minX + rect.width / CGFloat(Self.historyWindow),
+                              y: rect.maxY - 1))
         path.lineWidth = max(1, rect.height * 0.03)
         path.stroke()
     }
 
+    private static let historyWindow = 60
+
     private func suffix60(_ values: [Double]) -> [Double] {
-        Array(values.suffix(60))
+        Array(values.suffix(Self.historyWindow))
     }
 
     private func byteRate(_ bytesPerSecond: Double) -> String {

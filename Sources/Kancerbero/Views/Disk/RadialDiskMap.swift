@@ -19,16 +19,7 @@ struct RadialDiskMap: View {
     private let maxDepth = 3
     private let minimumLabelAngle = 0.28
 
-    private static let palette: [Color] = [
-        Color(red: 0.94, green: 0.56, blue: 0.18),
-        Color(red: 0.90, green: 0.35, blue: 0.30),
-        Color(red: 0.20, green: 0.70, blue: 0.62),
-        Color(red: 0.16, green: 0.62, blue: 0.94),
-        Color(red: 0.62, green: 0.42, blue: 0.95),
-        Color(red: 0.85, green: 0.65, blue: 0.20),
-        Color(red: 0.45, green: 0.65, blue: 0.35),
-        Color(red: 0.70, green: 0.45, blue: 0.30)
-    ]
+    private static let palette = KBTheme.diskChartPalette
 
     var body: some View {
         GeometryReader { proxy in

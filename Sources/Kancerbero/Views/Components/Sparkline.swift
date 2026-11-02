@@ -8,6 +8,8 @@ struct Sparkline: View {
     /// percentage series that should keep a fixed 0...100 scale.
     var scale: Double? = nil
 
+    private static let window = 60
+
     var body: some View {
         GeometryReader { geometry in
             let points = makePoints(in: geometry.size)
@@ -24,10 +26,14 @@ struct Sparkline: View {
                                                          lineCap: .round,
                                                          lineJoin: .round))
                 } else {
+                    // A single sample occupies one slot at the leading edge,
+                    // so the chart fills up progressively.
                     Capsule()
                         .fill(tint.opacity(0.15))
-                        .frame(height: 1)
-                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        .frame(width: max(1, geometry.size.width / CGFloat(Self.window)),
+                               height: 1)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity,
+                               alignment: .bottomLeading)
                 }
             }
         }
@@ -35,13 +41,13 @@ struct Sparkline: View {
     }
 
     private func makePoints(in size: CGSize) -> [CGPoint] {
-        let data = Array(values.suffix(60))
+        let data = Array(values.suffix(Self.window))
         guard data.count > 1, size.width > 1, size.height > 1 else { return [] }
         let peak = max(scale ?? data.max() ?? 0, 1)
-        let stepX = size.width / CGFloat(data.count - 1)
+        let slot = size.width / CGFloat(Self.window - 1)
         return data.enumerated().map { index, value in
             let normalized = min(max(value / peak, 0), 1)
-            return CGPoint(x: size.width - CGFloat(index) * stepX,
+            return CGPoint(x: CGFloat(data.count - 1 - index) * slot,
                            y: size.height - CGFloat(normalized) * size.height)
         }
     }

@@ -4,8 +4,27 @@ import KancerberoCore
 
 struct DiskVolumeDetailView: View {
     let item: KBDiskItem
+    let inventory: KBDiskInventorySnapshot?
     let onAnalyze: (String) -> Void
     let onClose: () -> Void
+
+    private var spaceContext: APFSSpaceContext? {
+        inventory?.apfsSpaceContext(for: item)
+    }
+
+    /// A container with no mounted volume reports used/free as 0 in the
+    /// inventory; the chart treats it as unknown, so the stats do too.
+    private var containerSpaceUnknown: Bool {
+        item.kind == .apfsContainer && spaceContext?.availability == .unmounted
+    }
+
+    private var usedText: String {
+        containerSpaceUnknown ? "—" : (item.usedBytes.map(KBFormat.bytes) ?? "—")
+    }
+
+    private var freeText: String {
+        containerSpaceUnknown ? "—" : (item.freeBytes.map(KBFormat.bytes) ?? "—")
+    }
 
     var body: some View {
         ScrollView {
@@ -13,6 +32,10 @@ struct DiskVolumeDetailView: View {
                 header
                 Divider().opacity(0.5)
                 stats
+                if let context = spaceContext {
+                    Divider().opacity(0.5)
+                    APFSSpaceDonut(context: context)
+                }
                 Divider().opacity(0.5)
                 metadata
                 Divider().opacity(0.5)
@@ -71,8 +94,8 @@ struct DiskVolumeDetailView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 14) {
                 stat("Capacity", KBFormat.bytes(item.sizeBytes))
-                stat("Used", item.usedBytes.map(KBFormat.bytes) ?? "—")
-                stat("Free", item.freeBytes.map(KBFormat.bytes) ?? "—")
+                stat("Used", usedText)
+                stat("Free", freeText)
             }
             if item.kind == .apfsVolume || item.kind == .apfsContainer {
                 Text("APFS volumes share the container's free space.")
@@ -104,10 +127,10 @@ struct DiskVolumeDetailView: View {
                 row("Content", content)
             }
             row("Mount point", item.mountPoint ?? "Not mounted")
-            row("Used", item.usedBytes.map(KBFormat.bytes) ?? "—")
+            row("Used", usedText)
             row(item.kind == .apfsVolume || item.kind == .apfsContainer
                 ? "Free (container)" : "Free",
-                item.freeBytes.map(KBFormat.bytes) ?? "—")
+                freeText)
             row(item.kind == .apfsVolume || item.kind == .apfsContainer
                 ? "Available (container)" : "Available",
                 item.availableBytes.map(KBFormat.bytes) ?? "—")

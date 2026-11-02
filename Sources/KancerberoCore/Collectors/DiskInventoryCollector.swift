@@ -6,7 +6,9 @@ import Foundation
 /// APFS container -> APFS volume) and the APFS metadata. DiskArbitration adds
 /// volume names, mount points, UUIDs and device metadata. `getmntinfo` and
 /// `getattrlist(ATTR_VOL_*)` provide mounted capacities, including per-volume
-/// APFS used space. No external process is executed.
+/// APFS used space. A container without a mounted volume keeps used/free at
+/// zero, which consumers must treat as "unknown", not "empty". No external
+/// process is executed.
 public final class DiskInventoryCollector: @unchecked Sendable {
     public init() {}
 

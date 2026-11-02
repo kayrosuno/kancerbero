@@ -198,6 +198,10 @@ anuncia como “Disk Space Analyzer”) y de `/System/Applications/Utilities/Dis
   milisegundos). IOKit expone `AppleAPFSMedia`/`AppleAPFSVolume` y `Whole`/`Content`/`Role`
   exactamente como los muestra `ioreg`.
 - SMART no está expuesto por APIs públicas; se omite o se muestra “Unavailable”.
+- El donut APFS de Volumes (`APFSSpaceContext`) se calcula solo con estos datos públicos: una
+  porción por contenedor (capacidad) o por volumen (usado) dentro de un contenedor. El residual
+  «Snapshots & metadata» cubre snapshots, metadatos y volúmenes desmontados; un contenedor sin
+  volumen montado se muestra como desconocido (no como 0 B).
 
 ## Política de versión
 

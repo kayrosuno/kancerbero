@@ -455,6 +455,7 @@ NetworkStatistics y de `net.statistics_privcheck`.
 | `daemons [system\|gui\|user]` | Inventario launchd del dominio | `system` |
 | `disk volumes` | Inventario de discos y volúmenes | — |
 | `disk info <diskXsY>` | Detalle de un dispositivo | — |
+| `disk apfs [diskXsY]` | Contexto del gráfico APFS (contenedores/volúmenes, capacidad, usado, libre, residual) | — |
 | `disk scan <path> [--top N] [--hidden]` | Escaneo de un directorio | `--top 20` |
 | `daemon-action <domain> <action> <label> [plist]` | Ejecuta una acción de `LaunchctlRunner`; `action` ∈ `start`, `stop`, `restart`, `enable`, `disable`, `load`, `unload` | — |
 | `sources` | Fuentes de tráfico disponibles | — |

@@ -453,6 +453,51 @@ private func printDiskInfo(_ identifier: String) {
     write("parent: \(item.parentID ?? "-")\n")
 }
 
+private func printDiskAPFS(_ identifier: String?) {
+    let snapshot = DiskInventoryCollector().snapshot()
+    let targets: [KBDiskItem]
+    if let identifier {
+        guard let item = snapshot.allItems.first(where: {
+            $0.deviceIdentifier == identifier
+        }) else {
+            fail("disk not found: \(identifier)")
+        }
+        targets = [item]
+    } else {
+        targets = snapshot.allItems.filter {
+            $0.kind == .apfsContainer || $0.kind == .physicalDisk
+        }
+    }
+
+    for item in targets {
+        guard let context = snapshot.apfsSpaceContext(for: item) else {
+            write("\(item.deviceIdentifier): not APFS\n")
+            continue
+        }
+        write("apfs \(item.deviceIdentifier) subject=\(context.subject.rawValue) "
+              + "availability=\(context.availability.rawValue) "
+              + "total=\(formatBytes(context.totalBytes)) "
+              + "used=\(context.usedBytes.map(formatBytes) ?? "-") "
+              + "free=\(context.freeBytes.map(formatBytes) ?? "-") "
+              + "caption=\(context.caption ?? "-")\n")
+        for segment in context.segments {
+            write("  segment \"\(segment.label)\" role=\(segment.role.rawValue) "
+                  + "bytes=\(formatBytes(segment.bytes)) "
+                  + "fraction=\(String(format: "%.4f", segment.fraction))\n")
+        }
+        for row in context.legend {
+            write("  legend \"\(row.label)\" role=\(row.role.rawValue) "
+                  + "bytes=\(row.bytes.map(formatBytes) ?? "-") "
+                  + "capacity=\(row.capacityBytes.map(formatBytes) ?? "-") "
+                  + "percent=\(row.percent.map { String(format: "%.2f", $0) } ?? "-") "
+                  + "detail=\(row.detail ?? "-")\n")
+        }
+        if let note = context.note {
+            write("  note: \(note)\n")
+        }
+    }
+}
+
 private func printDiskScan(path: String, top: Int, includeHidden: Bool) {
     var options = KBDiskScanOptions()
     options.largestFilesLimit = max(top, 10)
@@ -619,6 +664,8 @@ case "disk":
             fail("usage: disk info <deviceIdentifier>")
         }
         printDiskInfo(remainder[1])
+    case "apfs":
+        printDiskAPFS(remainder.count > 1 ? remainder[1] : nil)
     case "scan":
         guard remainder.count >= 2 else {
             fail("usage: disk scan <path> [--top N] [--hidden]")
@@ -627,7 +674,7 @@ case "disk":
                       top: integerOption("--top", default: 20),
                       includeHidden: remainder.contains("--hidden"))
     default:
-        fail("usage: disk <volumes|info <device>|scan <path>>")
+        fail("usage: disk <volumes|info <device>|apfs [device]|scan <path>>")
     }
 case "daemon-action":
     guard remainder.count >= 3,
