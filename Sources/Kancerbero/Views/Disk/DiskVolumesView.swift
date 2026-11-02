@@ -72,7 +72,7 @@ struct DiskVolumesView: View {
                 tint: Color(red: 0.42, green: 0.46, blue: 0.54),
                 action: { showAll() },
                 isSelected: ui.disk.volumesFocus == nil,
-                filterHint: "Show all disks, containers and volumes"
+                filterHint: "Show all disks, containers and volumes", compact: true
             )
             SummaryCard(
                 title: "Disks",
@@ -82,7 +82,7 @@ struct DiskVolumesView: View {
                 tint: Color(red: 0.94, green: 0.56, blue: 0.18),
                 action: { toggleFocus(.disks) },
                 isSelected: ui.disk.volumesFocus == .disks,
-                filterHint: "Show only top-level media"
+                filterHint: "Show only top-level media", compact: true
             )
             SummaryCard(
                 title: "Containers",
@@ -92,7 +92,7 @@ struct DiskVolumesView: View {
                 tint: Color(red: 0.85, green: 0.65, blue: 0.20),
                 action: { toggleFocus(.containers) },
                 isSelected: ui.disk.volumesFocus == .containers,
-                filterHint: "Show only APFS containers"
+                filterHint: "Show only APFS containers", compact: true
             )
             SummaryCard(
                 title: "Volumes",
@@ -102,7 +102,7 @@ struct DiskVolumesView: View {
                 tint: Color(red: 0.20, green: 0.70, blue: 0.62),
                 action: { toggleFocus(.volumes) },
                 isSelected: ui.disk.volumesFocus == .volumes,
-                filterHint: "Show only mounted volumes"
+                filterHint: "Show only mounted volumes", compact: true
             )
             SummaryCard(
                 title: "Capacity",
@@ -112,7 +112,7 @@ struct DiskVolumesView: View {
                 tint: Color(red: 0.16, green: 0.62, blue: 0.94),
                 action: { toggleFocus(.capacity) },
                 isSelected: ui.disk.volumesFocus == .capacity,
-                filterHint: "Show items ordered by size"
+                filterHint: "Show items ordered by size", compact: true
             )
             SummaryCard(
                 title: "Free",
@@ -122,7 +122,7 @@ struct DiskVolumesView: View {
                 tint: Color(red: 0.62, green: 0.42, blue: 0.95),
                 action: { toggleFocus(.free) },
                 isSelected: ui.disk.volumesFocus == .free,
-                filterHint: "Show items with the least free space first"
+                filterHint: "Show items with the least free space first", compact: true
             )
         }
     }
