@@ -2,6 +2,7 @@ import Foundation
 
 enum DiskVolumesFocus: String, CaseIterable, Identifiable, Sendable {
     case disks
+    case containers
     case volumes
     case capacity
     case free
@@ -11,6 +12,7 @@ enum DiskVolumesFocus: String, CaseIterable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .disks: return "Disks"
+        case .containers: return "Containers"
         case .volumes: return "Volumes"
         case .capacity: return "Capacity"
         case .free: return "Free"

@@ -323,6 +323,8 @@ Disk (filtros de tarjetas):
 ```bash
 $K --screenshot /tmp/kb-disk-free.png --section disk \
   --disk-tab volumes --volumes-focus free --screenshot-delay 5
+$K --screenshot /tmp/kb-disk-containers.png --section disk \
+  --disk-tab volumes --volumes-focus containers --screenshot-delay 5
 $K --screenshot /tmp/kb-disk-folders.png --section disk \
   --disk-tab analyzer --disk-path="$HOME/Documents" --disk-scan \
   --analyzer-focus folders --screenshot-delay 8
