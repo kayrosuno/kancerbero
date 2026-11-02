@@ -132,6 +132,7 @@ final class FilterModel {
             if rules[index].policy != .ask {
                 rules[index].policy = .ask
             }
+            rules[index].enabled = true
         } else {
             rules.append(FilterRule(executablePath: process.path,
                                     bundleID: Bundle(path: process.path)?.bundleIdentifier,
@@ -144,17 +145,15 @@ final class FilterModel {
 
     func unwatch(_ process: KBProcessInfo) {
         guard !process.path.isEmpty else { return }
-        rules.removeAll { $0.executablePath == process.path }
-        remembered.removeAll { $0.executablePath == process.path }
-        persistRules()
-        persistRemembered()
-        Task { await pushRules() }
+        removeRule(atPath: process.path)
     }
 
     func setPolicy(_ policy: FilterPolicy, for process: KBProcessInfo) {
         guard !process.path.isEmpty else { return }
         if let index = rules.firstIndex(where: { $0.executablePath == process.path }) {
             rules[index].policy = policy
+            // Choosing a policy from Processes means the rule should apply.
+            rules[index].enabled = true
         } else {
             rules.append(FilterRule(executablePath: process.path,
                                     bundleID: Bundle(path: process.path)?.bundleIdentifier,
@@ -167,6 +166,34 @@ final class FilterModel {
 
     func isWatched(path: String) -> Bool {
         rules.contains { $0.executablePath == path }
+    }
+
+    func setRuleEnabled(_ enabled: Bool, ruleID: UUID) {
+        guard let index = rules.firstIndex(where: { $0.id == ruleID }),
+              rules[index].enabled != enabled else { return }
+        rules[index].enabled = enabled
+        persistRules()
+        Task { await pushRules() }
+    }
+
+    func removeRule(id: UUID) {
+        guard let rule = rules.first(where: { $0.id == id }) else { return }
+        removeRule(atPath: rule.executablePath)
+    }
+
+    func removeRemembered(id: UUID) {
+        guard remembered.contains(where: { $0.id == id }) else { return }
+        remembered.removeAll { $0.id == id }
+        persistRemembered()
+        Task { await pushRules() }
+    }
+
+    private func removeRule(atPath path: String) {
+        rules.removeAll { $0.executablePath == path }
+        remembered.removeAll { $0.executablePath == path }
+        persistRules()
+        persistRemembered()
+        Task { await pushRules() }
     }
 
     // MARK: - Approvals

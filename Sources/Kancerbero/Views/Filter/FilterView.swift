@@ -5,6 +5,7 @@ import KancerberoFilterContract
 struct FilterView: View {
     @Environment(FilterModel.self) private var filter
     @Environment(UIState.self) private var ui
+    @Environment(\.openWindow) private var openWindow
 
     private var search: Binding<String> {
         Binding(
@@ -68,34 +69,12 @@ struct FilterView: View {
                 ProgressView().controlSize(.mini)
             }
 
-            filterButton
-        }
-    }
+            Button("Rules…") {
+                openWindow(id: FilterRulesWindow.id)
+            }
+            .help("Show configured filters, rules and remembered decisions")
 
-    @ViewBuilder
-    private var filterButton: some View {
-        switch filter.controller.state {
-        case .enabled:
-            Button("Disable filter") {
-                Task { await filter.disableFilter() }
-            }
-            .buttonStyle(.bordered)
-        case .disabled, .failed:
-            Button("Enable filter") {
-                Task { await filter.enableFilter() }
-            }
-            .buttonStyle(.borderedProminent)
-        case .notInstalled, .requiresApproval:
-            Button("Install filter extension") {
-                Task { await filter.enableFilter() }
-            }
-            .buttonStyle(.borderedProminent)
-        case .activating:
-            Button("Installing…") {}
-                .buttonStyle(.bordered)
-                .disabled(true)
-        case .unsupported:
-            EmptyView()
+            FilterPowerButton()
         }
     }
 

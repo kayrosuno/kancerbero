@@ -436,8 +436,18 @@
 - Volumen: los veredictos llevan `shouldReport = true` y `statisticsReportFrequency = .medium`;
   `handle(_ report:)` acumula `bytesInboundCount/bytesOutboundCount` por flujo. Son contadores
   agregados del kernel y el tráfico excluido por Apple no se ve.
+- `FilterRule.enabled` permite dejar una regla listada sin aplicarla: la extensión solo casa
+  reglas activas (`executablePath` + `enabled`). El campo es opcional al decodificar
+  (`enabled ?? true`), así que las cachés antiguas siguen siendo válidas y el schema no cambia.
+  La app puede activar/desactivar y borrar reglas y decisiones recordadas; cada mutación
+  persiste su copia y empuja el snapshot completo (`setRules`), que la extensión reemplaza y
+  guarda en su `rules.plist`.
 - UI: pestaña **Filter** (flujos con RX/TX y estado), escudo por fila en **Processes**, hoja de
-  aprobación en `RootView` y filas de estado en **System status**.
+  aprobación en `RootView` (`FilterApprovalSheet`: icono y nombre grandes, destino a 30 pt,
+  anillo de cuenta atrás, selector Remember Once/This app/App + destination y botones
+  Allow/Deny; `.interactiveDismissDisabled` y Return/Escape), ventana **Filter rules**
+  (`FilterRulesView`, abierta con **Rules…** desde el Filter) con estado, reglas y decisiones
+  recordadas, y filas de estado en **System status**.
 - Entitlements: en Release, `content-filter-provider-systemextension` en app y extensión,
   `system-extension.install` en la app y `app-sandbox` en la extensión; ambos se firman con
   Developer ID + provisioning profile. En Debug se usan los archivos `-Development.entitlements`

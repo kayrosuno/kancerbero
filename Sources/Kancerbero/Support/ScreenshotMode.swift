@@ -75,7 +75,11 @@ enum ScreenshotMode {
             if window != nil { break }
         }
         guard let window else {
-            fail("no visible window after 5s")
+            let titles = NSApp.windows.map {
+                "\($0.title.isEmpty ? "<untitled>" : $0.title)"
+                    + ($0.isVisible ? "" : "(hidden)")
+            }
+            fail("no visible window after 5s: \(titles.joined(separator: ", "))")
         }
         window.makeKeyAndOrderFront(nil)
         if let size = Self.screenshotSize(arguments) {

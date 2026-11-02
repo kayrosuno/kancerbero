@@ -923,10 +923,14 @@ runtime y timestamp; que la app no lleva `get-task-allow`; que ambas firmas llev
 ### Pruebas funcionales
 
 1. **Aprobación**: vigilar `/usr/bin/curl` con el escudo de **Processes**. Cada conexión nueva
-   abre la hoja (y notificación si la app está en segundo plano):
-   - *Allow once* → la conexión funciona.
-   - *Deny once* → `curl` falla de inmediato.
-   - *Always allow this app* / *app + destination* → no vuelve a preguntar según la opción.
+   abre la hoja (y notificación si la app está en segundo plano). Comprobar el rediseño: icono y
+   nombre del proceso grandes, destino a 30 pt con transporte y origen, anillo de cuenta atrás
+   con segundos y barra de progreso, selector **Remember** (Once / This app / App + destination)
+   y botones grandes **Deny** / **Allow**. Return permite y Escape deniega; la hoja no se puede
+   cerrar sin decidir.
+   - Remember *Once* + Allow/Deny → afecta solo a esa conexión; `curl` funciona o falla.
+   - Remember *This app* / *App + destination* + Allow/Deny → no vuelve a preguntar según la
+     opción (la de destino queda deshabilitada si no hay remoto).
 2. **Fail-closed**: cerrar Kancerbero y repetir `curl` desde el proceso vigilado sin decisión
    recordada → conexión bloqueada; al reabrir la app aparece en **Recent blocks** como
    `no app`. Con una decisión recordada de allow → permitida.
@@ -937,6 +941,20 @@ runtime y timestamp; que la app no lleva `get-task-allow`; que ambas firmas llev
    intervalo y tráfico excluido).
 5. **Regresión**: con el filtro desactivado, Interfaces/Connections/Processes siguen funcionando
    con nstat; `scripts/verify.sh` sin cambios.
+6. **Ventana de reglas** (Filter → **Rules…**):
+   - La ventana muestra el estado del filtro (Enabled/Disabled/Unsupported, conexión XPC y
+     contadores) con su botón global Enable/Disable.
+   - Las reglas creadas con el escudo de Processes aparecen con proceso, política, ruta y un
+     toggle. Desactivar una regla hace que la extensión deje de aplicarla (un flujo nuevo pasa a
+     observado/permitido; con `ask` ya no sale la hoja); reactivarla restaura el comportamiento.
+   - Borrar una regla pide confirmación, la elimina junto con sus decisiones recordadas de esa
+     app y el escudo de Processes deja de marcarla.
+   - Las decisiones `Always allow/deny` (app y app+destino) aparecen en su tabla; borrarlas hace
+     que el siguiente flujo vuelva a preguntar.
+   - Tras reiniciar app y extensión, reglas, flags y decisiones se conservan (la app empuja el
+     snapshot al conectar).
+   - La extensión en ejecución debe ser el build nuevo (instalar/reactivar) para que `enabled`
+     surta efecto; el handshake sigue aceptando `schemaVersion == 1`.
 
 ### Desinstalación
 
