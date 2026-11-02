@@ -104,9 +104,11 @@ struct EnergyView: View {
 
                 if let graph = model.batteryChargeGraph,
                    !graph.chargeLevels.isEmpty {
-                    BatteryChargeChart(graph: graph)
-                        .frame(maxHeight: .infinity)
-                        .layoutPriority(1)
+                    ChartWithTimeAxis(span: 12 * 3600) {
+                        BatteryChargeChart(graph: graph)
+                    }
+                    .frame(maxHeight: .infinity)
+                    .layoutPriority(1)
                 } else {
                     CapacityBar(fraction: power.chargeFraction,
                                 tint: batteryTintFor(power),
@@ -183,8 +185,10 @@ struct EnergyView: View {
                 .help(topEnergyProcess?.process.path ?? "Energy history")
 
             if model.energyUsageHistory.count > 1 {
-                Sparkline(values: model.energyUsageHistory, tint: energyTint)
-                    .frame(maxHeight: .infinity)
+                ChartWithTimeAxis(span: model.interval * 60) {
+                    Sparkline(values: model.energyUsageHistory, tint: energyTint)
+                }
+                .frame(maxHeight: .infinity)
             } else {
                 Color.clear.frame(maxHeight: .infinity)
             }
@@ -248,8 +252,10 @@ struct EnergyView: View {
                 .help(topWakeupProcess?.process.path ?? "Idle wake-ups")
 
             if model.wakeupHistory.count > 1 {
-                Sparkline(values: model.wakeupHistory, tint: wakeupTint)
-                    .frame(maxHeight: .infinity)
+                ChartWithTimeAxis(span: model.interval * 60) {
+                    Sparkline(values: model.wakeupHistory, tint: wakeupTint)
+                }
+                .frame(maxHeight: .infinity)
             } else {
                 Color.clear.frame(maxHeight: .infinity)
             }

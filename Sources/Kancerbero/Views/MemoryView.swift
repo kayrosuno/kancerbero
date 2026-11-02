@@ -111,9 +111,11 @@ struct MemoryView: View {
             }
 
             if model.memoryPressureHistory.count > 1 {
-                MemoryPressureChart(values: model.memoryPressureHistory,
-                                    levels: model.memoryPressureLevelHistory)
-                    .frame(maxHeight: .infinity)
+                ChartWithTimeAxis(span: model.interval * 60) {
+                    MemoryPressureChart(values: model.memoryPressureHistory,
+                                        levels: model.memoryPressureLevelHistory)
+                }
+                .frame(maxHeight: .infinity)
             } else {
                 Text("Collecting…")
                     .font(.system(size: 9))
@@ -168,18 +170,20 @@ struct MemoryView: View {
 
             if let memory {
                 if model.memoryAppHistory.count > 1 {
-                    MemoryCompositionChart(
-                        app: model.memoryAppHistory,
-                        wired: model.memoryWiredHistory,
-                        compressed: model.memoryCompressedHistory,
-                        cached: model.memoryCachedHistory,
-                        free: model.memoryFreeHistory,
-                        appColor: appColor,
-                        wiredColor: wiredColor,
-                        compressedColor: compressedColor,
-                        cachedColor: cachedColor,
-                        freeColor: idleColor
-                    )
+                    ChartWithTimeAxis(span: model.interval * 60) {
+                        MemoryCompositionChart(
+                            app: model.memoryAppHistory,
+                            wired: model.memoryWiredHistory,
+                            compressed: model.memoryCompressedHistory,
+                            cached: model.memoryCachedHistory,
+                            free: model.memoryFreeHistory,
+                            appColor: appColor,
+                            wiredColor: wiredColor,
+                            compressedColor: compressedColor,
+                            cachedColor: cachedColor,
+                            freeColor: idleColor
+                        )
+                    }
                     .frame(maxHeight: .infinity)
                 } else {
                     Text("Collecting…")

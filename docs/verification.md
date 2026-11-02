@@ -567,7 +567,10 @@ $APP --screenshot /tmp/kb-net-process-independent.png --section networking \
   el foco de su dirección; ecualizador espejado de barras sólidas con upload arriba y download abajo,
   coloreadas por calor según su magnitud, sobre cuadrícula, etiquetas Y en
   `bps/Kbps/Mbps/Gbps` y eje temporal nominal `now/-60s/-2m` (con el intervalo de 1 s; el dato
-  más reciente entra por la izquierda). Las barras ocupan slots fijos desde el borde izquierdo,
+  más reciente entra por la izquierda). Al pasar el ratón, una línea vertical marca la muestra y
+  un tooltip muestra su antigüedad y las tasas Upload/Download de esa muestra. La escala vertical
+  se ajusta al mayor valor visible, de modo que la barra más alta llena siempre su mitad. Las
+  barras ocupan slots fijos desde el borde izquierdo,
   así que un histórico corto queda empaquetado. Sin salto de layout entre 0,3 s y 5 s.
 - Activity muestra tres métricas: **processes** con sockets (total de la tabla Processes),
   **Connections** totales (`sources.count`) y **Active** (flujos con tráfico RX+TX dentro de la
@@ -792,6 +795,8 @@ Capturas:
 
 - En la captura de I/O, copiar un archivo grande mientras la pestaña está abierta: el gráfico
   (barras espejadas, lecturas arriba y escrituras abajo) y las tasas Read/Write deben moverse;
+  la escala vertical se ajusta al mayor valor visible; al pasar el ratón, una línea vertical y un
+  tooltip muestran la muestra bajo el cursor;
   Data/Operations cambia las unidades; los totales
   “Reads in/Writes out/Data read/Data written” deben coincidir con
   `ioreg -r -d 1 -w 0 -c IOBlockStorageDriver | grep Statistics`. La tabla se ordena por
