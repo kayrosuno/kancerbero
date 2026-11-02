@@ -7,9 +7,12 @@ struct FilterApprovalSheet: View {
     @Environment(FilterModel.self) private var filter
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var deciding = false
+    /// Guards against a double decision without disabling the whole sheet.
+    @State private var acted = false
+    @State private var disabling = false
     @State private var remember: FilterRemember = .none
     @State private var pulse = false
+    @State private var appearedAt = Date()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -30,9 +33,11 @@ struct FilterApprovalSheet: View {
         }
         .interactiveDismissDisabled(true)
         .onAppear {
-            if request.remote == nil, remember == .destination {
-                remember = .none
-            }
+            // Never inherit a stale, blocked state if SwiftUI reuses the view.
+            acted = false
+            disabling = false
+            appearedAt = Date()
+            remember = .none
             guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
                 pulse = true
@@ -65,9 +70,6 @@ struct FilterApprovalSheet: View {
                     pidBadge
                     if request.delegated {
                         delegatedBadge
-                    }
-                    if deciding {
-                        ProgressView().controlSize(.small)
                     }
                 }
 
@@ -301,7 +303,6 @@ struct FilterApprovalSheet: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .disabled(deciding)
 
             Text(rememberDetail)
                 .font(.system(size: 11))
@@ -336,7 +337,7 @@ struct FilterApprovalSheet: View {
             .tint(KBTheme.approvalDenyTint)
             .keyboardShortcut(.cancelAction)
             .accessibilityHint("Blocks this connection; Remember makes it permanent.")
-            .disabled(deciding)
+            .disabled(acted)
 
             Button {
                 decide(allow: true, remember: remember)
@@ -349,7 +350,7 @@ struct FilterApprovalSheet: View {
             .tint(KBTheme.approvalAllowTint)
             .keyboardShortcut(.defaultAction)
             .accessibilityHint("Allows this connection; Remember makes it permanent.")
-            .disabled(deciding)
+            .disabled(acted)
         }
         .controlSize(.large)
     }
@@ -365,31 +366,48 @@ struct FilterApprovalSheet: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Button("Disable filter") {
-                disableFilter()
+            HStack(spacing: 8) {
+                Button("Disable filter") {
+                    disableFilter()
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(KBTheme.approvalDenyTint)
+                .help("Turns off the network filter and stops asking for approvals.")
+                .disabled(disabling)
+
+                if disabling {
+                    ProgressView().controlSize(.mini)
+                }
             }
-            .buttonStyle(.borderless)
-            .foregroundStyle(KBTheme.approvalDenyTint)
-            .help("Turns off the network filter and stops asking for approvals.")
-            .disabled(deciding)
         }
     }
 
     // MARK: - Actions
 
+    /// The NEFilterManager work is bounded in FilterController, so this always
+    /// finishes; the Allow/Deny buttons stay usable while it runs.
     private func disableFilter() {
-        deciding = true
+        guard !disabling, !isJustPresented else { return }
+        disabling = true
         Task {
             await filter.disableFilter()
             dismiss()
         }
     }
 
+    /// Decisions are optimistic: the model removes the pending request before
+    /// sending the XPC message, so the sheet can close immediately.
     private func decide(allow: Bool, remember: FilterRemember) {
-        deciding = true
+        guard !acted, !isJustPresented else { return }
+        acted = true
         Task {
             await filter.decide(request, allow: allow, remember: remember)
-            dismiss()
         }
+        dismiss()
+    }
+
+    /// Ignore a Return/Escape that was already in flight when the sheet opened.
+    private var isJustPresented: Bool {
+        Date().timeIntervalSince(appearedAt) < 0.35
     }
 }

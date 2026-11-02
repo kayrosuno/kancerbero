@@ -150,7 +150,8 @@ como vigilado: cada conexión nueva de un proceso vigilado pide aprobación (all
 recordada por app o app+destino). La aprobación es una hoja grande con el icono y el nombre del
 proceso, el destino destacado, una cuenta atrás circular y un selector **Remember** (Once / This
 app / App + destination) junto a dos botones **Allow** / **Deny**; Return permite y Escape deniega,
-y la hoja no se cierra sin decidir. La barra del Filter incluye **Rules…**, que abre una ventana
+y la hoja no se cierra sin decidir. Las decisiones cierran la hoja al instante y las operaciones
+del filtro tienen timeout, así que la ventana nunca se queda bloqueada esperando al sistema. La barra del Filter incluye **Rules…**, que abre una ventana
 con el estado del filtro y la lista de reglas (activar/desactivar y borrar) y de decisiones
 recordadas (borrar). Si Kancerbero está cerrado o nadie responde, la conexión se
 deniega (fail-closed). Requiere una build firmada con Developer ID, los entitlements de Network

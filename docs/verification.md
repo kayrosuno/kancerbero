@@ -927,7 +927,11 @@ runtime y timestamp; que la app no lleva `get-task-allow`; que ambas firmas llev
    nombre del proceso grandes, destino a 30 pt con transporte y origen, anillo de cuenta atrás
    con segundos y barra de progreso, selector **Remember** (Once / This app / App + destination)
    y botones grandes **Deny** / **Allow**. Return permite y Escape deniega; la hoja no se puede
-   cerrar sin decidir.
+   cerrar sin decidir. Al abrirse no debe mostrar ningún spinner ni controles desactivados:
+   Allow/Deny cierran la hoja al instante (la decisión se envía en segundo plano) y «Disable
+   filter» muestra progreso solo en ese botón, con un límite de 5 s para las operaciones de
+   `NEFilterManager`; si el daemon no responde, la hoja se cierra y Filter/System status muestran
+   el estado `.failed` en vez de quedarse bloqueada.
    - Remember *Once* + Allow/Deny → afecta solo a esa conexión; `curl` funciona o falla.
    - Remember *This app* / *App + destination* + Allow/Deny → no vuelve a preguntar según la
      opción (la de destino queda deshabilitada si no hay remoto).
