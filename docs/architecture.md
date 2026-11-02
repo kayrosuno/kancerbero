@@ -450,6 +450,13 @@
   `"block all"`. Al activarlo, la extensión resuelve y deniega los flujos ya pausados para
   aprobación (con `resolved` para cerrar la hoja) y `applyDecisionLocked` fuerza deny mientras
   siga activo. Los flujos ya establecidos no se tocan.
+- La extensión responde a `setRules` con `FilterAck.message = FilterVersion.current`; la app
+  compara ese valor con el suyo y, si no coincide (una extensión anterior responde sin mensaje),
+  deja de afirmar que bloquea: muestra **Block outdated** y pide reinstalar o reactivar. Los
+  cambios del target `KancerberoFilter` requieren un **build Release limpio** (el incremental
+  reutilizó una vez un `FilterCore.o` obsoleto; `scripts/build-release.sh` hace `clean build`) y
+  subir `CFBundleVersion` en `Resources/Filter/Info.plist` para que sysextd reemplace la copia
+  staged que sigue corriendo desde `/Library/SystemExtensions`.
 - UI: pestaña **Filter** (flujos con RX/TX y estado), escudo por fila en **Processes** con el
   badge de la política activa al lado (Ask/Allow/Deny) cuando el proceso está vigilado, hoja de
   aprobación en `RootView` (`FilterApprovalSheet`: icono y nombre grandes, destino a 30 pt,
@@ -471,7 +478,8 @@
   tarjeta siempre visible con el interruptor global: en rojo con pulso y el texto «Blocking new
   connections» cuando está activo, y con un aviso naranja si el filtro está apagado. La barra de
   estado compartida añade un chip rojo **Blocking** (o naranja **Block armed** si la extensión no
-  corre). Filas de estado en **System status**.
+  corre, y **Block outdated** si la que corre es una build anterior). Filas de estado en
+  **System status**.
 - Entitlements: en Release, `content-filter-provider-systemextension` en app y extensión,
   `system-extension.install` en la app y `app-sandbox` en la extensión; ambos se firman con
   Developer ID + provisioning profile. En Debug se usan los archivos `-Development.entitlements`

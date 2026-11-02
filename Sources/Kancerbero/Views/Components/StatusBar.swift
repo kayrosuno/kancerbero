@@ -165,17 +165,26 @@ struct StatusBar: View {
     private var globalStatus: some View {
         HStack(spacing: 14) {
             if filter.blockAllNewConnections {
-                let active = filter.filterHealth == .running
-                chip(label: active ? "Blocking" : "Block armed",
-                     textWidth: 76,
-                     icon: "hand.raised.fill",
-                     tint: active ? KBTheme.approvalDenyTint : Color.orange,
-                     help: active
-                        ? "All new network connections are being denied."
-                        : "Block-all is armed, but the filter extension is not running. It applies when the filter starts.",
-                     accessibilityLabel: active
-                        ? "Blocking all new network connections"
-                        : "Block all new connections armed")
+                if filter.blockAllNeedsExtensionUpdate {
+                    chip(label: "Block outdated",
+                         textWidth: 82,
+                         icon: "exclamationmark.triangle.fill",
+                         tint: .orange,
+                         help: "The running filter extension is an older build and is not enforcing the block. Reinstall or reactivate it.",
+                         accessibilityLabel: "Block all new connections requested, filter extension out of date")
+                } else {
+                    let active = filter.filterHealth == .running
+                    chip(label: active ? "Blocking" : "Block armed",
+                         textWidth: 82,
+                         icon: "hand.raised.fill",
+                         tint: active ? KBTheme.approvalDenyTint : Color.orange,
+                         help: active
+                            ? "All new network connections are being denied."
+                            : "Block-all is armed, but the filter extension is not running. It applies when the filter starts.",
+                         accessibilityLabel: active
+                            ? "Blocking all new network connections"
+                            : "Block all new connections armed")
+                }
             }
 
             chip(label: filter.filterStatusLabel,
