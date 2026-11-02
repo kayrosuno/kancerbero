@@ -12,6 +12,7 @@ final class FilterCore: NSObject, @unchecked Sendable, KancerberoFilterXPC {
     private weak var provider: FilterDataProvider?
     private var rules: [FilterRule] = []
     private var remembered: [RememberedDecision] = []
+    private var blockAllNewConnections = false
     private var flows: [UUID: FlowRecord] = [:]
     private var lastReport: [UUID: (inbound: UInt64, outbound: UInt64)] = [:]
     private var paused: [UUID: NEFilterFlow] = [:]
@@ -80,13 +81,19 @@ final class FilterCore: NSObject, @unchecked Sendable, KancerberoFilterXPC {
                 if flows.count < maxFlows || flows[flowID] != nil {
                     record.state = state
                     record.deniedReason = reason
-                    record.ruleID = rule?.id
+                    record.ruleID = blockAllNewConnections ? nil : rule?.id
                     flows[flowID] = record
                     dirtyFlows.insert(flowID)
                 }
             }
 
-            if let rule {
+            if blockAllNewConnections {
+                // Global override: deny every new flow before rules and
+                // remembered decisions get a chance to allow it.
+                state = .denied
+                reason = "block all"
+                verdict = .drop()
+            } else if let rule {
                 switch rule.policy {
                 case .allow:
                     state = .allowed
@@ -221,8 +228,17 @@ final class FilterCore: NSObject, @unchecked Sendable, KancerberoFilterXPC {
                 let snapshot = try FilterCodec.decodePayload(FilterRuleSnapshot.self, from: envelope)
                 rules = snapshot.rules
                 remembered = snapshot.remembered
+                blockAllNewConnections = snapshot.blockAllNewConnections
                 saveCacheLocked()
-                flushLocked()
+
+                // Arming the global block resolves any flow already paused for
+                // approval; the resolved IDs let the app close its sheet.
+                var dropped: [UUID] = []
+                if blockAllNewConnections, !paused.isEmpty {
+                    dropped = Array(paused.keys)
+                    dropAllPausedLocked(reason: "block all")
+                }
+                flushLocked(resolved: dropped)
                 return FilterCodec.envelope(.setRulesAck, value: FilterAck(ok: true))
             case .decide:
                 let message = try FilterCodec.decodePayload(FilterDecisionMessage.self, from: envelope)
@@ -260,19 +276,24 @@ final class FilterCore: NSObject, @unchecked Sendable, KancerberoFilterXPC {
         }
         pending.removeValue(forKey: message.flowID)
 
-        let verdict: NEFilterNewFlowVerdict = message.allow ? .allow() : .drop()
+        // A decision can race the global block; while it is on, nothing is
+        // allowed and no remembered allow/deny is stored.
+        let allow = message.allow && !blockAllNewConnections
+        let verdict: NEFilterNewFlowVerdict = allow ? .allow() : .drop()
         verdict.shouldReport = true
         verdict.statisticsReportFrequency = .medium
         provider?.resumeFlow(flow, with: verdict)
 
         if var record = flows[message.flowID] {
-            record.state = message.allow ? .allowed : .denied
-            record.deniedReason = message.allow ? nil : "user"
+            record.state = allow ? .allowed : .denied
+            record.deniedReason = allow ? nil
+                : (blockAllNewConnections ? "block all" : "user")
             flows[message.flowID] = record
             dirtyFlows.insert(message.flowID)
         }
 
-        if let path = message.executablePath, !path.isEmpty {
+        if !blockAllNewConnections,
+           let path = message.executablePath, !path.isEmpty {
             switch message.remember {
             case .none:
                 break
@@ -446,11 +467,14 @@ final class FilterCore: NSObject, @unchecked Sendable, KancerberoFilterXPC {
         }
         rules = snapshot.rules
         remembered = snapshot.remembered
+        blockAllNewConnections = snapshot.blockAllNewConnections
     }
 
     private func saveCacheLocked() {
         guard let url = cacheURL else { return }
-        let snapshot = FilterRuleSnapshot(rules: rules, remembered: remembered)
+        let snapshot = FilterRuleSnapshot(rules: rules,
+                                          remembered: remembered,
+                                          blockAllNewConnections: blockAllNewConnections)
         guard let data = try? PropertyListEncoder().encode(snapshot) else { return }
         try? data.write(to: url, options: .atomic)
     }

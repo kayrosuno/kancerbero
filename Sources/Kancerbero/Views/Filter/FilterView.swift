@@ -37,6 +37,7 @@ struct FilterView: View {
     var body: some View {
         VStack(spacing: 8) {
             toolbar
+            blockAllBanner
             if !filter.controller.isSupported {
                 unsupportedState
             } else if !filter.controller.state.isEnabled {
@@ -45,6 +46,7 @@ struct FilterView: View {
                 flowsContent
             }
         }
+        .animation(.snappy(duration: 0.2), value: filter.blockAllNewConnections)
     }
 
     private var toolbar: some View {
@@ -75,6 +77,81 @@ struct FilterView: View {
             .help("Show configured filters, rules and remembered decisions")
 
             FilterPowerButton()
+        }
+    }
+
+    /// Always visible: it also renders in the unsupported/disabled states so
+    /// the armed flag survives (and is explained) while the filter is off.
+    private var blockAllBanner: some View {
+        let active = filter.blockAllNewConnections
+        let tint = active ? KBTheme.approvalDenyTint : Color.secondary
+        let binding = Binding(
+            get: { filter.blockAllNewConnections },
+            set: { filter.setBlockAllNewConnections($0) }
+        )
+
+        return HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(tint.opacity(active ? 0.20 : 0.10))
+                    .frame(width: 30, height: 30)
+                Image(systemName: "hand.raised.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(tint)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(active ? "Blocking new connections"
+                                : "Block all new connections")
+                        .font(.system(size: 12, weight: .semibold))
+                    if active {
+                        BlockingPulse()
+                    }
+                }
+                Text(active
+                     ? "Every new connection is denied, including processes with Allow rules or remembered decisions. Existing connections stay open."
+                     : "Deny every new connection from every process. Applies only while the filter extension is running.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if active && !filter.controller.state.isEnabled {
+                    Text("The filter is off — blocking starts when you enable it.")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            Toggle("Block all new connections", isOn: binding)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .tint(KBTheme.approvalDenyTint)
+                .controlSize(.small)
+                .accessibilityLabel("Block all new connections")
+                .help(active
+                      ? "Stop blocking new connections"
+                      : "Deny every new network connection")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background {
+            RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
+                .fill(active
+                      ? AnyShapeStyle(LinearGradient(
+                            colors: [KBTheme.approvalDenyTint.opacity(0.20),
+                                     KBTheme.approvalDenyTint.opacity(0.07)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing))
+                      : AnyShapeStyle(Color.gray.opacity(0.08)))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
+                .strokeBorder(active
+                              ? KBTheme.approvalDenyTint.opacity(0.45)
+                              : Color.gray.opacity(0.15),
+                              lineWidth: 1)
         }
     }
 
@@ -250,6 +327,33 @@ struct FilterView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(24)
+    }
+}
+
+/// Small red pulse matching `LiveDot`'s state-driven animation (a repeating
+/// `symbolEffect` broke offscreen window captures).
+private struct BlockingPulse: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pulsing = false
+
+    var body: some View {
+        ZStack {
+            if !reduceMotion {
+                Circle()
+                    .stroke(KBTheme.approvalDenyTint.opacity(0.5), lineWidth: 1)
+                    .frame(width: 8, height: 8)
+                    .scaleEffect(pulsing ? 2.4 : 1)
+                    .opacity(pulsing ? 0 : 0.9)
+                    .animation(.easeOut(duration: 1.5).repeatForever(autoreverses: false),
+                               value: pulsing)
+            }
+            Circle()
+                .fill(KBTheme.approvalDenyTint)
+                .frame(width: 7, height: 7)
+        }
+        .frame(width: 16, height: 16)
+        .onAppear { pulsing = true }
+        .accessibilityHidden(true)
     }
 }
 

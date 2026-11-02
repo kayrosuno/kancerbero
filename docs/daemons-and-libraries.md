@@ -366,6 +366,11 @@ Comportamiento del filtro:
   listadas están activas; la ventana de reglas solo permite crearlas y eliminarlas. Las cachés
   antiguas que incluyeran el campo `enabled` siguen decodificándose (se ignora) y el schema
   sigue en 1.
+- **Bloqueo global**: `FilterRuleSnapshot.blockAllNewConnections` se aplica en `handleNewFlow`
+  antes que cualquier regla o decisión recordada, así que deniega todo flujo nuevo (también de
+  procesos con Allow). No es una regla; se cachea en `rules.plist` y la app lo reenvía al
+  conectar. Al activarlo se resuelven los flujos pausados. Las conexiones ya establecidas no se
+  cortan.
 - **Decisiones**: `once`, `rememberApp`, `rememberDestination`, `alwaysAllow` y `alwaysDeny`.
   Las recordadas se indexan por ruta de ejecutable y, si aplica, por destino.
 - **Pausa y reanudación**: con política `ask` y sin decisión recordada, el flujo se **pausa**, se

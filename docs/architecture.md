@@ -441,6 +441,15 @@
   mutación persiste su copia y empuja el snapshot completo (`setRules`), que la extensión
   reemplaza y guarda en su `rules.plist`. La ventana de reglas usa
   `setPolicy(_:forRuleID:)` (por `FilterRule.id`) para no depender de `KBProcessInfo`.
+- El bloqueo global de conexiones nuevas viaja como `FilterRuleSnapshot.blockAllNewConnections`
+  (decodificado con `decodeIfPresent ?? false` para no romper cachés ni payloads antiguos; el
+  schema sigue en 1). No es una `FilterRule` y nunca aparece en la lista de reglas. La app lo
+  persiste en `UserDefaults` (`filterBlockAll.v1`) y lo reenvía al conectar; la extensión lo
+  guarda en su `rules.plist`, así que sigue bloqueando aunque la app esté cerrada. En
+  `handleNewFlow` se evalúa antes que reglas y decisiones recordadas: deniega todo con
+  `"block all"`. Al activarlo, la extensión resuelve y deniega los flujos ya pausados para
+  aprobación (con `resolved` para cerrar la hoja) y `applyDecisionLocked` fuerza deny mientras
+  siga activo. Los flujos ya establecidos no se tocan.
 - UI: pestaña **Filter** (flujos con RX/TX y estado), escudo por fila en **Processes** con el
   badge de la política activa al lado (Ask/Allow/Deny) cuando el proceso está vigilado, hoja de
   aprobación en `RootView` (`FilterApprovalSheet`: icono y nombre grandes, destino a 30 pt,
@@ -458,8 +467,11 @@
   seleccionar una fila y usar
   **Delete** en la cabecera de la sección, la papelera de la fila o el menú contextual; todas
   piden confirmación con un `.alert` y borran la regla junto con las decisiones recordadas de esa
-  app. Sin selección, el botón de cabecera queda deshabilitado. Filas de estado en
-  **System status**.
+  app. Sin selección, el botón de cabecera queda deshabilitado. La pestaña Filter muestra una
+  tarjeta siempre visible con el interruptor global: en rojo con pulso y el texto «Blocking new
+  connections» cuando está activo, y con un aviso naranja si el filtro está apagado. La barra de
+  estado compartida añade un chip rojo **Blocking** (o naranja **Block armed** si la extensión no
+  corre). Filas de estado en **System status**.
 - Entitlements: en Release, `content-filter-provider-systemextension` en app y extensión,
   `system-extension.install` en la app y `app-sandbox` en la extensión; ambos se firman con
   Developer ID + provisioning profile. En Debug se usan los archivos `-Development.entitlements`

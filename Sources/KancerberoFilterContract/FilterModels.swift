@@ -244,10 +244,30 @@ public struct FilterStatus: Codable, Sendable, Equatable {
 public struct FilterRuleSnapshot: Codable, Sendable, Equatable {
     public var rules: [FilterRule]
     public var remembered: [RememberedDecision]
+    /// Global override: deny every new flow, regardless of rules or remembered
+    /// decisions. It is not a `FilterRule` and never appears in the rules list.
+    public var blockAllNewConnections: Bool
 
-    public init(rules: [FilterRule] = [], remembered: [RememberedDecision] = []) {
+    private enum CodingKeys: String, CodingKey {
+        case rules, remembered, blockAllNewConnections
+    }
+
+    public init(rules: [FilterRule] = [],
+                remembered: [RememberedDecision] = [],
+                blockAllNewConnections: Bool = false) {
         self.rules = rules
         self.remembered = remembered
+        self.blockAllNewConnections = blockAllNewConnections
+    }
+
+    /// Added after the first release: old app payloads and the extension's
+    /// cached `rules.plist` do not carry it, so decode it as false.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        rules = try container.decode([FilterRule].self, forKey: .rules)
+        remembered = try container.decode([RememberedDecision].self, forKey: .remembered)
+        blockAllNewConnections = try container.decodeIfPresent(
+            Bool.self, forKey: .blockAllNewConnections) ?? false
     }
 }
 

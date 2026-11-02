@@ -971,6 +971,20 @@ runtime y timestamp; que la app no lleva `get-task-allow`; que ambas firmas llev
    - Tras reiniciar app y extensión, reglas y decisiones se conservan (la app empuja el snapshot
      al conectar). El handshake sigue aceptando `schemaVersion == 1`; las cachés antiguas que
      incluyeran `enabled` se decodifican igual porque la clave desconocida se ignora.
+7. **Bloqueo global de conexiones nuevas** (interruptor de la pestaña Filter):
+   - Al activarlo, la tarjeta pasa a rojo con «Blocking new connections», pulso (salvo Reduce
+     Motion) y el aviso naranja si el filtro está apagado; la barra de estado muestra
+     **Blocking** (o **Block armed** si la extensión no corre) en cualquier sección.
+   - Un proceso con regla Allow, uno con decisión recordada de allow y uno sin regla deben ser
+     denegados al abrir conexiones nuevas; en Filter aparecen como `DENIED (block all)` y el
+     contador/lista de reglas no cambia (no se crea ninguna regla).
+   - Una conexión ya establecida antes de activar sigue funcionando.
+   - Con una petición Ask pendiente, activar cierra la hoja, la fila desaparece y
+     `pausedFlows` llega a 0. Toggles rápidos on/off/on dejan UI y comportamiento coherentes.
+   - Cerrar la app con el bloqueo activo: la extensión sigue denegando; al reabrir, el
+     interruptor sigue activo y se re-arma. Reiniciar la extensión mantiene el bloqueo.
+   - Desactivarlo restaura reglas y decisiones recordadas y retira el aviso. Instalar sobre un
+     perfil con un `rules.plist` anterior conserva las reglas y arranca con el bloqueo apagado.
 
 ### Desinstalación
 
