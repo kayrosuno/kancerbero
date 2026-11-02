@@ -99,15 +99,10 @@ struct DiskIOView: View {
     }
 
     private var modePicker: some View {
-        Picker("Graph", selection: graphMode) {
-            ForEach(DiskIOGraphMode.allCases) { mode in
-                Text(mode.title).tag(mode)
-            }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .frame(width: 180)
-        .accessibilityLabel("Disk graph type")
+        GraphModeSelector(mode: graphMode,
+                          accessibilityLabel: "Disk graph type",
+                          help: "Show disk throughput in bytes or operations per second",
+                          legacyWidth: 150)
     }
 
     private var sampleCount: some View {
@@ -139,6 +134,8 @@ struct DiskIOView: View {
             Text(label)
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize()
             Text(value)
                 .font(.system(size: 10, weight: .medium))
                 .monospacedDigit()

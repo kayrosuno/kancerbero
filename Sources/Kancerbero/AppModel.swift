@@ -63,6 +63,10 @@ final class AppModel {
     var hostMetrics: KBHostMetrics?
     var cpuProcessRows: [CPUProcessRow] = []
     var userNames: [UInt32: String] = [:]
+    /// Session-only reverse-DNS cache keyed by the address exactly as it
+    /// appears in `KBEndpoint.address` / `FilterEndpoint.address`. Misses are
+    /// cached separately so a failed PTR query is not retried every tick.
+    private(set) var hostNames: [String: String] = [:]
     var cpuUsageHistory: [Double] = []
     var cpuUserHistory: [Double] = []
     var cpuSystemHistory: [Double] = []
@@ -183,6 +187,8 @@ final class AppModel {
     private var daemonGeneration = 0
     private var daemonConnectTask: Task<Void, Never>?
     private var resolvingUIDs: Set<UInt32> = []
+    private var unresolvedHostNames: Set<String> = []
+    private var resolvingHostNames: Set<String> = []
     private var registrationCheckTask: Task<Void, Never>?
     private static let daemonFingerprintKey = "daemon.registrationFingerprint"
     /// Set when the user explicitly disables the background service, so the
@@ -1349,5 +1355,65 @@ final class AppModel {
 
     func userName(for uid: UInt32) -> String {
         userNames[uid] ?? String(uid)
+    }
+
+    // MARK: - Reverse DNS
+
+    func hostName(for address: String) -> String? {
+        hostNames[address]
+    }
+
+    func hostName(for endpoint: KBEndpoint) -> String? {
+        guard endpoint.family == 4 || endpoint.family == 6 else { return nil }
+        return hostNames[endpoint.address]
+    }
+
+    /// Starts bounded reverse lookups for addresses that are not cached, not
+    /// cached as unresolved, and not already in flight. Results are applied one
+    /// by one on the main actor so cells switch from the IP to the hostname as
+    /// each query finishes.
+    func requestHostNames(_ addresses: [String]) {
+        let targets = Set(addresses.filter {
+            HostNameResolver.isResolvableAddress($0)
+                && hostNames[$0] == nil
+                && !unresolvedHostNames.contains($0)
+                && !resolvingHostNames.contains($0)
+        })
+        guard !targets.isEmpty else { return }
+
+        let batch = targets.sorted()
+        resolvingHostNames.formUnion(batch)
+
+        // Unstructured on purpose: switching tabs or filtering must not cancel
+        // lookups whose results still improve the session cache.
+        Task { [weak self] in
+            guard let self else { return }
+            await withTaskGroup(of: (address: String, name: String?).self) { group in
+                var pending = batch.makeIterator()
+                for _ in 0..<HostNameResolver.maxConcurrentLookups {
+                    guard let address = pending.next() else { break }
+                    group.addTask {
+                        (address, await HostNameResolver.hostNameAsync(for: address))
+                    }
+                }
+                for await result in group {
+                    self.applyHostName(result.name, for: result.address)
+                    if let address = pending.next() {
+                        group.addTask {
+                            (address, await HostNameResolver.hostNameAsync(for: address))
+                        }
+                    }
+                }
+            }
+            self.resolvingHostNames.subtract(batch)
+        }
+    }
+
+    private func applyHostName(_ name: String?, for address: String) {
+        if let name, !name.isEmpty {
+            hostNames[address] = name
+        } else {
+            unresolvedHostNames.insert(address)
+        }
     }
 }

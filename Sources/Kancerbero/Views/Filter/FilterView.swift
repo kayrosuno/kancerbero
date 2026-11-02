@@ -5,12 +5,20 @@ import KancerberoFilterContract
 struct FilterView: View {
     @Environment(FilterModel.self) private var filter
     @Environment(UIState.self) private var ui
+    @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
 
     private var search: Binding<String> {
         Binding(
             get: { ui.filter.search },
             set: { ui.filter.search = $0 }
+        )
+    }
+
+    private var resolveNames: Binding<Bool> {
+        Binding(
+            get: { ui.networking.resolveNames },
+            set: { ui.networking.resolveNames = $0 }
         )
     }
 
@@ -28,10 +36,45 @@ struct FilterView: View {
             : filter.flows.filter { row in
                 row.processName.lowercased().contains(query)
                     || row.executablePath.lowercased().contains(query)
-                    || (row.remote?.display.lowercased().contains(query) ?? false)
-                    || (row.local?.display.lowercased().contains(query) ?? false)
+                    || endpointMatches(row.remote, query: query)
+                    || endpointMatches(row.local, query: query)
             }
         return ui.filter.sortOrder.isEmpty ? matched : matched.sorted(using: ui.filter.sortOrder)
+    }
+
+    private func endpointMatches(_ endpoint: FilterEndpoint?, query: String) -> Bool {
+        guard let endpoint else { return false }
+        if endpoint.rawDisplay.lowercased().contains(query) { return true }
+        if let hostname = endpoint.hostname?.lowercased(), hostname.contains(query) {
+            return true
+        }
+        guard ui.networking.resolveNames else { return false }
+        return model.hostName(for: endpoint.address)?.lowercased().contains(query) ?? false
+    }
+
+    private func endpointLabel(_ endpoint: FilterEndpoint?) -> EndpointLabel {
+        guard let endpoint else { return EndpointLabel(text: "—", help: "") }
+        guard ui.networking.resolveNames else {
+            return EndpointLabel(text: endpoint.rawDisplay, help: endpoint.rawDisplay)
+        }
+        let name = endpoint.hostname.flatMap { $0.isEmpty ? nil : $0 }
+            ?? model.hostName(for: endpoint.address)
+        return endpoint.label(hostName: name)
+    }
+
+    /// Changes only when the toggle changes or the set of displayed numeric
+    /// addresses changes; byte counters do not affect it.
+    private struct FlowHostNameRequestKey: Hashable {
+        var enabled = false
+        var addresses: Set<String> = []
+    }
+
+    private var hostNameRequestKey: FlowHostNameRequestKey {
+        guard ui.networking.resolveNames else { return FlowHostNameRequestKey() }
+        let addresses = Set(displayRows.flatMap { row in
+            [row.local?.address, row.remote?.address].compactMap { $0 }
+        }.filter { HostNameResolver.isResolvableAddress($0) })
+        return FlowHostNameRequestKey(enabled: true, addresses: addresses)
     }
 
     var body: some View {
@@ -71,7 +114,12 @@ struct FilterView: View {
                 ProgressView().controlSize(.mini)
             }
 
-            Button("Rules…") {
+            Toggle("Resolve names", isOn: resolveNames)
+                .toggleStyle(.checkbox)
+                .controlSize(.small)
+                .help("Show hostnames for the visible flows' addresses")
+
+            Button("Filter Rules…") {
                 openWindow(id: FilterRulesWindow.id)
             }
             .help("Show configured filters, rules and remembered decisions")
@@ -209,15 +257,19 @@ struct FilterView: View {
                 }
                 .width(min: 45, ideal: 55)
                 TableColumn("Local", value: \.localSortValue) { row in
-                    Text(row.local?.display ?? "—")
+                    let label = endpointLabel(row.local)
+                    Text(label.text)
                         .font(.system(size: 10, design: .monospaced))
                         .lineLimit(1)
+                        .help(label.help)
                 }
                 .width(min: 120, ideal: 160)
                 TableColumn("Remote", value: \.remoteSortValue) { row in
-                    Text(row.remote?.display ?? "—")
+                    let label = endpointLabel(row.remote)
+                    Text(label.text)
                         .font(.system(size: 10, design: .monospaced))
                         .lineLimit(1)
+                        .help(label.help)
                 }
                 .width(min: 130, ideal: 180)
                 TableColumn("Proto", value: \.transport) { row in
@@ -250,6 +302,10 @@ struct FilterView: View {
                 recentBlocks
             }
         }
+        .task(id: hostNameRequestKey) {
+            guard hostNameRequestKey.enabled else { return }
+            model.requestHostNames(Array(hostNameRequestKey.addresses))
+        }
     }
 
     private var recentBlocks: some View {
@@ -264,9 +320,11 @@ struct FilterView: View {
                         .foregroundStyle(.red)
                     Text(block.processName)
                         .font(.system(size: 10, weight: .medium))
-                    Text(block.remote?.display ?? "—")
+                    let label = endpointLabel(block.remote)
+                    Text(label.text)
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.secondary)
+                        .help(label.help)
                     Text(block.deniedReason ?? "denied")
                         .font(.system(size: 9))
                         .foregroundStyle(.orange)

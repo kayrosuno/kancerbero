@@ -141,6 +141,13 @@ struct ConnectionsView: View {
         )
     }
 
+    private var resolveNames: Binding<Bool> {
+        Binding(
+            get: { ui.networking.resolveNames },
+            set: { ui.networking.resolveNames = $0 }
+        )
+    }
+
     private var displayRows: [KBNStatSource] {
         ui.networking.connectionSortOrder.isEmpty
             ? rows
@@ -163,13 +170,6 @@ struct ConnectionsView: View {
                     .frame(width: 180)
                     .help("Filter by process name or PID")
 
-                Button("Inspect Process") {
-                    if let source = selectedSource {
-                        inspected = process(for: source)
-                    }
-                }
-                .disabled(selectedSource == nil)
-
                 Spacer(minLength: 8)
 
                 Text(context)
@@ -177,6 +177,18 @@ struct ConnectionsView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .contentTransition(.numericText())
+
+                Toggle("Resolve names", isOn: resolveNames)
+                    .toggleStyle(.checkbox)
+                    .controlSize(.small)
+                    .help("Reverse-resolve the IP addresses of visible connections")
+
+                Button("Inspect Process") {
+                    if let source = selectedSource {
+                        inspected = process(for: source)
+                    }
+                }
+                .disabled(selectedSource == nil)
             }
 
             Table(displayRows, selection: selection, sortOrder: sortOrder) {
@@ -191,11 +203,13 @@ struct ConnectionsView: View {
                 }
                 .width(min: 45, ideal: 55)
                 TableColumn("Local", value: \.local, comparator: EndpointComparator()) { source in
-                    Text(source.local.display).monospaced().help(source.local.display)
+                    let label = source.local.label(hostName: resolvedHostName(for: source.local))
+                    Text(label.text).monospaced().help(label.help)
                 }
                 .width(min: 120, ideal: 170)
                 TableColumn("Remote", value: \.remote, comparator: EndpointComparator()) { source in
-                    Text(source.remote.display).monospaced().help(source.remote.display)
+                    let label = source.remote.label(hostName: resolvedHostName(for: source.remote))
+                    Text(label.text).monospaced().help(label.help)
                 }
                 .width(min: 120, ideal: 170)
                 TableColumn("Proto", value: \.protocolSortRank) { source in
@@ -245,6 +259,28 @@ struct ConnectionsView: View {
                   !ids.contains(selected) else { return }
             ui.networking.selectedConnection = nil
         }
+        .task(id: hostNameRequestKey) {
+            guard hostNameRequestKey.enabled else { return }
+            model.requestHostNames(Array(hostNameRequestKey.addresses))
+        }
+    }
+
+    private func resolvedHostName(for endpoint: KBEndpoint) -> String? {
+        ui.networking.resolveNames ? model.hostName(for: endpoint) : nil
+    }
+
+    /// Changes only when the toggle changes or the set of displayed numeric
+    /// addresses changes; row counters and rates do not affect it.
+    private struct ConnectionHostNameRequestKey: Hashable {
+        var enabled = false
+        var addresses: Set<String> = []
+    }
+
+    private var hostNameRequestKey: ConnectionHostNameRequestKey {
+        guard ui.networking.resolveNames else { return ConnectionHostNameRequestKey() }
+        let addresses = Set(rows.flatMap { [$0.local.address, $0.remote.address] }
+            .filter { HostNameResolver.isResolvableAddress($0) })
+        return ConnectionHostNameRequestKey(enabled: true, addresses: addresses)
     }
 
     private func process(for source: KBNStatSource) -> KBProcessInfo {
