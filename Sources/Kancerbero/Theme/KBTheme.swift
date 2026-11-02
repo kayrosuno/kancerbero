@@ -52,6 +52,8 @@ enum KBTheme {
     static let connectionsTint = Color(red: 0.20, green: 0.70, blue: 0.62)
     static let activeTint = Color(red: 0.16, green: 0.62, blue: 0.94)
     static let processesTint = Color(red: 0.94, green: 0.56, blue: 0.18)
+    static let approvalAllowTint = Color(red: 0.20, green: 0.72, blue: 0.52)
+    static let approvalDenyTint = Color(red: 0.92, green: 0.30, blue: 0.26)
 
     static var background: some View {
         ZStack {

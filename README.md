@@ -147,7 +147,12 @@ Applications muestra un aviso para desbloquear los contenedores de otras apps.
 La pestaña **Filter** muestra los flujos que ve la Network Extension (proceso, endpoints,
 protocolo, RX/TX por flujo y estado). En **Processes**, el escudo de cada fila marca un proceso
 como vigilado: cada conexión nueva de un proceso vigilado pide aprobación (allow/deny, una vez o
-recordada por app o app+destino). Si Kancerbero está cerrado o nadie responde, la conexión se
+recordada por app o app+destino). La aprobación es una hoja grande con el icono y el nombre del
+proceso, el destino destacado, una cuenta atrás circular y un selector **Remember** (Once / This
+app / App + destination) junto a dos botones **Allow** / **Deny**; Return permite y Escape deniega,
+y la hoja no se cierra sin decidir. La barra del Filter incluye **Rules…**, que abre una ventana
+con el estado del filtro y la lista de reglas (activar/desactivar y borrar) y de decisiones
+recordadas (borrar). Si Kancerbero está cerrado o nadie responde, la conexión se
 deniega (fail-closed). Requiere una build firmada con Developer ID, los entitlements de Network
 Extension y aprobar la system extension; el detalle de binario y permisos está en
 `docs/daemons-and-libraries.md` y las pruebas en `docs/verification.md`.
