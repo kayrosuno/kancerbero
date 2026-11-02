@@ -118,7 +118,7 @@ struct KancerberoApp: App {
             FilterRulesView()
                 .environment(filter)
         }
-        .defaultSize(width: 760, height: 560)
+        .defaultSize(width: 820, height: 580)
         .windowResizability(.contentMinSize)
 
         Settings {

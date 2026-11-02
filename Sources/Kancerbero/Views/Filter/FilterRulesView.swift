@@ -40,6 +40,7 @@ struct FilterRulesView: View {
     @Environment(FilterModel.self) private var filter
     @Environment(\.dismissWindow) private var dismissWindow
     @State private var rulePendingDeletion: FilterRule?
+    @State private var selectedRuleID: FilterRule.ID?
     @State private var ruleSortOrder: [KeyPathComparator<FilterRule>] = []
     @State private var rememberedSortOrder: [KeyPathComparator<RememberedDecision>] = []
 
@@ -52,25 +53,27 @@ struct FilterRulesView: View {
             Spacer(minLength: 0)
         }
         .padding(14)
-        .frame(minWidth: 720, minHeight: 560)
-        .confirmationDialog(
-            "Delete rule for \(rulePendingDeletion?.displayName ?? "this process")?",
-            isPresented: Binding(
-                get: { rulePendingDeletion != nil },
-                set: { if !$0 { rulePendingDeletion = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
+        .frame(minWidth: 760, minHeight: 560)
+        .onChange(of: filter.rules.map(\.id), initial: true) { _, ids in
+            if let selected = selectedRuleID, !ids.contains(selected) {
+                selectedRuleID = nil
+            }
+        }
+        .alert("Delete rule?",
+               isPresented: Binding(
+                   get: { rulePendingDeletion != nil },
+                   set: { if !$0 { rulePendingDeletion = nil } }
+               ),
+               presenting: rulePendingDeletion) { rule in
             Button("Delete rule and remembered decisions", role: .destructive) {
-                if let rule = rulePendingDeletion {
-                    filter.removeRule(id: rule.id)
-                }
+                filter.removeRule(id: rule.id)
+                selectedRuleID = nil
                 rulePendingDeletion = nil
             }
             Button("Cancel", role: .cancel) { rulePendingDeletion = nil }
-        } message: {
-            Text("The process stops being watched and its Always allow/deny "
-                 + "decisions are removed.")
+        } message: { rule in
+            Text("\(rule.displayName) stops being watched and its Always "
+                 + "allow/deny decisions are removed.")
         }
     }
 
@@ -151,7 +154,26 @@ struct FilterRulesView: View {
 
     private var rulesSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            sectionHeader("Rules", detail: "\(filter.rules.count)")
+            HStack(spacing: 8) {
+                Text("Rules")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("\(filter.rules.count)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                Button {
+                    if let id = selectedRuleID,
+                       let rule = filter.rules.first(where: { $0.id == id }) {
+                        rulePendingDeletion = rule
+                    }
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(selectedRuleID == nil ? Color.secondary : Color.red)
+                .disabled(selectedRuleID == nil)
+                .help("Delete the selected rule and its remembered decisions")
+            }
             if filter.rules.isEmpty {
                 emptyState("No rules yet. Watch a process from Processes "
                            + "(shield button or context menu).")
@@ -162,7 +184,7 @@ struct FilterRulesView: View {
     }
 
     private var rulesTable: some View {
-        Table(filter.rules, sortOrder: $ruleSortOrder) {
+        Table(filter.rules, selection: $selectedRuleID, sortOrder: $ruleSortOrder) {
             TableColumn("On") { rule in
                 Toggle("", isOn: enabledBinding(rule))
                     .labelsHidden()
@@ -173,11 +195,11 @@ struct FilterRulesView: View {
             TableColumn("Process", value: \.displayName) { rule in
                 Text(rule.displayName).lineLimit(1)
             }
-            .width(min: 110, ideal: 140)
+            .width(min: 110, ideal: 130)
             TableColumn("Policy", value: \.policy.rawValue) { rule in
                 PolicyBadge(policy: rule.policy)
             }
-            .width(min: 70, ideal: 80)
+            .width(min: 60, ideal: 70)
             TableColumn("Executable", value: \.executablePath) { rule in
                 Text(rule.executablePath)
                     .font(.system(size: 10))
@@ -186,13 +208,13 @@ struct FilterRulesView: View {
                     .truncationMode(.middle)
                     .help(rule.executablePath)
             }
-            .width(min: 170, ideal: 250)
+            .width(min: 150, ideal: 200)
             TableColumn("Created", value: \.createdAt) { rule in
                 Text(rule.createdAt.formatted(date: .abbreviated, time: .shortened))
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
-            .width(min: 120, ideal: 140)
+            .width(min: 110, ideal: 125)
             TableColumn("") { rule in
                 Button(role: .destructive) {
                     rulePendingDeletion = rule
@@ -202,9 +224,17 @@ struct FilterRulesView: View {
                 .buttonStyle(.borderless)
                 .help("Delete rule")
             }
-            .width(min: 30, ideal: 34)
+            .width(min: 44, ideal: 48)
         }
         .frame(minHeight: 140)
+        .contextMenu(forSelectionType: FilterRule.ID.self) { ids in
+            if let id = ids.first,
+               let rule = filter.rules.first(where: { $0.id == id }) {
+                Button("Delete rule…", role: .destructive) {
+                    rulePendingDeletion = rule
+                }
+            }
+        }
     }
 
     private func enabledBinding(_ rule: FilterRule) -> Binding<Bool> {

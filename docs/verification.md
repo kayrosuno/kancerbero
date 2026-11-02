@@ -951,8 +951,12 @@ runtime y timestamp; que la app no lleva `get-task-allow`; que ambas firmas llev
    - Las reglas creadas con el escudo de Processes aparecen con proceso, política, ruta y un
      toggle. Desactivar una regla hace que la extensión deje de aplicarla (un flujo nuevo pasa a
      observado/permitido; con `ask` ya no sale la hoja); reactivarla restaura el comportamiento.
-   - Borrar una regla pide confirmación, la elimina junto con sus decisiones recordadas de esa
-     app y el escudo de Processes deja de marcarla.
+   - Una regla se borra de tres formas: seleccionar la fila y pulsar **Delete** en la cabecera
+     de la sección, la papelera de la propia fila o «Delete rule…» del menú contextual. Las tres
+     piden confirmación (alert con Delete/Cancel); al confirmar la regla desaparece, se borran sus
+     decisiones recordadas de esa app y el escudo de Processes deja de marcarla. Cancelar no borra
+     nada y, sin selección, el **Delete** de cabecera está deshabilitado. Tras borrar, la tabla
+     actualiza y la selección queda limpia.
    - Las decisiones `Always allow/deny` (app y app+destino) aparecen en su tabla; borrarlas hace
      que el siguiente flujo vuelva a preguntar.
    - Tras reiniciar app y extensión, reglas, flags y decisiones se conservan (la app empuja el
