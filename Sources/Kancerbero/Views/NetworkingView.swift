@@ -91,7 +91,9 @@ struct NetworkingView: View {
             onToggle: toggleFocus
         )
 
-        let network = NetworkTotalsCard(counters: model.systemCounters)
+        let statistics = NetworkStatisticsCard(rates: rates,
+                                               counters: model.systemCounters,
+                                               isLive: model.isLive)
 
         VStack(spacing: 14) {
             CollapsibleSectionHeader(
@@ -102,9 +104,9 @@ struct NetworkingView: View {
 
             if !ui.cardsCollapsed(for: .networking) {
                 HStack(alignment: .top, spacing: KBTheme.summaryGridSpacing) {
+                    statistics
+                        .frame(width: 220)
                     activityColumn
-                    network
-                        .frame(width: 160)
                     traffic
                         .frame(minWidth: 260, maxWidth: .infinity)
                 }
