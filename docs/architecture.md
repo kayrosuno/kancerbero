@@ -32,9 +32,11 @@
   **Download** (punto de color, etiqueta y tasa en las unidades del modo activo). Cada entrada
   de la leyenda alterna el foco de su dirección al pulsarla. `TrafficChart` dibuja, vía
   `MirroredBarChart`, un ecualizador espejado de barras sólidas —upload arriba, download abajo—
-  coloreadas con la escala de calor según su magnitud; escala compartida con
-  techo 1/2/5×10^n, cuadrícula, niveles y eje temporal; ventana de 120 muestras en slots fijos
+  coloreadas con la escala de calor según su magnitud; escala compartida ajustada al mayor valor
+  visible, cuadrícula, niveles y eje temporal; ventana de 120 muestras en slots fijos
   empaquetados desde la izquierda (dato más reciente en `now`, eje nominal 120 × intervalo).
+  Al pasar el ratón, una línea vertical marca la muestra bajo el cursor y un tooltip muestra su
+  antigüedad y sus tasas de upload y download.
   `KBTheme.rateHeat` colorea los valores de tasa de los cards de estadísticas según su magnitud.
   Debajo, `PillTabBar` y las tablas (`NetworkingTables.swift`). `NetworkingUIState` guarda, por un
   lado, los filtros de Connections —`transports: Set<NetworkingTransport>`, `ipVersions:
@@ -112,7 +114,9 @@
 - `CPUView`: dashboard tipo `htop`. Cuatro `SummaryCard` (CPU, load, tareas/hilos, memoria) con
   `Sparkline`; tarjeta de núcleos tipo muro ecualizador (`C1..CN`, `CoreLoadBars` sobre
   `AppModel.coreUsageHistory`, grupos Performance/Efficiency, uso y temperatura por core, y
-  temperatura de paquete IOHID). Con ancho suficiente y ≤8 cores usa una fila de columnas con
+  temperatura de paquete IOHID). Las cards CPU, GPU y Physical Memory reservan bajo el gráfico un
+  `ChartTimeAxis` con `now` a la izquierda y el intervalo visible a la derecha (`-2m` con 2 s). Con
+  ancho suficiente y ≤8 cores usa una fila de columnas con
   barritas; en ventanas estrechas o Macs con más cores cae a la rejilla de filas con medidores
   rectangulares. Uptime; tarjeta
   de memoria/swap con segmentos Active/Wired/Compressed/Cached/Free y `CapacityBar`; tabla de
@@ -130,14 +134,16 @@
   (`KBTheme.cardStripHeight`, 190 pt) van la presión con
   `MemoryPressureChart` y su explicación, la composición App/Wired/Compressed/Cached/Free
   (`SegmentedMeter` + `MeterLegend`) y el detalle Physical Memory / Memory Used / App / Wired /
-  Compressed / Cached Files, más una tarjeta de swap con `CapacityBar`. Debajo, el resto del alto,
+  Compressed / Cached Files, más una tarjeta de swap con `CapacityBar`. Presión, composición y
+  Physical Memory comparten el eje inferior `ChartTimeAxis` (`now` → `-span`). Debajo, el resto del alto,
   `MemoryProcessTable` ordena `CPUProcessRow` por memoria residente con búsqueda, selección e
   inspector. Los valores AM se derivan de `KBMemoryStats` (`appMemoryBytes`,
   `cachedFileBytes`, `activityMonitorUsedBytes`).
 - `EnergyView`: panel tipo Activity Monitor. En una franja superior fija
   (`KBTheme.cardStripHeight`, 190 pt) van la batería (`IOPowerSources`:
   carga, tiempo restante, cargando/conector), el consumo total en vatios de los procesos
-  visibles y los wake-ups inactivos, cada uno con `Sparkline` de su histórico. La card Battery
+  visibles y los wake-ups inactivos, cada uno con `Sparkline` de su histórico y un eje inferior
+  `ChartTimeAxis` (`now` → `-span`; en Battery `-12h`). La card Battery
   muestra además el gráfico de 12 h de `libsystemstats` (`BatteryChargeChart`: línea cian, bandas
   verdes del periodo en AC y rejilla discontinua) y «Time on AC/Battery» a partir de
   `battery_times`/`battery_states`. Con una sola muestra el gráfico se dibuja como línea plana
@@ -331,7 +337,8 @@
     `ri_logical_writes`), convertidos a tasas por `ProcessCPUTracker`; con daemons antiguos la app
     rellena los procesos del usuario mediante `ProcessIOReader`/`kb_process_io_read`. El gráfico
     (`DiskIOChart`) alterna Data/Operations y dibuja el mismo ecualizador de barras espejado que
-    Traffic —lecturas arriba, escrituras abajo, desde `MirroredBarChart`—; la tabla
+    Traffic —lecturas arriba, escrituras abajo, desde `MirroredBarChart`—; al pasar el ratón,
+    una línea vertical y un tooltip muestran la muestra bajo el cursor. La tabla
     (`DiskIOProcessTable`) ordena por actividad con estado, PID y usuario.
 - **Límites:** SMART no está expuesto por APIs públicas; los volúmenes desmontados no tienen
   libre/usado; los hard links se cuentan por entrada; clones/snapshots APFS hacen que la suma de

@@ -87,14 +87,19 @@ enum KBFormat {
         value.formatted()
     }
 
-    /// Compact duration for chart axes: "30s", "60s", "2m", "2m30s".
+    /// Compact duration for chart axes: "30s", "60s", "2m", "2m30s", "12h".
     static func shortDuration(_ seconds: TimeInterval) -> String {
         guard seconds.isFinite, seconds > 0 else { return "0s" }
         let total = Int(seconds.rounded())
         if total < 120 { return "\(total)s" }
         let minutes = total / 60
-        let rest = total % 60
-        return rest == 0 ? "\(minutes)m" : "\(minutes)m\(rest)s"
+        let restSeconds = total % 60
+        if minutes < 60 {
+            return restSeconds == 0 ? "\(minutes)m" : "\(minutes)m\(restSeconds)s"
+        }
+        let hours = minutes / 60
+        let restMinutes = minutes % 60
+        return restMinutes == 0 ? "\(hours)h" : "\(hours)h\(restMinutes)m"
     }
 
     static func compactCount(_ value: Int) -> String {

@@ -158,14 +158,16 @@ struct CPUView: View {
                 if let cpu {
                     VStack(alignment: .leading, spacing: 6) {
                         breakdownInlineRow(cpu)
-                        CPUHistoryChart(user: model.cpuUserHistory,
-                                        system: model.cpuSystemHistory,
-                                        nice: model.cpuNiceHistory,
-                                        userColor: userColor,
-                                        systemColor: systemColor,
-                                        niceColor: niceColor,
-                                        freeColor: idleColor)
-                            .frame(minHeight: 56, maxHeight: .infinity)
+                        ChartWithTimeAxis(span: model.interval * 60) {
+                            CPUHistoryChart(user: model.cpuUserHistory,
+                                            system: model.cpuSystemHistory,
+                                            nice: model.cpuNiceHistory,
+                                            userColor: userColor,
+                                            systemColor: systemColor,
+                                            niceColor: niceColor,
+                                            freeColor: idleColor)
+                        }
+                        .frame(minHeight: 56, maxHeight: .infinity)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 } else {
@@ -656,7 +658,9 @@ struct CPUView: View {
                      systemImage: "display",
                      tint: gpuTint) {
                 if available {
-                    Sparkline(values: model.gpuUsageHistory, tint: gpuTint)
+                    ChartWithTimeAxis(span: model.interval * 60) {
+                        Sparkline(values: model.gpuUsageHistory, tint: gpuTint)
+                    }
                 } else {
                     Color.clear
                 }

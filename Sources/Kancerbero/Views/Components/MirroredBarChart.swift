@@ -2,26 +2,26 @@ import SwiftUI
 
 /// Mirrored bar history shared by the traffic and disk activity charts.
 /// `top` bars grow above the centre line and `bottom` below it, packed from the
-/// left in fixed 120-sample slots on a shared, rounded scale. Each bar is a
-/// solid heat colour, so height and hue both show magnitude. Grid, level labels
-/// and the time axis complete the chart.
+/// left in fixed 120-sample slots on a shared scale that tracks the largest
+/// visible sample. Each bar is a solid heat colour, so height and hue both show
+/// magnitude. Grid, level labels and the time axis complete the chart.
 struct MirroredBarChart: View {
     var top: [Double]
     var bottom: [Double]
     var format: (Double) -> String
     var topTint: Color
     var bottomTint: Color
+    var topLabel: String
+    var bottomLabel: String
     var topOpacity: Double = 1
     var bottomOpacity: Double = 1
-    /// Multiplier that converts stored values into display units before
-    /// rounding the ceiling (8 for bit rates, 1 for byte/packet rates).
-    var labelScale: Double = 1
     var fallbackCeiling: Double = 1
     var sampleInterval: TimeInterval = 1
     var accessibilityLabel: String
     var accessibilityValue: String
 
     @Environment(\.colorScheme) private var colorScheme
+    @State private var hover: HoverSlot?
 
     static let window = 120
     private static let axisHeight: CGFloat = 14
@@ -29,12 +29,38 @@ struct MirroredBarChart: View {
     private static let rightInset: CGFloat = 1
     private static let verticalInset: CGFloat = 8
     private static let seriesInset: CGFloat = 2
+    private static let tooltipWidth: CGFloat = 150
+
+    private struct HoverSlot: Equatable {
+        var index: Int
+        var lineX: CGFloat
+    }
 
     var body: some View {
-        Canvas { context, size in
-            draw(context: &context, size: size)
+        GeometryReader { proxy in
+            ZStack(alignment: .topLeading) {
+                Canvas { context, size in
+                    draw(context: &context, size: size, hover: hover)
+                }
+                .frame(width: proxy.size.width, height: proxy.size.height)
+
+                if let hover {
+                    tooltip(hover)
+                        .offset(x: tooltipOriginX(for: hover, width: proxy.size.width),
+                                y: 4)
+                }
+            }
+            .contentShape(Rectangle())
+            .onContinuousHover(coordinateSpace: .local) { phase in
+                switch phase {
+                case .active(let location):
+                    let next = hoverSlot(at: location, size: proxy.size)
+                    if next != hover { hover = next }
+                case .ended:
+                    hover = nil
+                }
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(accessibilityValue)
@@ -45,28 +71,32 @@ struct MirroredBarChart: View {
         max(sampleInterval, 0.1) * Double(Self.window)
     }
 
-    private func draw(context: inout GraphicsContext, size: CGSize) {
+    private func plotRect(in size: CGSize) -> CGRect {
+        let plotHeight = max(size.height - Self.axisHeight, 1)
+        return CGRect(
+            x: Self.gutter,
+            y: 0,
+            width: max(size.width - Self.gutter - Self.rightInset, 1),
+            height: plotHeight
+        )
+    }
+
+    private func draw(context: inout GraphicsContext, size: CGSize,
+                      hover: HoverSlot?) {
         let width = size.width
         let height = size.height
         guard width > 0, height > 0 else { return }
 
-        let plotHeight = max(height - Self.axisHeight, 1)
-        let plot = CGRect(
-            x: Self.gutter,
-            y: 0,
-            width: max(width - Self.gutter - Self.rightInset, 1),
-            height: plotHeight
-        )
+        let plot = plotRect(in: size)
         let midY = plot.midY
         let half = max(plot.height / 2 - Self.verticalInset, 1)
 
         let topValues = sanitized(top)
         let bottomValues = sanitized(bottom)
         let peak = max(topValues.max() ?? 0, bottomValues.max() ?? 0)
-        let scale = max(labelScale, 0.0001)
-        let ceilingValue = peak > 0
-            ? Self.niceCeiling(peak * scale) / scale
-            : fallbackCeiling
+        // Scale to the largest sample currently on screen, so the tallest
+        // visible bar always reaches the top of the plot.
+        let ceilingValue = peak > 0 ? peak : fallbackCeiling
 
         drawGrid(context: &context, plot: plot, midY: midY, half: half)
         drawBars(values: topValues, ceiling: ceilingValue, plot: plot,
@@ -79,6 +109,109 @@ struct MirroredBarChart: View {
         drawLevelLabels(context: &context, midY: midY, half: half,
                         ceiling: ceilingValue)
         drawTimeAxis(context: &context, plot: plot)
+        drawHoverMarker(context: &context, plot: plot, hover: hover)
+    }
+
+    // MARK: - Hover
+
+    private func hoverSlot(at point: CGPoint, size: CGSize) -> HoverSlot? {
+        let plot = plotRect(in: size)
+        guard plot.contains(point) else { return nil }
+
+        let count = max(sanitized(top).count, sanitized(bottom).count)
+        guard count > 0 else { return nil }
+
+        let startX = plot.minX + Self.seriesInset
+        let usable = max(plot.width - 2 * Self.seriesInset, 1)
+        let slot = usable / CGFloat(Self.window)
+        let raw = (point.x - startX) / slot
+        guard raw >= 0 else { return nil }
+
+        let index = Int(raw)
+        guard index < count else { return nil }
+
+        return HoverSlot(index: index,
+                         lineX: startX + (CGFloat(index) + 0.5) * slot)
+    }
+
+    /// The newest sample sits in the leftmost slot, so `slot` counts back
+    /// from the end of the chronological history.
+    private func sample(at slot: Int, in values: [Double]) -> Double? {
+        let position = values.count - 1 - slot
+        guard values.indices.contains(position) else { return nil }
+        return values[position]
+    }
+
+    private func drawHoverMarker(context: inout GraphicsContext, plot: CGRect,
+                                 hover: HoverSlot?) {
+        guard let hover else { return }
+        var path = Path()
+        path.move(to: CGPoint(x: hover.lineX, y: plot.minY))
+        path.addLine(to: CGPoint(x: hover.lineX, y: plot.maxY))
+        context.stroke(
+            path,
+            with: .color(.primary.opacity(colorScheme == .dark ? 0.5 : 0.35)),
+            lineWidth: 1
+        )
+    }
+
+    private func tooltipOriginX(for hover: HoverSlot, width: CGFloat) -> CGFloat {
+        let half = Self.tooltipWidth / 2
+        return min(max(hover.lineX - half, 2),
+                   max(width - Self.tooltipWidth - 2, 2))
+    }
+
+    private func tooltip(_ hover: HoverSlot) -> some View {
+        let topValues = sanitized(top)
+        let bottomValues = sanitized(bottom)
+        let topValue = sample(at: hover.index, in: topValues).map(format) ?? "—"
+        let bottomValue = sample(at: hover.index, in: bottomValues).map(format) ?? "—"
+        let elapsed = Double(hover.index) * max(sampleInterval, 0.1)
+        let time = hover.index == 0
+            ? "now"
+            : "-" + KBFormat.shortDuration(elapsed)
+
+        return VStack(alignment: .leading, spacing: 2) {
+            Text(time)
+                .font(.system(size: 8, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            tooltipRow(label: topLabel, value: topValue, tint: topTint)
+            tooltipRow(label: bottomLabel, value: bottomValue, tint: bottomTint)
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 5)
+        .frame(width: Self.tooltipWidth, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .opacity(0.55)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(.quaternary.opacity(0.6), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func tooltipRow(label: String, value: String, tint: Color) -> some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(tint)
+                .frame(width: 5, height: 5)
+            Text(label)
+                .font(.system(size: 8.5))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            Text(value)
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
     }
 
     // MARK: - Grid and axes
@@ -221,25 +354,5 @@ struct MirroredBarChart: View {
 
     private func sanitized(_ values: [Double]) -> [Double] {
         Array(values.suffix(Self.window)).map { $0.isFinite ? max($0, 0) : 0 }
-    }
-
-    /// 1/2/5 × 10^n in the mode's display units, so labels stay stable as
-    /// samples change.
-    private static func niceCeiling(_ value: Double) -> Double {
-        guard value.isFinite, value > 0 else { return 1 }
-        let exponent = floor(log10(value))
-        let magnitude = pow(10.0, exponent)
-        let fraction = value / magnitude
-        let nice: Double
-        if fraction <= 1.0001 {
-            nice = 1
-        } else if fraction <= 2 {
-            nice = 2
-        } else if fraction <= 5 {
-            nice = 5
-        } else {
-            nice = 10
-        }
-        return nice * magnitude
     }
 }

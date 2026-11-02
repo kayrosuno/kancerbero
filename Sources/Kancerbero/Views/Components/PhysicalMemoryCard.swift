@@ -50,10 +50,12 @@ struct PhysicalMemoryCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 if model.memoryUsageHistory.count > 1 {
-                    Sparkline(values: model.memoryUsageHistory,
-                              tint: tint,
-                              scale: 100)
-                        .frame(maxHeight: .infinity)
+                    ChartWithTimeAxis(span: model.interval * 60) {
+                        Sparkline(values: model.memoryUsageHistory,
+                                  tint: tint,
+                                  scale: 100)
+                    }
+                    .frame(maxHeight: .infinity)
                 } else {
                     Text("Collecting…")
                         .font(.system(size: 9))

@@ -43,6 +43,8 @@ struct DiskIOChart: View {
             format: mode.format,
             topTint: readColor,
             bottomTint: writeColor,
+            topLabel: "Read",
+            bottomLabel: "Write",
             fallbackCeiling: mode == .data ? 1_048_576 : 10,
             sampleInterval: sampleInterval,
             accessibilityLabel: "Disk activity",
