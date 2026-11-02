@@ -57,6 +57,7 @@ struct DiskVolumesView: View {
     private var cards: some View {
         let inventory = disk.inventory
         let disks = DiskMetrics.physicalDiskCount(inventory)
+        let containers = DiskMetrics.apfsContainerCount(inventory)
         let volumes = DiskMetrics.mountedVolumeCount(inventory)
         let capacity = DiskMetrics.capacityBytes(inventory)
         let free = DiskMetrics.freeBytes(inventory)
@@ -82,6 +83,16 @@ struct DiskVolumesView: View {
                 action: { toggleFocus(.disks) },
                 isSelected: ui.disk.volumesFocus == .disks,
                 filterHint: "Show only top-level media"
+            )
+            SummaryCard(
+                title: "Containers",
+                value: "\(containers)",
+                caption: "APFS containers",
+                systemImage: "square.stack.3d.up",
+                tint: Color(red: 0.85, green: 0.65, blue: 0.20),
+                action: { toggleFocus(.containers) },
+                isSelected: ui.disk.volumesFocus == .containers,
+                filterHint: "Show only APFS containers"
             )
             SummaryCard(
                 title: "Volumes",
@@ -194,6 +205,11 @@ struct DiskVolumesView: View {
         switch focus {
         case .disks:
             return inventory.items.map { VisibleRow(item: $0, depth: 0) }
+        case .containers:
+            return inventory.allItems
+                .filter { $0.kind == .apfsContainer }
+                .sorted { $0.sizeBytes > $1.sizeBytes }
+                .map { VisibleRow(item: $0, depth: 0) }
         case .volumes:
             return inventory.mountedVolumes
                 .sorted { $0.sizeBytes > $1.sizeBytes }

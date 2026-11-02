@@ -35,4 +35,8 @@ enum DiskMetrics {
     static func mountedVolumeCount(_ inventory: KBDiskInventorySnapshot?) -> Int {
         inventory?.mountedVolumes.count ?? 0
     }
+
+    static func apfsContainerCount(_ inventory: KBDiskInventorySnapshot?) -> Int {
+        inventory?.allItems.filter { $0.kind == .apfsContainer }.count ?? 0
+    }
 }

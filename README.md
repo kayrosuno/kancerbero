@@ -88,8 +88,9 @@ El detalle de binarios, permisos, instalación y librerías está en
   - **Volumes** — jerarquía nativa de discos físicos, particiones, contenedores APFS y volúmenes
     (IOKit + DiskArbitration + `getmntinfo`/`getattrlist`), con capacidad, usado, libre, punto de
     montaje, UUID, roles APFS, modelo/protocolo y cifrado. No ejecuta procesos externos. Las
-    tarjetas All / Disks / Volumes / Capacity / Free filtran la lista (vista completa, medios,
-    volúmenes montados, orden por tamaño o por menos espacio libre); All restaura el árbol
+    tarjetas All / Disks / Containers / Volumes / Capacity / Free filtran la lista (vista
+    completa, medios, contenedores APFS, volúmenes montados, orden por tamaño o por menos espacio
+    libre); All restaura el árbol
     completo expandido. Al seleccionar un disco, contenedor o volumen APFS, el panel de detalle
     muestra un donut con el número de contenedores y el espacio de cada uno (o el desglose de
     volúmenes, snapshots/metadatos y libre). El selector **Decimal/Binary** de la línea de
@@ -293,7 +294,7 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--networking-process-ip ipv4|ipv6[,..]|all] \
   [--networking-process-protocol tcp|udp|icmp|icmpv6|sctp|gre|esp|raw|other[,..]|all] \
   [--networking-process-socket stream|dgram|raw|seqpacket|other[,..]|all] \
-  [--volumes-focus disks|volumes|capacity|free] \
+  [--volumes-focus disks|containers|volumes|capacity|free] \
   [--analyzer-focus scanned|files|folders|denied] \
   [--daemon-type all|agent|daemon[,..]] \
   [--daemon-scope system|global|user|runtime[,..]] \

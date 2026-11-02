@@ -112,8 +112,8 @@
   disco → partición → contenedor APFS → volumen, un inspector y `CapacityBar`; Analyzer muestra
   controles de escaneo, progreso, `RadialDiskMap` y las tablas de contenidos y mayores archivos;
   I/O muestra el gráfico Data/Operations y la tabla de procesos por actividad de disco.
-  Las tarjetas de ambas subpestañas filtran el contenido (medios/volúmenes/orden por tamaño o
-  espacio libre; todo/ficheros/carpetas/denegados).
+  Las tarjetas de ambas subpestañas filtran el contenido (medios/contenedores APFS/volúmenes/
+  orden por tamaño o espacio libre; todo/ficheros/carpetas/denegados).
 - `DaemonsView`: inventario launchd deduplicado por label (`DaemonDeduplicator`). Los filtros de
   tipo, ámbito, origen y estado son chips multiselección (`MultiSelectChipBar`): todos los valores
   están pulsados al arrancar, se muestran las filas de los valores pulsados y un grupo sin nada
