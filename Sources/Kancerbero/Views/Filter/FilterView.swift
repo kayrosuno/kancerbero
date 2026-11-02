@@ -114,13 +114,15 @@ struct FilterView: View {
                      : "Deny every new connection from every process. Applies only while the filter extension is running.")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(2)
                 if active && !filter.controller.state.isEnabled {
                     Text("The filter is off — blocking starts when you enable it.")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.orange)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
 
             Spacer(minLength: 8)
 
