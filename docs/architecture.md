@@ -19,13 +19,13 @@
 - `SidebarView`: selección propia con `matchedGeometryEffect` para Networking / Disk / Daemons /
   CPU / Memory / Energy / Applications; cabecera con marca y estado live, engranaje de Settings
   sobre el separador de estado y pie con fuente (daemon/local), privcheck y hora.
-- `NetworkingView`: franja superior como un único `HStack` sin `ViewThatFits`: columna
-  `ActivityCard` (procesos con sockets, conexiones totales y conexiones activas dentro de la
-  ventana configurada —10 s por defecto—, las dos últimas como filtro todas/activas) +
-  `ProtocolCard`, `NetworkTotalsCard` fijo y
-  `TrafficCard` con mínimo 260. Network siempre queda en la franja. `NetworkTotalsCard` recibe
-  solo contadores: dos grupos apilados y sombreados, **Bytes** encima de **Packets**, cada uno
-  con filas Input/Output y su total acumulado. `TrafficCard` recibe las tasas y usa
+- `NetworkingView`: franja superior como un único `HStack` sin `ViewThatFits`: primero
+  `NetworkStatisticsCard` fijo de 220 pt (tasas Download/Upload en bits/s con pkt/s como
+  subtítulo y, bajo un separador, totales acumulados de bytes y paquetes In/Out), después la
+  columna `ActivityCard` (procesos con sockets, conexiones totales y conexiones activas dentro
+  de la ventana configurada —10 s por defecto—, las dos últimas como filtro todas/activas) +
+  `ProtocolCard`, y por último `TrafficCard` con mínimo 260. Network siempre queda en la
+  franja. `TrafficCard` recibe las tasas y usa
   `TrafficModeSelector` (glass en macOS 26+, `Picker` segmentado nativo en versiones anteriores)
   a la derecha de una cabecera con dos grupos de tasas, **Bytes** y **Packets**, ambos visibles;
   el grupo del modo activo se resalta y el otro queda atenuado. Cada tasa es un botón que alterna

@@ -5,6 +5,9 @@ import KancerberoCore
 struct DiskIOView: View {
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    @State private var statsHovering = false
 
     private let readTint = Color(red: 0.94, green: 0.56, blue: 0.18)
     private let writeTint = KBTheme.uploadTint
@@ -14,7 +17,7 @@ struct DiskIOView: View {
             if !ui.cardsCollapsed(for: .disk) {
                 HStack(alignment: .top, spacing: 14) {
                     statsCard
-                        .frame(width: 240)
+                        .frame(width: 200)
                     activityCard
                         .frame(maxWidth: .infinity)
                 }
@@ -140,69 +143,205 @@ struct DiskIOView: View {
         }
     }
 
+    // MARK: - Statistics card
+
     private var statsCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                cardIcon("chart.bar.fill",
-                         fill: KBTheme.gradient(KBTheme.downloadTint))
-                Text("Disk statistics")
-                    .font(.system(size: 12, weight: .semibold))
-                Spacer()
-            }
-
-            LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading),
-                                GridItem(.flexible(), alignment: .leading)],
-                      alignment: .leading,
-                      spacing: 10) {
-                metric("Reads in/sec", KBFormat.opsRate(model.diskReadOpsRate))
-                metric("Writes out/sec", KBFormat.opsRate(model.diskWriteOpsRate))
-                metric("Data read/sec", KBFormat.byteRate(model.diskReadRate))
-                metric("Data written/sec", KBFormat.byteRate(model.diskWriteRate))
-                metric("Reads in", model.diskReadOperationsTotal.formatted())
-                metric("Writes out", model.diskWriteOperationsTotal.formatted())
-                metric("Data read", KBFormat.bytes(model.diskReadTotalBytes))
-                metric("Data written", KBFormat.bytes(model.diskWriteTotalBytes))
-            }
-
-            Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: 6) {
+            statsHeader
+            heroRows
+            Spacer(minLength: 4)
+            Rectangle()
+                .fill(.quaternary.opacity(0.5))
+                .frame(height: 1)
+            totalsFooter
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
             RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
                 .fill(.regularMaterial)
+            RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
+                .fill(LinearGradient(
+                    colors: [readTint.opacity(0.09), writeTint.opacity(0.05), .clear],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing))
         }
         .overlay {
             RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
-                .strokeBorder(.quaternary.opacity(0.5), lineWidth: 1)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [readTint.opacity(statsHovering ? 0.55 : 0.30),
+                                 writeTint.opacity(statsHovering ? 0.55 : 0.30)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing),
+                    lineWidth: statsHovering ? 1.5 : 1)
+        }
+        .shadow(color: .black.opacity(statsHovering ? 0.16 : 0.06),
+                radius: statsHovering ? 12 : 10,
+                y: statsHovering ? 5 : 4)
+        .contentShape(RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous))
+        .onHover { hovering in
+            guard !reduceMotion else { return }
+            withAnimation(.snappy(duration: 0.2)) { statsHovering = hovering }
+        }
+        .accessibilityElement(children: .contain)
+        .help("Read/write throughput over the last 60 samples; cumulative totals since boot.")
+    }
+
+    private var statsHeader: some View {
+        HStack(spacing: 6) {
+            cardIcon("chart.bar.fill",
+                     fill: LinearGradient(colors: [readTint, writeTint],
+                                          startPoint: .topLeading,
+                                          endPoint: .bottomTrailing))
+            Text("Disk statistics")
+                .font(.system(size: 12, weight: .semibold))
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            LiveDot(isLive: model.isLive)
+                .accessibilityHidden(true)
+            Text(model.isLive ? "live" : "paused")
+                .font(.system(size: 8, weight: .medium))
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+        }
+        .frame(height: 20)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Disk statistics")
+        .accessibilityValue(model.isLive ? "Live" : "Paused")
+    }
+
+    private var heroRows: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            throughputRow(title: "Read rate",
+                          systemImage: "arrow.down",
+                          bytesPerSecond: model.diskReadRate,
+                          opsPerSecond: model.diskReadOpsRate,
+                          tint: readTint)
+            throughputRow(title: "Write rate",
+                          systemImage: "arrow.up",
+                          bytesPerSecond: model.diskWriteRate,
+                          opsPerSecond: model.diskWriteOpsRate,
+                          tint: writeTint)
         }
     }
 
-    private func cardIcon(_ systemImage: String, fill: LinearGradient) -> some View {
+    private func throughputRow(title: String,
+                               systemImage: String,
+                               bytesPerSecond: Double,
+                               opsPerSecond: Double,
+                               tint: Color) -> some View {
+        let rate = KBFormat.byteRate(bytesPerSecond)
+        let ops = KBFormat.opsRate(opsPerSecond)
+        return HStack(spacing: 8) {
+            cardIcon(systemImage,
+                     fill: KBTheme.gradient(tint),
+                     size: 24, cornerRadius: 7, glyphSize: 11)
+
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text("ops \(ops)")
+                        .font(.system(size: 9, weight: .medium, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Spacer(minLength: 0)
+                }
+                Text(rate)
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .contentTransition(numericTransition)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue("\(rate), \(ops) operations per second")
+        .help("\(title): \(rate) · \(ops) ops/s")
+    }
+
+    private var totalsFooter: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 10) {
+                totalMetric("Reads in",
+                            value: KBFormat.compactTotal(model.diskReadOperationsTotal),
+                            exact: "\(KBFormat.count(model.diskReadOperationsTotal)) operations",
+                            icon: "arrow.down.to.line",
+                            tint: readTint)
+                totalMetric("Writes out",
+                            value: KBFormat.compactTotal(model.diskWriteOperationsTotal),
+                            exact: "\(KBFormat.count(model.diskWriteOperationsTotal)) operations",
+                            icon: "arrow.up.to.line",
+                            tint: writeTint)
+            }
+            HStack(spacing: 10) {
+                totalMetric("Data read",
+                            value: KBFormat.totalBytes(model.diskReadTotalBytes),
+                            exact: KBFormat.bytes(model.diskReadTotalBytes),
+                            icon: "internaldrive",
+                            tint: readTint)
+                totalMetric("Data written",
+                            value: KBFormat.totalBytes(model.diskWriteTotalBytes),
+                            exact: KBFormat.bytes(model.diskWriteTotalBytes),
+                            icon: "internaldrive",
+                            tint: writeTint)
+            }
+        }
+    }
+
+    private func totalMetric(_ label: String, value: String, exact: String,
+                             icon: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 3) {
+                Image(systemName: icon)
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(tint)
+                Text(label)
+                    .font(.system(size: 8.5, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            Text(value)
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .contentTransition(numericTransition)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue("\(exact) since boot")
+        .help("\(label): \(exact)")
+    }
+
+    // MARK: - Helpers
+
+    private var numericTransition: ContentTransition {
+        reduceMotion ? .identity : .numericText()
+    }
+
+    private func cardIcon(_ systemImage: String,
+                          fill: LinearGradient,
+                          size: CGFloat = 18,
+                          cornerRadius: CGFloat = 5,
+                          glyphSize: CGFloat = 9) -> some View {
         Image(systemName: systemImage)
-            .font(.system(size: 9, weight: .semibold))
+            .font(.system(size: glyphSize, weight: .semibold))
             .foregroundStyle(.white)
-            .frame(width: 18, height: 18)
+            .frame(width: size, height: size)
             .background {
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(fill)
             }
             .accessibilityHidden(true)
-    }
-
-    private func metric(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(label)
-                .font(.system(size: 9))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-            Text(value)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
     }
 
     private var processCard: some View {
