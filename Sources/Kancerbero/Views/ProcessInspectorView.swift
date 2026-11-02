@@ -5,6 +5,7 @@ struct ProcessInspectorView: View {
     let process: KBProcessInfo
 
     @Environment(AppModel.self) private var model
+    @Environment(\.byteUnitSystem) private var byteUnitSystem
     @Environment(\.dismiss) private var dismiss
     @State private var detail: KBProcessDetail?
     @State private var errorMessage: String?
@@ -92,7 +93,10 @@ struct ProcessInspectorView: View {
             TableColumn("Type") { item in Text(item.type) }
                 .width(min: 100, ideal: 130)
             TableColumn("Size") { item in
-                Text(item.size > 0 ? KBFormat.bytes(UInt64(clamping: item.size)) : "—")
+                Text(item.size > 0
+                     ? KBFormat.bytes(UInt64(clamping: item.size),
+                                      units: byteUnitSystem)
+                     : "—")
                     .monospacedDigit()
             }
             .width(min: 80, ideal: 100)

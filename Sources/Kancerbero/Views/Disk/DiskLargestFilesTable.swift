@@ -6,6 +6,7 @@ struct DiskLargestFilesTable: View {
     let files: [KBDiskFile]
 
     @State private var selection: String?
+    @Environment(\.byteUnitSystem) private var byteUnitSystem
 
     var body: some View {
         VStack(spacing: 0) {
@@ -50,7 +51,7 @@ struct DiskLargestFilesTable: View {
                     .width(min: 140, ideal: 190)
 
                     TableColumn("Size") { file in
-                        Text(KBFormat.bytes(file.allocatedBytes))
+                        Text(KBFormat.bytes(file.allocatedBytes, units: byteUnitSystem))
                             .font(.system(size: 10, weight: .medium))
                             .monospacedDigit()
                     }

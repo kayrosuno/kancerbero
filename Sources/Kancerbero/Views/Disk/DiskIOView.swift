@@ -7,6 +7,7 @@ struct DiskIOView: View {
     @Environment(UIState.self) private var ui
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.byteUnitSystem) private var byteUnitSystem
 
     @State private var statsHovering = false
 
@@ -49,7 +50,8 @@ struct DiskIOView: View {
                         write: isData ? model.diskWriteHistory : model.diskWriteOpsHistory,
                         readColor: readTint,
                         writeColor: writeTint,
-                        sampleInterval: model.interval)
+                        sampleInterval: model.interval,
+                        units: byteUnitSystem)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(12)
@@ -116,11 +118,11 @@ struct DiskIOView: View {
     private func legendEntries(isData: Bool) -> some View {
         HStack(spacing: 14) {
             legend("Read", value: isData
-                   ? KBFormat.byteRate(model.diskReadRate)
+                   ? KBFormat.byteRate(model.diskReadRate, units: byteUnitSystem)
                    : KBFormat.opsRate(model.diskReadOpsRate),
                    color: readTint)
             legend("Write", value: isData
-                   ? KBFormat.byteRate(model.diskWriteRate)
+                   ? KBFormat.byteRate(model.diskWriteRate, units: byteUnitSystem)
                    : KBFormat.opsRate(model.diskWriteOpsRate),
                    color: writeTint)
         }
@@ -233,7 +235,7 @@ struct DiskIOView: View {
                                bytesPerSecond: Double,
                                opsPerSecond: Double,
                                tint: Color) -> some View {
-        let rate = KBFormat.byteRate(bytesPerSecond)
+        let rate = KBFormat.byteRate(bytesPerSecond, units: byteUnitSystem)
         let ops = KBFormat.opsRate(opsPerSecond)
         return HStack(spacing: 8) {
             cardIcon(systemImage,
@@ -285,13 +287,17 @@ struct DiskIOView: View {
             }
             HStack(spacing: 10) {
                 totalMetric("Data read",
-                            value: KBFormat.totalBytes(model.diskReadTotalBytes),
-                            exact: KBFormat.bytes(model.diskReadTotalBytes),
+                            value: KBFormat.totalBytes(model.diskReadTotalBytes,
+                                                       units: byteUnitSystem),
+                            exact: KBFormat.bytes(model.diskReadTotalBytes,
+                                                  units: byteUnitSystem),
                             icon: "internaldrive",
                             tint: readTint)
                 totalMetric("Data written",
-                            value: KBFormat.totalBytes(model.diskWriteTotalBytes),
-                            exact: KBFormat.bytes(model.diskWriteTotalBytes),
+                            value: KBFormat.totalBytes(model.diskWriteTotalBytes,
+                                                       units: byteUnitSystem),
+                            exact: KBFormat.bytes(model.diskWriteTotalBytes,
+                                                  units: byteUnitSystem),
                             icon: "internaldrive",
                             tint: writeTint)
             }

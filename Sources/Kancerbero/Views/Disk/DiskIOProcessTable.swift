@@ -8,6 +8,7 @@ struct DiskIOProcessTable: View {
 
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
+    @Environment(\.byteUnitSystem) private var byteUnitSystem
     @State private var inspected: KBProcessInfo?
 
     private var selection: Binding<KBProcessKey?> {
@@ -139,7 +140,7 @@ struct DiskIOProcessTable: View {
     private var readRateColumn: some TableColumnContent<CPUProcessRow,
                                                         KeyPathComparator<CPUProcessRow>> {
         TableColumn("Read/s", value: \.diskReadSortValue) { row in
-            Text(row.diskReadRateText)
+            Text(row.diskReadRateText(units: byteUnitSystem))
                 .monospacedDigit()
         }
         .width(min: 75, ideal: 90)
@@ -148,7 +149,7 @@ struct DiskIOProcessTable: View {
     private var writeRateColumn: some TableColumnContent<CPUProcessRow,
                                                          KeyPathComparator<CPUProcessRow>> {
         TableColumn("Write/s", value: \.diskWriteSortValue) { row in
-            Text(row.diskWriteRateText)
+            Text(row.diskWriteRateText(units: byteUnitSystem))
                 .monospacedDigit()
         }
         .width(min: 75, ideal: 90)
@@ -157,7 +158,7 @@ struct DiskIOProcessTable: View {
     private var bytesReadColumn: some TableColumnContent<CPUProcessRow,
                                                          KeyPathComparator<CPUProcessRow>> {
         TableColumn("Bytes Read", value: \.diskBytesReadSortValue) { row in
-            Text(row.diskBytesReadText)
+            Text(row.diskBytesReadText(units: byteUnitSystem))
                 .monospacedDigit()
                 .help("Cumulative bytes read by this process")
         }
@@ -167,7 +168,7 @@ struct DiskIOProcessTable: View {
     private var bytesWrittenColumn: some TableColumnContent<CPUProcessRow,
                                                             KeyPathComparator<CPUProcessRow>> {
         TableColumn("Bytes Written", value: \.diskBytesWrittenSortValue) { row in
-            Text(row.diskBytesWrittenText)
+            Text(row.diskBytesWrittenText(units: byteUnitSystem))
                 .monospacedDigit()
                 .help("Cumulative bytes written by this process")
         }

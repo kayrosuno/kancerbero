@@ -11,6 +11,32 @@ enum KBFormat {
         bytes(UInt64(max(0, value)))
     }
 
+    /// Byte size in the requested unit system: decimal KB/MB/GB (1000) or
+    /// binary KiB/MiB/GiB (1024).
+    static func bytes(_ value: UInt64, units: KBByteUnitSystem) -> String {
+        guard value > 0 else { return "0 B" }
+        var scaled = Double(value)
+        var unit = 0
+        let names = units.units
+        while scaled >= units.base * 0.99995, unit < names.count - 1 {
+            scaled /= units.base
+            unit += 1
+        }
+        let number = scaled.formatted(.number.precision(.fractionLength(0...1)))
+        return "\(number) \(names[unit])"
+    }
+
+    static func totalBytes(_ value: UInt64, units: KBByteUnitSystem) -> String {
+        value == 0 ? "0 B" : bytes(value, units: units)
+    }
+
+    static func byteRate(_ bytesPerSecond: Double,
+                         units: KBByteUnitSystem) -> String {
+        guard bytesPerSecond.isFinite, bytesPerSecond >= 1 else { return "0 B/s" }
+        let value = UInt64(max(0, min(bytesPerSecond, Double(UInt64.max))))
+        return bytes(value, units: units) + "/s"
+    }
+
     /// Bytes per second -> human-readable decimal bit rate (1 Kbps = 1000 bps).
     static func bitRate(_ bytesPerSecond: Double) -> String {
         guard bytesPerSecond.isFinite, bytesPerSecond > 0 else { return "0 bps" }

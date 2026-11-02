@@ -86,22 +86,22 @@ struct CPUProcessRow: Identifiable, Hashable {
         preventingSleep ? "Yes" : "—"
     }
 
-    var diskReadRateText: String {
-        diskReadRate.map { KBFormat.byteRate($0) } ?? "—"
+    func diskReadRateText(units: KBByteUnitSystem) -> String {
+        diskReadRate.map { KBFormat.byteRate($0, units: units) } ?? "—"
     }
 
-    var diskWriteRateText: String {
-        diskWriteRate.map { KBFormat.byteRate($0) } ?? "—"
+    func diskWriteRateText(units: KBByteUnitSystem) -> String {
+        diskWriteRate.map { KBFormat.byteRate($0, units: units) } ?? "—"
     }
 
-    var diskBytesReadText: String {
+    func diskBytesReadText(units: KBByteUnitSystem) -> String {
         guard let diskBytesRead else { return "—" }
-        return diskBytesRead == 0 ? "0 B" : KBFormat.bytes(diskBytesRead)
+        return KBFormat.bytes(diskBytesRead, units: units)
     }
 
-    var diskBytesWrittenText: String {
+    func diskBytesWrittenText(units: KBByteUnitSystem) -> String {
         guard let diskBytesWritten else { return "—" }
-        return diskBytesWritten == 0 ? "0 B" : KBFormat.bytes(diskBytesWritten)
+        return KBFormat.bytes(diskBytesWritten, units: units)
     }
 
     var logicalWritesText: String {

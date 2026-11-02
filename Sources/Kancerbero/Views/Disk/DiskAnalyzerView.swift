@@ -6,6 +6,7 @@ struct DiskAnalyzerView: View {
     @Environment(DiskModel.self) private var disk
     @Environment(UIState.self) private var ui
     @Environment(AppModel.self) private var appModel
+    @Environment(\.byteUnitSystem) private var byteUnitSystem
 
     private var pathDraft: Binding<String> {
         Binding(
@@ -120,7 +121,7 @@ struct DiskAnalyzerView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 if let progress = disk.scanProgress {
-                    Text("\(KBFormat.compactCount(progress.files)) files · \(KBFormat.compactCount(progress.folders)) folders · \(KBFormat.bytes(progress.bytes)) · \(String(format: "%.1f", progress.elapsed))s")
+                    Text("\(KBFormat.compactCount(progress.files)) files · \(KBFormat.compactCount(progress.folders)) folders · \(KBFormat.bytes(progress.bytes, units: byteUnitSystem)) · \(String(format: "%.1f", progress.elapsed))s")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
@@ -152,7 +153,7 @@ struct DiskAnalyzerView: View {
                   spacing: KBTheme.summaryGridSpacing) {
             SummaryCard(
                 title: "Scanned",
-                value: KBFormat.bytes(snapshot.root.allocatedBytes),
+                value: KBFormat.bytes(snapshot.root.allocatedBytes, units: byteUnitSystem),
                 caption: snapshot.isPartial
                     ? "scanning…"
                     : String(format: "%.2f s", snapshot.duration),
@@ -267,7 +268,7 @@ struct DiskAnalyzerView: View {
             Spacer(minLength: 6)
 
             if let node = disk.currentNode {
-                Text("\(KBFormat.compactCount(node.fileCount)) files · \(KBFormat.bytes(node.allocatedBytes))")
+                Text("\(KBFormat.compactCount(node.fileCount)) files · \(KBFormat.bytes(node.allocatedBytes, units: byteUnitSystem))")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .monospacedDigit()

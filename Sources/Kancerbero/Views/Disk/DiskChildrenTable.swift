@@ -10,6 +10,7 @@ struct DiskChildrenTable: View {
     let onSelect: (KBDiskNode) -> Void
 
     @State private var selection: String?
+    @Environment(\.byteUnitSystem) private var byteUnitSystem
 
     private var rows: [KBDiskNode] {
         node.children
@@ -82,7 +83,7 @@ struct DiskChildrenTable: View {
                     .width(min: 110, ideal: 160)
 
                     TableColumn("Size") { child in
-                        Text(KBFormat.bytes(child.allocatedBytes))
+                        Text(KBFormat.bytes(child.allocatedBytes, units: byteUnitSystem))
                             .font(.system(size: 10, weight: .medium))
                             .monospacedDigit()
                     }

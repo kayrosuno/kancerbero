@@ -6,7 +6,22 @@ struct DiskView: View {
     @Environment(DiskModel.self) private var disk
     @AppStorage(KBPreferences.tabAnimationsKey)
     private var tabAnimations = KBPreferences.tabAnimationsDefault
+    @AppStorage(KBPreferences.diskUnitSystemKey)
+    private var storedUnitSystem = KBPreferences.diskUnitSystemDefault
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var unitSystem: KBByteUnitSystem {
+        KBByteUnitSystem.fromCommandLine()
+            ?? KBByteUnitSystem(rawValue: storedUnitSystem)
+            ?? .decimal
+    }
+
+    private var unitSystemBinding: Binding<KBByteUnitSystem> {
+        Binding(
+            get: { unitSystem },
+            set: { storedUnitSystem = $0.rawValue }
+        )
+    }
 
     private var pillAnimation: Animation? {
         KBPreferences.tabAnimation(stored: tabAnimations,
@@ -30,6 +45,13 @@ struct DiskView: View {
 
             HStack(spacing: 12) {
                 PillTabBar(selection: $tab, selectionAnimation: pillAnimation)
+
+                GraphModeSelector(
+                    mode: unitSystemBinding,
+                    accessibilityLabel: "Disk size units",
+                    help: "Show disk and file sizes in decimal (KB) or binary (KiB) units",
+                    legacyWidth: 150)
+
                 Spacer()
                 if let label = contextLabel {
                     Text(label)
@@ -55,6 +77,7 @@ struct DiskView: View {
                 }
             }
             .id(tab)
+            .environment(\.byteUnitSystem, unitSystem)
             .transition(tabTransition)
         }
         .padding(.horizontal, KBTheme.contentPadding)
@@ -77,12 +100,12 @@ struct DiskView: View {
         case .analyzer:
             if disk.isScanning {
                 if let live = disk.liveSnapshot {
-                    return "\(KBFormat.bytes(live.root.allocatedBytes)) · \(KBFormat.compactCount(live.root.fileCount)) files"
+                    return "\(KBFormat.bytes(live.root.allocatedBytes, units: unitSystem)) · \(KBFormat.compactCount(live.root.fileCount)) files"
                 }
                 return "Scanning…"
             }
             if let node = disk.currentNode {
-                return "\(KBFormat.bytes(node.allocatedBytes)) · \(KBFormat.compactCount(node.fileCount)) files"
+                return "\(KBFormat.bytes(node.allocatedBytes, units: unitSystem)) · \(KBFormat.compactCount(node.fileCount)) files"
             }
             return "Not scanned"
         case .io:
