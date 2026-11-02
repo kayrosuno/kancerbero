@@ -14,6 +14,8 @@ final class FilterModel {
     private(set) var remembered: [RememberedDecision] = []
     private(set) var flows: [FlowRecord] = []
     private(set) var pending: [FilterRequest] = []
+    /// Global override pushed to the extension; it is not a `FilterRule`.
+    private(set) var blockAllNewConnections = false
     private(set) var history: [FlowRecord] = []
     private(set) var status: FilterStatus?
     private(set) var isConnected = false
@@ -35,6 +37,9 @@ final class FilterModel {
 
     private static let rulesKey = "filterRules.v1"
     private static let rememberedKey = "filterRemembered.v1"
+    private static let blockAllKey = "filterBlockAll.v1"
+    /// Serializes rule pushes so two quick changes cannot arrive out of order.
+    private var rulePushTask: Task<Void, Never>?
 
     var recentBlocks: [FlowRecord] {
         history.filter { $0.state == .denied }.prefix(20).map { $0 }
@@ -139,7 +144,7 @@ final class FilterModel {
                                     policy: .ask))
         }
         persistRules()
-        Task { await pushRules() }
+        schedulePushRules()
     }
 
     func unwatch(_ process: KBProcessInfo) {
@@ -158,7 +163,7 @@ final class FilterModel {
                                     policy: policy))
         }
         persistRules()
-        Task { await pushRules() }
+        schedulePushRules()
     }
 
     /// Changes the policy of an existing rule addressed by `FilterRule.id`.
@@ -169,7 +174,7 @@ final class FilterModel {
               rules[index].policy != policy else { return }
         rules[index].policy = policy
         persistRules()
-        Task { await pushRules() }
+        schedulePushRules()
     }
 
     func isWatched(path: String) -> Bool {
@@ -185,7 +190,7 @@ final class FilterModel {
         guard remembered.contains(where: { $0.id == id }) else { return }
         remembered.removeAll { $0.id == id }
         persistRemembered()
-        Task { await pushRules() }
+        schedulePushRules()
     }
 
     private func removeRule(atPath path: String) {
@@ -193,7 +198,37 @@ final class FilterModel {
         remembered.removeAll { $0.executablePath == path }
         persistRules()
         persistRemembered()
-        Task { await pushRules() }
+        schedulePushRules()
+    }
+
+    /// Arms or disarms the global "deny every new connection" override. It is
+    /// persisted locally and pushed inside the rule snapshot; it never becomes
+    /// a `FilterRule`.
+    func setBlockAllNewConnections(_ enabled: Bool) {
+        guard blockAllNewConnections != enabled else { return }
+        blockAllNewConnections = enabled
+        UserDefaults.standard.set(enabled, forKey: Self.blockAllKey)
+
+        if enabled {
+            // The extension resolves paused flows when it receives the flag.
+            // Hide them now so an approval sheet cannot outlive the toggle and
+            // ignore any push that was already in flight.
+            locallyResolved.formUnion(pending.map(\.id))
+            pending.removeAll()
+        }
+        schedulePushRules()
+    }
+
+    /// Chains each push behind the previous one: `setRules` carries the whole
+    /// snapshot, so out-of-order delivery could leave the extension armed
+    /// while the UI shows the opposite.
+    private func schedulePushRules() {
+        let previous = rulePushTask
+        rulePushTask = Task { [weak self] in
+            await previous?.value
+            guard let self, !Task.isCancelled else { return }
+            await self.pushRules()
+        }
     }
 
     // MARK: - Approvals
@@ -204,12 +239,17 @@ final class FilterModel {
         pending.removeAll { $0.id == request.id }
         locallyResolved.insert(request.id)
 
-        if remember != .none, !request.executablePath.isEmpty {
+        // A click can race the global block; mirror the extension and neither
+        // allow nor persist a remembered decision while it is armed.
+        let effectiveAllow = allow && !blockAllNewConnections
+        let effectiveRemember: FilterRemember = blockAllNewConnections ? .none : remember
+
+        if effectiveRemember != .none, !request.executablePath.isEmpty {
             // Remember an "app + destination" decision under every key the
             // endpoint can be reported with (`host:port` and `address:port`),
             // otherwise the next flow may not match and asks again.
             let keys: [String?]
-            if remember == .destination {
+            if effectiveRemember == .destination {
                 let destinations = request.remote?.destinationKeys ?? []
                 keys = destinations.isEmpty ? [nil] : destinations.map { Optional($0) }
             } else {
@@ -221,20 +261,20 @@ final class FilterModel {
                 }
                 remembered.append(RememberedDecision(executablePath: request.executablePath,
                                                      destination: key,
-                                                     allow: allow))
+                                                     allow: effectiveAllow))
             }
             persistRemembered()
         }
 
         let message = FilterDecisionMessage(flowID: request.id,
-                                            allow: allow,
-                                            remember: remember,
+                                            allow: effectiveAllow,
+                                            remember: effectiveRemember,
                                             destinationKey: request.remote?.destinationKey,
                                             destinationKeys: request.remote?.destinationKeys,
                                             executablePath: request.executablePath)
         _ = await client?.request(FilterCodec.envelope(.decide, value: message))
-        if remember != .none {
-            await pushRules()
+        if effectiveRemember != .none {
+            schedulePushRules()
         }
     }
 
@@ -273,7 +313,9 @@ final class FilterModel {
 
     private func pushRules() async {
         guard let client, client.isConnected else { return }
-        let snapshot = FilterRuleSnapshot(rules: rules, remembered: remembered)
+        let snapshot = FilterRuleSnapshot(rules: rules,
+                                          remembered: remembered,
+                                          blockAllNewConnections: blockAllNewConnections)
         _ = await client.request(FilterCodec.envelope(.setRules, value: snapshot))
     }
 
@@ -383,6 +425,7 @@ final class FilterModel {
            let value = try? JSONDecoder().decode([RememberedDecision].self, from: data) {
             remembered = value
         }
+        blockAllNewConnections = defaults.bool(forKey: Self.blockAllKey)
     }
 
     private func persistRules() {

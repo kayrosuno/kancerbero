@@ -155,7 +155,11 @@ y la hoja no se cierra sin decidir. Las decisiones cierran la hoja al instante y
 del filtro tienen timeout, así que la ventana nunca se queda bloqueada esperando al sistema. La barra del Filter incluye **Rules…**, que abre una ventana
 con el estado del filtro y la lista de reglas (cambiar la política pulsando su badge, y borrar
 seleccionando la fila y usando **Delete** en la cabecera, la papelera de la fila o el menú
-contextual) y de decisiones recordadas (borrar). Si Kancerbero está cerrado o nadie responde, la conexión se
+contextual) y de decisiones recordadas (borrar). La pestaña incluye además un interruptor global
+**Block all new connections**: mientras está activo deniega todo flujo nuevo (también los de
+procesos con Allow o decisión recordada) sin crear ninguna regla, se conserva al reiniciar y la
+tarjeta se vuelve roja con un pulso; la barra de estado muestra **Blocking** (o **Block armed**
+si el filtro aún no está corriendo). Si Kancerbero está cerrado o nadie responde, la conexión se
 deniega (fail-closed). Requiere una build firmada con Developer ID, los entitlements de Network
 Extension y aprobar la system extension; el detalle de binario y permisos está en
 `docs/daemons-and-libraries.md` y las pruebas en `docs/verification.md`.
