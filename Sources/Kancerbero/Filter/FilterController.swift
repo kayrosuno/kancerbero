@@ -9,6 +9,25 @@ import KancerberoFilterContract
 
 private let filterLog = Logger(subsystem: "uno.kayros.kancerbero.filter", category: "extension")
 
+/// One-shot continuation used by the NEFilterManager timeout: the callback and
+/// the deadline may both fire, but only the first one resumes the await.
+private final class FilterResumeOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Error>?
+
+    init(_ continuation: CheckedContinuation<Void, Error>) {
+        self.continuation = continuation
+    }
+
+    func resume(_ result: Result<Void, Error>) {
+        lock.lock()
+        let pending = continuation
+        continuation = nil
+        lock.unlock()
+        pending?.resume(with: result)
+    }
+}
+
 /// Owns the system-extension lifecycle and the `NEFilterManager` configuration.
 /// The extension itself runs as root; the container app only installs,
 /// approves, enables and disables it.
@@ -281,39 +300,47 @@ final class FilterController: NSObject {
 
     // MARK: - Async wrappers
 
-    private func load(_ manager: NEFilterManager) async throws {
+    /// The NetworkExtension daemon may stop answering (extension wedged,
+    /// system dialog pending…). Without a deadline the awaiting UI would stay
+    /// disabled forever, as happened with the approval sheet's Disable filter.
+    private func withFilterTimeout(
+        timeout: TimeInterval = 5,
+        _ operation: @escaping (@escaping (Error?) -> Void) -> Void
+    ) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            manager.loadFromPreferences { error in
+            let once = FilterResumeOnce(continuation)
+            operation { error in
                 if let error {
-                    continuation.resume(throwing: error)
+                    once.resume(.failure(error))
                 } else {
-                    continuation.resume()
+                    once.resume(.success(()))
                 }
             }
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+                once.resume(.failure(NSError(
+                    domain: "uno.kayros.kancerbero.filter",
+                    code: 15,
+                    userInfo: [NSLocalizedDescriptionKey:
+                                "The network filter did not respond in time."])))
+            }
+        }
+    }
+
+    private func load(_ manager: NEFilterManager) async throws {
+        try await withFilterTimeout { completion in
+            manager.loadFromPreferences(completionHandler: completion)
         }
     }
 
     private func save(_ manager: NEFilterManager) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            manager.saveToPreferences { error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume()
-                }
-            }
+        try await withFilterTimeout { completion in
+            manager.saveToPreferences(completionHandler: completion)
         }
     }
 
     private func remove(_ manager: NEFilterManager) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            manager.removeFromPreferences { error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume()
-                }
-            }
+        try await withFilterTimeout { completion in
+            manager.removeFromPreferences(completionHandler: completion)
         }
     }
 }

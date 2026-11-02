@@ -445,7 +445,12 @@
 - UI: pestaña **Filter** (flujos con RX/TX y estado), escudo por fila en **Processes**, hoja de
   aprobación en `RootView` (`FilterApprovalSheet`: icono y nombre grandes, destino a 30 pt,
   anillo de cuenta atrás, selector Remember Once/This app/App + destination y botones
-  Allow/Deny; `.interactiveDismissDisabled` y Return/Escape), ventana **Filter rules**
+  Allow/Deny; `.interactiveDismissDisabled` y Return/Escape). La decisión es optimista: la hoja se
+  cierra al instante y el modelo quita el pending antes de enviar el mensaje XPC; «Disable
+  filter» corre en segundo plano sin bloquear el resto. Las operaciones de `NEFilterManager`
+  (`loadFromPreferences`/`saveToPreferences`/`removeFromPreferences`) tienen un timeout de 5 s
+  con una continuación one-shot, para que un daemon de NetworkExtension que no responde deje el
+  estado en `.failed` en vez de colgar la UI. Ventana **Filter rules**
   (`FilterRulesView`, abierta con **Rules…** desde el Filter) con estado, reglas y decisiones
   recordadas, y filas de estado en **System status**.
 - Entitlements: en Release, `content-filter-provider-systemextension` en app y extensión,
