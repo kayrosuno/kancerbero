@@ -33,8 +33,8 @@
   de la leyenda alterna el foco de su dirección al pulsarla. `TrafficChart` dibuja, vía
   `MirroredBarChart`, un ecualizador espejado de barras sólidas —upload arriba, download abajo—
   coloreadas con la escala de calor según su magnitud; escala compartida con
-  techo 1/2/5×10^n, cuadrícula, niveles y eje temporal; ventana de 60 muestras en slots fijos
-  empaquetados desde la izquierda (dato más reciente en `now`, eje nominal 60 × intervalo).
+  techo 1/2/5×10^n, cuadrícula, niveles y eje temporal; ventana de 120 muestras en slots fijos
+  empaquetados desde la izquierda (dato más reciente en `now`, eje nominal 120 × intervalo).
   `KBTheme.rateHeat` colorea los valores de tasa de los cards de estadísticas según su magnitud.
   Debajo, `PillTabBar` y las tablas (`NetworkingTables.swift`). `NetworkingUIState` guarda, por un
   lado, los filtros de Connections —`transports: Set<NetworkingTransport>`, `ipVersions:
@@ -326,7 +326,7 @@
 - **Actividad de E/S (`DiskIOView`)**
   - Host: `kb_disk_io_read` recorre `IOBlockStorageDriver` y suma su `Statistics` (`Bytes
     (Read/Write)`, `Operations (Read/Write)`); `DiskIOReader` y `AppModel` derivan tasas por
-    muestra, totales acumulados y los históricos de 60 muestras (bytes y operaciones).
+    muestra, totales acumulados y los históricos de 120 muestras (bytes y operaciones).
   - Procesos: `rusage_info_v6` (`ri_diskio_bytesread`, `ri_diskio_byteswritten`,
     `ri_logical_writes`), convertidos a tasas por `ProcessCPUTracker`; con daemons antiguos la app
     rellena los procesos del usuario mediante `ProcessIOReader`/`kb_process_io_read`. El gráfico

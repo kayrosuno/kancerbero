@@ -46,7 +46,7 @@ El detalle de binarios, permisos, instalación y librerías está en
   es un **ecualizador espejado** de barras sólidas (upload arriba, download abajo) coloreadas con
   la escala de calor según su magnitud. Las barras ocupan slots
   fijos desde la izquierda, de modo que un histórico corto queda empaquetado en lugar de
-  repartirse por todo el ancho, sobre cuadrícula, niveles y eje temporal nominal (60 × intervalo). Una **barra de filtros** entre las pills y la
+  repartirse por todo el ancho, sobre cuadrícula, niveles y eje temporal nominal (120 × intervalo). Una **barra de filtros** entre las pills y la
   tarjeta de la tabla reúne los grupos de checkboxes multiselección en cápsulas. En Connections:
   **IP** (IPv4/IPv6), **Transport** (TCP/UDP/Other), **TCP State** (Established, Listening,
   Connecting (SYN), Closing (Close/Fin/Time Wait)) y **Other** en su propia cápsula (solo el
@@ -93,7 +93,7 @@ El detalle de binarios, permisos, instalación y librerías está en
     escaneo; las tablas de contenidos y mayores archivos aparecen al terminar. Las etiquetas del
     mapa muestran el nombre y el tamaño en formato humano. Las tarjetas filtran el panel derecho
     (todo, solo ficheros, solo carpetas o rutas denegadas); no se lee contenido de ficheros.
-  - **I/O** — actividad de disco con gráfico espejado lectura/escritura (histórico de 60 muestras),
+  - **I/O** — actividad de disco con gráfico espejado lectura/escritura (histórico de 120 muestras),
     selector **Data / Operations**, tasas y totales de Reads in, Writes out, Data read y Data
     written, y tabla de procesos por actividad de disco (Read/s, Write/s, Bytes Read, Bytes
     Written, Writes, State, PID, USER). Los contadores del sistema salen de `IOBlockStorageDriver`

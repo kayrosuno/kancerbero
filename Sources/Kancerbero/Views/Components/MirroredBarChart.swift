@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Mirrored bar history shared by the traffic and disk activity charts.
 /// `top` bars grow above the centre line and `bottom` below it, packed from the
-/// left in fixed 60-sample slots on a shared, rounded scale. Each bar is a
+/// left in fixed 120-sample slots on a shared, rounded scale. Each bar is a
 /// solid heat colour, so height and hue both show magnitude. Grid, level labels
 /// and the time axis complete the chart.
 struct MirroredBarChart: View {
@@ -23,7 +23,7 @@ struct MirroredBarChart: View {
 
     @Environment(\.colorScheme) private var colorScheme
 
-    static let window = 60
+    static let window = 120
     private static let axisHeight: CGFloat = 14
     private static let gutter: CGFloat = 54
     private static let rightInset: CGFloat = 1
@@ -40,7 +40,7 @@ struct MirroredBarChart: View {
         .accessibilityValue(accessibilityValue)
     }
 
-    /// Nominal duration represented by the fixed 60-slot window.
+    /// Nominal duration represented by the fixed sample window.
     var nominalSpan: TimeInterval {
         max(sampleInterval, 0.1) * Double(Self.window)
     }
@@ -174,7 +174,7 @@ struct MirroredBarChart: View {
         let values = sanitized(rawValues)
         guard !values.isEmpty, ceiling > 0 else { return }
 
-        // Fixed 60 slots: the newest sample sits in the first slot at the
+        // Fixed window slots: the newest sample sits in the first slot at the
         // left edge and older samples fill consecutive slots, so a short
         // history stays packed instead of stretching across the window.
         let startX = plot.minX + Self.seriesInset

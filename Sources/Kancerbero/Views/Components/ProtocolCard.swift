@@ -17,10 +17,10 @@ struct ProtocolCard: View {
     ]
 
     private static let colors: [KBConnectionProtocol: Color] = [
-        .tcp4: Color(red: 0.16, green: 0.55, blue: 0.90),
+        .tcp4: KBTheme.netDownloadTint,
         .tcp6: Color(red: 0.35, green: 0.70, blue: 0.95),
         .udp4: Color(red: 0.15, green: 0.65, blue: 0.58),
-        .udp6: Color(red: 0.40, green: 0.80, blue: 0.72),
+        .udp6: KBTheme.netUploadTint,
         .unix: Color(red: 0.60, green: 0.45, blue: 0.90),
         .other: Color(red: 0.55, green: 0.57, blue: 0.63)
     ]
@@ -50,8 +50,8 @@ struct ProtocolCard: View {
             RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
                 .strokeBorder(
                     LinearGradient(
-                        colors: [KBTheme.downloadTint.opacity(0.28),
-                                 KBTheme.uploadTint.opacity(0.28)],
+                        colors: [KBTheme.netDownloadTint.opacity(0.28),
+                                 KBTheme.netUploadTint.opacity(0.28)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
