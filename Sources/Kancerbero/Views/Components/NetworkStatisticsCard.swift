@@ -1,7 +1,7 @@
 import SwiftUI
 import KancerberoCore
 
-/// Live download/upload rates plus cumulative interface totals, styled to
+/// Live upload/download rates plus cumulative interface totals, styled to
 /// match `Disk statistics` in Disk → I/O.
 struct NetworkStatisticsCard: View {
     let rates: KBRates
@@ -9,6 +9,7 @@ struct NetworkStatisticsCard: View {
     let isLive: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     @State private var statsHovering = false
 
     private let downloadTint = KBTheme.downloadTint
@@ -54,7 +55,7 @@ struct NetworkStatisticsCard: View {
             withAnimation(.snappy(duration: 0.2)) { statsHovering = hovering }
         }
         .accessibilityElement(children: .contain)
-        .help("Current download and upload rates, plus cumulative byte and packet "
+        .help("Current upload and download rates, plus cumulative byte and packet "
               + "totals since boot. Totals cover non-loopback, non-tunnel interfaces "
               + "and reset if an interface restarts.")
     }
@@ -89,16 +90,16 @@ struct NetworkStatisticsCard: View {
 
     private var heroRows: some View {
         VStack(alignment: .leading, spacing: 8) {
-            rateRow(title: "Download rate",
-                    systemImage: "arrow.down",
-                    bytesPerSecond: rates.rxBytesPerSecond,
-                    packetsPerSecond: rates.rxPacketsPerSecond,
-                    tint: downloadTint)
             rateRow(title: "Upload rate",
                     systemImage: "arrow.up",
                     bytesPerSecond: rates.txBytesPerSecond,
                     packetsPerSecond: rates.txPacketsPerSecond,
                     tint: uploadTint)
+            rateRow(title: "Download rate",
+                    systemImage: "arrow.down",
+                    bytesPerSecond: rates.rxBytesPerSecond,
+                    packetsPerSecond: rates.rxPacketsPerSecond,
+                    tint: downloadTint)
         }
     }
 
@@ -130,6 +131,7 @@ struct NetworkStatisticsCard: View {
                 Text(rate)
                     .font(.system(size: 18, weight: .semibold, design: .rounded))
                     .monospacedDigit()
+                    .foregroundStyle(KBTheme.rateHeat(bytesPerSecond, scheme: colorScheme))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .contentTransition(numericTransition)

@@ -6,6 +6,7 @@ struct DiskIOView: View {
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var statsHovering = false
 
@@ -47,7 +48,8 @@ struct DiskIOView: View {
                         read: isData ? model.diskReadHistory : model.diskReadOpsHistory,
                         write: isData ? model.diskWriteHistory : model.diskWriteOpsHistory,
                         readColor: readTint,
-                        writeColor: writeTint)
+                        writeColor: writeTint,
+                        sampleInterval: model.interval)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(12)
@@ -140,6 +142,9 @@ struct DiskIOView: View {
             Text(value)
                 .font(.system(size: 10, weight: .medium))
                 .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: 60, alignment: .leading)
         }
     }
 
@@ -214,12 +219,12 @@ struct DiskIOView: View {
     private var heroRows: some View {
         VStack(alignment: .leading, spacing: 8) {
             throughputRow(title: "Read rate",
-                          systemImage: "arrow.down",
+                          systemImage: "arrow.up",
                           bytesPerSecond: model.diskReadRate,
                           opsPerSecond: model.diskReadOpsRate,
                           tint: readTint)
             throughputRow(title: "Write rate",
-                          systemImage: "arrow.up",
+                          systemImage: "arrow.down",
                           bytesPerSecond: model.diskWriteRate,
                           opsPerSecond: model.diskWriteOpsRate,
                           tint: writeTint)
@@ -254,6 +259,7 @@ struct DiskIOView: View {
                 Text(rate)
                     .font(.system(size: 18, weight: .semibold, design: .rounded))
                     .monospacedDigit()
+                    .foregroundStyle(KBTheme.rateHeat(bytesPerSecond, scheme: colorScheme))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .contentTransition(numericTransition)
@@ -272,12 +278,12 @@ struct DiskIOView: View {
                 totalMetric("Reads in",
                             value: KBFormat.compactTotal(model.diskReadOperationsTotal),
                             exact: "\(KBFormat.count(model.diskReadOperationsTotal)) operations",
-                            icon: "arrow.down.to.line",
+                            icon: "arrow.up.to.line",
                             tint: readTint)
                 totalMetric("Writes out",
                             value: KBFormat.compactTotal(model.diskWriteOperationsTotal),
                             exact: "\(KBFormat.count(model.diskWriteOperationsTotal)) operations",
-                            icon: "arrow.up.to.line",
+                            icon: "arrow.down.to.line",
                             tint: writeTint)
             }
             HStack(spacing: 10) {
