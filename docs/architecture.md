@@ -452,7 +452,11 @@
   con una continuación one-shot, para que un daemon de NetworkExtension que no responde deje el
   estado en `.failed` en vez de colgar la UI. Ventana **Filter rules**
   (`FilterRulesView`, abierta con **Rules…** desde el Filter) con estado, reglas y decisiones
-  recordadas, y filas de estado en **System status**.
+  recordadas. Las reglas se pueden eliminar de varias formas: seleccionar una fila y usar
+  **Delete** en la cabecera de la sección, la papelera de la fila o el menú contextual; todas
+  piden confirmación con un `.alert` y borran la regla junto con las decisiones recordadas de esa
+  app. Sin selección, el botón de cabecera queda deshabilitado. Filas de estado en
+  **System status**.
 - Entitlements: en Release, `content-filter-provider-systemextension` en app y extensión,
   `system-extension.install` en la app y `app-sandbox` en la extensión; ambos se firman con
   Developer ID + provisioning profile. En Debug se usan los archivos `-Development.entitlements`
