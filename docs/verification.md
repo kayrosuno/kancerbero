@@ -35,7 +35,7 @@ nettop -P -d -L 3 -s 1 -x
   del modo activo) y el selector glass a la derecha (segmentado nativo en versiones anteriores);
   cada entrada de la leyenda alterna el foco de su dirección al pulsarla. Contrastar tasas con
   Activity Monitor → Network y
-  totales con `netstat -ib` sumando `en*` y excluyendo `lo0`/`utun`. A 1040×640 comprobar que las
+  totales con `netstat -ib` sumando `en*` y excluyendo `lo0`/`utun`. A 1340×700 comprobar que las
   tres cards siguen en una fila, sin recortes de Traffic, y que la cabecera mantiene título y
   selector legibles. `--cards-collapsed` oculta toda la franja.
 - Prueba controlada:
@@ -112,6 +112,7 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--networking-state established|listening|connecting|closing|other[,..]|all] \
   [--networking-connection-search <texto>] [--networking-interface-search <texto>] \
   [--networking-search <texto>] \
+  [--networking-resolve-names] \
   [--networking-process-domain inet|inet6|unix|other[,..]|all] \
   [--networking-process-ip ipv4|ipv6[,..]|all] \
   [--networking-process-protocol tcp|udp|icmp|icmpv6|sctp|gre|esp|raw|other[,..]|all] \
@@ -121,10 +122,11 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
 ```
 
 Los flags **sin valor** (`--cards-collapsed`, `--cards-expanded`, `--sidebar-collapsed`,
-`--disk-scan`, `--show-status`) deben ir al final de la línea de argumentos; si quedan en medio,
+`--disk-scan`, `--show-status`, `--networking-resolve-names`) deben ir al final de la línea de
+argumentos; si quedan en medio,
 macOS puede abrir la app sin ventana principal y la captura no se genera. `--cards-collapsed` /
 `--cards-expanded` fuerzan todas las tarjetas colapsadas/expandidas, `--cards-collapsed-sections`
-un estado mixto y `--screenshot-size 1040x640` fija el tamaño de la ventana.
+un estado mixto y `--screenshot-size 1340x700` fija el tamaño de la ventana.
 
 `--section` selecciona la sección de primer nivel, `--tab` la subpestaña de Networking,
 `--traffic-graph bits|packets` cambia solo las unidades del gráfico de Traffic,
@@ -140,7 +142,9 @@ hacen lo mismo en la tabla de Memory, `--energy-search`/`--energy-selected` en l
 `--networking-transport`/`--networking-ip`
 marcan solo esos checkboxes (lista con comas; `all` equivale a todos), `--networking-state` marca
 solo esas categorías de estado TCP, `--networking-connection-search` el filtro de proceso de
-Connections y `--networking-search` el de la tabla de procesos. Los flags
+Connections y `--networking-search` el de la tabla de procesos.
+`--networking-resolve-names` activa el checkbox **Resolve names** (solo sesión, apagado por
+defecto) para capturar las tablas con hostnames. Los flags
 `--networking-process-domain`/`--networking-process-protocol`/`--networking-process-socket`
 marcan los grupos propios de Processes (misma sintaxis de lista);
 `--networking-process-ip ipv4|ipv6` queda como alias de domain (inet/inet6) y
@@ -174,10 +178,10 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
 
 | Síntoma | Causa |
 |---|---|
-| No se genera el PNG y queda una ventana sin contenido (o ninguna ventana) | Un flag sin valor (`--cards-expanded`, `--cards-collapsed`, `--sidebar-collapsed`, `--disk-scan`, `--show-status`) quedó en medio de los argumentos; muévelo al final. |
+| No se genera el PNG y queda una ventana sin contenido (o ninguna ventana) | Un flag sin valor (`--cards-expanded`, `--cards-collapsed`, `--sidebar-collapsed`, `--disk-scan`, `--show-status`, `--networking-resolve-names`) quedó en medio de los argumentos; muévelo al final. |
 | El PNG sale con ceros o «Last 0 samples» | `--screenshot-delay` insuficiente o daemon no disponible; súbelo. |
 | La captura no corresponde a la sección/pestaña pedida | Valor no válido en `--section`, `--tab` o `--disk-tab`; usa solo los de la lista superior. |
-| Ventana recortada o tarjetas apiladas | Usa `--screenshot-size 1040x640` (mínimo soportado) o superior. |
+| Ventana recortada o tarjetas apiladas | Usa `--screenshot-size 1340x700` (mínimo soportado) o superior. |
 
 Capturas recomendadas:
 
@@ -226,7 +230,11 @@ $K --screenshot /tmp/kb-col-disk-analyzer.png --section disk --disk-tab analyzer
 - Estado mixto: `--cards-collapsed-sections networking,disk,daemons,memory,energy,applications`
   con `--section cpu` deja las tarjetas de CPU visibles y el resto ocultas. El botón global pasa a
   «Hide all»; al pulsarlo colapsa todas («Show all»); `Show cards` en CPU expande solo CPU.
-- Ventana mínima: `--screenshot-size 1040x640`; el botón de cabecera y el global caben sin truncar.
+- Ventana mínima: `--screenshot-size 1340x700`; el botón de cabecera y el global caben sin truncar.
+- La sidebar no se recorta al redimensionar: el mínimo de la ventana (1340 pt) cubre el layout
+  completo (sidebar de 252 pt + tabla de Connections) y la columna tiene ancho fijo
+  (`KBTheme.sidebarWidth`), así que no queda a medias. Con el botón nativo de la toolbar o Ver >
+  Ocultar barra lateral se oculta entera y se restaura con el mismo ancho.
 - Reduce Motion o “Animate tab changes” desactivado: el cambio es instantáneo. El estado no se
   guarda en `UserDefaults` y desaparece al reiniciar.
 
@@ -611,7 +619,7 @@ $APP --screenshot /tmp/kb-net-process-independent.png --section networking \
 - Los grupos aparecen en una **barra a todo el ancho entre las pills y la tarjeta** de la tabla;
   la tarjeta ya no los contiene y su cabecera muestra el título, la búsqueda, el botón Inspect
   junto al filtro y el contador de filas a la derecha. Interfaces muestra ese mismo contador en
-  su cabecera; ni ella ni Filter tienen barra (sin hueco extra). A 1040×640 la barra cae a dos
+  su cabecera; ni ella ni Filter tienen barra (sin hueco extra). A 1340×700 la barra cae a dos
   líneas sin recortarse.
 - Processes muestra en su cabecera `Filter processes` y filtra por nombre, ruta, PID o usuario,
   igual que CPU. El contador “N of M” refleja sus facetas y la búsqueda. La columna **Domain**
@@ -646,6 +654,11 @@ $APP --screenshot /tmp/kb-connections-columns.png --section networking \
 
 - Orden de columnas: Process, PID, Local, Remote, Proto, State, RX, TX, Rate e Iface.
   Los flujos UDP muestran `Datagram` en State (no tienen estado TCP).
+- **Resolve names** está apagado por defecto: Local/Remote muestran `ip:puerto` y el tooltip solo
+  la IP. Al activarlo, las celdas cambian a `hostname:puerto` a medida que terminan las consultas
+  inversas (las IPs sin PTR se mantienen), el tooltip pasa a `hostname · ip:puerto` y el orden no
+  cambia. El checkbox de la pestaña Filter comparte estado; apagado, la tabla de flujos vuelve a
+  mostrar direcciones. Comprobar con `--networking-resolve-names` al final de la línea.
 - La columna Rate muestra la suma RX+TX del intervalo en bits/s (`KBFormat.bitRate`); en reposo
   `0 bps`, y con una descarga activa el flujo debe subir a Mbps y coincidir en orden de magnitud
   con la tarjeta Traffic y `nettop`. Ordenar por Rate deja arriba la conexión con más caudal.
@@ -657,7 +670,7 @@ $APP --screenshot /tmp/kb-connections-columns.png --section networking \
 - Seleccionar una fila, ordenar y cambiar de subpestaña/sección: la selección y el criterio de
   orden se conservan (estado de sesión en `UIState`). Si el filtro hace desaparecer la fila, la
   selección se limpia.
-- Comprobar direcciones IPv6 largas (truncadas con tooltip) y el scroll horizontal a 1040×640.
+- Comprobar direcciones IPv6 largas (truncadas con tooltip) y el scroll horizontal a 1340×700.
 
 Tabla de Interfaces (orden y filtro):
 
@@ -994,7 +1007,7 @@ runtime y timestamp; que la app no lleva `get-task-allow`; que ambas firmas llev
    intervalo y tráfico excluido).
 5. **Regresión**: con el filtro desactivado, Interfaces/Connections/Processes siguen funcionando
    con nstat; `scripts/verify.sh` sin cambios.
-6. **Ventana de reglas** (Filter → **Rules…**):
+6. **Ventana de reglas** (Filter → **Filter Rules…**):
    - La ventana muestra el estado del filtro (Enabled/Disabled/Unsupported, conexión XPC y
      contadores) con su botón global Enable/Disable.
    - Las reglas creadas con el escudo de Processes aparecen con proceso, política, ruta y fecha;

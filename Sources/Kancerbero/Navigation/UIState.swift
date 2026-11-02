@@ -95,6 +95,9 @@ final class UIState {
         }
         networking.connectionSearch = Self.value(for: "--networking-connection-search",
                                                  in: arguments) ?? ""
+        if arguments.contains("--networking-resolve-names") {
+            networking.resolveNames = true
+        }
         networking.interfaceSearch = Self.value(for: "--networking-interface-search",
                                                 in: arguments) ?? ""
         networking.processSearch = Self.value(for: "--networking-search", in: arguments) ?? ""
@@ -262,6 +265,9 @@ struct NetworkingUIState: Equatable {
     /// All states, including Other (UDP flows and unclassified TCP states).
     var connectionStates: Set<NetworkingConnectionState> = NetworkingConnectionState.all
     var connectionSearch = ""
+    /// Reverse-resolve the IPs of the visible connections and flows.
+    /// Session-only and off by default; the CLI flag enables it for captures.
+    var resolveNames = false
     var interfaceSearch = ""
     var processSearch = ""
     var processDomains: Set<ProcessDomain> = ProcessDomain.all

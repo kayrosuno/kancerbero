@@ -92,9 +92,12 @@ struct RootView: View {
 
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(selection: selection)
-                .navigationSplitViewColumnWidth(min: 220,
+                // Fixed column: resizing the window or dragging the divider
+                // can never leave the sidebar partially visible. Hiding it
+                // through the toggle/menu still collapses it entirely.
+                .navigationSplitViewColumnWidth(min: KBTheme.sidebarWidth,
                                                 ideal: KBTheme.sidebarWidth,
-                                                max: 320)
+                                                max: KBTheme.sidebarWidth)
         } detail: {
             VStack(spacing: 0) {
                 Group {

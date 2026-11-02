@@ -118,7 +118,7 @@ enum ScreenshotMode {
         return seconds
     }
 
-    /// `--screenshot-size 1040x640` for deterministic captures at the minimum
+    /// `--screenshot-size 1340x700` for deterministic captures at the minimum
     /// window size.
     private static func screenshotSize(_ arguments: [String]) -> NSSize? {
         guard let raw = value(for: "--screenshot-size", in: arguments) else {

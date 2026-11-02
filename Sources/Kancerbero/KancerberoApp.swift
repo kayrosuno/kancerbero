@@ -19,7 +19,10 @@ struct KancerberoApp: App {
                 .environment(applications)
                 .environment(ui)
                 .environment(filter)
-                .frame(minWidth: 1040, minHeight: 640)
+                // The sidebar, cards and Connections table need this much
+                // before SwiftUI overflows and clips the sidebar at the
+                // window edge. Shrinking below it hides it partially.
+                .frame(minWidth: 1340, minHeight: 640)
                 .task {
                     if CommandLine.arguments.contains("--register-service") {
                         await model.registerDaemonService()

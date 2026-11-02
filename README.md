@@ -31,7 +31,7 @@ El detalle de binarios, permisos, instalación y librerías está en
 
 ## Interfaz
 
-`NavigationSplitView` con panel lateral colapsable:
+`NavigationSplitView` con panel lateral colapsable de ancho fijo (252 pt):
 
 - **Networking** — a la izquierda, una tarjeta **Activity** con tres métricas —procesos con
   sockets, conexiones totales y conexiones activas (con tráfico en los últimos 10 s)— donde las
@@ -60,9 +60,13 @@ El detalle de binarios, permisos, instalación y librerías está en
   **Transport › UDP**. La cabecera de la tarjeta
   conserva el título, **Filter process**
   en Connections / **Filter processes** en Processes (nombre o PID; en Processes también ruta y
-  usuario), el botón **Inspect** junto al filtro y, a la derecha, el contador de filas.
+  usuario), y, alineados a la derecha, el contador de filas, **Resolve names** y el botón
+  **Inspect Process**, que queda en el extremo derecho.
   La tabla de Connections muestra Process, PID, Local, Remote, Proto, State, RX,
-  TX, Rate (bits/s) e Iface, y permite ordenar por cualquier columna. Los flujos
+  TX, Rate (bits/s) e Iface, y permite ordenar por cualquier columna. La cabecera incluye
+  **Resolve names** (apagado por defecto): al activarlo, Local y Remote cambian de
+  `ip:puerto` a `hostname:puerto` a medida que termina la resolución inversa, conservan la IP
+  si no hay PTR y el tooltip guarda `hostname · ip:puerto`. Los flujos
   UDP, que no tienen estado TCP, muestran **Datagram** en State.
   La tabla de Processes lista solo procesos con flujos TCP/UDP o sockets (incluye UNIX y RAW vía
   libproc) y muestra Process, PID, Guard, **Domain**, **Protocols**, **Type**, Flows, RX, TX,
@@ -155,7 +159,9 @@ app o app+destino). La aprobación es una hoja grande con el icono y el nombre d
 proceso, el destino destacado, una cuenta atrás circular y un selector **Remember** (Once / This
 app / App + destination) junto a dos botones **Allow** / **Deny**; Return permite y Escape deniega,
 y la hoja no se cierra sin decidir. Las decisiones cierran la hoja al instante y las operaciones
-del filtro tienen timeout, así que la ventana nunca se queda bloqueada esperando al sistema. La barra del Filter incluye **Rules…**, que abre una ventana
+del filtro tienen timeout, así que la ventana nunca se queda bloqueada esperando al sistema. La
+barra del Filter incluye **Resolve names** (comparte estado con la tabla de Connections) y
+**Filter Rules…**, que abre una ventana
 con el estado del filtro y la lista de reglas (cambiar la política pulsando su badge, y borrar
 seleccionando la fila y usando **Delete** en la cabecera, la papelera de la fila o el menú
 contextual) y de decisiones recordadas (borrar). La pestaña incluye además un interruptor global
@@ -277,6 +283,7 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--networking-state established|listening|connecting|closing|other[,..]|all] \
   [--networking-connection-search <texto>] [--networking-interface-search <texto>] \
   [--networking-search <texto>] \
+  [--networking-resolve-names] \
   [--networking-process-domain inet|inet6|unix|other[,..]|all] \
   [--networking-process-ip ipv4|ipv6[,..]|all] \
   [--networking-process-protocol tcp|udp|icmp|icmpv6|sctp|gre|esp|raw|other[,..]|all] \
@@ -292,9 +299,11 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
 ```
 
 `--cards-collapsed`/`--cards-expanded` fuerzan todas las tarjetas colapsadas/expandidas y
-`--cards-collapsed-sections` un estado mixto (lista de secciones); `--screenshot-size 1040x640`
-fija el tamaño de la ventana. Los flags **sin valor** (`--cards-collapsed`, `--cards-expanded`,
-`--sidebar-collapsed`, `--disk-scan`, `--show-status`) deben ir al final de la línea de
+`--cards-collapsed-sections` un estado mixto (lista de secciones); `--screenshot-size 1340x700`
+fija el tamaño de la ventana (mínimo 1340×700, el que necesita el layout con la sidebar
+completa). Los flags **sin valor** (`--cards-collapsed`, `--cards-expanded`,
+`--sidebar-collapsed`, `--disk-scan`, `--show-status`, `--networking-resolve-names`) deben ir al
+final de la línea de
 argumentos; si quedan en medio, macOS puede abrir la app sin ventana principal y la captura no se
 genera.
 

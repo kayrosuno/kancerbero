@@ -15,7 +15,9 @@
 ## UI
 
 - `RootView`: `NavigationSplitView` con `columnVisibility`; sidebar colapsable con
-  `SidebarCommands()` y el toggle nativo que macOS dibuja en la toolbar.
+  `SidebarCommands()` y el toggle nativo de la toolbar. La columna tiene ancho fijo
+  (`KBTheme.sidebarWidth`), y el mínimo de la ventana (1340 pt) cubre el layout completo, de modo
+  que al redimensionar la sidebar nunca se recorta ni se colapsa.
 - `SidebarView`: selección propia con `matchedGeometryEffect` para Networking / Disk / Daemons /
   CPU / Memory / Energy / Applications; cabecera con marca y estado live, engranaje de Settings
   sobre el separador de estado y pie con fuente (daemon/local), privcheck y hora.
@@ -193,10 +195,15 @@
   `--networking-interface-search`,
   `--networking-process-domain`, `--networking-process-ip` (alias ipv4/ipv6),
   `--networking-process-protocol`, `--networking-process-socket`,
-  `--networking-search`, `--daemon-*`, `--volumes-focus`, `--analyzer-focus`,
+  `--networking-search`, `--networking-resolve-names`, `--sidebar-collapsed`, `--daemon-*`,
+  `--volumes-focus`, `--analyzer-focus`,
   `--disk-io-search`, `--disk-io-selected`, `--disk-io-graph`, `--cpu-search`,
   `--cpu-selected`, `--memory-search`, `--memory-selected`, `--energy-search` y
   `--energy-selected` se aplican una sola vez al crear `UIState`.
+  En Networking, `resolveNames` (apagado por defecto) también es de sesión: `AppModel` mantiene
+  `hostNames` más una caché negativa y `HostNameResolver` ejecuta `getnameinfo(...,
+  NI_NAMEREQD)` en una cola GCD privada con concurrencia limitada, aplicando cada nombre en el
+  main actor para que las celdas pasen de IP a hostname de forma incremental.
 - Tarjetas colapsables: `UIState.collapsedCardSections` guarda las secciones cuyo dashboard está
   oculto (solo sesión). El botón global del toolbar, delante del selector de intervalo, aplica
   “todo o nada” a las 7 secciones y `CollapsibleSectionHeader` añade un control `Hide/Show cards`
@@ -232,7 +239,7 @@
   `--networking-focus`, `--networking-transport`, `--networking-ip`, `--networking-state`,
   `--networking-connection-search`, `--networking-process-domain`,
   `--networking-process-ip` (alias ipv4/ipv6), `--networking-process-protocol`,
-  `--networking-process-socket`, `--networking-search`,
+  `--networking-process-socket`, `--networking-search`, `--networking-resolve-names`,
   `--volumes-focus`, `--analyzer-focus`, `--disk-io-search`, `--disk-io-selected`,
   `--disk-io-graph`, `--cpu-search`, `--cpu-selected`, `--memory-search`,
   `--memory-selected`, `--energy-search`, `--energy-selected`, `--screenshot-dock`,
@@ -336,7 +343,8 @@
   - Procesos: `rusage_info_v6` (`ri_diskio_bytesread`, `ri_diskio_byteswritten`,
     `ri_logical_writes`), convertidos a tasas por `ProcessCPUTracker`; con daemons antiguos la app
     rellena los procesos del usuario mediante `ProcessIOReader`/`kb_process_io_read`. El gráfico
-    (`DiskIOChart`) alterna Data/Operations y dibuja el mismo ecualizador de barras espejado que
+    (`DiskIOChart`) alterna Data/Operations con el mismo selector glass que Traffic
+    (`GraphModeSelector`) y dibuja el mismo ecualizador de barras espejado que
     Traffic —lecturas arriba, escrituras abajo, desde `MirroredBarChart`—; al pasar el ratón,
     una línea vertical y un tooltip muestran la muestra bajo el cursor. La tabla
     (`DiskIOProcessTable`) ordena por actividad con estado, PID y usuario.
@@ -479,7 +487,7 @@
   (`loadFromPreferences`/`saveToPreferences`/`removeFromPreferences`) tienen un timeout de 5 s
   con una continuación one-shot, para que un daemon de NetworkExtension que no responde deje el
   estado en `.failed` en vez de colgar la UI. Ventana **Filter rules**
-  (`FilterRulesView`, abierta con **Rules…** desde el Filter) con estado, reglas y decisiones
+  (`FilterRulesView`, abierta con **Filter Rules…** desde el Filter) con estado, reglas y decisiones
   recordadas. La columna **Policy** es un badge pulsable que abre un popover con Ask/Allow/Deny,
   checkmark en la actual y la descripción de cada opción (el `Menu` nativo perdía el color y la
   cápsula del badge dentro de la tabla). Las reglas se pueden eliminar de varias formas:
