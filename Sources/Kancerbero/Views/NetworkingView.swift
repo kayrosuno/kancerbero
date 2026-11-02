@@ -84,7 +84,6 @@ struct NetworkingView: View {
             uploadHistory: model.txHistory,
             downloadPacketHistory: model.rxPacketHistory,
             uploadPacketHistory: model.txPacketHistory,
-            sampleDates: model.sampleDates,
             focus: ui.networking.focus,
             sampleInterval: model.interval,
             graphMode: trafficGraphMode,

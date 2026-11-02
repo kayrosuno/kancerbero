@@ -26,18 +26,18 @@ nettop -P -d -L 3 -s 1 -x
   puede diferir entre ambas herramientas si parte de su tráfico lo gestiona un helper XPC; es una
   diferencia de atribución, no de contadores.
 - Comprobado: `ollama`, `2.1.310` y `rapportd` coinciden con `nettop` (±1%).
-- **Network totals y selector Bits/Packets:** capturar
+- **Network statistics y selector Bits/Packets:** capturar
   `--section networking --traffic-graph bits` y `--traffic-graph packets`. La card **Network
-  totals** queda siempre en la franja superior (ya no hay variante horizontal debajo): dos grupos
-  sombreados, **Bytes** encima de **Packets**, con filas Input/Output y solo el total acumulado
-  desde el arranque. Traffic se adapta hasta su mínimo y lleva en la cabecera los grupos de tasas
-  **Bytes** y **Packets**, ambos visibles, con el grupo del modo activo resaltado y el otro
-  atenuado; el selector glass está a la derecha (fallback segmentado en versiones anteriores) y
-  cada tasa alterna el foco Download/Upload al pulsarla. Contrastar tasas con Activity Monitor →
-  Network y totales con `netstat -ib` sumando `en*` y excluyendo `lo0`/`utun`. A 1040×640
-  comprobar que las tres cards siguen en una fila, sin card Network debajo ni recortes de
-  Traffic, y que el fallback de cabecera mantiene ambos grupos. `--cards-collapsed` oculta toda
-  la franja.
+  statistics** queda siempre la primera de la franja: tasas **Upload** arriba y **Download**
+  debajo, en bits/s con pkt/s como subtítulo, y bajo un separador los totales acumulados de
+  Bytes/Packets In/Out desde el arranque. Traffic se adapta hasta su mínimo; su cabecera reúne en
+  una línea el título, la leyenda **Upload**/**Download** (punto de color y tasa en las unidades
+  del modo activo) y el selector glass a la derecha (segmentado nativo en versiones anteriores);
+  cada entrada de la leyenda alterna el foco de su dirección al pulsarla. Contrastar tasas con
+  Activity Monitor → Network y
+  totales con `netstat -ib` sumando `en*` y excluyendo `lo0`/`utun`. A 1040×640 comprobar que las
+  tres cards siguen en una fila, sin recortes de Traffic, y que la cabecera mantiene título y
+  selector legibles. `--cards-collapsed` oculta toda la franja.
 - Prueba controlada:
 
 ```bash
@@ -364,7 +364,8 @@ log stream --predicate 'subsystem == "uno.kayros.kancerbero"' --info --debug
   suscripción.
 - Comprobar la cadencia real por la hora de “Updated” y el avance de los sparklines: a 0,5 s la
   ventana de 60 muestras abarca ~30 s; a 5 s, ~5 min. Los historiales se conservan al cambiar el
-  intervalo y el eje temporal usa las marcas de `sampleDates`, así que no mezcla cadencias.
+  intervalo; Traffic usa slots fijos y un eje nominal de 60 × intervalo, de modo que las muestras
+  antiguas se re-espacian uniformemente al cambiar la cadencia.
 - Todos los gráficos temporales (Traffic, CPU, Disk I/O, memoria, batería, sparklines y core bars,
   además de los estilos del icono del Dock) dibujan el dato más reciente a la izquierda. En
   Traffic el eje lee `now → -30s → -60s`; en Battery el ancla antigua queda a la derecha y la
@@ -560,9 +561,13 @@ $APP --screenshot /tmp/kb-net-process-independent.png --section networking \
   --tab processes --networking-transport udp --screenshot-delay 12
 ```
 
-- Traffic: Download/Upload en la cabecera, gráfico espejado con cuadrícula, etiquetas Y en
-  `bps/Kbps/Mbps/Gbps` y eje temporal `now/-30s/-60s` (con el intervalo de 1 s; el dato más
-  reciente entra por la izquierda). Sin salto de layout entre 0,3 s y 5 s.
+- Traffic: cabecera en una línea con el título, la leyenda **Upload**/**Download** (punto de
+  color y tasa en las unidades del modo activo) y el selector Bits/Packets; cada entrada alterna
+  el foco de su dirección; ecualizador espejado de barras sólidas con upload arriba y download abajo,
+  coloreadas por calor según su magnitud, sobre cuadrícula, etiquetas Y en
+  `bps/Kbps/Mbps/Gbps` y eje temporal nominal `now/-30s/-60s` (con el intervalo de 1 s; el dato
+  más reciente entra por la izquierda). Las barras ocupan slots fijos desde el borde izquierdo,
+  así que un histórico corto queda empaquetado. Sin salto de layout entre 0,3 s y 5 s.
 - Activity muestra tres métricas: **processes** con sockets (total de la tabla Processes),
   **Connections** totales (`sources.count`) y **Active** (flujos con tráfico RX+TX dentro de la
   ventana configurada, 10 s por defecto). Los tres son totales y no dependen de los filtros.
@@ -784,8 +789,9 @@ Capturas:
   --screenshot-delay 6
 ```
 
-- En la captura de I/O, copiar un archivo grande mientras la pestaña está abierta: el gráfico y
-  las tasas Read/Write deben moverse; Data/Operations cambia las unidades; los totales
+- En la captura de I/O, copiar un archivo grande mientras la pestaña está abierta: el gráfico
+  (barras espejadas, lecturas arriba y escrituras abajo) y las tasas Read/Write deben moverse;
+  Data/Operations cambia las unidades; los totales
   “Reads in/Writes out/Data read/Data written” deben coincidir con
   `ioreg -r -d 1 -w 0 -c IOBlockStorageDriver | grep Statistics`. La tabla se ordena por
   actividad y los procesos sin contadores (`usage` nulo o daemon antiguo) muestran “—”; el

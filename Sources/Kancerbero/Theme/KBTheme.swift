@@ -43,6 +43,33 @@ enum KBTheme {
         }
     }
 
+    /// Heat ramp for the headline rate values on the statistics cards: cool
+    /// at idle through green, amber and orange to red at saturation.
+    /// Thresholds are bytes per second, so one ramp serves disk throughput
+    /// and network rates. Each appearance gets tones with enough contrast
+    /// for the 18 pt semibold value over the card material.
+    static func rateHeat(_ bytesPerSecond: Double, scheme: ColorScheme) -> Color {
+        guard bytesPerSecond.isFinite, bytesPerSecond > 0 else { return .secondary }
+        let dark = scheme == .dark
+        switch bytesPerSecond {
+        case ..<(100 * 1024):
+            return dark ? Color(red: 0.35, green: 0.67, blue: 0.98)
+                        : Color(red: 0.10, green: 0.40, blue: 0.80)
+        case ..<(1024 * 1024):
+            return dark ? Color(red: 0.25, green: 0.78, blue: 0.56)
+                        : Color(red: 0.05, green: 0.45, blue: 0.30)
+        case ..<(10 * 1024 * 1024):
+            return dark ? Color(red: 0.98, green: 0.74, blue: 0.25)
+                        : Color(red: 0.58, green: 0.36, blue: 0.00)
+        case ..<(100 * 1024 * 1024):
+            return dark ? Color(red: 1.00, green: 0.58, blue: 0.20)
+                        : Color(red: 0.75, green: 0.30, blue: 0.00)
+        default:
+            return dark ? Color(red: 1.00, green: 0.44, blue: 0.40)
+                        : Color(red: 0.74, green: 0.13, blue: 0.11)
+        }
+    }
+
     static let summaryCardMinWidth: CGFloat = 170
     static let summaryGridSpacing: CGFloat = 10
     static let summaryColumns = [GridItem(.adaptive(minimum: 170), spacing: 10)]

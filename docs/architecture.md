@@ -20,18 +20,22 @@
   CPU / Memory / Energy / Applications; cabecera con marca y estado live, engranaje de Settings
   sobre el separador de estado y pie con fuente (daemon/local), privcheck y hora.
 - `NetworkingView`: franja superior como un único `HStack` sin `ViewThatFits`: primero
-  `NetworkStatisticsCard` fijo de 220 pt (tasas Download/Upload en bits/s con pkt/s como
-  subtítulo y, bajo un separador, totales acumulados de bytes y paquetes In/Out), después la
+  `NetworkStatisticsCard` fijo de 220 pt (tasas Upload arriba y Download debajo, en bits/s con
+  pkt/s como subtítulo y, bajo un separador, totales acumulados de bytes y paquetes In/Out),
+  después la
   columna `ActivityCard` (procesos con sockets, conexiones totales y conexiones activas dentro
   de la ventana configurada —10 s por defecto—, las dos últimas como filtro todas/activas) +
   `ProtocolCard`, y por último `TrafficCard` con mínimo 260. Network siempre queda en la
   franja. `TrafficCard` recibe las tasas y usa
   `TrafficModeSelector` (glass en macOS 26+, `Picker` segmentado nativo en versiones anteriores)
-  a la derecha de una cabecera con dos grupos de tasas, **Bytes** y **Packets**, ambos visibles;
-  el grupo del modo activo se resalta y el otro queda atenuado. Cada tasa es un botón que alterna
-  el foco Download/Upload. `TrafficChart` dibuja el gráfico espejado, escala compartida con techo
-  1/2/5×10^n, cuadrícula, niveles y eje temporal; ventana de 60 muestras con el dato más reciente
-  a la izquierda (`now` → `-60 s`).
+  a la derecha de una cabecera en una línea con el título y la leyenda de **Upload** y
+  **Download** (punto de color, etiqueta y tasa en las unidades del modo activo). Cada entrada
+  de la leyenda alterna el foco de su dirección al pulsarla. `TrafficChart` dibuja, vía
+  `MirroredBarChart`, un ecualizador espejado de barras sólidas —upload arriba, download abajo—
+  coloreadas con la escala de calor según su magnitud; escala compartida con
+  techo 1/2/5×10^n, cuadrícula, niveles y eje temporal; ventana de 60 muestras en slots fijos
+  empaquetados desde la izquierda (dato más reciente en `now`, eje nominal 60 × intervalo).
+  `KBTheme.rateHeat` colorea los valores de tasa de los cards de estadísticas según su magnitud.
   Debajo, `PillTabBar` y las tablas (`NetworkingTables.swift`). `NetworkingUIState` guarda, por un
   lado, los filtros de Connections —`transports: Set<NetworkingTransport>`, `ipVersions:
   Set<NetworkingIPVersion>` y `connectionStates: Set<NetworkingConnectionState>`— y, por otro,
@@ -326,8 +330,9 @@
   - Procesos: `rusage_info_v6` (`ri_diskio_bytesread`, `ri_diskio_byteswritten`,
     `ri_logical_writes`), convertidos a tasas por `ProcessCPUTracker`; con daemons antiguos la app
     rellena los procesos del usuario mediante `ProcessIOReader`/`kb_process_io_read`. El gráfico
-    (`DiskIOChart`) alterna Data/Operations y la tabla (`DiskIOProcessTable`) ordena por actividad
-    con estado, PID y usuario.
+    (`DiskIOChart`) alterna Data/Operations y dibuja el mismo ecualizador de barras espejado que
+    Traffic —lecturas arriba, escrituras abajo, desde `MirroredBarChart`—; la tabla
+    (`DiskIOProcessTable`) ordena por actividad con estado, PID y usuario.
 - **Límites:** SMART no está expuesto por APIs públicas; los volúmenes desmontados no tienen
   libre/usado; los hard links se cuentan por entrada; clones/snapshots APFS hacen que la suma de
   tamaños no coincida exactamente con el “Used” del contenedor.

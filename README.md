@@ -36,14 +36,17 @@ El detalle de binarios, permisos, instalación y librerías está en
 - **Networking** — a la izquierda, una tarjeta **Activity** con tres métricas —procesos con
   sockets, conexiones totales y conexiones activas (con tráfico en los últimos 10 s)— donde las
   dos de conexiones actúan como filtro (todas / solo activas), y una tarjeta **Protocols** con el
-  desglose TCP4/TCP6/UDP4/UDP6/UNIX/OTHER; en medio, la tarjeta
-  **Network totals**, siempre visible en la franja, con dos grupos apilados y sombreados,
-  **Bytes** sobre **Packets**; cada grupo muestra las filas **Input**/**Output** y su total
-  acumulado desde el arranque. A la derecha, la tarjeta **Traffic** se adapta hasta un mínimo y
-  lleva en la cabecera los grupos de tasas **Bytes** y **Packets** (ambos visibles, con el grupo
-  del modo activo resaltado) y el selector **Bits/Packets** glass a la derecha; cada tasa es
-  clicable para filtrar por dirección. El gráfico espejado (download arriba, upload abajo)
-  conserva cuadrícula, niveles y eje temporal. Una **barra de filtros** entre las pills y la
+  desglose TCP4/TCP6/UDP4/UDP6/UNIX/OTHER; primero, la tarjeta **Network statistics**, fija a la
+  izquierda, con las tasas actuales **Upload** arriba y **Download** debajo, en bits/s (pkt/s
+  como subtítulo) y, bajo un separador, los totales acumulados **Bytes** y **Packets** In/Out
+  desde el arranque. A la derecha, la tarjeta **Traffic** se adapta hasta un mínimo y lleva en la
+  cabecera, en una sola línea, el título, la leyenda con **Upload** y **Download** (punto de
+  color, etiqueta y tasa en las unidades del modo activo) y el selector **Bits/Packets** glass a
+  la derecha; cada entrada de la leyenda alterna el foco de su dirección al pulsarla. El gráfico
+  es un **ecualizador espejado** de barras sólidas (upload arriba, download abajo) coloreadas con
+  la escala de calor según su magnitud. Las barras ocupan slots
+  fijos desde la izquierda, de modo que un histórico corto queda empaquetado en lugar de
+  repartirse por todo el ancho, sobre cuadrícula, niveles y eje temporal nominal (60 × intervalo). Una **barra de filtros** entre las pills y la
   tarjeta de la tabla reúne los grupos de checkboxes multiselección en cápsulas. En Connections:
   **IP** (IPv4/IPv6), **Transport** (TCP/UDP/Other), **TCP State** (Established, Listening,
   Connecting (SYN), Closing (Close/Fin/Time Wait)) y **Other** en su propia cápsula (solo el
