@@ -11,6 +11,8 @@ struct SummaryCard: View {
     var isSelected = false
     var filterHint: String? = nil
     var fillsHeight = false
+    /// Horizontal, shorter layout used by the Disk → Volumes cards.
+    var compact = false
 
     @State private var hovering = false
 
@@ -37,54 +39,16 @@ struct SummaryCard: View {
     }
 
     private var card: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 22, height: 22)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(KBTheme.gradient(tint))
-                    )
-                Spacer(minLength: 2)
-                Text(title)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(tint)
-                }
-            }
-
-            Text(value)
-                .font(.system(size: 19, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .contentTransition(.numericText())
-                .lineLimit(1)
-                .minimumScaleFactor(0.65)
-
-            Text(caption)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-
-            if let sparkline {
-                if sparkline.isEmpty {
-                    // Reserve the chart's height before the first sample arrives
-                    // so the grid row (and everything below it) does not jump.
-                    Color.clear
-                        .frame(height: sparklineHeight)
-                } else {
-                    Sparkline(values: sparkline, tint: tint)
-                        .frame(height: sparklineHeight)
-                }
+        Group {
+            if compact {
+                compactContent
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+            } else {
+                regularContent
+                    .padding(10)
             }
         }
-        .padding(10)
         .frame(maxWidth: .infinity,
                maxHeight: fillsHeight ? .infinity : nil,
                alignment: fillsHeight ? .topLeading : .leading)
@@ -119,5 +83,93 @@ struct SummaryCard: View {
             guard isInteractive else { return }
             withAnimation(.snappy(duration: 0.2)) { hovering = value }
         }
+    }
+
+    // MARK: - Layouts
+
+    private var regularContent: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                iconBadge
+                Spacer(minLength: 2)
+                Text(title)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                if isSelected { checkmark }
+            }
+
+            Text(value)
+                .font(.system(size: 19, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .contentTransition(.numericText())
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+
+            Text(caption)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+
+            if let sparkline {
+                if sparkline.isEmpty {
+                    // Reserve the chart's height before the first sample arrives
+                    // so the grid row (and everything below it) does not jump.
+                    Color.clear
+                        .frame(height: sparklineHeight)
+                } else {
+                    Sparkline(values: sparkline, tint: tint)
+                        .frame(height: sparklineHeight)
+                }
+            }
+        }
+    }
+
+    private var compactContent: some View {
+        HStack(alignment: .center, spacing: 8) {
+            iconBadge
+
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Text(value)
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                    Text(title)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Spacer(minLength: 2)
+                }
+                Text(caption)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+
+            if isSelected { checkmark }
+        }
+    }
+
+    private var iconBadge: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 22, height: 22)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(KBTheme.gradient(tint))
+            )
+    }
+
+    private var checkmark: some View {
+        Image(systemName: "checkmark.circle.fill")
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(tint)
     }
 }
