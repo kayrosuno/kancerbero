@@ -12,6 +12,14 @@ struct StatusBar: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(KBPreferences.statusBarTextAnimationsKey)
     private var statusBarTextAnimations = KBPreferences.statusBarTextAnimationsDefault
+    @AppStorage(KBPreferences.diskUnitSystemKey)
+    private var storedDiskUnits = KBPreferences.diskUnitSystemDefault
+
+    private var diskUnits: KBByteUnitSystem {
+        KBByteUnitSystem.fromCommandLine()
+            ?? KBByteUnitSystem(rawValue: storedDiskUnits)
+            ?? .decimal
+    }
 
     var body: some View {
         HStack(spacing: 14) {
@@ -62,14 +70,14 @@ struct StatusBar: View {
             LiveDot(isLive: disk.inventory != nil && !disk.isLoadingInventory)
             slot("\(DiskMetrics.physicalDiskCount(disk.inventory)) disks", width: 80)
             slot("\(DiskMetrics.mountedVolumeCount(disk.inventory)) volumes", width: 90)
-            slot("\(KBFormat.bytes(DiskMetrics.capacityBytes(disk.inventory))) total", width: 100)
-            slot("\(KBFormat.bytes(DiskMetrics.freeBytes(disk.inventory))) free", width: 95)
+            slot("\(KBFormat.bytes(DiskMetrics.capacityBytes(disk.inventory), units: diskUnits)) total", width: 100)
+            slot("\(KBFormat.bytes(DiskMetrics.freeBytes(disk.inventory), units: diskUnits)) free", width: 95)
             if disk.isScanning {
                 ProgressView().controlSize(.mini)
                 slot("Scanning \(KBFormat.compactCount(disk.scanProgress?.files ?? 0)) files",
                      width: 150)
             } else if let snapshot = disk.scanSnapshot {
-                slot("Scanned \(KBFormat.bytes(snapshot.root.allocatedBytes))", width: 115)
+                slot("Scanned \(KBFormat.bytes(snapshot.root.allocatedBytes, units: diskUnits))", width: 115)
             }
 
         case .daemons:

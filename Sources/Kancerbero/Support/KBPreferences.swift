@@ -14,6 +14,9 @@ enum KBPreferences {
     static let dockIconStyleKey = "dockIconStyle"
     static let dockIconStyleDefault = DockIconStyle.applicationIcon.rawValue
 
+    static let diskUnitSystemKey = "diskByteUnitSystem"
+    static let diskUnitSystemDefault = KBByteUnitSystem.decimal.rawValue
+
     /// Window (seconds) in which a connection that moved data still counts as
     /// active. The list is the set of supported values; the default is 10 and
     /// the effective minimum is 5.

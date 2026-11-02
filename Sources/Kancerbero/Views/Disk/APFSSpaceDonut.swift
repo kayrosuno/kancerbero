@@ -7,6 +7,8 @@ struct APFSSpaceDonut: View {
     var diameter: CGFloat = 172
     var ringWidth: CGFloat = 26
 
+    @Environment(\.byteUnitSystem) private var byteUnitSystem
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -123,7 +125,7 @@ struct APFSSpaceDonut: View {
         if let used = context.usedBytes, context.totalBytes > 0 {
             return KBFormat.percent(Double(used) / Double(context.totalBytes))
         }
-        return KBFormat.bytes(context.totalBytes)
+        return KBFormat.bytes(context.totalBytes, units: byteUnitSystem)
     }
 
     private var centerSubtitle: String {
@@ -133,15 +135,15 @@ struct APFSSpaceDonut: View {
                 : "Capacity unavailable"
         }
         if containerCount > 1 {
-            return "containers · \(KBFormat.bytes(context.totalBytes))"
+            return "containers · \(KBFormat.bytes(context.totalBytes, units: byteUnitSystem))"
         }
         if highlightedRow != nil {
-            return "of \(KBFormat.bytes(context.totalBytes))"
+            return "of \(KBFormat.bytes(context.totalBytes, units: byteUnitSystem))"
         }
         if let used = context.usedBytes {
-            return "\(KBFormat.bytes(used)) used"
+            return "\(KBFormat.bytes(used, units: byteUnitSystem)) used"
         }
-        return KBFormat.bytes(context.totalBytes)
+        return KBFormat.bytes(context.totalBytes, units: byteUnitSystem)
     }
 
     private var containerCount: Int {
@@ -244,11 +246,11 @@ struct APFSSpaceDonut: View {
     private func valueText(_ row: APFSSpaceLegendRow) -> String {
         switch row.role {
         case .container:
-            let used = row.bytes.map(KBFormat.bytes) ?? "—"
-            let capacity = row.capacityBytes.map(KBFormat.bytes) ?? "—"
+            let used = row.bytes.map { KBFormat.bytes($0, units: byteUnitSystem) } ?? "—"
+            let capacity = row.capacityBytes.map { KBFormat.bytes($0, units: byteUnitSystem) } ?? "—"
             return "\(used) / \(capacity)"
         case .volume, .residual, .free:
-            return row.bytes.map(KBFormat.bytes) ?? "—"
+            return row.bytes.map { KBFormat.bytes($0, units: byteUnitSystem) } ?? "—"
         case .unknown:
             return "—"
         }
@@ -256,7 +258,7 @@ struct APFSSpaceDonut: View {
 
     private var accessibilityValue: String {
         context.legend.map { row in
-            let value = row.bytes.map(KBFormat.bytes) ?? "unknown"
+            let value = row.bytes.map { KBFormat.bytes($0, units: byteUnitSystem) } ?? "unknown"
             return "\(row.label): \(value)"
         }
         .joined(separator: "; ")

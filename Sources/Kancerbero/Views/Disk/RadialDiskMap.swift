@@ -14,6 +14,8 @@ struct RadialDiskMap: View {
     let onSelect: (KBDiskNode) -> Void
     let onCenterTap: () -> Void
 
+    @Environment(\.byteUnitSystem) private var byteUnitSystem
+
     @State private var hoveredID: String?
 
     private let maxDepth = 3
@@ -67,7 +69,7 @@ struct RadialDiskMap: View {
             )
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(focus.name), \(KBFormat.bytes(focus.allocatedBytes))")
+        .accessibilityLabel("\(focus.name), \(KBFormat.bytes(focus.allocatedBytes, units: byteUnitSystem))")
         .accessibilityValue("\(focus.children.count) items")
         .accessibilityAction(named: "Go up one level") {
             onCenterTap()
@@ -319,7 +321,7 @@ struct RadialDiskMap: View {
                         .foregroundColor(.white)
                 )
                 let sizeText = context.resolve(
-                    Text(KBFormat.bytes(sector.size))
+                    Text(KBFormat.bytes(sector.size, units: byteUnitSystem))
                         .font(.system(size: 7, weight: .regular))
                         .foregroundColor(.white.opacity(0.82))
                 )
@@ -350,7 +352,7 @@ struct RadialDiskMap: View {
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
-            Text(KBFormat.bytes(focus.allocatedBytes))
+            Text(KBFormat.bytes(focus.allocatedBytes, units: byteUnitSystem))
                 .font(.system(size: 10, weight: .medium))
                 .monospacedDigit()
             if let capacity = volumeCapacity,
@@ -370,7 +372,7 @@ struct RadialDiskMap: View {
             Text(sector.label)
                 .font(.system(size: 11, weight: .semibold))
                 .lineLimit(1)
-            Text(KBFormat.bytes(sector.size))
+            Text(KBFormat.bytes(sector.size, units: byteUnitSystem))
                 .font(.system(size: 10))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)

@@ -8,6 +8,8 @@ struct DiskVolumeDetailView: View {
     let onAnalyze: (String) -> Void
     let onClose: () -> Void
 
+    @Environment(\.byteUnitSystem) private var byteUnitSystem
+
     private var spaceContext: APFSSpaceContext? {
         inventory?.apfsSpaceContext(for: item)
     }
@@ -19,11 +21,15 @@ struct DiskVolumeDetailView: View {
     }
 
     private var usedText: String {
-        containerSpaceUnknown ? "—" : (item.usedBytes.map(KBFormat.bytes) ?? "—")
+        containerSpaceUnknown
+            ? "—"
+            : (item.usedBytes.map { KBFormat.bytes($0, units: byteUnitSystem) } ?? "—")
     }
 
     private var freeText: String {
-        containerSpaceUnknown ? "—" : (item.freeBytes.map(KBFormat.bytes) ?? "—")
+        containerSpaceUnknown
+            ? "—"
+            : (item.freeBytes.map { KBFormat.bytes($0, units: byteUnitSystem) } ?? "—")
     }
 
     var body: some View {
@@ -93,7 +99,7 @@ struct DiskVolumeDetailView: View {
     private var stats: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 14) {
-                stat("Capacity", KBFormat.bytes(item.sizeBytes))
+                stat("Capacity", KBFormat.bytes(item.sizeBytes, units: byteUnitSystem))
                 stat("Used", usedText)
                 stat("Free", freeText)
             }
@@ -133,7 +139,7 @@ struct DiskVolumeDetailView: View {
                 freeText)
             row(item.kind == .apfsVolume || item.kind == .apfsContainer
                 ? "Available (container)" : "Available",
-                item.availableBytes.map(KBFormat.bytes) ?? "—")
+                item.availableBytes.map { KBFormat.bytes($0, units: byteUnitSystem) } ?? "—")
             row("Volume UUID", item.volumeUUID ?? "—")
             row("Media UUID", item.mediaUUID ?? "—")
             if let group = item.volumeGroupUUID {

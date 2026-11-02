@@ -5,6 +5,7 @@ import KancerberoCore
 struct DiskVolumesView: View {
     @Environment(DiskModel.self) private var disk
     @Environment(UIState.self) private var ui
+    @Environment(\.byteUnitSystem) private var byteUnitSystem
     let onAnalyze: (String) -> Void
 
     private var selection: Binding<String?> {
@@ -94,7 +95,7 @@ struct DiskVolumesView: View {
             )
             SummaryCard(
                 title: "Capacity",
-                value: KBFormat.bytes(capacity),
+                value: KBFormat.bytes(capacity, units: byteUnitSystem),
                 caption: "across all media",
                 systemImage: "square.stack.3d.up.fill",
                 tint: Color(red: 0.16, green: 0.62, blue: 0.94),
@@ -104,7 +105,7 @@ struct DiskVolumesView: View {
             )
             SummaryCard(
                 title: "Free",
-                value: KBFormat.bytes(free),
+                value: KBFormat.bytes(free, units: byteUnitSystem),
                 caption: "deduplicated across APFS containers",
                 systemImage: "circle.dashed",
                 tint: Color(red: 0.62, green: 0.42, blue: 0.95),
@@ -269,6 +270,7 @@ struct DiskVolumesView: View {
 
 private struct DiskTreeRow: View {
     let item: KBDiskItem
+    @Environment(\.byteUnitSystem) private var byteUnitSystem
 
     var body: some View {
         HStack(spacing: 8) {
@@ -303,7 +305,7 @@ private struct DiskTreeRow: View {
             Spacer(minLength: 6)
 
             VStack(alignment: .trailing, spacing: 3) {
-                Text(KBFormat.bytes(item.sizeBytes))
+                Text(KBFormat.bytes(item.sizeBytes, units: byteUnitSystem))
                     .font(.system(size: 10, weight: .medium))
                     .monospacedDigit()
                 if let fraction = item.volumeUsedFraction {

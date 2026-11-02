@@ -13,9 +13,9 @@ enum DiskIOGraphMode: String, CaseIterable, Identifiable, Equatable {
         }
     }
 
-    func format(_ value: Double) -> String {
+    func format(_ value: Double, units: KBByteUnitSystem) -> String {
         switch self {
-        case .data: return KBFormat.byteRate(value)
+        case .data: return KBFormat.byteRate(value, units: units)
         case .operations: return KBFormat.opsRate(value)
         }
     }
@@ -31,6 +31,7 @@ struct DiskIOChart: View {
     var readColor: Color
     var writeColor: Color
     var sampleInterval: TimeInterval = 1
+    var units: KBByteUnitSystem = .binary
 
     private var count: Int {
         min(MirroredBarChart.window, min(read.count, write.count))
@@ -40,7 +41,7 @@ struct DiskIOChart: View {
         MirroredBarChart(
             top: read,
             bottom: write,
-            format: mode.format,
+            format: { mode.format($0, units: units) },
             topTint: readColor,
             bottomTint: writeColor,
             topLabel: "Read",
@@ -64,6 +65,6 @@ struct DiskIOChart: View {
         guard n > 0 else { return "Collecting" }
         let reads = Array(read.suffix(n))
         let writes = Array(write.suffix(n))
-        return "Read \(mode.format(reads.last ?? 0)), write \(mode.format(writes.last ?? 0))"
+        return "Read \(mode.format(reads.last ?? 0, units: units)), write \(mode.format(writes.last ?? 0, units: units))"
     }
 }

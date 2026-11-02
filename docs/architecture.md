@@ -103,7 +103,12 @@
   produce el daemon root. Sin root solo cubre el uid actual. Los historiales y
   `KBRates` siguen en bytes/s; la presentación usa `KBFormat.bitRate` y los totales acumulados
   `KBFormat.bytes`.
-- `DiskView`: `PillTabBar` con Volumes / Analyzer / I/O. Volumes muestra el árbol
+- `DiskView`: `PillTabBar` con Volumes / Analyzer / I/O y un selector `Decimal`/`Binary`
+  (`GraphModeSelector` + `KBByteUnitSystem`) que cambia tamaños y velocidades de toda la sección.
+  Decimal (por defecto) usa base 1000 con KB/MB/GB; Binary usa base 1024 con KiB/MiB/GiB. El
+  valor vive en `UserDefaults` (`diskByteUnitSystem`) y `DiskView` lo propaga con
+  `EnvironmentValues.byteUnitSystem`; fuera de Disk el valor por defecto es binario para no
+  alterar CPU/Memory/Network. Volumes muestra el árbol
   disco → partición → contenedor APFS → volumen, un inspector y `CapacityBar`; Analyzer muestra
   controles de escaneo, progreso, `RadialDiskMap` y las tablas de contenidos y mayores archivos;
   I/O muestra el gráfico Data/Operations y la tabla de procesos por actividad de disco.
@@ -202,7 +207,7 @@
   `--networking-process-protocol`, `--networking-process-socket`,
   `--networking-search`, `--networking-resolve-names`, `--sidebar-collapsed`, `--daemon-*`,
   `--volumes-focus`, `--analyzer-focus`,
-  `--disk-io-search`, `--disk-io-selected`, `--disk-io-graph`, `--cpu-search`,
+  `--disk-io-search`, `--disk-io-selected`, `--disk-io-graph`, `--disk-units`, `--cpu-search`,
   `--cpu-selected`, `--memory-search`, `--memory-selected`, `--energy-search` y
   `--energy-selected` se aplican una sola vez al crear `UIState`.
   En Networking, `resolveNames` (apagado por defecto) también es de sesión: `AppModel` mantiene

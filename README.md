@@ -92,7 +92,9 @@ El detalle de binarios, permisos, instalación y librerías está en
     volúmenes montados, orden por tamaño o por menos espacio libre); All restaura el árbol
     completo expandido. Al seleccionar un disco, contenedor o volumen APFS, el panel de detalle
     muestra un donut con el número de contenedores y el espacio de cada uno (o el desglose de
-    volúmenes, snapshots/metadatos y libre).
+    volúmenes, snapshots/metadatos y libre). El selector **Decimal/Binary** de la línea de
+    pestañas cambia todas las cifras de Disk: Decimal (por defecto, como Finder) usa KB/MB/GB con
+    base 1000; Binary usa KiB/MiB/GiB con base 1024. La elección se recuerda.
   - **Analyzer** — escaneo local de una carpeta o volumen con `getattrlistbulk`, mapa radial
     interactivo (clic en un sector para bajar, clic en el centro para subir), drill-down, mayores
     archivos, progreso y cancelación. El mapa y las tarjetas se actualizan en vivo durante el
@@ -271,6 +273,7 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--disk-path=<carpeta>] [--disk-scan] [--disk-item <diskXsY>] \
   [--disk-io-search <texto>] [--disk-io-selected <pid>] \
   [--disk-io-graph data|operations] \
+  [--disk-units decimal|binary] \
   [--cpu-search <texto>] [--cpu-selected <pid>] \
   [--memory-search <texto>] [--memory-selected <pid>] \
   [--energy-search <texto>] [--energy-selected <pid>] \

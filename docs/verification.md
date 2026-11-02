@@ -103,6 +103,7 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--disk-path=<carpeta>] [--disk-scan] [--disk-item <diskXsY>] \
   [--disk-io-search <texto>] [--disk-io-selected <pid>] \
   [--disk-io-graph data|operations] \
+  [--disk-units decimal|binary] \
   [--cpu-search <texto>] [--cpu-selected <pid>] \
   [--memory-search <texto>] [--memory-selected <pid>] \
   [--energy-search <texto>] [--energy-selected <pid>] \
@@ -133,7 +134,9 @@ un estado mixto y `--screenshot-size 1340x700` fija el tamaño de la ventana.
 `--disk-tab` la de Disk, `--disk-path`/`--disk-scan` lanzan el analizador sobre una ruta y
 `--disk-item` preselecciona un dispositivo en Volumes. `--disk-tab io` abre la pestaña de
 actividad; `--disk-io-search`/`--disk-io-selected` filtran y preseleccionan procesos y
-`--disk-io-graph data|operations` elige el tipo de gráfico. `--cpu-search` aplica el filtro inicial de
+`--disk-io-graph data|operations` elige el tipo de gráfico. `--disk-units decimal|binary` cambia
+el sistema de unidades de tamaño/velocidad de la pestaña Disk (por defecto decimal); sin el flag
+se usa el valor guardado por el selector. `--cpu-search` aplica el filtro inicial de
 la tabla de CPU, `--cpu-selected` preselecciona un PID, `--memory-search`/`--memory-selected`
 hacen lo mismo en la tabla de Memory, `--energy-search`/`--energy-selected` en la de Energy,
 `--screenshot-dock` renderiza el icono del Dock a PNG (256×256) y `--dock-style` elige el estilo
@@ -805,8 +808,8 @@ $K --screenshot /tmp/kb-apfs-volume.png --section disk --disk-tab volumes \
 
 - El número de contenedores del disco debe coincidir con `diskutil list` (incluye los
   contenedores ISC y Recovery que `diskutil apfs list` no muestra); `diskutil apfs list` sirve
-  para los volúmenes y la capacidad en uso del contenedor principal. La app formatea con unidades
-  binarias etiquetadas como GB, así que 494,4 GB decimales equivalen a ~460,4 GB en el gráfico.
+  para los volúmenes y la capacidad en uso del contenedor principal. Con el selector en Decimal
+  (por defecto) el gráfico muestra 494,4 GB; en Binario muestra 460,4 GiB.
   Con varios contenedores, el donut muestra una porción por contenedor (tamaño = capacidad) y la
   leyenda `usado / capacidad` + número de volúmenes/snapshots.
 - Con un solo contenedor, el donut muestra el desglose de sus volúmenes con el subtítulo
@@ -817,6 +820,12 @@ $K --screenshot /tmp/kb-apfs-volume.png --section disk --disk-tab volumes \
   `ATTR_VOL_SPACEUSED` frente a `diskutil`. Si la suma de usado excede lo usable, las porciones se
   escalan y aparece la nota correspondiente.
 - Seleccionar un disco/partición no APFS no muestra gráfico ni divisor.
+- Selector **Decimal/Binary** de la línea de pestañas:
+  `--disk-units decimal` muestra `500,3 GB` para disk0 (base 1000, KB/MB/GB);
+  `--disk-units binary` muestra `465,9 GiB` (base 1024, KiB/MiB/GiB). Cambian árbol, tarjetas,
+  detalle, donut APFS, analyzer, tablas de I/O, velocidades Read/s/Write/s y la barra de estado.
+  Las operaciones/s y los contadores no cambian. CPU/Memory/Network conservan su formato. La
+  elección del selector se guarda en `UserDefaults`; el flag solo afecta a la sesión/captura.
 
 Escaneo:
 
