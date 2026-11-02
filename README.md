@@ -90,7 +90,9 @@ El detalle de binarios, permisos, instalación y librerías está en
     montaje, UUID, roles APFS, modelo/protocolo y cifrado. No ejecuta procesos externos. Las
     tarjetas All / Disks / Volumes / Capacity / Free filtran la lista (vista completa, medios,
     volúmenes montados, orden por tamaño o por menos espacio libre); All restaura el árbol
-    completo expandido.
+    completo expandido. Al seleccionar un disco, contenedor o volumen APFS, el panel de detalle
+    muestra un donut con el número de contenedores y el espacio de cada uno (o el desglose de
+    volúmenes, snapshots/metadatos y libre).
   - **Analyzer** — escaneo local de una carpeta o volumen con `getattrlistbulk`, mapa radial
     interactivo (clic en un sector para bajar, clic en el centro para subir), drill-down, mayores
     archivos, progreso y cancelación. El mapa y las tarjetas se actualizan en vivo durante el

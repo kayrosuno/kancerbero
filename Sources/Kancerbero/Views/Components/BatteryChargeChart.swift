@@ -58,18 +58,18 @@ struct BatteryChargeChart: View {
                        style: StrokeStyle(lineWidth: 1, lineCap: .round, lineJoin: .round))
     }
 
-    /// Charge samples across the fixed 12 h window, oldest first. Activity
-    /// Monitor keeps the oldest sample before the window as a right anchor;
-    /// the first point is pinned to the right edge and the last level extends
-    /// to the left edge. A single sample therefore draws a flat line.
+    /// Charge samples across the fixed 12 h window, oldest first. Each sample
+    /// maps to its real age, so a short history only covers the left corner
+    /// and the chart fills up progressively. The oldest sample before the
+    /// window anchors the right edge; the newest level extends to "now".
     private func chargePoints(size: CGSize) -> [CGPoint] {
         let samples = chargeSamples()
         guard !samples.isEmpty else { return [] }
 
         var points: [CGPoint] = []
         points.reserveCapacity(samples.count + 1)
-        for (index, sample) in samples.enumerated() {
-            let x = index == 0 ? size.width : xPosition(sample.time, width: size.width)
+        for sample in samples {
+            let x = xPosition(sample.time, width: size.width)
             points.append(CGPoint(x: x, y: yPosition(sample.level, height: size.height)))
         }
         if let last = samples.last {
@@ -99,18 +99,17 @@ struct BatteryChargeChart: View {
         return samples
     }
 
-    /// Full-height bands for the AC intervals. The state just before the
-    /// window anchors the right edge; the current state owns everything up to
-    /// the left edge.
+    /// Full-height bands for the AC intervals. Each state entry maps to its
+    /// real age; the current state owns everything up to the left edge.
     private func acRegions(size: CGSize) -> [CGRect] {
         let entries = stateEntries()
         guard let first = entries.first else { return [] }
 
         var regions: [CGRect] = []
         var previous = first.onAC
-        var start = size.width
-        for (index, entry) in entries.enumerated() {
-            let x = index == 0 ? size.width : xPosition(entry.time, width: size.width)
+        var start = xPosition(first.time, width: size.width)
+        for entry in entries {
+            let x = xPosition(entry.time, width: size.width)
             if entry.onAC != previous {
                 if entry.onAC {
                     start = x

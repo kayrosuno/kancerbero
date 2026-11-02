@@ -19,6 +19,10 @@
   (`KBTheme.sidebarWidth`), y el mínimo de la ventana se deriva de la visibilidad: 1340 pt con la
   sidebar y 1088 pt cuando está oculta (`.detailOnly`), de modo que al redimensionar la sidebar
   nunca se recorta y, al ocultarla, el contenido aprovecha el espacio liberado.
+- Gráficos temporales: todos usan un paso X fijo por slot (`ancho / (ventana - 1)`) con la muestra
+  más reciente a la izquierda y la ventana completa de 60 muestras (120 en Traffic y Disk); así el
+  contenido crece por slots en vez de estirarse con 2-3 muestras. Battery conserva su eje de 12 h
+  y mapea cada muestra por su antigüedad real, sin anclar la primera al borde derecho.
 - `SidebarView`: selección propia con `matchedGeometryEffect` para Networking / Disk / Daemons /
   CPU / Memory / Energy / Applications; cabecera con marca y estado live, engranaje de Settings
   sobre el separador de estado y pie con fuente (daemon/local), privcheck y hora.
@@ -311,6 +315,12 @@
     ATTR_VOL_SPACEAVAIL | ATTR_VOL_SPACEUSED` da el tamaño, libre, disponible y **usado real por
     volumen APFS** (coincide con `CapacityInUse` de `diskutil`).
   - El contenedor APFS hereda el libre de sus volúmenes montados (el espacio es compartido).
+  - El detalle de Volumes incluye un donut APFS (`APFSSpaceContext` + `APFSSpaceDonut`): para un
+    disco, una porción por contenedor dimensionada por capacidad; para un contenedor o volumen,
+    usado por volumen, residual de snapshots/metadatos/volúmenes desmontados y libre. Un
+    contenedor sin volumen montado se muestra como desconocido (—), nunca como 0 B; si la suma de
+    usado excede el espacio usable (clones/bloques compartidos), las porciones se escalan
+    proporcionalmente y se avisa en una nota.
   - No se ejecuta ningún proceso externo.
 - **Escaneo (`DiskScanner`)**
   - Una llamada C a `kb_disk_list_directory` por directorio; la capa C usa `open(O_RDONLY |

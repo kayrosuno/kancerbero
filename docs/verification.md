@@ -383,6 +383,11 @@ log stream --predicate 'subsystem == "uno.kayros.kancerbero"' --info --debug
   además de los estilos del icono del Dock) dibujan el dato más reciente a la izquierda. En
   Traffic el eje lee `now → -60s → -2m`; en Battery el ancla antigua queda a la derecha y la
   muestra nueva en el borde izquierdo. Los gráficos de composición no cambian.
+- Crecimiento progresivo: con 1-3 muestras los gráficos temporales ocupan solo los primeros slots
+  a la izquierda (CPU history, GPU, Physical Memory, presión, composición, Energy, wake-ups y los
+  estilos del Dock) y se extienden a la derecha al llegar muestras hasta llenar la ventana (60
+  muestras; 120 en Traffic/Disk). No deben estirarse con 2-3 muestras. En Battery, con minutos de
+  histórico la línea queda junto al borde izquierdo; el eje de 12 h no cambia.
 - Arranque limpio: capturar Networking a 1, 2, 4 y 6 s no debe mostrar ningún pico GB/s ni un techo
   desproporcionado; la primera muestra es 0 y las siguientes se estabilizan. Repetir en Disk →
   I/O (Data/Operations) y Energy (sparklines de Energy y Wake-ups) y con `--screenshot-dock
@@ -781,6 +786,37 @@ diskutil info disk3s5
 ```bash
 grep -R "diskutil" Sources/ || echo "sin diskutil en el código"
 ```
+
+Gráfico APFS del detalle (Volumes):
+
+```bash
+./build/Build/Products/Debug/KancerberoProbe disk apfs
+./build/Build/Products/Debug/KancerberoProbe disk apfs disk3
+diskutil apfs list
+
+K=build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
+$K --screenshot /tmp/kb-apfs-disk.png --section disk --disk-tab volumes \
+  --disk-item disk0 --screenshot-size 1440x900 --screenshot-delay 5 --cards-collapsed
+$K --screenshot /tmp/kb-apfs-container.png --section disk --disk-tab volumes \
+  --disk-item disk3 --screenshot-size 1440x900 --screenshot-delay 5 --cards-collapsed
+$K --screenshot /tmp/kb-apfs-volume.png --section disk --disk-tab volumes \
+  --disk-item disk3s5 --screenshot-size 1340x800 --screenshot-delay 5 --cards-collapsed
+```
+
+- El número de contenedores del disco debe coincidir con `diskutil list` (incluye los
+  contenedores ISC y Recovery que `diskutil apfs list` no muestra); `diskutil apfs list` sirve
+  para los volúmenes y la capacidad en uso del contenedor principal. La app formatea con unidades
+  binarias etiquetadas como GB, así que 494,4 GB decimales equivalen a ~460,4 GB en el gráfico.
+  Con varios contenedores, el donut muestra una porción por contenedor (tamaño = capacidad) y la
+  leyenda `usado / capacidad` + número de volúmenes/snapshots.
+- Con un solo contenedor, el donut muestra el desglose de sus volúmenes con el subtítulo
+  «1 APFS container». Al seleccionar un contenedor o volumen se muestran sus volúmenes,
+  snapshots/metadatos y libre; el volumen seleccionado queda resaltado.
+- Un contenedor sin volumen montado muestra un anillo discontinuo y `—` (nunca `0 B`).
+- `usado de volúmenes + residual + libre = capacidad`; permitir la diferencia documentada de
+  `ATTR_VOL_SPACEUSED` frente a `diskutil`. Si la suma de usado excede lo usable, las porciones se
+  escalan y aparece la nota correspondiente.
+- Seleccionar un disco/partición no APFS no muestra gráfico ni divisor.
 
 Escaneo:
 

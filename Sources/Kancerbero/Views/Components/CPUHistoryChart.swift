@@ -17,6 +17,8 @@ struct CPUHistoryChart: View {
         min(60, min(user.count, min(system.count, nice.count)))
     }
 
+    private static let window = 60
+
     private var slices: (user: [Double], system: [Double], nice: [Double]) {
         let n = count
         return (Array(user.suffix(n)),
@@ -29,7 +31,12 @@ struct CPUHistoryChart: View {
             let size = proxy.size
             let data = slices
             let n = data.user.count
-            let stepX = n > 1 ? size.width / CGFloat(n - 1) : size.width
+            let slot = size.width / CGFloat(Self.window - 1)
+            /// Newest sample at the left edge; older samples fill to the
+            /// right in fixed slots so a short history does not stretch.
+            let x: (Int) -> CGFloat = { index in
+                CGFloat(n - 1 - index) * slot
+            }
             let stacked = (0..<n).map { index in
                 let system = data.system[index]
                 let user = data.user[index]
@@ -60,13 +67,13 @@ struct CPUHistoryChart: View {
 
                 func band(lower: [Double], upper: [Double]) -> Path {
                     var path = Path()
-                    path.move(to: CGPoint(x: size.width, y: y(lower[0])))
+                    path.move(to: CGPoint(x: x(0), y: y(lower[0])))
                     for index in 1..<n {
-                        path.addLine(to: CGPoint(x: size.width - CGFloat(index) * stepX,
+                        path.addLine(to: CGPoint(x: x(index),
                                                  y: y(lower[index])))
                     }
                     for index in stride(from: n - 1, through: 0, by: -1) {
-                        path.addLine(to: CGPoint(x: size.width - CGFloat(index) * stepX,
+                        path.addLine(to: CGPoint(x: x(index),
                                                  y: y(upper[index])))
                     }
                     path.closeSubpath()
@@ -75,9 +82,9 @@ struct CPUHistoryChart: View {
 
                 func topLine(_ values: [Double]) -> Path {
                     var path = Path()
-                    path.move(to: CGPoint(x: size.width, y: y(values[0])))
+                    path.move(to: CGPoint(x: x(0), y: y(values[0])))
                     for index in 1..<n {
-                        path.addLine(to: CGPoint(x: size.width - CGFloat(index) * stepX,
+                        path.addLine(to: CGPoint(x: x(index),
                                                  y: y(values[index])))
                     }
                     return path

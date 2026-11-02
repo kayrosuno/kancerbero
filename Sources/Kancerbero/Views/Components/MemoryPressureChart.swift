@@ -11,11 +11,13 @@ struct MemoryPressureChart: View {
         min(60, min(values.count, levels.count))
     }
 
+    private static let window = 60
+
     var body: some View {
         GeometryReader { proxy in
             let size = proxy.size
             let n = count
-            let stepX = n > 1 ? size.width / CGFloat(n - 1) : size.width
+            let slot = size.width / CGFloat(Self.window - 1)
 
             Canvas { context, canvasSize in
                 // 50 % reference line.
@@ -28,7 +30,7 @@ struct MemoryPressureChart: View {
 
                 func point(_ index: Int) -> CGPoint {
                     let percent = min(max(Double(values[index]), 0), 100) / 100
-                    return CGPoint(x: size.width - CGFloat(index) * stepX,
+                    return CGPoint(x: CGFloat(n - 1 - index) * slot,
                                    y: canvasSize.height - CGFloat(percent) * canvasSize.height)
                 }
 
@@ -42,12 +44,12 @@ struct MemoryPressureChart: View {
 
                 // Soft area under the line in the current band colour.
                 var area = Path()
-                area.move(to: CGPoint(x: size.width, y: canvasSize.height))
+                area.move(to: CGPoint(x: point(0).x, y: canvasSize.height))
                 area.addLine(to: point(0))
                 for index in 1..<n {
                     area.addLine(to: point(index))
                 }
-                area.addLine(to: CGPoint(x: size.width - CGFloat(n - 1) * stepX,
+                area.addLine(to: CGPoint(x: point(n - 1).x,
                                          y: canvasSize.height))
                 area.closeSubpath()
                 context.fill(area, with: .color(color(for: levels[n - 1]).opacity(0.10)))

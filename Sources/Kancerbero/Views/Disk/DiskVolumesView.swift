@@ -27,6 +27,7 @@ struct DiskVolumesView: View {
                 if let item = disk.selectedItem {
                     DiskVolumeDetailView(
                         item: item,
+                        inventory: disk.inventory,
                         onAnalyze: onAnalyze,
                         onClose: { disk.select(nil) }
                     )

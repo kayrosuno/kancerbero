@@ -23,6 +23,8 @@ struct MemoryCompositionChart: View {
                         min(compressed.count, min(cached.count, free.count)))))
     }
 
+    private static let window = 60
+
     /// Cumulative tops for each sample, clamped to 0...100 so a sample whose
     /// committed memory exceeds the physical total cannot spill past the top.
     private struct Bounds {
@@ -66,7 +68,12 @@ struct MemoryCompositionChart: View {
             let size = proxy.size
             let data = bounds
             let n = data.app.count
-            let stepX = n > 1 ? size.width / CGFloat(n - 1) : size.width
+            let slot = size.width / CGFloat(Self.window - 1)
+            /// Newest sample at the left edge; older samples fill to the
+            /// right in fixed slots so a short history does not stretch.
+            let x: (Int) -> CGFloat = { index in
+                CGFloat(n - 1 - index) * slot
+            }
 
             Canvas { context, canvasSize in
                 guard n > 1 else { return }
@@ -90,13 +97,13 @@ struct MemoryCompositionChart: View {
 
                 func band(lower: [Double], upper: [Double]) -> Path {
                     var path = Path()
-                    path.move(to: CGPoint(x: size.width, y: y(lower[0])))
+                    path.move(to: CGPoint(x: x(0), y: y(lower[0])))
                     for index in 1..<n {
-                        path.addLine(to: CGPoint(x: size.width - CGFloat(index) * stepX,
+                        path.addLine(to: CGPoint(x: x(index),
                                                  y: y(lower[index])))
                     }
                     for index in stride(from: n - 1, through: 0, by: -1) {
-                        path.addLine(to: CGPoint(x: size.width - CGFloat(index) * stepX,
+                        path.addLine(to: CGPoint(x: x(index),
                                                  y: y(upper[index])))
                     }
                     path.closeSubpath()
@@ -105,9 +112,9 @@ struct MemoryCompositionChart: View {
 
                 func topLine(_ values: [Double]) -> Path {
                     var path = Path()
-                    path.move(to: CGPoint(x: size.width, y: y(values[0])))
+                    path.move(to: CGPoint(x: x(0), y: y(values[0])))
                     for index in 1..<n {
-                        path.addLine(to: CGPoint(x: size.width - CGFloat(index) * stepX,
+                        path.addLine(to: CGPoint(x: x(index),
                                                  y: y(values[index])))
                     }
                     return path

@@ -511,7 +511,9 @@ int kb_disk_media_list(kb_disk_media **out, size_t *count)
         }
     }
 
-    /* APFS volumes share the container's free space. Propagate it upward. */
+    /* APFS volumes share the container's free space. Propagate it upward.
+       A container with no mounted child keeps free_bytes == used_bytes == 0;
+       consumers must treat that as "unknown", not "empty". */
     for (size_t container_index = 0; container_index < used; container_index++) {
         if (!items[container_index].is_apfs_container) {
             continue;
