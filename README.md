@@ -295,6 +295,9 @@ fija el tamaño de la ventana. Los flags **sin valor** (`--cards-collapsed`, `--
 argumentos; si quedan en medio, macOS puede abrir la app sin ventana principal y la captura no se
 genera.
 
+Guía paso a paso, comandos reproducibles y errores frecuentes:
+[`docs/verification.md` → Captura visual de la UI sin TCC](docs/verification.md#captura-visual-de-la-ui-sin-tcc).
+
 ## Daemon
 
 Detalle de binarios, permisos, instalación y desinstalación en `docs/daemons-and-libraries.md`.
