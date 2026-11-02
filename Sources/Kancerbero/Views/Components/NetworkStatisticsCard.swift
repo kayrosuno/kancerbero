@@ -149,28 +149,28 @@ struct NetworkStatisticsCard: View {
     private var totalsFooter: some View {
         VStack(spacing: 4) {
             HStack(spacing: 10) {
-                totalMetric("Bytes in",
-                            value: KBFormat.totalBytes(counters.rxBytes),
-                            exact: "\(counters.rxBytes.formatted()) bytes",
-                            icon: "arrow.down.to.line",
-                            tint: downloadTint)
                 totalMetric("Bytes out",
                             value: KBFormat.totalBytes(counters.txBytes),
                             exact: "\(counters.txBytes.formatted()) bytes",
                             icon: "arrow.up.to.line",
                             tint: uploadTint)
+                totalMetric("Bytes in",
+                            value: KBFormat.totalBytes(counters.rxBytes),
+                            exact: "\(counters.rxBytes.formatted()) bytes",
+                            icon: "arrow.down.to.line",
+                            tint: downloadTint)
             }
             HStack(spacing: 10) {
-                totalMetric("Packets in",
-                            value: KBFormat.compactTotal(counters.rxPackets),
-                            exact: "\(KBFormat.count(counters.rxPackets)) packets",
-                            icon: "number",
-                            tint: downloadTint)
                 totalMetric("Packets out",
                             value: KBFormat.compactTotal(counters.txPackets),
                             exact: "\(KBFormat.count(counters.txPackets)) packets",
                             icon: "number",
                             tint: uploadTint)
+                totalMetric("Packets in",
+                            value: KBFormat.compactTotal(counters.rxPackets),
+                            exact: "\(KBFormat.count(counters.rxPackets)) packets",
+                            icon: "number",
+                            tint: downloadTint)
             }
         }
     }
