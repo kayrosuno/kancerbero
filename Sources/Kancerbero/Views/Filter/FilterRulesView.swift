@@ -41,6 +41,7 @@ struct FilterRulesView: View {
     @Environment(\.dismissWindow) private var dismissWindow
     @State private var rulePendingDeletion: FilterRule?
     @State private var selectedRuleID: FilterRule.ID?
+    @State private var policyEditorRuleID: FilterRule.ID?
     @State private var ruleSortOrder: [KeyPathComparator<FilterRule>] = []
     @State private var rememberedSortOrder: [KeyPathComparator<RememberedDecision>] = []
 
@@ -185,21 +186,14 @@ struct FilterRulesView: View {
 
     private var rulesTable: some View {
         Table(filter.rules, selection: $selectedRuleID, sortOrder: $ruleSortOrder) {
-            TableColumn("On") { rule in
-                Toggle("", isOn: enabledBinding(rule))
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .help(rule.enabled ? "Rule enabled" : "Rule disabled")
-            }
-            .width(min: 38, ideal: 42)
             TableColumn("Process", value: \.displayName) { rule in
                 Text(rule.displayName).lineLimit(1)
             }
             .width(min: 110, ideal: 130)
             TableColumn("Policy", value: \.policy.rawValue) { rule in
-                PolicyBadge(policy: rule.policy)
+                policyMenu(for: rule)
             }
-            .width(min: 60, ideal: 70)
+            .width(min: 64, ideal: 76)
             TableColumn("Executable", value: \.executablePath) { rule in
                 Text(rule.executablePath)
                     .font(.system(size: 10))
@@ -237,11 +231,57 @@ struct FilterRulesView: View {
         }
     }
 
-    private func enabledBinding(_ rule: FilterRule) -> Binding<Bool> {
-        Binding(
-            get: { rule.enabled },
-            set: { filter.setRuleEnabled($0, ruleID: rule.id) }
-        )
+    /// A plain Button keeps the badge's own colors and capsule; a Menu label
+    /// is restyled by the menu style and loses them.
+    @ViewBuilder
+    private func policyMenu(for rule: FilterRule) -> some View {
+        Button {
+            selectedRuleID = rule.id
+            policyEditorRuleID = rule.id
+        } label: {
+            PolicyBadge(policy: rule.policy)
+        }
+        .buttonStyle(.plain)
+        .help("Policy: \(rule.policy.title) — \(rule.policy.detail)")
+        .accessibilityLabel("Policy for \(rule.displayName)")
+        .accessibilityValue(rule.policy.title)
+        .popover(isPresented: Binding(
+            get: { policyEditorRuleID == rule.id },
+            set: { if !$0 { policyEditorRuleID = nil } }
+        ), arrowEdge: .bottom) {
+            policyEditor(for: rule)
+        }
+    }
+
+    private func policyEditor(for rule: FilterRule) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(FilterPolicy.allCases) { policy in
+                Button {
+                    filter.setPolicy(policy, forRuleID: rule.id)
+                    policyEditorRuleID = nil
+                } label: {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 10, weight: .semibold))
+                            .opacity(policy == rule.policy ? 1 : 0)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(policy.title)
+                                .font(.system(size: 12, weight: .semibold))
+                            Text(policy.detail)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 6)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(6)
+        .frame(width: 240)
     }
 
     private var rememberedSection: some View {
@@ -322,28 +362,5 @@ struct FilterRulesView: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(Color.gray.opacity(0.12))
             }
-    }
-}
-
-private struct PolicyBadge: View {
-    let policy: FilterPolicy
-
-    var body: some View {
-        Text(policy.title)
-            .font(.system(size: 9, weight: .semibold))
-            .padding(.horizontal, 5)
-            .padding(.vertical, 1)
-            .background {
-                Capsule().fill(color.opacity(0.16))
-            }
-            .foregroundStyle(color)
-    }
-
-    private var color: Color {
-        switch policy {
-        case .ask: return .orange
-        case .allow: return .green
-        case .deny: return .red
-        }
     }
 }

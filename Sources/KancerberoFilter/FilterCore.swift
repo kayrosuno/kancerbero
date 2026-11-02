@@ -70,7 +70,7 @@ final class FilterCore: NSObject, @unchecked Sendable, KancerberoFilterXPC {
             let endpoints = FilterFlowEndpoints.describe(flow)
             let rule = identity.path.isEmpty
                 ? nil
-                : rules.first(where: { $0.executablePath == identity.path && $0.enabled })
+                : rules.first(where: { $0.executablePath == identity.path })
 
             var state: FilterFlowState = .observing
             var reason: String?

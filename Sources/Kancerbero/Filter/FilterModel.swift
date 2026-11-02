@@ -132,7 +132,6 @@ final class FilterModel {
             if rules[index].policy != .ask {
                 rules[index].policy = .ask
             }
-            rules[index].enabled = true
         } else {
             rules.append(FilterRule(executablePath: process.path,
                                     bundleID: Bundle(path: process.path)?.bundleIdentifier,
@@ -152,8 +151,6 @@ final class FilterModel {
         guard !process.path.isEmpty else { return }
         if let index = rules.firstIndex(where: { $0.executablePath == process.path }) {
             rules[index].policy = policy
-            // Choosing a policy from Processes means the rule should apply.
-            rules[index].enabled = true
         } else {
             rules.append(FilterRule(executablePath: process.path,
                                     bundleID: Bundle(path: process.path)?.bundleIdentifier,
@@ -164,16 +161,19 @@ final class FilterModel {
         Task { await pushRules() }
     }
 
-    func isWatched(path: String) -> Bool {
-        rules.contains { $0.executablePath == path }
-    }
-
-    func setRuleEnabled(_ enabled: Bool, ruleID: UUID) {
-        guard let index = rules.firstIndex(where: { $0.id == ruleID }),
-              rules[index].enabled != enabled else { return }
-        rules[index].enabled = enabled
+    /// Changes the policy of an existing rule addressed by `FilterRule.id`.
+    /// FilterRulesView has neither `KBProcessInfo` nor `AppModel`, so it
+    /// cannot use the process-based overload.
+    func setPolicy(_ policy: FilterPolicy, forRuleID id: FilterRule.ID) {
+        guard let index = rules.firstIndex(where: { $0.id == id }),
+              rules[index].policy != policy else { return }
+        rules[index].policy = policy
         persistRules()
         Task { await pushRules() }
+    }
+
+    func isWatched(path: String) -> Bool {
+        rules.contains { $0.executablePath == path }
     }
 
     func removeRule(id: UUID) {

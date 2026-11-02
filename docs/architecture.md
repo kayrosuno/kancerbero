@@ -436,13 +436,13 @@
 - Volumen: los veredictos llevan `shouldReport = true` y `statisticsReportFrequency = .medium`;
   `handle(_ report:)` acumula `bytesInboundCount/bytesOutboundCount` por flujo. Son contadores
   agregados del kernel y el tráfico excluido por Apple no se ve.
-- `FilterRule.enabled` permite dejar una regla listada sin aplicarla: la extensión solo casa
-  reglas activas (`executablePath` + `enabled`). El campo es opcional al decodificar
-  (`enabled ?? true`), así que las cachés antiguas siguen siendo válidas y el schema no cambia.
-  La app puede activar/desactivar y borrar reglas y decisiones recordadas; cada mutación
-  persiste su copia y empuja el snapshot completo (`setRules`), que la extensión reemplaza y
-  guarda en su `rules.plist`.
-- UI: pestaña **Filter** (flujos con RX/TX y estado), escudo por fila en **Processes**, hoja de
+- La extensión casa reglas por `executablePath`; todas las reglas listadas están activas. La app
+  puede crear, borrar y cambiar la política de las reglas, y borrar decisiones recordadas; cada
+  mutación persiste su copia y empuja el snapshot completo (`setRules`), que la extensión
+  reemplaza y guarda en su `rules.plist`. La ventana de reglas usa
+  `setPolicy(_:forRuleID:)` (por `FilterRule.id`) para no depender de `KBProcessInfo`.
+- UI: pestaña **Filter** (flujos con RX/TX y estado), escudo por fila en **Processes** con el
+  badge de la política activa al lado (Ask/Allow/Deny) cuando el proceso está vigilado, hoja de
   aprobación en `RootView` (`FilterApprovalSheet`: icono y nombre grandes, destino a 30 pt,
   anillo de cuenta atrás, selector Remember Once/This app/App + destination y botones
   Allow/Deny; `.interactiveDismissDisabled` y Return/Escape). La decisión es optimista: la hoja se
@@ -452,7 +452,10 @@
   con una continuación one-shot, para que un daemon de NetworkExtension que no responde deje el
   estado en `.failed` en vez de colgar la UI. Ventana **Filter rules**
   (`FilterRulesView`, abierta con **Rules…** desde el Filter) con estado, reglas y decisiones
-  recordadas. Las reglas se pueden eliminar de varias formas: seleccionar una fila y usar
+  recordadas. La columna **Policy** es un badge pulsable que abre un popover con Ask/Allow/Deny,
+  checkmark en la actual y la descripción de cada opción (el `Menu` nativo perdía el color y la
+  cápsula del badge dentro de la tabla). Las reglas se pueden eliminar de varias formas:
+  seleccionar una fila y usar
   **Delete** en la cabecera de la sección, la papelera de la fila o el menú contextual; todas
   piden confirmación con un `.alert` y borran la regla junto con las decisiones recordadas de esa
   app. Sin selección, el botón de cabecera queda deshabilitado. Filas de estado en

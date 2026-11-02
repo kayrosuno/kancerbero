@@ -1,4 +1,5 @@
 import SwiftUI
+import KancerberoFilterContract
 
 /// Single source of truth for how the network filter is presented in the
 /// status bar, the sidebar footer and System status.
@@ -180,4 +181,31 @@ extension FilterModel {
     var filterSidebarLabel: String { filterHealth.sidebarLabel }
     var filterStatusTint: Color { filterHealth.tint }
     var filterStatusHelp: String { filterHealth.help }
+}
+
+/// Compact, colored policy pill shared by the Filter rules window and the
+/// Processes Guard column. The owning surface decides whether it is wrapped
+/// in a Menu (editable) or shown read-only.
+struct PolicyBadge: View {
+    let policy: FilterPolicy
+
+    var body: some View {
+        Text(policy.title)
+            .font(.system(size: 9, weight: .semibold))
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .background {
+                Capsule().fill(color.opacity(0.16))
+            }
+            .foregroundStyle(color)
+            .fixedSize()
+    }
+
+    private var color: Color {
+        switch policy {
+        case .ask: return .orange
+        case .allow: return .green
+        case .deny: return .red
+        }
+    }
 }

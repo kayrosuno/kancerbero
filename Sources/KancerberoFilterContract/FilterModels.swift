@@ -43,40 +43,19 @@ public struct FilterRule: Codable, Sendable, Identifiable, Equatable {
     public var displayName: String
     public var policy: FilterPolicy
     public var createdAt: Date
-    /// Disabled rules stay listed but the extension does not apply them.
-    public var enabled: Bool
 
     public init(id: UUID = UUID(),
                 executablePath: String,
                 bundleID: String? = nil,
                 displayName: String,
                 policy: FilterPolicy = .ask,
-                createdAt: Date = Date(),
-                enabled: Bool = true) {
+                createdAt: Date = Date()) {
         self.id = id
         self.executablePath = executablePath
         self.bundleID = bundleID
         self.displayName = displayName
         self.policy = policy
         self.createdAt = createdAt
-        self.enabled = enabled
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case id, executablePath, bundleID, displayName, policy, createdAt, enabled
-    }
-
-    /// `enabled` was added after the first release: older app/extension caches
-    /// do not carry it, so decode it as true instead of bumping the schema.
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
-        executablePath = try container.decode(String.self, forKey: .executablePath)
-        bundleID = try container.decodeIfPresent(String.self, forKey: .bundleID)
-        displayName = try container.decode(String.self, forKey: .displayName)
-        policy = try container.decode(FilterPolicy.self, forKey: .policy)
-        createdAt = try container.decode(Date.self, forKey: .createdAt)
-        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
     }
 }
 
