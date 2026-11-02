@@ -149,6 +149,36 @@ marcan los grupos propios de Processes (misma sintaxis de lista);
 captura el panel lateral oculto. El PNG se escribe a escala de backing (2x en Retina) y la app
 termina con código 0.
 
+### Comando reproducible
+
+```bash
+# 1. Compilar
+CONFIG=Debug ./scripts/build.sh
+
+# 2. Capturar (los flags sin valor, SIEMPRE al final)
+build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
+  --screenshot /tmp/kb-disk-io.png \
+  --section disk --disk-tab io \
+  --screenshot-size 1440x860 \
+  --screenshot-delay 3 \
+  --cards-expanded
+```
+
+- `--screenshot-delay` espera a que llegue el primer snapshot del daemon (4 s por defecto); súbelo
+  a 6-8 s si la captura sale con ceros o el analizador aún está escaneando.
+- También se puede lanzar vía LaunchServices, pasando los mismos flags tras `--args`:
+  `open build/Build/Products/Debug/Kancerbero.app --args --screenshot /tmp/kb.png ... --cards-expanded`.
+- La app termina sola con código 0 y no requiere permisos de Grabación de pantalla.
+
+**Errores frecuentes**
+
+| Síntoma | Causa |
+|---|---|
+| No se genera el PNG y queda una ventana sin contenido (o ninguna ventana) | Un flag sin valor (`--cards-expanded`, `--cards-collapsed`, `--sidebar-collapsed`, `--disk-scan`, `--show-status`) quedó en medio de los argumentos; muévelo al final. |
+| El PNG sale con ceros o «Last 0 samples» | `--screenshot-delay` insuficiente o daemon no disponible; súbelo. |
+| La captura no corresponde a la sección/pestaña pedida | Valor no válido en `--section`, `--tab` o `--disk-tab`; usa solo los de la lista superior. |
+| Ventana recortada o tarjetas apiladas | Usa `--screenshot-size 1040x640` (mínimo soportado) o superior. |
+
 Capturas recomendadas:
 
 ```bash
