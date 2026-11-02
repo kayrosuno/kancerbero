@@ -1252,11 +1252,13 @@ final class AppModel {
         diskWriteOpsHistory.append(diskWriteOpsRate)
 
         let limit = 60
-        trim(&rxHistory, limit: limit)
-        trim(&txHistory, limit: limit)
-        trim(&rxPacketHistory, limit: limit)
-        trim(&txPacketHistory, limit: limit)
-        trim(&sampleDates, limit: limit)
+        // Traffic and Disk activity graphs display twice the samples.
+        let graphLimit = 120
+        trim(&rxHistory, limit: graphLimit)
+        trim(&txHistory, limit: graphLimit)
+        trim(&rxPacketHistory, limit: graphLimit)
+        trim(&txPacketHistory, limit: graphLimit)
+        trim(&sampleDates, limit: graphLimit)
         trim(&cpuUsageHistory, limit: limit)
         trim(&cpuUserHistory, limit: limit)
         trim(&cpuSystemHistory, limit: limit)
@@ -1274,10 +1276,10 @@ final class AppModel {
         trim(&gpuUsageHistory, limit: limit)
         trim(&energyUsageHistory, limit: limit)
         trim(&wakeupHistory, limit: limit)
-        trim(&diskReadHistory, limit: limit)
-        trim(&diskWriteHistory, limit: limit)
-        trim(&diskReadOpsHistory, limit: limit)
-        trim(&diskWriteOpsHistory, limit: limit)
+        trim(&diskReadHistory, limit: graphLimit)
+        trim(&diskWriteHistory, limit: graphLimit)
+        trim(&diskReadOpsHistory, limit: graphLimit)
+        trim(&diskWriteOpsHistory, limit: graphLimit)
     }
 
     /// Clears every graph history (Dock icon "Clear History").

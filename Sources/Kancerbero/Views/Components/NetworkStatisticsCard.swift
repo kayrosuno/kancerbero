@@ -12,8 +12,8 @@ struct NetworkStatisticsCard: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var statsHovering = false
 
-    private let downloadTint = KBTheme.downloadTint
-    private let uploadTint = KBTheme.uploadTint
+    private let downloadTint = KBTheme.netDownloadTint
+    private let uploadTint = KBTheme.netUploadTint
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {

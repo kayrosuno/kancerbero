@@ -33,7 +33,9 @@ struct TrafficCard: View {
                 upload: graphMode == .bits ? uploadHistory : uploadPacketHistory,
                 focus: focus,
                 sampleInterval: sampleInterval,
-                mode: graphMode
+                mode: graphMode,
+                downloadTint: KBTheme.netDownloadTint,
+                uploadTint: KBTheme.netUploadTint
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -84,7 +86,7 @@ struct TrafficCard: View {
     private func legend(_ direction: NetworkingFocus) -> some View {
         let isDownload = direction == .download
         let name = isDownload ? "Download" : "Upload"
-        let tint = isDownload ? KBTheme.downloadTint : KBTheme.uploadTint
+        let tint = isDownload ? KBTheme.netDownloadTint : KBTheme.netUploadTint
         let selected = focus == direction
         let bitRate = KBFormat.bitRate(isDownload ? rates.rxBytesPerSecond
                                                  : rates.txBytesPerSecond)
@@ -147,7 +149,7 @@ struct TrafficCard: View {
                 .background {
                     RoundedRectangle(cornerRadius: 5, style: .continuous)
                         .fill(LinearGradient(
-                            colors: [KBTheme.downloadTint, KBTheme.uploadTint],
+                            colors: [KBTheme.netDownloadTint, KBTheme.netUploadTint],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing))
                 }
@@ -161,14 +163,14 @@ struct TrafficCard: View {
 
     private var borderStyle: AnyShapeStyle {
         if focus == .download {
-            return AnyShapeStyle(KBTheme.downloadTint.opacity(0.8))
+            return AnyShapeStyle(KBTheme.netDownloadTint.opacity(0.8))
         }
         if focus == .upload {
-            return AnyShapeStyle(KBTheme.uploadTint.opacity(0.8))
+            return AnyShapeStyle(KBTheme.netUploadTint.opacity(0.8))
         }
         return AnyShapeStyle(LinearGradient(
-            colors: [KBTheme.downloadTint.opacity(0.32),
-                     KBTheme.uploadTint.opacity(0.32)],
+            colors: [KBTheme.netDownloadTint.opacity(0.32),
+                     KBTheme.netUploadTint.opacity(0.32)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing))
     }

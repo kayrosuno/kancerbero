@@ -76,6 +76,10 @@ enum KBTheme {
 
     static let downloadTint = Color(red: 0.16, green: 0.62, blue: 0.94)
     static let uploadTint = Color(red: 0.62, green: 0.42, blue: 0.95)
+    /// Networking cards: download uses the TCP4 chip colour and upload the
+    /// UDP6 chip colour from the Protocols card, so both stay in sync.
+    static let netDownloadTint = Color(red: 0.16, green: 0.55, blue: 0.90)
+    static let netUploadTint = Color(red: 0.40, green: 0.80, blue: 0.72)
     static let connectionsTint = Color(red: 0.20, green: 0.70, blue: 0.62)
     static let activeTint = Color(red: 0.16, green: 0.62, blue: 0.94)
     static let processesTint = Color(red: 0.94, green: 0.56, blue: 0.18)

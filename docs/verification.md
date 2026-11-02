@@ -363,12 +363,13 @@ log stream --predicate 'subsystem == "uno.kayros.kancerbero"' --info --debug
   daemon por cada valor distinto. Volver a seleccionar el mismo valor no debe reenviar la
   suscripción.
 - Comprobar la cadencia real por la hora de “Updated” y el avance de los sparklines: a 0,5 s la
-  ventana de 60 muestras abarca ~30 s; a 5 s, ~5 min. Los historiales se conservan al cambiar el
-  intervalo; Traffic usa slots fijos y un eje nominal de 60 × intervalo, de modo que las muestras
+  ventana de 120 muestras de Traffic y Disk abarca ~60 s; a 5 s, ~10 min. El resto de gráficos
+  mantiene 60. Los historiales se conservan al cambiar el
+  intervalo; Traffic usa slots fijos y un eje nominal de 120 × intervalo, de modo que las muestras
   antiguas se re-espacian uniformemente al cambiar la cadencia.
 - Todos los gráficos temporales (Traffic, CPU, Disk I/O, memoria, batería, sparklines y core bars,
   además de los estilos del icono del Dock) dibujan el dato más reciente a la izquierda. En
-  Traffic el eje lee `now → -30s → -60s`; en Battery el ancla antigua queda a la derecha y la
+  Traffic el eje lee `now → -60s → -2m`; en Battery el ancla antigua queda a la derecha y la
   muestra nueva en el borde izquierdo. Los gráficos de composición no cambian.
 - Arranque limpio: capturar Networking a 1, 2, 4 y 6 s no debe mostrar ningún pico GB/s ni un techo
   desproporcionado; la primera muestra es 0 y las siguientes se estabilizan. Repetir en Disk →
@@ -565,7 +566,7 @@ $APP --screenshot /tmp/kb-net-process-independent.png --section networking \
   color y tasa en las unidades del modo activo) y el selector Bits/Packets; cada entrada alterna
   el foco de su dirección; ecualizador espejado de barras sólidas con upload arriba y download abajo,
   coloreadas por calor según su magnitud, sobre cuadrícula, etiquetas Y en
-  `bps/Kbps/Mbps/Gbps` y eje temporal nominal `now/-30s/-60s` (con el intervalo de 1 s; el dato
+  `bps/Kbps/Mbps/Gbps` y eje temporal nominal `now/-60s/-2m` (con el intervalo de 1 s; el dato
   más reciente entra por la izquierda). Las barras ocupan slots fijos desde el borde izquierdo,
   así que un histórico corto queda empaquetado. Sin salto de layout entre 0,3 s y 5 s.
 - Activity muestra tres métricas: **processes** con sockets (total de la tabla Processes),
