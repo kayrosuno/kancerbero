@@ -651,6 +651,10 @@ $APP --screenshot /tmp/kb-processes.png --section networking --tab processes \
   (stream/dgram/raw/seqpacket/other), más Flows, RX/TX (Bytes), Rate (bits/s, suma de sus flujos)
   y “—” en procesos solo-locales. Con varias familias la tabla puede requerir scroll horizontal
   en ventanas estrechas.
+- **Guard**: un proceso vigilado muestra el escudo medio lleno y, al lado, el badge de su
+  política (Ask naranja, Allow verde, Deny rojo); los no vigilados solo muestran el escudo
+  vacío. Cambiar la política desde el menú contextual o desde la ventana de reglas debe
+  actualizar el badge al instante, y la elección persiste tras reiniciar la app.
 - En modo local, los procesos de otros uid pueden mostrar Domain/Protocols/Flows/RX/TX pero Type
   “—” (restringido); con el daemon root deben mostrar también sus sockets. Con un Socket type
   activo esas filas «—» desaparecen; con el grupo completo siguen visibles.
@@ -948,9 +952,14 @@ runtime y timestamp; que la app no lleva `get-task-allow`; que ambas firmas llev
 6. **Ventana de reglas** (Filter → **Rules…**):
    - La ventana muestra el estado del filtro (Enabled/Disabled/Unsupported, conexión XPC y
      contadores) con su botón global Enable/Disable.
-   - Las reglas creadas con el escudo de Processes aparecen con proceso, política, ruta y un
-     toggle. Desactivar una regla hace que la extensión deje de aplicarla (un flujo nuevo pasa a
-     observado/permitido; con `ask` ya no sale la hoja); reactivarla restaura el comportamiento.
+   - Las reglas creadas con el escudo de Processes aparecen con proceso, política, ruta y fecha;
+     todas las reglas listadas están siempre activas (la ventana no permite desactivarlas).
+   - Pulsar el badge de la columna **Policy** abre un selector con Ask/Allow/Deny, un checkmark
+     en la política actual y una descripción de cada opción. Elegir otra la aplica al instante:
+     el badge cambia de color, el de la columna Guard de Processes también y la extensión la
+     aplica (Ask vuelve a preguntar, Allow pasa, Deny bloquea) sin reiniciar. El cambio persiste
+     tras reiniciar app y extensión. El orden por la cabecera Policy y el resto de acciones de
+     la ventana siguen funcionando.
    - Una regla se borra de tres formas: seleccionar la fila y pulsar **Delete** en la cabecera
      de la sección, la papelera de la propia fila o «Delete rule…» del menú contextual. Las tres
      piden confirmación (alert con Delete/Cancel); al confirmar la regla desaparece, se borran sus
@@ -959,10 +968,9 @@ runtime y timestamp; que la app no lleva `get-task-allow`; que ambas firmas llev
      actualiza y la selección queda limpia.
    - Las decisiones `Always allow/deny` (app y app+destino) aparecen en su tabla; borrarlas hace
      que el siguiente flujo vuelva a preguntar.
-   - Tras reiniciar app y extensión, reglas, flags y decisiones se conservan (la app empuja el
-     snapshot al conectar).
-   - La extensión en ejecución debe ser el build nuevo (instalar/reactivar) para que `enabled`
-     surta efecto; el handshake sigue aceptando `schemaVersion == 1`.
+   - Tras reiniciar app y extensión, reglas y decisiones se conservan (la app empuja el snapshot
+     al conectar). El handshake sigue aceptando `schemaVersion == 1`; las cachés antiguas que
+     incluyeran `enabled` se decodifican igual porque la clave desconocida se ignora.
 
 ### Desinstalación
 

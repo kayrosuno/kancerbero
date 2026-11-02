@@ -397,9 +397,9 @@ struct ProcessesView: View {
             }
             .width(min: 50, ideal: 60)
             TableColumn("Guard") { row in
-                guardButton(for: row)
+                guardCell(for: row)
             }
-            .width(min: 46, ideal: 54)
+            .width(min: 64, ideal: 78)
         }
         Group {
             TableColumn("Domain", value: \ProcessInventoryRow.domainSortRank) { row in
@@ -518,25 +518,38 @@ struct ProcessesView: View {
     }
 
     @ViewBuilder
-    private func guardButton(for row: ProcessInventoryRow) -> some View {
+    private func guardCell(for row: ProcessInventoryRow) -> some View {
         let watched = filterModel.isWatched(row.process)
         let policy = filterModel.policy(for: row.process)
-        Button {
-            if watched {
-                filterModel.unwatch(row.process)
-            } else {
-                filterModel.watch(row.process)
+
+        HStack(spacing: 4) {
+            Button {
+                if watched {
+                    filterModel.unwatch(row.process)
+                } else {
+                    filterModel.watch(row.process)
+                }
+            } label: {
+                Image(systemName: watched ? "shield.lefthalf.filled" : "shield")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(watched ? Color.orange : Color.secondary)
             }
-        } label: {
-            Image(systemName: watched ? "shield.lefthalf.filled" : "shield")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(watched ? Color.orange : Color.secondary)
+            .buttonStyle(.plain)
+            .disabled(row.process.path.isEmpty)
+            .help(watched
+                  ? "Watching network access (\(policy?.title ?? "Ask"))"
+                  : "Watch network access and ask before each connection")
+            .accessibilityLabel(watched ? "Stop watching network access"
+                                        : "Watch network access")
+            .accessibilityValue(policy?.title ?? "Ask")
+
+            if watched {
+                PolicyBadge(policy: policy ?? .ask)
+                    .help(policy?.detail ?? FilterPolicy.ask.detail)
+                    .accessibilityHidden(true)
+            }
         }
-        .buttonStyle(.plain)
-        .disabled(row.process.path.isEmpty)
-        .help(watched
-              ? "Watching network access (\(policy?.title ?? "Ask"))"
-              : "Watch network access and ask before each connection")
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var selectedRow: ProcessInventoryRow? {

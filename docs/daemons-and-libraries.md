@@ -362,10 +362,10 @@ Comportamiento del filtro:
 
 - **Identidad del flujo**: `sourceAppAuditToken`/`sourceProcessAuditToken` →
   `audit_token_to_pid` → `proc_pidpath`. En macOS `sourceAppIdentifier` no existe.
-- **Políticas**: `ask`, `allow` y `deny` por ruta de ejecutable (`FilterRule`). Cada regla lleva
-  `enabled`: la extensión solo aplica las activas; una desactivada se comporta como «sin regla»
-  (observar/permitir). `enabled` se decodifica con `decodeIfPresent ?? true`, así que las cachés
-  antiguas valen y el schema sigue en 1.
+- **Políticas**: `ask`, `allow` y `deny` por ruta de ejecutable (`FilterRule`). Todas las reglas
+  listadas están activas; la ventana de reglas solo permite crearlas y eliminarlas. Las cachés
+  antiguas que incluyeran el campo `enabled` siguen decodificándose (se ignora) y el schema
+  sigue en 1.
 - **Decisiones**: `once`, `rememberApp`, `rememberDestination`, `alwaysAllow` y `alwaysDeny`.
   Las recordadas se indexan por ruta de ejecutable y, si aplica, por destino.
 - **Pausa y reanudación**: con política `ask` y sin decisión recordada, el flujo se **pausa**, se
