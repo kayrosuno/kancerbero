@@ -6,7 +6,9 @@ import Foundation
 
 public enum FilterVersion {
     public static let schema = 1
-    public static let current = "0.1.0"
+    /// Bumped when the extension's behavior changes so the app can detect a
+    /// running extension that is older than the one it ships with.
+    public static let current = "0.2.0"
 }
 
 public enum FilterPolicy: String, Codable, Sendable, CaseIterable, Identifiable {

@@ -399,7 +399,7 @@ struct ProcessesView: View {
             TableColumn("Guard") { row in
                 guardCell(for: row)
             }
-            .width(min: 64, ideal: 78)
+            .width(min: 48, ideal: 56)
         }
         Group {
             TableColumn("Domain", value: \ProcessInventoryRow.domainSortRank) { row in
@@ -414,15 +414,15 @@ struct ProcessesView: View {
                              details: row.signatureDetails,
                              kind: .protocolKind)
             }
-            .width(min: 80, ideal: 120)
+            .width(min: 48, ideal: 68)
             TableColumn("Type", value: \ProcessInventoryRow.socketCount) { row in
                 SocketTypeCell(row: row)
             }
-            .width(min: 140, ideal: 175)
+            .width(min: 85, ideal: 105)
             TableColumn("Flows", value: \ProcessInventoryRow.connectionCount) { row in
                 FlowsCell(row: row)
             }
-            .width(min: 50, ideal: 60)
+            .width(min: 30, ideal: 36)
         }
         Group {
             TableColumn("RX", value: \ProcessInventoryRow.counters.rxBytes) { row in

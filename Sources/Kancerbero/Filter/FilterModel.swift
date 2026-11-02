@@ -16,6 +16,9 @@ final class FilterModel {
     private(set) var pending: [FilterRequest] = []
     /// Global override pushed to the extension; it is not a `FilterRule`.
     private(set) var blockAllNewConnections = false
+    /// False when the running extension reports a different build, e.g. the
+    /// app was updated but the system extension was not replaced.
+    private(set) var extensionIsCurrent = true
     private(set) var history: [FlowRecord] = []
     private(set) var status: FilterStatus?
     private(set) var isConnected = false
@@ -43,6 +46,12 @@ final class FilterModel {
 
     var recentBlocks: [FlowRecord] {
         history.filter { $0.state == .denied }.prefix(20).map { $0 }
+    }
+
+    /// True when blocking is armed but the connected extension predates the
+    /// feature and therefore ignores the flag.
+    var blockAllNeedsExtensionUpdate: Bool {
+        blockAllNewConnections && filterHealth == .running && !extensionIsCurrent
     }
 
     var watchedCount: Int { rules.count }
@@ -316,7 +325,12 @@ final class FilterModel {
         let snapshot = FilterRuleSnapshot(rules: rules,
                                           remembered: remembered,
                                           blockAllNewConnections: blockAllNewConnections)
-        _ = await client.request(FilterCodec.envelope(.setRules, value: snapshot))
+        guard let reply = await client.request(FilterCodec.envelope(.setRules, value: snapshot)),
+              let envelope = try? FilterCodec.decodeEnvelope(reply),
+              let ack = try? FilterCodec.decodePayload(FilterAck.self, from: envelope),
+              ack.ok else { return }
+        // Pre-0.2.0 extensions acknowledge without a message.
+        extensionIsCurrent = ack.message == FilterVersion.current
     }
 
     // MARK: - Applying extension state

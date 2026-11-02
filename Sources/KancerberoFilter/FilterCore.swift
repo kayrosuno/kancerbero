@@ -230,6 +230,8 @@ final class FilterCore: NSObject, @unchecked Sendable, KancerberoFilterXPC {
                 remembered = snapshot.remembered
                 blockAllNewConnections = snapshot.blockAllNewConnections
                 saveCacheLocked()
+                let blockLabel = blockAllNewConnections ? "on" : "off"
+                log.info("setRules: \(self.rules.count, privacy: .public) rules, global block \(blockLabel, privacy: .public)")
 
                 // Arming the global block resolves any flow already paused for
                 // approval; the resolved IDs let the app close its sheet.
@@ -239,7 +241,10 @@ final class FilterCore: NSObject, @unchecked Sendable, KancerberoFilterXPC {
                     dropAllPausedLocked(reason: "block all")
                 }
                 flushLocked(resolved: dropped)
-                return FilterCodec.envelope(.setRulesAck, value: FilterAck(ok: true))
+                // The message lets the app detect a stale extension build: pre
+                // 0.2.0 replies with no message at all.
+                return FilterCodec.envelope(.setRulesAck,
+                                            value: FilterAck(ok: true, message: FilterVersion.current))
             case .decide:
                 let message = try FilterCodec.decodePayload(FilterDecisionMessage.self, from: envelope)
                 applyDecisionLocked(message)

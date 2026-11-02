@@ -120,6 +120,12 @@ struct FilterView: View {
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.orange)
                 }
+                if filter.blockAllNeedsExtensionUpdate {
+                    Text("The running filter extension is an older build and is not enforcing this block. Reinstall or reactivate it.")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.orange)
+                        .lineLimit(2)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .layoutPriority(1)

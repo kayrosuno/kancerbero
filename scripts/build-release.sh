@@ -101,9 +101,12 @@ done
 # Do not pass DEVELOPMENT_TEAM on the command line: command-line settings
 # override every target and would make Xcode derive an App ID (and therefore a
 # restricted application-identifier entitlement) for the daemon tool.
+# Clean build: the incremental build has been observed to reuse a stale
+# FilterCore.o for the system extension, leaving a binary that ignores new
+# wire fields. Release builds must always recompile the extension.
 xcodebuild -project Kancerbero.xcodeproj -scheme Kancerbero \
     -configuration Release -derivedDataPath build \
-    build
+    clean build
 
 APP="$ROOT/build/Build/Products/Release/Kancerbero.app"
 EXT="$APP/Contents/Library/SystemExtensions/uno.kayros.kancerbero.filter.systemextension"

@@ -159,7 +159,8 @@ contextual) y de decisiones recordadas (borrar). La pestaña incluye además un 
 **Block all new connections**: mientras está activo deniega todo flujo nuevo (también los de
 procesos con Allow o decisión recordada) sin crear ninguna regla, se conserva al reiniciar y la
 tarjeta se vuelve roja con un pulso; la barra de estado muestra **Blocking** (o **Block armed**
-si el filtro aún no está corriendo). Si Kancerbero está cerrado o nadie responde, la conexión se
+si el filtro aún no está corriendo, y **Block outdated** si la extensión en ejecución es una
+build anterior y hay que reinstalarla/reactivarla). Si Kancerbero está cerrado o nadie responde, la conexión se
 deniega (fail-closed). Requiere una build firmada con Developer ID, los entitlements de Network
 Extension y aprobar la system extension; el detalle de binario y permisos está en
 `docs/daemons-and-libraries.md` y las pruebas en `docs/verification.md`.

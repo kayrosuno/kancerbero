@@ -655,6 +655,9 @@ $APP --screenshot /tmp/kb-processes.png --section networking --tab processes \
   política (Ask naranja, Allow verde, Deny rojo); los no vigilados solo muestran el escudo
   vacío. Cambiar la política desde el menú contextual o desde la ventana de reglas debe
   actualizar el badge al instante, y la elección persiste tras reiniciar la app.
+- Con el ancho por defecto de la ventana deben verse también **Rate** y **Path** a la derecha
+  (Guard/Protocols/Type/Flows quedan compactas). Los paths largos se recortan y el tooltip
+  conserva la ruta completa.
 - En modo local, los procesos de otros uid pueden mostrar Domain/Protocols/Flows/RX/TX pero Type
   “—” (restringido); con el daemon root deben mostrar también sus sockets. Con un Socket type
   activo esas filas «—» desaparecen; con el grupo completo siguen visibles.
@@ -985,6 +988,19 @@ runtime y timestamp; que la app no lleva `get-task-allow`; que ambas firmas llev
      interruptor sigue activo y se re-arma. Reiniciar la extensión mantiene el bloqueo.
    - Desactivarlo restaura reglas y decisiones recordadas y retira el aviso. Instalar sobre un
      perfil con un `rules.plist` anterior conserva las reglas y arranca con el bloqueo apagado.
+   - **Extensión antigua**: con una app nueva conectada a una extensión anterior, el chip debe
+     decir **Block outdated** y la tarjeta advertir que no está aplicando el bloqueo (el ack de
+     `setRules` no trae la versión esperada). Tras reinstalar/reactivar la extensión pasa a
+     **Blocking** y `log stream --predicate 'subsystem == "uno.kayros.kancerbero.filter"'`
+     muestra `setRules: … global block on`.
+   - **Actualizar la extensión**: los cambios en `Sources/KancerberoFilter` exigen un build
+     Release limpio (`./scripts/clean.sh --release`; `build-release.sh` ya hace `clean build`) y
+     subir `CFBundleVersion` en `Resources/Filter/Info.plist`, o instalar puede dejar la copia
+     antigua en `/Library/SystemExtensions` aunque la app se actualice. Si sysextd no la
+     reemplaza, `sudo systemextensionsctl uninstall AK37TK8X2Y uno.kayros.kancerbero.filter` y
+     volver a instalar/aprobar. Tras el reemplazo, `systemextensionsctl list` puede mostrar la
+     copia anterior como «terminated waiting to uninstall on reboot»: reiniciar para que la
+     nueva arranque y el proveedor pueda conectar por XPC.
 
 ### Desinstalación
 
