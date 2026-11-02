@@ -87,6 +87,15 @@ struct RootView: View {
         )
     }
 
+    private static let contentMinWidth: CGFloat = 1088
+    private static let windowMinWidth = KBTheme.sidebarWidth + contentMinWidth
+
+    /// With the sidebar hidden the window can shrink by the freed space;
+    /// showing it again restores the full minimum.
+    private var minimumWidth: CGFloat {
+        columnVisibility == .detailOnly ? Self.contentMinWidth : Self.windowMinWidth
+    }
+
     var body: some View {
         @Bindable var model = model
 
@@ -196,6 +205,7 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .kbToggleAllCards)) { _ in
             toggleAllCards()
         }
+        .frame(minWidth: minimumWidth, minHeight: 640)
     }
 
     private func toggleAllCards() {

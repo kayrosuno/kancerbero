@@ -300,8 +300,8 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
 
 `--cards-collapsed`/`--cards-expanded` fuerzan todas las tarjetas colapsadas/expandidas y
 `--cards-collapsed-sections` un estado mixto (lista de secciones); `--screenshot-size 1340x700`
-fija el tamaño de la ventana (mínimo 1340×700, el que necesita el layout con la sidebar
-completa). Los flags **sin valor** (`--cards-collapsed`, `--cards-expanded`,
+fija el tamaño de la ventana (mínimo 1340×700 con la sidebar; al ocultarla baja a 1088×700,
+porque el contenido aprovecha sus 252 pt). Los flags **sin valor** (`--cards-collapsed`, `--cards-expanded`,
 `--sidebar-collapsed`, `--disk-scan`, `--show-status`, `--networking-resolve-names`) deben ir al
 final de la línea de
 argumentos; si quedan en medio, macOS puede abrir la app sin ventana principal y la captura no se
