@@ -90,9 +90,11 @@ El detalle de binarios, permisos, instalación y librerías está en
     montaje, UUID, roles APFS, modelo/protocolo y cifrado. No ejecuta procesos externos. La
     cabecera de la tarjeta muestra de forma esquemática lo que contiene el componente seleccionado
     (particiones, contenedores y volúmenes) y el árbol muestra la jerarquía completa. El flag
-    `--volumes-focus` sigue permitiendo filtrar la lista para capturas. Cada fila muestra el
-    espacio usado y libre (solo usado en volúmenes; los contenedores sin volumen montado muestran
-    `—`); en los volúmenes la barra representa su parte del espacio usado del contenedor. El árbol
+    `--volumes-focus` sigue permitiendo filtrar la lista para capturas. El árbol es una tabla con
+    columnas **Name / Size / Used / Free / Mount**, filas de dos líneas (nombre + `id · fs`) e
+    indentación de los hijos; en el panel de 1/3 la tabla se desplaza horizontalmente si no caben
+    todas las columnas. Used incluye una mini barra (volúmenes: parte del usado del contenedor;
+    resto: usado/capacidad) y Free muestra `—` en volúmenes (espacio compartido). El árbol
     ocupa 1/3 del ancho y el detalle 2/3
     (sin selección, el árbol ocupa todo). Al seleccionar cualquier elemento, el detalle muestra
     una tarjeta hero con el gauge vertical de uso a la izquierda, Capacidad/Usado/Libre entre el
