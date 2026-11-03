@@ -342,13 +342,15 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
 ```
 
 - Volumes: por defecto árbol 1/3 + detalle 2/3 (sin selección, el árbol ocupa todo); no existe
-  una tercera tarjeta ni las tarjetas resumen superiores. Cada fila muestra usado/libre (disco,
-  partición y contenedor) o solo usado (volumen); un contenedor sin volumen montado muestra `—` y
-  ninguna barra. En volúmenes la barra representa su parte del usado del contenedor; el resto usan
-  usado/capacidad. La cabecera de la tarjeta muestra pills esquemáticas de lo que contiene el
-  componente (disco: particiones/contenedores/volúmenes; contenedor: volúmenes; volumen:
-  “No nested items”). La flecha de la cabecera del detalle sube un nivel (volumen → contenedor →
-  partición → disco) y deja el padre seleccionado en el árbol.
+  una tercera tarjeta ni las tarjetas resumen superiores. El árbol es una tabla con cabecera
+  **Name / Size / Used / Free / Mount**, filas de dos líneas (nombre + `id · fs`) e indentación de
+  hijos; a 1/3 se desplaza horizontalmente (~420 pt de contenido). Used muestra el valor y una
+  mini barra (volúmenes: parte del usado del contenedor; resto: usado/capacidad); Free muestra `—`
+  en volúmenes (libre compartido); Mount trunca con tooltip. Un contenedor sin volumen montado
+  muestra `—` en Used/Free. La cabecera de la tarjeta muestra pills esquemáticas de lo que
+  contiene el componente (disco: particiones/contenedores/volúmenes; contenedor: volúmenes;
+  volumen: “No nested items”). La flecha de la cabecera del detalle sube un nivel (volumen →
+  contenedor → partición → disco) y deja el padre seleccionado en el árbol.
 - Gráfico radial: tarjeta hero con el gauge vertical a la izquierda, CAPACITY encima de la barra,
   USED/FREE en la columna lateral y un círculo grande (~430 pt normal; ~740 maximizado) con
   particiones → contenedores APFS → volúmenes (y “Other” para el espacio no asignado). Usa la
@@ -888,9 +890,10 @@ $K --screenshot /tmp/kb-hero-min.png --section disk --disk-tab volumes \
 - `usado de volúmenes + residual + libre = capacidad`; permitir la diferencia documentada de
   `ATTR_VOL_SPACEUSED` frente a `diskutil`. Si la suma de usado excede lo usable, las porciones se
   escalan y aparece la nota correspondiente.
-- El árbol muestra usado/libre por fila (volúmenes solo usado). `disk usage` debe dar las mismas
-  cifras agregadas y `partial=yes` cuando falte algún volumen montado; un disco/partición no APFS
-  usa el anillo usado/libre y, sin datos, omite el gráfico.
+- El árbol muestra usado/free por fila (volúmenes con Free `—`) y la barra de Used con el criterio
+  correcto. `disk usage` debe dar las mismas cifras agregadas y `partial=yes` cuando falte algún
+  volumen montado; un disco/partición no APFS usa el anillo usado/libre y, sin datos, omite el
+  gráfico.
 - Selector **Decimal/Binary** de la línea de pestañas:
   `--disk-units decimal` muestra `500,3 GB` para disk0 (base 1000, KB/MB/GB);
   `--disk-units binary` muestra `465,9 GiB` (base 1024, KiB/MiB/GiB). Cambian árbol, tarjetas,

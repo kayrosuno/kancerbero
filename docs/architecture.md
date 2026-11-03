@@ -112,8 +112,11 @@
   el árbol ocupa todo); al seleccionar un ítem no se abre ninguna tercera tarjeta. Cada tarjeta
   tiene un botón maximizar/restaurar que la lleva al área de Volumes (oculta la otra columna;
   cabecera y pestañas siguen visibles). El estado vive en `DiskUIState`
-  (`maximizedVolumesPanel`). El árbol
-  disco → partición → contenedor APFS → volumen, un inspector y `CapacityBar`; Analyzer muestra
+  (`maximizedVolumesPanel`). El árbol es una tabla propia (`Name / Size / Used / Free / Mount`) con
+  filas de dos líneas, chevron e indentación `depth * 10`, cebra y selección por botón de fila;
+  cabecera pegada, scroll vertical y horizontal con ancho mínimo 420 pt. Usa
+  `KBDiskItem.spaceUsage` para las celdas, `usageFraction` para la mini barra de Used y `—` en
+  Free para volúmenes (libre compartido). Un inspector y `CapacityBar`; Analyzer muestra
   controles de escaneo, progreso, `RadialDiskMap` y las tablas de contenidos y mayores archivos;
   I/O muestra el gráfico Data/Operations y la tabla de procesos por actividad de disco.
   En Analyzer las tarjetas filtran el contenido; en Volumes la cabecera de la tarjeta muestra el
