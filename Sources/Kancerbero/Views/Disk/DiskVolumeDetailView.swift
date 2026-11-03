@@ -65,22 +65,12 @@ struct DiskVolumeDetailView: View {
         .background {
             RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
                 .fill(.regularMaterial)
-            RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
-                .fill(LinearGradient(
-                    colors: [kindTint.opacity(0.10), .clear],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing))
         }
         .overlay {
             RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [kindTint.opacity(0.42),
-                                 kindTint.opacity(0.14)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing),
-                    lineWidth: 1)
+                .strokeBorder(.quaternary.opacity(0.5), lineWidth: 1)
         }
+        .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
     }
 
     private var header: some View {
@@ -166,7 +156,7 @@ struct DiskVolumeDetailView: View {
     private var usageCaption: String {
         guard item.volumeUsedFraction != nil else { return "usage unknown" }
         return item.kind == .apfsVolume || item.kind == .snapshot
-            ? "of container" : "of capacity"
+            ? "of container capacity" : "of capacity"
     }
 
     private var structureNotes: [String] {
@@ -174,10 +164,78 @@ struct DiskVolumeDetailView: View {
         if usage.isPartial && !containerSpaceUnknown {
             notes.append("Some volumes are not mounted; used and free space are partial.")
         }
-        if item.kind == .apfsVolume || item.kind == .apfsContainer {
-            notes.append("APFS volumes share the container's free space.")
+        if item.kind == .apfsContainer {
+            let volumes = containerVolumes
+            if volumes.isEmpty {
+                notes.append("No volumes in this container.")
+            } else {
+                notes.append("Shared free space · \(volumes.count) volume\(volumes.count == 1 ? "" : "s")")
+            }
+        } else if item.kind == .apfsVolume,
+                  let container = inventory?.apfsContainer(enclosing: item) {
+            let others = siblingVolumes(of: container)
+            if others.isEmpty {
+                notes.append("Shares free space with \(container.deviceIdentifier)")
+            } else {
+                notes.append("Shares free space with \(container.deviceIdentifier) and \(others.count) other volume\(others.count == 1 ? "" : "s")")
+            }
         }
         return notes
+    }
+
+    private var containerVolumes: [KBDiskItem] {
+        item.children
+            .filter { $0.kind == .apfsVolume }
+            .sorted { ($0.usedBytes ?? 0) > ($1.usedBytes ?? 0) }
+    }
+
+    private func siblingVolumes(of container: KBDiskItem) -> [KBDiskItem] {
+        container.children
+            .filter {
+                $0.kind == .apfsVolume
+                    && $0.deviceIdentifier != item.deviceIdentifier
+            }
+            .sorted { ($0.usedBytes ?? 0) > ($1.usedBytes ?? 0) }
+    }
+
+    /// "Shared with" list for containers and volumes; snapshots are omitted.
+    private var sharedWithEntries: [String]? {
+        guard let inventory else { return nil }
+        switch item.kind {
+        case .apfsContainer:
+            let volumes = containerVolumes
+            guard !volumes.isEmpty else { return nil }
+            return volumes.map { "\(displayName($0)) (\($0.deviceIdentifier))" }
+        case .apfsVolume:
+            guard let container = inventory.apfsContainer(enclosing: item) else {
+                return nil
+            }
+            var entries = ["\(container.deviceIdentifier) · \(displayName(container))"]
+            entries.append(contentsOf: siblingVolumes(of: container).map {
+                "\(displayName($0)) (\($0.deviceIdentifier))"
+            })
+            return entries
+        default:
+            return nil
+        }
+    }
+
+    private var sharedWithText: String? {
+        guard let entries = sharedWithEntries else { return nil }
+        let visible = entries.prefix(6)
+        var text = visible.joined(separator: ", ")
+        if entries.count > visible.count {
+            text += " and \(entries.count - visible.count) more"
+        }
+        return text
+    }
+
+    private var sharedWithHelp: String? {
+        sharedWithEntries?.joined(separator: ", ")
+    }
+
+    private func displayName(_ item: KBDiskItem) -> String {
+        item.name.isEmpty ? item.deviceIdentifier : item.name
     }
 
     private var metadata: some View {
@@ -197,6 +255,10 @@ struct DiskVolumeDetailView: View {
             row(item.kind == .apfsVolume || item.kind == .apfsContainer
                 ? "Available (container)" : "Available",
                 item.availableBytes.map { KBFormat.bytes($0, units: byteUnitSystem) } ?? "—")
+            if let sharedWithText {
+                row("Shared with", sharedWithText,
+                    lineLimit: 4, help: sharedWithHelp)
+            }
             row("Volume UUID", item.volumeUUID ?? "—")
             row("Media UUID", item.mediaUUID ?? "—")
             if let group = item.volumeGroupUUID {
@@ -217,7 +279,8 @@ struct DiskVolumeDetailView: View {
     }
 
     private func row(_ title: String, _ value: String,
-                     path: Bool = false) -> some View {
+                     path: Bool = false, lineLimit: Int? = nil,
+                     help: String? = nil) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Text(title)
                 .font(.system(size: 10, weight: .medium))
@@ -228,9 +291,9 @@ struct DiskVolumeDetailView: View {
                               design: path ? .monospaced : .default))
                 .foregroundStyle(.primary)
                 .textSelection(.enabled)
-                .lineLimit(path ? 2 : 3)
+                .lineLimit(lineLimit ?? (path ? 2 : 3))
                 .truncationMode(.middle)
-                .help(value)
+                .help(help ?? value)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }

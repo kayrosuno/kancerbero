@@ -322,7 +322,8 @@ Comprobar además:
 - Tras el refresco de 5 s, la selección y el panel de detalle se mantienen si el servicio sigue
   cumpliendo el filtro.
 
-Disk (filtros de tarjetas):
+Disk (filtros CLI de Volumes): las antiguas tarjetas resumen ya no existen; `--volumes-focus`
+sigue filtrando el árbol para capturas y el árbol muestra la jerarquía completa sin foco.
 
 ```bash
 $K --screenshot /tmp/kb-disk-free.png --section disk \
@@ -341,26 +342,33 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
 ```
 
 - Volumes: por defecto árbol 1/3 + detalle 2/3 (sin selección, el árbol ocupa todo); no existe
-  una tercera tarjeta. Cada fila muestra usado/libre (disco, partición y contenedor) o solo usado
-  (volumen); un contenedor sin volumen montado muestra `—` y ninguna barra. Capacidad/Usado/Libre
-  en grande y rutas de montaje visibles (11 pt, secundario). La flecha de la cabecera del detalle
-  sube un nivel (volumen → contenedor → partición → disco) y deja el padre seleccionado en el
-  árbol.
+  una tercera tarjeta ni las tarjetas resumen superiores. Cada fila muestra usado/libre (disco,
+  partición y contenedor) o solo usado (volumen); un contenedor sin volumen montado muestra `—` y
+  ninguna barra. En volúmenes la barra representa su parte del usado del contenedor; el resto usan
+  usado/capacidad. Capacidad/Usado/Libre en grande y rutas de montaje visibles (11 pt, secundario).
+  La flecha de la cabecera del detalle sube un nivel (volumen → contenedor → partición → disco) y
+  deja el padre seleccionado en el árbol.
 - Gráfico radial: tarjeta hero con el gauge vertical a la izquierda, las cifras entre el gauge y
-  el círculo, y un círculo grande (~374 pt normal; ~640 maximizado) con particiones →
+  el círculo, y un círculo grande (~430 pt normal; ~740 maximizado) con particiones →
   contenedores APFS → volúmenes (y “Other” para el espacio no asignado). Usa la paleta cálida
   `#faf6f2 #e9dccf #d4c1b1 #b8a293 #7e6a60`: cada anillo toma un tramo de la rampa (particiones
   claras, contenedores medias, volúmenes oscuras), con bandas y texto de contraste según la
-  luminancia del relleno. Las chips numeradas (Disk / 1 Partitions / 2 Containers / 3 Volumes)
-  indican el nivel. El centro muestra el tipo y el sistema de ficheros del elemento seleccionado
-  (p. ej. `APFS VOLUME · apfs`); la leyenda de dos líneas muestra `id · nombre` y `tipo · fs`, y el
+  luminancia del relleno. El centro es más grande que antes (tipo + nombre + usado/libre/%) y los
+  anillos algo más estrechos. La cabecera consolidada muestra `DISK STRUCTURE · <nombre del disco>
+  (<id>) · N partitions · N containers · N volumes` y una línea `Inventory · N items · N disks ·
+  N containers · N volumes · capacidad · libre`, con texto legible; no quedan chips ni caption
+  superior derecho. El sector seleccionado usa un núcleo claro (`paper`) con halo de tinta.
+  El centro muestra el tipo y el sistema de ficheros del elemento seleccionado (p. ej.
+  `APFS VOLUME · apfs`); la leyenda de dos líneas muestra `id · nombre` y `tipo · fs`, y el
   tooltip añade el punto de montaje o el número de volúmenes. Las porciones cuyo título no cabe
   dentro se etiquetan fuera con línea guía y punto; hover resalta porción, etiqueta y fila.
-- Las barras de uso del árbol y el gauge vertical usan la misma paleta; las tarjetas resumen y el
-  chrome de la tarjeta conservan sus acentos por tipo.
-- Maximizar/restaurar en árbol y detalle: la tarjeta ocupa el área de Volumes y se ocultan las
-  tarjetas resumen y la otra columna; la cabecera, las pestañas y el selector de unidades siguen
-  visibles. `--volumes-maximized details` sin selección cae al layout normal.
+- Las barras del árbol y el gauge usan la paleta cálida; sobre el gauge se rotula DISK/PARTITION/
+  CONTAINER/VOLUME, y en volúmenes el caption dice “of container capacity”. Al seleccionar un
+  contenedor/volumen APFS aparece la nota de espacio compartido y la fila “Shared with” con el
+  contenedor y los volúmenes (nombre+id); no se muestra para discos, particiones ni snapshots.
+- Maximizar/restaurar en árbol y detalle: la tarjeta ocupa el área de Volumes y se oculta la otra
+  columna; la cabecera, las pestañas y el selector de unidades siguen visibles.
+  `--volumes-maximized details` sin selección cae al layout normal.
 
 La barra inferior debe mostrar métricas de la sección activa y la marca de actualización de su
 fuente (red, inventario de disco, servicios launchd o CPU/memoria).
@@ -854,8 +862,10 @@ $K --screenshot /tmp/kb-hero-min.png --section disk --disk-tab volumes \
   su sistema de ficheros.
 - Los sectores pequeños sin título interior muestran un callout exterior con línea guía, punto de
   color y texto truncado si hace falta; no hay solapes ni etiquetas duplicadas con las interiores.
-  Hover/clic sobre la etiqueta externa resalta/selecciona su sector.
-- El círculo se ajusta para reservar gutters (~374 pt normal, ~307 en 1340×700, ~640 maximizado);
+  Hover/clic sobre la etiqueta externa resalta/selecciona su sector. Pulsar el centro del círculo
+  selecciona el disco del alcance y muestra su detalle. Los bordes de los sectores son una línea
+  fina (0.6 pt; 0.8 maximizado) salvo el sector seleccionado, que conserva el trazo de 2.5 pt.
+- El círculo se ajusta para reservar gutters (~430 pt normal, ~360 en 1340×700, ~740 maximizado);
   a 1340×700 la tarjeta hace scroll vertical. La leyenda queda debajo del hero, con dos líneas por
   fila (nombre + tipo/fs), y sigue siendo clicable.
 

@@ -110,14 +110,15 @@
   `EnvironmentValues.byteUnitSystem`; fuera de Disk el valor por defecto es binario para no
   alterar CPU/Memory/Network. Volumes muestra el árbol a 1/3 y el detalle a 2/3 (sin selección,
   el árbol ocupa todo); al seleccionar un ítem no se abre ninguna tercera tarjeta. Cada tarjeta
-  tiene un botón maximizar/restaurar que la lleva al área de Volumes (oculta las tarjetas resumen
-  y la otra columna; cabecera y pestañas siguen visibles). El estado vive en `DiskUIState`
+  tiene un botón maximizar/restaurar que la lleva al área de Volumes (oculta la otra columna;
+  cabecera y pestañas siguen visibles). El estado vive en `DiskUIState`
   (`maximizedVolumesPanel`). El árbol
   disco → partición → contenedor APFS → volumen, un inspector y `CapacityBar`; Analyzer muestra
   controles de escaneo, progreso, `RadialDiskMap` y las tablas de contenidos y mayores archivos;
   I/O muestra el gráfico Data/Operations y la tabla de procesos por actividad de disco.
-  Las tarjetas de ambas subpestañas filtran el contenido (medios/contenedores APFS/volúmenes/
-  orden por tamaño o espacio libre; todo/ficheros/carpetas/denegados).
+  En Analyzer las tarjetas filtran el contenido; en Volumes la cabecera del gráfico consolida los
+  conteos por disco y el inventario global, y el flag `--volumes-focus` permite filtrar la lista
+  para capturas.
 - `DaemonsView`: inventario launchd deduplicado por label (`DaemonDeduplicator`). Los filtros de
   tipo, ámbito, origen y estado son chips multiselección (`MultiSelectChipBar`): todos los valores
   están pulsados al arrancar, se muestran las filas de los valores pulsados y un grupo sin nada
@@ -344,16 +345,23 @@
     muestra como desconocido, nunca como 0 B; si la suma de usado excede el espacio usable, los
     segmentos se escalan y se avisa.
     Los gráficos usan `DiskPalette` (rampa cálida `#faf6f2 → #7e6a60`): cada nivel toma un par de
-    tonos (particiones sand/paper, contenedores stone/sand, volúmenes taupe/ink) y las chips
-    numeradas indican el orden de los anillos. Las bandas, separadores, textos y trazos de
-    selección se eligen por la luminancia relativa del relleno (`contentColor`/`bandColor`): tinta
-    oscura sobre los tonos claros y blanco/sand sobre `ink`. Las porciones cuya etiqueta no cabe
+    tonos (particiones sand/paper, contenedores stone/sand, volúmenes taupe/ink) y la cabecera
+    consolida el nombre del disco, los conteos por disco y el inventario global. Las bandas,
+    separadores y textos se eligen por la luminancia relativa del relleno
+    (`contentColor`/`bandColor`): tinta oscura sobre los tonos claros y blanco/sand sobre `ink`.
+    El sector seleccionado usa un núcleo claro (`paper`) con un halo de tinta; hover y ancestros
+    conservan `contentColor`. Las porciones cuya etiqueta no cabe
     dentro reciben un callout exterior con línea guía: se reservan gutters laterales (el círculo se
     ajusta), se reparten por lado con anti-solape (`distributedYs`) y se descartan los candidatos
-    más pequeños si no caben; las etiquetas son clicables. El centro indica el tipo y el sistema de
+    más pequeños si no caben; las etiquetas son clicables. El centro (más grande, con tipografía
+    algo mayor) indica el tipo y el sistema de
     ficheros del elemento seleccionado; la leyenda de dos líneas muestra `id · nombre` y
-    `tipo · fs`, y el tooltip añade el punto de montaje o el número de volúmenes. Las barras del
-    árbol y el gauge usan `DiskPalette.tint(for:)`; tarjetas resumen y chrome conservan sus acentos.
+    `tipo · fs`, y el tooltip añade el punto de montaje o el número de volúmenes. Pulsar el centro
+    del círculo selecciona el disco del alcance y muestra su detalle. En el árbol, la barra de un
+    volumen representa su parte del usado del contenedor (el resto usa usado/capacidad); el gauge
+    se rotula con el tipo y “of container capacity” en volúmenes. Para contenedores y volúmenes
+    APFS se añade una nota de espacio compartido y una fila “Shared with” con el contenedor y los
+    volúmenes implicados. El chrome de la tarjeta conserva sus acentos.
   - No se ejecuta ningún proceso externo.
 - **Escaneo (`DiskScanner`)**
   - Una llamada C a `kb_disk_list_directory` por directorio; la capa C usa `open(O_RDONLY |

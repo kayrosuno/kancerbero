@@ -36,13 +36,13 @@ struct VolumeHierarchyChart: View {
         let rows = legendRows(nodes)
 
         VStack(alignment: .leading, spacing: 10) {
-            header(nodes, scope: scope)
+            header(scope: scope)
 
             HStack(alignment: .center,
                    spacing: isMaximized ? 14 : 10) {
                 heroInfo
                 circle(nodes: nodes, scope: scope, highlightID: highlightID)
-                    .frame(height: isMaximized ? 660 : 400)
+                    .frame(height: isMaximized ? 760 : 500)
             }
             .frame(maxWidth: .infinity, alignment: .center)
 
@@ -56,13 +56,14 @@ struct VolumeHierarchyChart: View {
 
     private var heroInfo: some View {
         HStack(alignment: .center,
-               spacing: isMaximized ? 14 : 10) {
+               spacing: isMaximized ? 12 : 6) {
             VerticalUsageBar(
                 fraction: usageFraction,
                 tint: DiskPalette.tint(for: item.kind),
+                kindLabel: gaugeKindLabel(for: item.kind),
                 caption: usageCaption,
                 height: isMaximized ? 300 : 210,
-                width: isMaximized ? 58 : 52,
+                width: isMaximized ? 54 : 46,
                 isMaximized: isMaximized)
             statsColumn
         }
@@ -98,103 +99,84 @@ struct VolumeHierarchyChart: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .frame(width: isMaximized ? 170 : 146, alignment: .leading)
-    }
-
-    private func levelChips(_ nodes: [HierarchyNode]) -> some View {
-        HStack(spacing: 10) {
-            levelChip("Disk", DiskPalette.ink)
-            if contains(role: .partition, in: nodes) {
-                levelChip("1 Partitions", DiskPalette.sand)
-            }
-            if contains(role: .container, in: nodes) {
-                levelChip("2 Containers", DiskPalette.stone)
-            }
-            if contains(role: .volume, in: nodes) {
-                levelChip("3 Volumes", DiskPalette.taupe)
-            }
-        }
-        .accessibilityHidden(true)
-    }
-
-    private func levelChip(_ title: String, _ color: Color) -> some View {
-        HStack(spacing: 4) {
-            RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                .fill(color)
-                .frame(width: 12, height: 3)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                        .strokeBorder(
-                            DiskPalette.contentColor(on: color).opacity(0.45),
-                            lineWidth: 0.5)
-                }
-            Text(title)
-                .font(.system(size: 9))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-    }
-
-    private func contains(role: SliceRole,
-                          in nodes: [HierarchyNode]) -> Bool {
-        nodes.contains { node in
-            node.role == role || contains(role: role, in: node.children)
-        }
+        .frame(width: isMaximized ? 150 : 130, alignment: .leading)
     }
 
     // MARK: - Header
 
-    private func header(_ nodes: [HierarchyNode],
-                        scope: KBDiskItem) -> some View {
-        HStack(alignment: .center, spacing: 8) {
+    private func header(scope: KBDiskItem) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
             Text("Disk structure")
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase)
                 .tracking(0.5)
+                .foregroundStyle(.primary.opacity(0.80))
+            HStack(spacing: 4) {
+                Text(displayName(scope))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text("(\(scope.deviceIdentifier))")
+                    .lineLimit(1)
+                Text("· \(countsText(for: scope))")
+                    .lineLimit(1)
+                    .layoutPriority(1)
+            }
+            .font(.system(size: 9.5))
+            .foregroundStyle(.secondary)
+            Text("Inventory · \(globalSummary())")
+                .font(.system(size: 9))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
-            levelChips(nodes)
-            Spacer(minLength: 4)
-            Text(caption(nodes, scope: scope))
-                .font(.system(size: 8))
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
         }
     }
 
-    private func caption(_ nodes: [HierarchyNode],
-                         scope: KBDiskItem) -> String {
+    private func headerSummary(scope: KBDiskItem) -> String {
+        "\(displayName(scope)) (\(scope.deviceIdentifier)) · "
+            + "\(countsText(for: scope)) · Inventory: \(globalSummary())"
+    }
+
+    private func countsText(for scope: KBDiskItem) -> String {
         var partitions = 0
         var containers = 0
         var volumes = 0
-        func visit(_ nodes: [HierarchyNode]) {
-            for node in nodes {
-                switch node.role {
-                case .partition: partitions += 1
-                case .container: containers += 1
-                case .volume: volumes += 1
-                default: break
-                }
-                visit(node.children)
+        func visit(_ item: KBDiskItem) {
+            switch item.kind {
+            case .partition: partitions += 1
+            case .apfsContainer: containers += 1
+            case .apfsVolume: volumes += 1
+            default: break
             }
+            for child in item.children { visit(child) }
         }
-        visit(nodes)
+        for child in scope.children { visit(child) }
 
-        var parts: [String] = []
-        if partitions > 0 {
-            parts.append("\(partitions) partition\(partitions == 1 ? "" : "s")")
+        func count(_ value: Int, _ singular: String, _ plural: String) -> String {
+            "\(value) \(value == 1 ? singular : plural)"
         }
-        if containers > 0 {
-            parts.append("\(containers) container\(containers == 1 ? "" : "s")")
+        return "\(count(partitions, "partition", "partitions")) · "
+            + "\(count(containers, "container", "containers")) · "
+            + count(volumes, "volume", "volumes")
+    }
+
+    private func globalSummary() -> String {
+        let items = inventory.allItems.count
+        let disks = inventory.items.count
+        let containers = inventory.allItems
+            .filter { $0.kind == .apfsContainer }.count
+        let volumes = inventory.mountedVolumes.count
+        let capacity = DiskMetrics.capacityBytes(inventory)
+        let free = DiskMetrics.freeBytes(inventory)
+
+        func count(_ value: Int, _ singular: String, _ plural: String) -> String {
+            "\(value) \(value == 1 ? singular : plural)"
         }
-        if volumes > 0 {
-            parts.append("\(volumes) volume\(volumes == 1 ? "" : "s")")
-        }
-        let counts = parts.isEmpty ? "No structure"
-            : parts.joined(separator: " · ")
-        return "\(scope.deviceIdentifier) · \(counts)"
+        return "\(count(items, "item", "items")) · "
+            + "\(count(disks, "disk", "disks")) · "
+            + "\(count(containers, "container", "containers")) · "
+            + "\(count(volumes, "volume", "volumes")) · "
+            + "\(KBFormat.bytes(capacity, units: byteUnitSystem)) · "
+            + "\(KBFormat.bytes(free, units: byteUnitSystem)) free"
     }
 
     // MARK: - Chart
@@ -244,6 +226,10 @@ struct VolumeHierarchyChart: View {
             }
             .gesture(
                 SpatialTapGesture().onEnded { value in
+                    if isInsideCenter(value.location, in: layout) {
+                        onSelectItem?(scope.deviceIdentifier)
+                        return
+                    }
                     if let callout = callout(at: value.location, in: layout),
                        callout.node.role.isSelectable,
                        let itemID = callout.node.itemID {
@@ -259,7 +245,10 @@ struct VolumeHierarchyChart: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Disk structure")
             .accessibilityValue(
-                "\(caption(nodes, scope: scope)) · \(kindLine(for: item))")
+                "\(headerSummary(scope: scope)) · \(kindLine(for: item))")
+            .accessibilityAction(named: Text("Show disk details")) {
+                onSelectItem?(scope.deviceIdentifier)
+            }
         }
     }
 
@@ -287,6 +276,16 @@ struct VolumeHierarchyChart: View {
         return fileSystem.map { "\(kind) · \($0)" } ?? kind
     }
 
+    private func gaugeKindLabel(for kind: KBDiskItemKind) -> String {
+        switch kind {
+        case .physicalDisk: return "DISK"
+        case .partition: return "PARTITION"
+        case .apfsContainer: return "CONTAINER"
+        case .apfsVolume: return "VOLUME"
+        case .snapshot: return "SNAPSHOT"
+        }
+    }
+
     private func tooltipX(in size: CGSize) -> CGFloat {
         guard let hoverLocation else { return 8 }
         return min(max(8, hoverLocation.x + 16),
@@ -304,24 +303,24 @@ struct VolumeHierarchyChart: View {
         let usage = item.spaceUsage
         return VStack(spacing: 1) {
             Image(systemName: icon(for: item.kind))
-                .font(.system(size: isMaximized ? 18 : 14,
+                .font(.system(size: isMaximized ? 20 : 15,
                               weight: .semibold))
                 .foregroundStyle(DiskPalette.ink)
             Text(kindLine(for: item))
-                .font(.system(size: isMaximized ? 9.5 : 8.5,
+                .font(.system(size: isMaximized ? 10 : 9,
                               weight: .semibold))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
             Text(displayName(item))
-                .font(.system(size: isMaximized ? 14 : 11.5,
+                .font(.system(size: isMaximized ? 16 : 13,
                               weight: .semibold, design: .rounded))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
             if let used = usage.usedBytes {
                 Text("\(KBFormat.bytes(used, units: byteUnitSystem)) used")
-                    .font(.system(size: isMaximized ? 11.5 : 9.5,
+                    .font(.system(size: isMaximized ? 12.5 : 10.5,
                                   weight: .medium))
                     .monospacedDigit()
             } else {
@@ -331,13 +330,13 @@ struct VolumeHierarchyChart: View {
             }
             if let free = usage.freeBytes {
                 Text("\(KBFormat.bytes(free, units: byteUnitSystem)) free")
-                    .font(.system(size: isMaximized ? 10.5 : 9))
+                    .font(.system(size: isMaximized ? 11 : 9.5))
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
             if let fraction = item.volumeUsedFraction {
                 Text(KBFormat.percent(fraction))
-                    .font(.system(size: isMaximized ? 10.5 : 9))
+                    .font(.system(size: isMaximized ? 11 : 9.5))
                     .foregroundStyle(.tertiary)
                     .monospacedDigit()
             }
@@ -1012,7 +1011,7 @@ struct VolumeHierarchyChart: View {
 
     private func makeLayout(nodes: [HierarchyNode], in size: CGSize,
                             baseLevel: Int) -> Layout {
-        let minGutter: CGFloat = isMaximized ? 90 : 60
+        let minGutter: CGFloat = isMaximized ? 56 : 46
         let gutteredSide = min(size.height,
                                max(0, size.width - 2 * minGutter))
         let guttered = gutteredSide >= 240
@@ -1022,8 +1021,8 @@ struct VolumeHierarchyChart: View {
         let gutter = max(0, (size.width - side) / 2)
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
         let maxRadius = max(0, side / 2 - 10)
-        let centerRadius = max(52,
-                               min(isMaximized ? 82 : 58, side * 0.125))
+        let centerRadius = max(60,
+                               min(isMaximized ? 100 : 66, side * 0.15))
         let rings = max(1, depth(of: nodes))
         let ringWidth = max(0, (maxRadius - centerRadius) / CGFloat(rings))
 
@@ -1048,7 +1047,7 @@ struct VolumeHierarchyChart: View {
     private func makeCallouts(sectors: [Sector], size: CGSize,
                               center: CGPoint, maxRadius: CGFloat,
                               gutter: CGFloat) -> [Callout] {
-        let textBudget = max(24, gutter - 8)
+        let textBudget = max(24, gutter - 4)
         let nameSize: CGFloat = isMaximized ? 9.5 : 8.5
 
         struct Candidate {
@@ -1280,7 +1279,6 @@ struct VolumeHierarchyChart: View {
             let node = sector.node
             let content = DiskPalette.contentColor(on: node.color)
             let separator = content.opacity(0.18)
-            let selectedStroke = content.opacity(0.85)
             let ancestorStroke = content.opacity(0.35)
             let hoverStroke = content.opacity(0.65)
             let hovered = hoveredNodeID == node.id
@@ -1289,20 +1287,26 @@ struct VolumeHierarchyChart: View {
 
             let path = sectorPath(sector, center: layout.center)
             context.fill(path, with: .color(node.color))
-            context.stroke(path, with: .color(separator), lineWidth: 0.5)
+            context.stroke(path, with: .color(separator), lineWidth: 0.3)
 
             drawLevelBand(sector, layout: layout, context: &context)
 
             if selected {
-                context.stroke(path, with: .color(selectedStroke),
-                               lineWidth: 2.5)
+                if DiskPalette.isLight(node.color) {
+                    context.stroke(
+                        path,
+                        with: .color(DiskPalette.textInk.opacity(0.85)),
+                        lineWidth: 5)
+                }
+                context.stroke(path, with: .color(DiskPalette.paper),
+                               lineWidth: 3)
             } else if ancestor {
                 context.stroke(path, with: .color(ancestorStroke),
-                               lineWidth: 1)
+                               lineWidth: 0.75)
             }
             if hovered && !selected {
                 context.stroke(path, with: .color(hoverStroke),
-                               lineWidth: 1.5)
+                               lineWidth: 1.0)
             }
 
             drawLabel(sector, layout: layout, context: &context)
@@ -1317,7 +1321,7 @@ struct VolumeHierarchyChart: View {
         context.fill(centerPath, with: .color(Color(nsColor: .controlBackgroundColor)))
         let centerTint = DiskPalette.tint(for: item.kind)
         context.stroke(centerPath, with: .color(centerTint.opacity(0.85)),
-                       lineWidth: 2)
+                       lineWidth: 1.0)
 
         drawCallouts(layout, highlightID: highlightID, context: &context)
     }
@@ -1371,7 +1375,7 @@ struct VolumeHierarchyChart: View {
         let span = sector.endAngle - sector.startAngle
         guard span >= 0.02 else { return }
 
-        let width: CGFloat = isMaximized ? 3.5 : 2.5
+        let width: CGFloat = isMaximized ? 0.8 : 0.6
         let radius = max(0, sector.outerRadius - width / 2 - 0.5)
         let epsilon = min(0.012, span * 0.2, 1.2 / max(radius, 1))
         var path = Path()
@@ -1509,6 +1513,14 @@ struct VolumeHierarchyChart: View {
         layout.callouts.first { $0.textRect.contains(location) }
     }
 
+    private func isInsideCenter(_ location: CGPoint,
+                                in layout: Layout) -> Bool {
+        let dx = location.x - layout.center.x
+        let dy = location.y - layout.center.y
+        return dx * dx + dy * dy
+            <= layout.centerRadius * layout.centerRadius
+    }
+
     private func sector(at location: CGPoint, in layout: Layout) -> Sector? {
         let dx = location.x - layout.center.x
         let dy = location.y - layout.center.y
@@ -1533,6 +1545,7 @@ struct VolumeHierarchyChart: View {
 private struct VerticalUsageBar: View {
     let fraction: Double?
     let tint: Color
+    let kindLabel: String?
     let caption: String?
     let height: CGFloat
     let width: CGFloat
@@ -1551,6 +1564,16 @@ private struct VerticalUsageBar: View {
 
     var body: some View {
         VStack(spacing: 5) {
+            if let kindLabel {
+                Text(kindLabel)
+                    .font(.system(size: 7.5, weight: .semibold))
+                    .textCase(.uppercase)
+                    .tracking(0.3)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .frame(width: width)
+            }
             Text(percentText)
                 .font(.system(size: isMaximized ? 14 : 12,
                               weight: .semibold, design: .rounded))
@@ -1611,7 +1634,8 @@ private struct VerticalUsageBar: View {
         }
         .frame(width: width)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Capacity used")
+        .accessibilityLabel(kindLabel.map { "\($0) capacity used" }
+                            ?? "Capacity used")
         .accessibilityValue(fraction == nil ? "Unknown" : percentText)
     }
 }

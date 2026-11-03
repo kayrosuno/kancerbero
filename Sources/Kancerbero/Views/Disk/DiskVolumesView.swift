@@ -34,11 +34,6 @@ struct DiskVolumesView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            if !ui.cardsCollapsed(for: .disk), effectiveMaximized == nil {
-                cards
-                    .transition(.opacity)
-            }
-
             Group {
                 if let maximized = effectiveMaximized {
                     maximizedCard(maximized)
@@ -126,81 +121,6 @@ struct DiskVolumesView: View {
         )
     }
 
-    // MARK: - Cards
-
-    private var cards: some View {
-        let inventory = disk.inventory
-        let disks = DiskMetrics.physicalDiskCount(inventory)
-        let containers = DiskMetrics.apfsContainerCount(inventory)
-        let volumes = DiskMetrics.mountedVolumeCount(inventory)
-        let capacity = DiskMetrics.capacityBytes(inventory)
-        let free = DiskMetrics.freeBytes(inventory)
-
-        return LazyVGrid(columns: KBTheme.summaryColumns,
-                         spacing: KBTheme.summaryGridSpacing) {
-            SummaryCard(
-                title: "All",
-                value: KBFormat.compactCount(inventory?.allItems.count ?? 0),
-                caption: "items across the tree",
-                systemImage: "square.grid.2x2.fill",
-                tint: Color(red: 0.42, green: 0.46, blue: 0.54),
-                action: { showAll() },
-                isSelected: ui.disk.volumesFocus == nil,
-                filterHint: "Show all disks, containers and volumes", compact: true
-            )
-            SummaryCard(
-                title: "Disks",
-                value: "\(disks)",
-                caption: "physical and virtual media",
-                systemImage: "internaldrive",
-                tint: Color(red: 0.94, green: 0.56, blue: 0.18),
-                action: { toggleFocus(.disks) },
-                isSelected: ui.disk.volumesFocus == .disks,
-                filterHint: "Show only top-level media", compact: true
-            )
-            SummaryCard(
-                title: "Containers",
-                value: "\(containers)",
-                caption: "APFS containers",
-                systemImage: "square.stack.3d.up",
-                tint: Color(red: 0.85, green: 0.65, blue: 0.20),
-                action: { toggleFocus(.containers) },
-                isSelected: ui.disk.volumesFocus == .containers,
-                filterHint: "Show only APFS containers", compact: true
-            )
-            SummaryCard(
-                title: "Volumes",
-                value: "\(volumes)",
-                caption: "mounted filesystems",
-                systemImage: "externaldrive.fill",
-                tint: Color(red: 0.20, green: 0.70, blue: 0.62),
-                action: { toggleFocus(.volumes) },
-                isSelected: ui.disk.volumesFocus == .volumes,
-                filterHint: "Show only mounted volumes", compact: true
-            )
-            SummaryCard(
-                title: "Capacity",
-                value: KBFormat.bytes(capacity, units: byteUnitSystem),
-                caption: "across all media",
-                systemImage: "square.stack.3d.up.fill",
-                tint: Color(red: 0.16, green: 0.62, blue: 0.94),
-                action: { toggleFocus(.capacity) },
-                isSelected: ui.disk.volumesFocus == .capacity,
-                filterHint: "Show items ordered by size", compact: true
-            )
-            SummaryCard(
-                title: "Free",
-                value: KBFormat.bytes(free, units: byteUnitSystem),
-                caption: "deduplicated across APFS containers",
-                systemImage: "circle.dashed",
-                tint: Color(red: 0.62, green: 0.42, blue: 0.95),
-                action: { toggleFocus(.free) },
-                isSelected: ui.disk.volumesFocus == .free,
-                filterHint: "Show items with the least free space first", compact: true
-            )
-        }
-    }
-
     private func treeCard(isMaximized: Bool) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
@@ -242,7 +162,9 @@ struct DiskVolumesView: View {
                                 .foregroundStyle(.secondary)
                             }
 
-                            DiskTreeRow(item: row.item)
+                            DiskTreeRow(
+                                item: row.item,
+                                usageFraction: usageFraction(for: row.item))
                         }
                         .padding(.leading, ui.disk.volumesFocus == nil ? CGFloat(row.depth) * 14 : 0)
                         .tag(row.item.deviceIdentifier)
@@ -379,27 +301,13 @@ struct DiskVolumesView: View {
         }
     }
 
-    private func toggleFocus(_ newFocus: DiskVolumesFocus) {
-        withAnimation(.snappy(duration: 0.2)) {
-            ui.disk.volumesFocus = ui.disk.volumesFocus == newFocus ? nil : newFocus
-        }
-    }
-
-    private func showAll() {
-        withAnimation(.snappy(duration: 0.2)) {
-            ui.disk.volumesFocus = nil
-        }
-        expandAll()
-    }
-
     private func expandVolumesIfNeeded() {
         guard !ui.disk.didExpandVolumesOnce, disk.inventory != nil else { return }
         expandAll()
         ui.disk.didExpandVolumesOnce = true
     }
 
-    private func pruneExpanded() {
-        guard let inventory = disk.inventory else { return }
+    private func pruneExpanded() {        guard let inventory = disk.inventory else { return }
         let ids = Set(inventory.allItems.map(\.deviceIdentifier))
         ui.disk.expanded.formIntersection(ids)
     }
@@ -434,10 +342,37 @@ struct DiskVolumesView: View {
         for item in inventory.items { visit(item) }
         ui.disk.expanded.formUnion(identifiers)
     }
+
+    /// Volumes report their share of the container's used space; the rest of
+    /// the rows keep used / capacity.
+    private func usageFraction(for item: KBDiskItem) -> Double? {
+        guard item.kind == .apfsVolume,
+              let inventory = disk.inventory,
+              let container = inventory.apfsContainer(enclosing: item) else {
+            return item.volumeUsedFraction
+        }
+
+        if let containerUsed = container.spaceUsage.usedBytes,
+           containerUsed > 0,
+           let used = item.usedBytes {
+            return min(1, Double(used) / Double(containerUsed))
+        }
+
+        let siblings = container.children.filter { $0.kind == .apfsVolume }
+        var sum: UInt64 = 0
+        for sibling in siblings {
+            guard let used = sibling.usedBytes else { continue }
+            let (next, overflow) = sum.addingReportingOverflow(used)
+            sum = overflow ? UInt64.max : next
+        }
+        guard let used = item.usedBytes, sum > 0 else { return nil }
+        return min(1, Double(used) / Double(sum))
+    }
 }
 
 private struct DiskTreeRow: View {
     let item: KBDiskItem
+    let usageFraction: Double?
     @Environment(\.byteUnitSystem) private var byteUnitSystem
 
     var body: some View {
@@ -479,13 +414,19 @@ private struct DiskTreeRow: View {
                     Text(KBFormat.bytes(item.sizeBytes, units: byteUnitSystem))
                         .font(.system(size: 11, weight: .medium))
                         .monospacedDigit()
-                    if let fraction = item.volumeUsedFraction {
+                    if let fraction = usageFraction {
                         HStack(spacing: 4) {
                             CapacityBar(fraction: fraction,
                                         tint: barTint,
                                         height: 5,
-                                        outline: DiskPalette.ink.opacity(0.30))
+                                        outline: DiskPalette.ink.opacity(0.30),
+                                        accessibilityLabel: item.kind == .apfsVolume
+                                            ? "Share of container used"
+                                            : "Capacity used")
                                 .frame(width: 64)
+                                .help(item.kind == .apfsVolume
+                                      ? "Share of the container's used space"
+                                      : "Capacity used")
                             Text(KBFormat.percent(fraction))
                                 .font(.system(size: 8))
                                 .foregroundStyle(.secondary)
@@ -533,7 +474,7 @@ private struct DiskTreeRow: View {
             return "Some volumes are not mounted; used and free space are partial."
         }
         if item.kind == .apfsVolume {
-            return "Free space is shared with the APFS container."
+            return "Bar: share of the container's used space. Free space is shared with the APFS container."
         }
         return spaceSummary
     }
