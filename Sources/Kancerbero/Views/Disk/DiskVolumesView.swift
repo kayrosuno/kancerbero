@@ -118,7 +118,6 @@ struct DiskVolumesView: View {
         DiskVolumeDetailView(
             item: item,
             inventory: disk.inventory,
-            onSelectSegment: selectSegment,
             onSelectItem: selectItem,
             isMaximized: isMaximized,
             onToggleMaximize: { toggleMaximize(.details) },
@@ -283,11 +282,6 @@ struct DiskVolumesView: View {
             ui.disk.maximizedVolumesPanel =
                 ui.disk.maximizedVolumesPanel == panel ? nil : panel
         }
-    }
-
-    private func selectSegment(_ segment: APFSSpaceSegment) {
-        guard let id = segment.itemID else { return }
-        selectItem(id)
     }
 
     private func selectItem(_ id: String) {
@@ -469,6 +463,14 @@ private struct DiskTreeRow: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+
+                    Text(spaceSummary)
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .help(spaceHelp)
                 }
 
                 Spacer(minLength: 6)
@@ -478,8 +480,17 @@ private struct DiskTreeRow: View {
                         .font(.system(size: 11, weight: .medium))
                         .monospacedDigit()
                     if let fraction = item.volumeUsedFraction {
-                        CapacityBar(fraction: fraction, tint: tint, height: 5)
-                            .frame(width: 80)
+                        HStack(spacing: 4) {
+                            CapacityBar(fraction: fraction,
+                                        tint: barTint,
+                                        height: 5,
+                                        outline: DiskPalette.ink.opacity(0.30))
+                                .frame(width: 64)
+                            Text(KBFormat.percent(fraction))
+                                .font(.system(size: 8))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
                     }
                 }
             }
@@ -497,6 +508,36 @@ private struct DiskTreeRow: View {
         .padding(.vertical, 3)
     }
 
+    /// Volumes share their container's free space, so they only report used
+    /// bytes; disks, partitions and containers report used and free.
+    private var spaceSummary: String {
+        let usage = item.spaceUsage
+        switch item.kind {
+        case .apfsVolume, .snapshot:
+            guard let used = usage.usedBytes else { return "—" }
+            return "\(KBFormat.bytes(used, units: byteUnitSystem)) used"
+        case .physicalDisk, .partition, .apfsContainer:
+            guard let used = usage.usedBytes else { return "—" }
+            let usedText = KBFormat.bytes(used, units: byteUnitSystem)
+            guard let free = usage.freeBytes else { return "\(usedText) used" }
+            return "\(usedText) used · \(KBFormat.bytes(free, units: byteUnitSystem)) free"
+        }
+    }
+
+    private var spaceHelp: String {
+        let usage = item.spaceUsage
+        if !usage.isKnown {
+            return "Usage unknown: no mounted filesystem reports capacity."
+        }
+        if usage.isPartial {
+            return "Some volumes are not mounted; used and free space are partial."
+        }
+        if item.kind == .apfsVolume {
+            return "Free space is shared with the APFS container."
+        }
+        return spaceSummary
+    }
+
     private var icon: String {
         switch item.kind {
         case .physicalDisk: return "internaldrive"
@@ -505,6 +546,10 @@ private struct DiskTreeRow: View {
         case .apfsVolume: return "externaldrive.fill"
         case .snapshot: return "clock.arrow.circlepath"
         }
+    }
+
+    private var barTint: Color {
+        DiskPalette.tint(for: item.kind)
     }
 
     private var tint: Color {

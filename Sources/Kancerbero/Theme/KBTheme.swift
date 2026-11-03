@@ -76,7 +76,7 @@ enum KBTheme {
 
     static let downloadTint = Color(red: 0.16, green: 0.62, blue: 0.94)
     static let uploadTint = Color(red: 0.62, green: 0.42, blue: 0.95)
-    /// Categorical palette shared by the Disk charts.
+    /// Categorical palette used by the Analyzer radial map.
     static let diskChartPalette: [Color] = [
         Color(red: 0.94, green: 0.56, blue: 0.18),
         Color(red: 0.90, green: 0.35, blue: 0.30),
@@ -87,9 +87,6 @@ enum KBTheme {
         Color(red: 0.45, green: 0.65, blue: 0.35),
         Color(red: 0.70, green: 0.45, blue: 0.30)
     ]
-    static let diskChartFree = Color.secondary.opacity(0.22)
-    static let diskChartResidual = Color.secondary.opacity(0.45)
-    static let diskChartUnknown = Color.secondary.opacity(0.16)
     /// Networking cards: download uses the TCP4 chip colour and upload the
     /// UDP6 chip colour from the Protocols card, so both stay in sync.
     static let netDownloadTint = Color(red: 0.16, green: 0.55, blue: 0.90)

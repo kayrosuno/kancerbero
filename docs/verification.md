@@ -341,14 +341,23 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
 ```
 
 - Volumes: por defecto árbol 1/3 + detalle 2/3 (sin selección, el árbol ocupa todo); no existe
-  una tercera tarjeta. Capacidad/Usado/Libre en grande y rutas de montaje visibles (11 pt,
-  secundario). La flecha de la cabecera del detalle sube un nivel (volumen → contenedor →
-  partición → disco) y deja el padre seleccionado en el árbol.
-- Barra APFS: una barra apilada con una porción por contenedor (o por volumen dentro de un
-  contenedor) y leyenda con nombre, ruta, `usado / capacidad` y porcentaje. Cada porción muestra
-  `diskXsY - nombre` centrado cuando el texto cabe (p. ej. `disk3s5 - Macintosh HD - Data`); las
-  pequeñas no muestran etiqueta. Hover resalta fila y porción; pulsar una porción o una fila
-  selecciona el ítem en el árbol y actualiza el detalle.
+  una tercera tarjeta. Cada fila muestra usado/libre (disco, partición y contenedor) o solo usado
+  (volumen); un contenedor sin volumen montado muestra `—` y ninguna barra. Capacidad/Usado/Libre
+  en grande y rutas de montaje visibles (11 pt, secundario). La flecha de la cabecera del detalle
+  sube un nivel (volumen → contenedor → partición → disco) y deja el padre seleccionado en el
+  árbol.
+- Gráfico radial: tarjeta hero con el gauge vertical a la izquierda, las cifras entre el gauge y
+  el círculo, y un círculo grande (~374 pt normal; ~640 maximizado) con particiones →
+  contenedores APFS → volúmenes (y “Other” para el espacio no asignado). Usa la paleta cálida
+  `#faf6f2 #e9dccf #d4c1b1 #b8a293 #7e6a60`: cada anillo toma un tramo de la rampa (particiones
+  claras, contenedores medias, volúmenes oscuras), con bandas y texto de contraste según la
+  luminancia del relleno. Las chips numeradas (Disk / 1 Partitions / 2 Containers / 3 Volumes)
+  indican el nivel. El centro muestra el tipo y el sistema de ficheros del elemento seleccionado
+  (p. ej. `APFS VOLUME · apfs`); la leyenda de dos líneas muestra `id · nombre` y `tipo · fs`, y el
+  tooltip añade el punto de montaje o el número de volúmenes. Las porciones cuyo título no cabe
+  dentro se etiquetan fuera con línea guía y punto; hover resalta porción, etiqueta y fila.
+- Las barras de uso del árbol y el gauge vertical usan la misma paleta; las tarjetas resumen y el
+  chrome de la tarjeta conservan sus acentos por tipo.
 - Maximizar/restaurar en árbol y detalle: la tarjeta ocupa el área de Volumes y se ocultan las
   tarjetas resumen y la otra columna; la cabecera, las pestañas y el selector de unidades siguen
   visibles. `--volumes-maximized details` sin selección cae al layout normal.
@@ -813,42 +822,65 @@ diskutil info disk3s5
 grep -R "diskutil" Sources/ || echo "sin diskutil en el código"
 ```
 
-Gráfico APFS del detalle (Volumes):
+Estructura radial del detalle (Volumes):
 
 ```bash
 ./build/Build/Products/Debug/KancerberoProbe disk apfs
 ./build/Build/Products/Debug/KancerberoProbe disk apfs disk3
+./build/Build/Products/Debug/KancerberoProbe disk usage
+./build/Build/Products/Debug/KancerberoProbe disk usage disk0
 diskutil apfs list
 
 K=build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
-$K --screenshot /tmp/kb-apfs-disk.png --section disk --disk-tab volumes \
+$K --screenshot /tmp/kb-hero-disk.png --section disk --disk-tab volumes \
   --disk-item disk0 --screenshot-size 1440x900 --screenshot-delay 5 --cards-collapsed
-$K --screenshot /tmp/kb-apfs-container.png --section disk --disk-tab volumes \
+$K --screenshot /tmp/kb-hero-container.png --section disk --disk-tab volumes \
   --disk-item disk3 --screenshot-size 1440x900 --screenshot-delay 5 --cards-collapsed
-$K --screenshot /tmp/kb-apfs-volume.png --section disk --disk-tab volumes \
+$K --screenshot /tmp/kb-hero-volume.png --section disk --disk-tab volumes \
   --disk-item disk3s5 --screenshot-size 1340x800 --screenshot-delay 5 --cards-collapsed
+$K --screenshot /tmp/kb-hero-max.png --section disk --disk-tab volumes \
+  --disk-item disk0 --volumes-maximized details \
+  --screenshot-size 1440x900 --screenshot-delay 5 --cards-collapsed
+$K --screenshot /tmp/kb-hero-min.png --section disk --disk-tab volumes \
+  --disk-item disk0 --screenshot-size 1340x700 --screenshot-delay 5 --cards-collapsed
 ```
+
+- La cabecera del detalle muestra `DISK STRUCTURE` con chips Disk/1 Partitions/2 Containers/
+  3 Volumes y el caption del disco (`disk0 · 3 partitions · …`). Cada anillo usa su tramo de la
+  paleta y las bandas/texto se eligen por luminancia (tinta sobre claros, blanco/sand sobre ink).
+- El gauge vertical está a la izquierda del todo, seguido de Capacidad/Usado/Libre y luego el
+  círculo; llena de abajo arriba, muestra el porcentaje y “of capacity”/“of container”; sin datos
+  muestra `—` y el track vacío. El centro del círculo muestra el elemento seleccionado, su tipo y
+  su sistema de ficheros.
+- Los sectores pequeños sin título interior muestran un callout exterior con línea guía, punto de
+  color y texto truncado si hace falta; no hay solapes ni etiquetas duplicadas con las interiores.
+  Hover/clic sobre la etiqueta externa resalta/selecciona su sector.
+- El círculo se ajusta para reservar gutters (~374 pt normal, ~307 en 1340×700, ~640 maximizado);
+  a 1340×700 la tarjeta hace scroll vertical. La leyenda queda debajo del hero, con dos líneas por
+  fila (nombre + tipo/fs), y sigue siendo clicable.
 
 - El número de contenedores del disco debe coincidir con `diskutil list` (incluye los
   contenedores ISC y Recovery que `diskutil apfs list` no muestra); `diskutil apfs list` sirve
   para los volúmenes y la capacidad en uso del contenedor principal. Con el selector en Decimal
   (por defecto) el gráfico muestra 494,4 GB; en Binario muestra 460,4 GiB.
-  Con varios contenedores, la barra apilada muestra una porción por contenedor (tamaño =
-  capacidad) y la leyenda `usado / capacidad` + número de volúmenes/snapshots.
-- Con un solo contenedor, la barra muestra el desglose de sus volúmenes con el subtítulo
-  «1 APFS container». Al seleccionar un contenedor o volumen se muestran sus volúmenes,
-  snapshots/metadatos y libre; el volumen seleccionado queda resaltado en la leyenda.
-- Pulsar una porción o una fila de la leyenda selecciona ese ítem en el árbol y actualiza el
+  Con varios contenedores, el anillo de particiones y el de contenedores muestran una porción por
+  unidad (tamaño = capacidad), con “Other” para el espacio no asignado.
+- El anillo exterior muestra el desglose de volúmenes del contenedor (usado + residual +
+  snapshots/metadatos + libre). Al seleccionar un contenedor o volumen, el elemento y sus
+  ancestros quedan resaltados en sus anillos y en la leyenda.
+- Pulsar un sector o una fila de la leyenda selecciona ese ítem en el árbol y actualiza el
   detalle; la flecha de subir nivel recorre volumen → contenedor → partición → disco.
-- Un contenedor sin volumen montado muestra una pista atenuada y `—` (nunca `0 B`).
+- Un contenedor sin volumen montado muestra un arco desconocido y `—` (nunca `0 B`).
 - `usado de volúmenes + residual + libre = capacidad`; permitir la diferencia documentada de
   `ATTR_VOL_SPACEUSED` frente a `diskutil`. Si la suma de usado excede lo usable, las porciones se
   escalan y aparece la nota correspondiente.
-- Seleccionar un disco/partición no APFS no muestra gráfico ni divisor.
+- El árbol muestra usado/libre por fila (volúmenes solo usado). `disk usage` debe dar las mismas
+  cifras agregadas y `partial=yes` cuando falte algún volumen montado; un disco/partición no APFS
+  usa el anillo usado/libre y, sin datos, omite el gráfico.
 - Selector **Decimal/Binary** de la línea de pestañas:
   `--disk-units decimal` muestra `500,3 GB` para disk0 (base 1000, KB/MB/GB);
   `--disk-units binary` muestra `465,9 GiB` (base 1024, KiB/MiB/GiB). Cambian árbol, tarjetas,
-  detalle, barra APFS, analyzer, tablas de I/O, velocidades Read/s/Write/s y la barra de estado.
+  detalle, gráfico radial, analyzer, tablas de I/O, velocidades Read/s/Write/s y la barra de estado.
   Las operaciones/s y los contadores no cambian. CPU/Memory/Network conservan su formato. La
   elección del selector se guarda en `UserDefaults`; el flag solo afecta a la sesión/captura.
 
