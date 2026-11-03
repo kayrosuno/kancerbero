@@ -345,27 +345,28 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   una tercera tarjeta ni las tarjetas resumen superiores. Cada fila muestra usado/libre (disco,
   partición y contenedor) o solo usado (volumen); un contenedor sin volumen montado muestra `—` y
   ninguna barra. En volúmenes la barra representa su parte del usado del contenedor; el resto usan
-  usado/capacidad. Capacidad/Usado/Libre en grande y rutas de montaje visibles (11 pt, secundario).
-  La flecha de la cabecera del detalle sube un nivel (volumen → contenedor → partición → disco) y
-  deja el padre seleccionado en el árbol.
-- Gráfico radial: tarjeta hero con el gauge vertical a la izquierda, las cifras entre el gauge y
-  el círculo, y un círculo grande (~430 pt normal; ~740 maximizado) con particiones →
-  contenedores APFS → volúmenes (y “Other” para el espacio no asignado). Usa la paleta cálida
-  `#faf6f2 #e9dccf #d4c1b1 #b8a293 #7e6a60`: cada anillo toma un tramo de la rampa (particiones
-  claras, contenedores medias, volúmenes oscuras), con bandas y texto de contraste según la
-  luminancia del relleno. El centro es más grande que antes (tipo + nombre + usado/libre/%) y los
-  anillos algo más estrechos. La cabecera consolidada muestra `DISK STRUCTURE · <nombre del disco>
-  (<id>) · N partitions · N containers · N volumes` y una línea `Inventory · N items · N disks ·
-  N containers · N volumes · capacidad · libre`, con texto legible; no quedan chips ni caption
-  superior derecho. El sector seleccionado usa un núcleo claro (`paper`) con halo de tinta.
+  usado/capacidad. La cabecera de la tarjeta muestra pills esquemáticas de lo que contiene el
+  componente (disco: particiones/contenedores/volúmenes; contenedor: volúmenes; volumen:
+  “No nested items”). La flecha de la cabecera del detalle sube un nivel (volumen → contenedor →
+  partición → disco) y deja el padre seleccionado en el árbol.
+- Gráfico radial: tarjeta hero con el gauge vertical a la izquierda, CAPACITY encima de la barra,
+  USED/FREE en la columna lateral y un círculo grande (~430 pt normal; ~740 maximizado) con
+  particiones → contenedores APFS → volúmenes (y “Other” para el espacio no asignado). Usa la
+  paleta cálida `#faf6f2 #e9dccf #d4c1b1 #b8a293 #7e6a60`: cada anillo toma un tramo de la rampa
+  (particiones claras, contenedores medias, volúmenes oscuras), con bandas y texto de contraste
+  según la luminancia del relleno. El centro es grande (tipo + nombre + usado/libre/%) y los
+  anillos algo estrechos. **No hay bloque-resumen sobre el gráfico** (ni DISK STRUCTURE, ni
+  Inventory); el esquema está en la cabecera de la tarjeta. El sector seleccionado usa un trazo
+  oscuro (`contentColor`; blanco sobre el relleno `ink`), distinto del hover/ancestros.
   El centro muestra el tipo y el sistema de ficheros del elemento seleccionado (p. ej.
   `APFS VOLUME · apfs`); la leyenda de dos líneas muestra `id · nombre` y `tipo · fs`, y el
   tooltip añade el punto de montaje o el número de volúmenes. Las porciones cuyo título no cabe
   dentro se etiquetan fuera con línea guía y punto; hover resalta porción, etiqueta y fila.
 - Las barras del árbol y el gauge usan la paleta cálida; sobre el gauge se rotula DISK/PARTITION/
-  CONTAINER/VOLUME, y en volúmenes el caption dice “of container capacity”. Al seleccionar un
-  contenedor/volumen APFS aparece la nota de espacio compartido y la fila “Shared with” con el
-  contenedor y los volúmenes (nombre+id); no se muestra para discos, particiones ni snapshots.
+  CONTAINER/VOLUME, y el caption dice “of container”/“of capacity”. CAPACITY aparece solo encima
+  de la barra (sin duplicarse en la columna lateral). Al seleccionar un contenedor/volumen APFS
+  aparece la nota de espacio compartido y la fila “Shared with” con el contenedor y los volúmenes
+  (nombre+id); no se muestra para discos, particiones ni snapshots.
 - Maximizar/restaurar en árbol y detalle: la tarjeta ocupa el área de Volumes y se oculta la otra
   columna; la cabecera, las pestañas y el selector de unidades siguen visibles.
   `--volumes-maximized details` sin selección cae al layout normal.
@@ -853,18 +854,21 @@ $K --screenshot /tmp/kb-hero-min.png --section disk --disk-tab volumes \
   --disk-item disk0 --screenshot-size 1340x700 --screenshot-delay 5 --cards-collapsed
 ```
 
-- La cabecera del detalle muestra `DISK STRUCTURE` con chips Disk/1 Partitions/2 Containers/
-  3 Volumes y el caption del disco (`disk0 · 3 partitions · …`). Cada anillo usa su tramo de la
-  paleta y las bandas/texto se eligen por luminancia (tinta sobre claros, blanco/sand sobre ink).
-- El gauge vertical está a la izquierda del todo, seguido de Capacidad/Usado/Libre y luego el
-  círculo; llena de abajo arriba, muestra el porcentaje y “of capacity”/“of container”; sin datos
-  muestra `—` y el track vacío. El centro del círculo muestra el elemento seleccionado, su tipo y
-  su sistema de ficheros.
+- La cabecera de la tarjeta muestra el nombre, el subtítulo de tipo/id y las pills esquemáticas
+  del componente (disco: particiones/contenedores/volúmenes; contenedor: volúmenes; volumen:
+  “No nested items”). Encima del gráfico no queda ningún bloque-resumen; el círculo empieza
+  directamente. Cada anillo usa su tramo de la paleta y las bandas/texto se eligen por luminancia
+  (tinta sobre claros, blanco/sand sobre ink).
+- El gauge vertical está a la izquierda; CAPACITY (título+valor) aparece encima de la barra y
+  USED/FREE en la columna lateral. El gauge llena de abajo arriba, muestra el tipo, el porcentaje
+  y “of container”/“of capacity”; sin datos muestra `—` y el track vacío. El centro del círculo
+  muestra el elemento seleccionado, su tipo y su sistema de ficheros.
 - Los sectores pequeños sin título interior muestran un callout exterior con línea guía, punto de
   color y texto truncado si hace falta; no hay solapes ni etiquetas duplicadas con las interiores.
   Hover/clic sobre la etiqueta externa resalta/selecciona su sector. Pulsar el centro del círculo
   selecciona el disco del alcance y muestra su detalle. Los bordes de los sectores son una línea
-  fina (0.6 pt; 0.8 maximizado) salvo el sector seleccionado, que conserva el trazo de 2.5 pt.
+  fina (0.6 pt; 0.8 maximizado); el sector seleccionado usa un trazo oscuro de 3 pt (blanco sobre
+  el relleno `ink`).
 - El círculo se ajusta para reservar gutters (~430 pt normal, ~360 en 1340×700, ~740 maximizado);
   a 1340×700 la tarjeta hace scroll vertical. La leyenda queda debajo del hero, con dos líneas por
   fila (nombre + tipo/fs), y sigue siendo clicable.

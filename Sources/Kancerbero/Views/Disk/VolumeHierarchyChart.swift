@@ -36,8 +36,6 @@ struct VolumeHierarchyChart: View {
         let rows = legendRows(nodes)
 
         VStack(alignment: .leading, spacing: 10) {
-            header(scope: scope)
-
             HStack(alignment: .center,
                    spacing: isMaximized ? 14 : 10) {
                 heroInfo
@@ -48,6 +46,7 @@ struct VolumeHierarchyChart: View {
 
             legend(rows, highlightID: highlightID)
         }
+        .padding(.top, 6)
         .animation(reduceMotion ? nil : .snappy(duration: 0.25),
                    value: item.deviceIdentifier)
     }
@@ -55,24 +54,53 @@ struct VolumeHierarchyChart: View {
     // MARK: - Hero
 
     private var heroInfo: some View {
-        HStack(alignment: .center,
-               spacing: isMaximized ? 12 : 6) {
-            VerticalUsageBar(
-                fraction: usageFraction,
-                tint: DiskPalette.tint(for: item.kind),
-                kindLabel: gaugeKindLabel(for: item.kind),
-                caption: usageCaption,
-                height: isMaximized ? 300 : 210,
-                width: isMaximized ? 54 : 46,
-                isMaximized: isMaximized)
-            statsColumn
+        VStack(alignment: .leading, spacing: 8) {
+            if let capacity = capacityStat {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(capacity.title)
+                        .font(.system(size: 9.5, weight: .semibold))
+                        .textCase(.uppercase)
+                        .tracking(0.5)
+                        .foregroundStyle(.secondary)
+                    Text(capacity.value)
+                        .font(.system(
+                            size: isMaximized ? 24 : 20,
+                            weight: .semibold,
+                            design: .rounded))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                }
+                .offset(y: -10)
+            }
+
+            HStack(alignment: .center,
+                   spacing: isMaximized ? 12 : 6) {
+                VerticalUsageBar(
+                    fraction: usageFraction,
+                    tint: DiskPalette.tint(for: item.kind),
+                    kindLabel: gaugeKindLabel(for: item.kind),
+                    caption: usageCaption,
+                    height: isMaximized ? 300 : 210,
+                    width: isMaximized ? 54 : 46,
+                    isMaximized: isMaximized)
+                statsColumn
+            }
         }
         .fixedSize(horizontal: true, vertical: false)
     }
 
+    private var capacityStat: VolumeHierarchyStat? {
+        stats.first { $0.id == "capacity" }
+    }
+
+    private var sideStats: [VolumeHierarchyStat] {
+        stats.filter { $0.id != "capacity" }
+    }
+
     private var statsColumn: some View {
         VStack(alignment: .leading, spacing: isMaximized ? 14 : 11) {
-            ForEach(stats) { stat in
+            ForEach(sideStats) { stat in
                 VStack(alignment: .leading, spacing: 1) {
                     Text(stat.title)
                         .font(.system(size: 9.5, weight: .semibold))
@@ -102,40 +130,6 @@ struct VolumeHierarchyChart: View {
         .frame(width: isMaximized ? 150 : 130, alignment: .leading)
     }
 
-    // MARK: - Header
-
-    private func header(scope: KBDiskItem) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text("Disk structure")
-                .font(.system(size: 10, weight: .semibold))
-                .textCase(.uppercase)
-                .tracking(0.5)
-                .foregroundStyle(.primary.opacity(0.80))
-            HStack(spacing: 4) {
-                Text(displayName(scope))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Text("(\(scope.deviceIdentifier))")
-                    .lineLimit(1)
-                Text("· \(countsText(for: scope))")
-                    .lineLimit(1)
-                    .layoutPriority(1)
-            }
-            .font(.system(size: 9.5))
-            .foregroundStyle(.secondary)
-            Text("Inventory · \(globalSummary())")
-                .font(.system(size: 9))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-    }
-
-    private func headerSummary(scope: KBDiskItem) -> String {
-        "\(displayName(scope)) (\(scope.deviceIdentifier)) · "
-            + "\(countsText(for: scope)) · Inventory: \(globalSummary())"
-    }
-
     private func countsText(for scope: KBDiskItem) -> String {
         var partitions = 0
         var containers = 0
@@ -157,26 +151,6 @@ struct VolumeHierarchyChart: View {
         return "\(count(partitions, "partition", "partitions")) · "
             + "\(count(containers, "container", "containers")) · "
             + count(volumes, "volume", "volumes")
-    }
-
-    private func globalSummary() -> String {
-        let items = inventory.allItems.count
-        let disks = inventory.items.count
-        let containers = inventory.allItems
-            .filter { $0.kind == .apfsContainer }.count
-        let volumes = inventory.mountedVolumes.count
-        let capacity = DiskMetrics.capacityBytes(inventory)
-        let free = DiskMetrics.freeBytes(inventory)
-
-        func count(_ value: Int, _ singular: String, _ plural: String) -> String {
-            "\(value) \(value == 1 ? singular : plural)"
-        }
-        return "\(count(items, "item", "items")) · "
-            + "\(count(disks, "disk", "disks")) · "
-            + "\(count(containers, "container", "containers")) · "
-            + "\(count(volumes, "volume", "volumes")) · "
-            + "\(KBFormat.bytes(capacity, units: byteUnitSystem)) · "
-            + "\(KBFormat.bytes(free, units: byteUnitSystem)) free"
     }
 
     // MARK: - Chart
@@ -245,7 +219,8 @@ struct VolumeHierarchyChart: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Disk structure")
             .accessibilityValue(
-                "\(headerSummary(scope: scope)) · \(kindLine(for: item))")
+                "\(displayName(scope)) (\(scope.deviceIdentifier)) · "
+                    + "\(countsText(for: scope)) · \(kindLine(for: item))")
             .accessibilityAction(named: Text("Show disk details")) {
                 onSelectItem?(scope.deviceIdentifier)
             }
@@ -1292,14 +1267,10 @@ struct VolumeHierarchyChart: View {
             drawLevelBand(sector, layout: layout, context: &context)
 
             if selected {
-                if DiskPalette.isLight(node.color) {
-                    context.stroke(
-                        path,
-                        with: .color(DiskPalette.textInk.opacity(0.85)),
-                        lineWidth: 5)
-                }
-                context.stroke(path, with: .color(DiskPalette.paper),
-                               lineWidth: 3)
+                context.stroke(
+                    path,
+                    with: .color(DiskPalette.contentColor(on: node.color)),
+                    lineWidth: 3)
             } else if ancestor {
                 context.stroke(path, with: .color(ancestorStroke),
                                lineWidth: 0.75)
