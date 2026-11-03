@@ -20,6 +20,15 @@ enum DiskVolumesFocus: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Detail card that can be maximized in Disk → Volumes.
+enum DiskVolumesPanel: String, CaseIterable, Identifiable, Sendable {
+    case tree
+    case details
+    case volumes
+
+    var id: String { rawValue }
+}
+
 enum DiskAnalyzerFocus: String, CaseIterable, Identifiable, Sendable {
     case scanned
     case files

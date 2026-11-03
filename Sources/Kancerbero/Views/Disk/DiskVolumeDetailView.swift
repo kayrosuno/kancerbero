@@ -5,6 +5,10 @@ import KancerberoCore
 struct DiskVolumeDetailView: View {
     let item: KBDiskItem
     let inventory: KBDiskInventorySnapshot?
+    var highlightedContainerID: String? = nil
+    var onSelectSegment: ((APFSSpaceSegment) -> Void)? = nil
+    var isMaximized = false
+    var onToggleMaximize: (() -> Void)? = nil
     let onAnalyze: (String) -> Void
     let onClose: () -> Void
 
@@ -40,7 +44,9 @@ struct DiskVolumeDetailView: View {
                 stats
                 if let context = spaceContext {
                     Divider().opacity(0.5)
-                    APFSSpaceDonut(context: context)
+                    APFSSpaceDonut(context: context,
+                                   highlightOverride: highlightedContainerID,
+                                   onSelect: onSelectSegment)
                 }
                 Divider().opacity(0.5)
                 metadata
@@ -83,6 +89,13 @@ struct DiskVolumeDetailView: View {
 
                 Spacer(minLength: 0)
 
+                if let onToggleMaximize {
+                    DiskExpandButton(isMaximized: isMaximized,
+                                     subject: "Details panel") {
+                        onToggleMaximize()
+                    }
+                }
+
                 Button {
                     onClose()
                 } label: {
@@ -114,13 +127,15 @@ struct DiskVolumeDetailView: View {
     private func stat(_ title: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(title)
-                .font(.system(size: 9, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase)
                 .tracking(0.5)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
                 .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
     }
 
@@ -132,7 +147,8 @@ struct DiskVolumeDetailView: View {
             if let content = item.content {
                 row("Content", content)
             }
-            row("Mount point", item.mountPoint ?? "Not mounted")
+            row("Mount point", item.mountPoint ?? "Not mounted",
+                path: item.mountPoint != nil)
             row("Used", usedText)
             row(item.kind == .apfsVolume || item.kind == .apfsContainer
                 ? "Free (container)" : "Free",
@@ -159,16 +175,21 @@ struct DiskVolumeDetailView: View {
         }
     }
 
-    private func row(_ title: String, _ value: String) -> some View {
+    private func row(_ title: String, _ value: String,
+                     path: Bool = false) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Text(title)
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
-                .frame(width: 82, alignment: .leading)
+                .frame(width: 88, alignment: .leading)
             Text(value)
-                .font(.system(size: 10))
+                .font(.system(size: 11,
+                              design: path ? .monospaced : .default))
+                .foregroundStyle(path ? Color.primary : Color.primary)
                 .textSelection(.enabled)
-                .lineLimit(3)
+                .lineLimit(path ? 2 : 3)
+                .truncationMode(.middle)
+                .help(value)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }

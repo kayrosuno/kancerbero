@@ -169,6 +169,10 @@ final class UIState {
 
         disk.volumesFocus = Self.value(for: "--volumes-focus", in: arguments)
             .flatMap { DiskVolumesFocus(rawValue: $0.lowercased()) }
+        disk.volumesPanelContainerID = Self.value(for: "--volumes-panel", in: arguments)
+        if let raw = Self.value(for: "--volumes-maximized", in: arguments) {
+            disk.maximizedVolumesPanel = DiskVolumesPanel(rawValue: raw.lowercased())
+        }
         disk.analyzerFocus = Self.value(for: "--analyzer-focus", in: arguments)
             .flatMap { DiskAnalyzerFocus(rawValue: $0.lowercased()) } ?? .scanned
         disk.ioSearch = Self.value(for: "--disk-io-search", in: arguments) ?? ""
@@ -304,6 +308,10 @@ struct DiskUIState: Equatable {
     var volumesFocus: DiskVolumesFocus?
     var expanded: Set<String> = []
     var didExpandVolumesOnce = false
+    /// APFS container whose volumes card is open to the right of the detail.
+    var volumesPanelContainerID: String?
+    /// Detail card maximized over the Volumes area.
+    var maximizedVolumesPanel: DiskVolumesPanel?
     var analyzerFocus: DiskAnalyzerFocus = .scanned
     /// nil means "use DiskModel.scanRootPath".
     var analyzerPathDraft: String?

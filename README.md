@@ -91,9 +91,13 @@ El detalle de binarios, permisos, instalación y librerías está en
     tarjetas All / Disks / Containers / Volumes / Capacity / Free filtran la lista (vista
     completa, medios, contenedores APFS, volúmenes montados, orden por tamaño o por menos espacio
     libre); All restaura el árbol
-    completo expandido. Al seleccionar un disco, contenedor o volumen APFS, el panel de detalle
-    muestra un donut con el número de contenedores y el espacio de cada uno (o el desglose de
-    volúmenes, snapshots/metadatos y libre). El selector **Decimal/Binary** de la línea de
+    completo expandido. El árbol ocupa 1/3 del ancho y el detalle 2/3, con Capacidad/Usado/Libre
+    en grande y las rutas de montaje visibles. Al seleccionar un disco, contenedor o volumen APFS,
+    el detalle muestra un donut con nombres en las porciones (dentro del anillo o con líneas guía),
+    tooltip al pasar el ratón y selección al pulsar; al pulsar una porción de contenedor aparece
+    a la derecha la tarjeta de volúmenes y las tres columnas (árbol / contenedores / volúmenes)
+    quedan a 1/3. Cada tarjeta de detalle se puede maximizar al área de Volumes y restaurar. El
+    selector **Decimal/Binary** de la línea de
     pestañas cambia todas las cifras de Disk: Decimal (por defecto, como Finder) usa KB/MB/GB con
     base 1000; Binary usa KiB/MiB/GiB con base 1024. La elección se recuerda.
   - **Analyzer** — escaneo local de una carpeta o volumen con `getattrlistbulk`, mapa radial
@@ -295,6 +299,8 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--networking-process-protocol tcp|udp|icmp|icmpv6|sctp|gre|esp|raw|other[,..]|all] \
   [--networking-process-socket stream|dgram|raw|seqpacket|other[,..]|all] \
   [--volumes-focus disks|containers|volumes|capacity|free] \
+  [--volumes-panel <diskXsY>] \
+  [--volumes-maximized tree|details|volumes] \
   [--analyzer-focus scanned|files|folders|denied] \
   [--daemon-type all|agent|daemon[,..]] \
   [--daemon-scope system|global|user|runtime[,..]] \

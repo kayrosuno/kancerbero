@@ -108,7 +108,12 @@
   Decimal (por defecto) usa base 1000 con KB/MB/GB; Binary usa base 1024 con KiB/MiB/GiB. El
   valor vive en `UserDefaults` (`diskByteUnitSystem`) y `DiskView` lo propaga con
   `EnvironmentValues.byteUnitSystem`; fuera de Disk el valor por defecto es binario para no
-  alterar CPU/Memory/Network. Volumes muestra el árbol
+  alterar CPU/Memory/Network. Volumes muestra el árbol a 1/3 y el detalle a 2/3 (sin selección,
+  el árbol ocupa todo); al abrir la tarjeta de volúmenes desde una porción del donut, las tres
+  columnas (árbol / contenedores / volúmenes) quedan a 1/3. Cada tarjeta de detalle tiene un botón
+  maximizar/restaurar que la lleva al área de Volumes (oculta las tarjetas resumen y las demás
+  columnas; cabecera y pestañas siguen visibles). El estado vive en `DiskUIState`
+  (`volumesPanelContainerID`, `maximizedVolumesPanel`). El árbol
   disco → partición → contenedor APFS → volumen, un inspector y `CapacityBar`; Analyzer muestra
   controles de escaneo, progreso, `RadialDiskMap` y las tablas de contenidos y mayores archivos;
   I/O muestra el gráfico Data/Operations y la tabla de procesos por actividad de disco.
@@ -206,7 +211,7 @@
   `--networking-process-domain`, `--networking-process-ip` (alias ipv4/ipv6),
   `--networking-process-protocol`, `--networking-process-socket`,
   `--networking-search`, `--networking-resolve-names`, `--sidebar-collapsed`, `--daemon-*`,
-  `--volumes-focus`, `--analyzer-focus`,
+  `--volumes-focus`, `--volumes-panel`, `--volumes-maximized`, `--analyzer-focus`,
   `--disk-io-search`, `--disk-io-selected`, `--disk-io-graph`, `--disk-units`, `--cpu-search`,
   `--cpu-selected`, `--memory-search`, `--memory-selected`, `--energy-search` y
   `--energy-selected` se aplican una sola vez al crear `UIState`.
@@ -250,7 +255,8 @@
   `--networking-connection-search`, `--networking-process-domain`,
   `--networking-process-ip` (alias ipv4/ipv6), `--networking-process-protocol`,
   `--networking-process-socket`, `--networking-search`, `--networking-resolve-names`,
-  `--volumes-focus`, `--analyzer-focus`, `--disk-io-search`, `--disk-io-selected`,
+  `--volumes-focus`, `--volumes-panel`, `--volumes-maximized`, `--analyzer-focus`,
+  `--disk-io-search`, `--disk-io-selected`,
   `--disk-io-graph`, `--cpu-search`, `--cpu-selected`, `--memory-search`,
   `--memory-selected`, `--energy-search`, `--energy-selected`, `--screenshot-dock`,
   `--dock-style`, filtros `--daemon-*` y `--sidebar-collapsed` (ver `docs/verification.md`).
@@ -325,7 +331,10 @@
     usado por volumen, residual de snapshots/metadatos/volúmenes desmontados y libre. Un
     contenedor sin volumen montado se muestra como desconocido (—), nunca como 0 B; si la suma de
     usado excede el espacio usable (clones/bloques compartidos), las porciones se escalan
-    proporcionalmente y se avisa en una nota.
+    proporcionalmente y se avisa en una nota. El donut dibuja el nombre de las porciones grandes
+    dentro del anillo y el de las pequeñas fuera con líneas guía (con reparto vertical y descarte
+    de las menores si no caben); el hover muestra un tooltip y resalta la porción/leyenda, y al
+    pulsar una porción de contenedor se abre la tarjeta de volúmenes (`onSelect`).
   - No se ejecuta ningún proceso externo.
 - **Escaneo (`DiskScanner`)**
   - Una llamada C a `kb_disk_list_directory` por directorio; la capa C usa `open(O_RDONLY |
