@@ -6,6 +6,7 @@ struct CapacityBar: View {
     var height: CGFloat = 6
     /// Optional hairline around the track for very light tints.
     var outline: Color? = nil
+    var accessibilityLabel = "Capacity used"
 
     var body: some View {
         GeometryReader { proxy in
@@ -23,7 +24,7 @@ struct CapacityBar: View {
             }
         }
         .accessibilityElement()
-        .accessibilityLabel("Capacity used")
+        .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(KBFormat.percent(fraction))
     }
 }
