@@ -109,11 +109,10 @@
   valor vive en `UserDefaults` (`diskByteUnitSystem`) y `DiskView` lo propaga con
   `EnvironmentValues.byteUnitSystem`; fuera de Disk el valor por defecto es binario para no
   alterar CPU/Memory/Network. Volumes muestra el árbol a 1/3 y el detalle a 2/3 (sin selección,
-  el árbol ocupa todo); al abrir la tarjeta de volúmenes desde una porción del donut, las tres
-  columnas (árbol / contenedores / volúmenes) quedan a 1/3. Cada tarjeta de detalle tiene un botón
-  maximizar/restaurar que la lleva al área de Volumes (oculta las tarjetas resumen y las demás
-  columnas; cabecera y pestañas siguen visibles). El estado vive en `DiskUIState`
-  (`volumesPanelContainerID`, `maximizedVolumesPanel`). El árbol
+  el árbol ocupa todo); al seleccionar un ítem no se abre ninguna tercera tarjeta. Cada tarjeta
+  tiene un botón maximizar/restaurar que la lleva al área de Volumes (oculta las tarjetas resumen
+  y la otra columna; cabecera y pestañas siguen visibles). El estado vive en `DiskUIState`
+  (`maximizedVolumesPanel`). El árbol
   disco → partición → contenedor APFS → volumen, un inspector y `CapacityBar`; Analyzer muestra
   controles de escaneo, progreso, `RadialDiskMap` y las tablas de contenidos y mayores archivos;
   I/O muestra el gráfico Data/Operations y la tabla de procesos por actividad de disco.
@@ -211,7 +210,7 @@
   `--networking-process-domain`, `--networking-process-ip` (alias ipv4/ipv6),
   `--networking-process-protocol`, `--networking-process-socket`,
   `--networking-search`, `--networking-resolve-names`, `--sidebar-collapsed`, `--daemon-*`,
-  `--volumes-focus`, `--volumes-panel`, `--volumes-maximized`, `--analyzer-focus`,
+  `--volumes-focus`, `--volumes-maximized`, `--analyzer-focus`,
   `--disk-io-search`, `--disk-io-selected`, `--disk-io-graph`, `--disk-units`, `--cpu-search`,
   `--cpu-selected`, `--memory-search`, `--memory-selected`, `--energy-search` y
   `--energy-selected` se aplican una sola vez al crear `UIState`.
@@ -249,13 +248,15 @@
 - Disk → Volumes mantiene `expanded` y `volumesFocus` en `UIState`. La expansión inicial se hace
   una sola vez (`didExpandVolumesOnce`); los refrescos de inventario solo podan ids obsoletos, así
   que el colapso manual se conserva. La tarjeta All limpia el filtro y re-expande el árbol
-  completo.
+  completo. Pulsar una porción o fila de la barra APFS, o la flecha de subir nivel, limpia el
+  foco, expande los ancestros y selecciona el ítem (`DiskModel.select`), de modo que el árbol y
+  el detalle siempre apuntan al mismo elemento.
 - Captura interna para verificación: `--screenshot`, `--section`, `--tab`, `--disk-tab`,
   `--networking-focus`, `--networking-transport`, `--networking-ip`, `--networking-state`,
   `--networking-connection-search`, `--networking-process-domain`,
   `--networking-process-ip` (alias ipv4/ipv6), `--networking-process-protocol`,
   `--networking-process-socket`, `--networking-search`, `--networking-resolve-names`,
-  `--volumes-focus`, `--volumes-panel`, `--volumes-maximized`, `--analyzer-focus`,
+  `--volumes-focus`, `--volumes-maximized`, `--analyzer-focus`,
   `--disk-io-search`, `--disk-io-selected`,
   `--disk-io-graph`, `--cpu-search`, `--cpu-selected`, `--memory-search`,
   `--memory-selected`, `--energy-search`, `--energy-selected`, `--screenshot-dock`,
@@ -326,15 +327,18 @@
     ATTR_VOL_SPACEAVAIL | ATTR_VOL_SPACEUSED` da el tamaño, libre, disponible y **usado real por
     volumen APFS** (coincide con `CapacityInUse` de `diskutil`).
   - El contenedor APFS hereda el libre de sus volúmenes montados (el espacio es compartido).
-  - El detalle de Volumes incluye un donut APFS (`APFSSpaceContext` + `APFSSpaceDonut`): para un
-    disco, una porción por contenedor dimensionada por capacidad; para un contenedor o volumen,
-    usado por volumen, residual de snapshots/metadatos/volúmenes desmontados y libre. Un
+  - El detalle de Volumes incluye una barra APFS apilada (`APFSSpaceContext` +
+    `APFSSpaceBarChart`): para un disco, una porción por contenedor dimensionada por capacidad;
+    para un contenedor o volumen, usado por volumen, residual de
+    snapshots/metadatos/volúmenes desmontados y libre. Un
     contenedor sin volumen montado se muestra como desconocido (—), nunca como 0 B; si la suma de
     usado excede el espacio usable (clones/bloques compartidos), las porciones se escalan
-    proporcionalmente y se avisa en una nota. El donut dibuja el nombre de las porciones grandes
-    dentro del anillo y el de las pequeñas fuera con líneas guía (con reparto vertical y descarte
-    de las menores si no caben); el hover muestra un tooltip y resalta la porción/leyenda, y al
-    pulsar una porción de contenedor se abre la tarjeta de volúmenes (`onSelect`).
+    proporcionalmente y se avisa en una nota. La leyenda muestra nombre, ruta, valor (`usado /
+    capacidad` para contenedores) y porcentaje; las porciones dibujan `diskXsY - nombre` dentro
+    cuando el texto cabe en su ancho (medido con la fuente real, sin invadir las vecinas). El
+    hover resalta fila y porción y atenúa el resto,
+    y al pulsar una porción o fila se selecciona el contenedor/volumen (`onSelect`). Las porciones
+    diminutas siguen siendo accesibles desde la leyenda.
   - No se ejecuta ningún proceso externo.
 - **Escaneo (`DiskScanner`)**
   - Una llamada C a `kb_disk_list_directory` por directorio; la capa C usa `open(O_RDONLY |

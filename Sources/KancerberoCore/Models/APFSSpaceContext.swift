@@ -1,6 +1,6 @@
 import Foundation
 
-/// One donut slice for the APFS space chart.
+/// One slice of the APFS space bar for the APFS space chart.
 public struct APFSSpaceSegment: Sendable, Identifiable, Hashable {
     public enum Role: String, Sendable, Hashable {
         case volume
@@ -61,8 +61,8 @@ public struct APFSSpaceLegendRow: Sendable, Identifiable, Hashable {
     }
 }
 
-/// Everything the APFS donut needs for a selected disk, container, volume or
-/// snapshot.
+/// Everything the APFS space chart needs for a selected disk, container,
+/// volume or snapshot.
 public struct APFSSpaceContext: Sendable, Hashable {
     public enum Subject: String, Sendable, Hashable {
         case physicalDisk

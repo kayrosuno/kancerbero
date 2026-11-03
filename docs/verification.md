@@ -105,8 +105,7 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--disk-io-graph data|operations] \
   [--disk-units decimal|binary] \
   [--volumes-focus disks|containers|volumes|capacity|free] \
-  [--volumes-panel <diskXsY>] \
-  [--volumes-maximized tree|details|volumes] \
+  [--volumes-maximized tree|details] \
   [--cpu-search <texto>] [--cpu-selected <pid>] \
   [--memory-search <texto>] [--memory-selected <pid>] \
   [--energy-search <texto>] [--energy-selected <pid>] \
@@ -139,9 +138,8 @@ un estado mixto y `--screenshot-size 1340x700` fija el tamaño de la ventana.
 actividad; `--disk-io-search`/`--disk-io-selected` filtran y preseleccionan procesos y
 `--disk-io-graph data|operations` elige el tipo de gráfico. `--disk-units decimal|binary` cambia
 el sistema de unidades de tamaño/velocidad de la pestaña Disk (por defecto decimal); sin el flag
-se usa el valor guardado por el selector. `--volumes-panel <diskXsY>` abre la tarjeta de
-volúmenes de ese contenedor (tres columnas) y `--volumes-maximized tree|details|volumes` maximiza
-la tarjeta indicada al área de Volumes; sin panel o sin selección caen al layout normal.
+se usa el valor guardado por el selector. `--volumes-maximized tree|details` maximiza la tarjeta
+indicada al área de Volumes; sin selección, el detalle maximizado cae al layout normal.
 `--cpu-search` aplica el filtro inicial de
 la tabla de CPU, `--cpu-selected` preselecciona un PID, `--memory-search`/`--memory-selected`
 hacen lo mismo en la tabla de Memory, `--energy-search`/`--energy-selected` en la de Energy,
@@ -331,11 +329,10 @@ $K --screenshot /tmp/kb-disk-free.png --section disk \
   --disk-tab volumes --volumes-focus free --screenshot-delay 5
 $K --screenshot /tmp/kb-disk-containers.png --section disk \
   --disk-tab volumes --volumes-focus containers --screenshot-delay 5
-$K --screenshot /tmp/kb-vol-3col.png --section disk --disk-tab volumes \
-  --disk-item disk0 --volumes-panel disk3 --screenshot-delay 5
+$K --screenshot /tmp/kb-vol-2col.png --section disk --disk-tab volumes \
+  --disk-item disk3s1s1 --screenshot-delay 5
 $K --screenshot /tmp/kb-vol-max.png --section disk --disk-tab volumes \
-  --disk-item disk0 --volumes-panel disk3 --volumes-maximized volumes \
-  --screenshot-delay 5
+  --disk-item disk3s1s1 --volumes-maximized details --screenshot-delay 5
 $K --screenshot /tmp/kb-disk-folders.png --section disk \
   --disk-tab analyzer --disk-path="$HOME/Documents" --disk-scan \
   --analyzer-focus folders --screenshot-delay 8
@@ -343,16 +340,18 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   --disk-tab io --screenshot-delay 6
 ```
 
-- Volumes: por defecto árbol 1/3 + detalle 2/3; Capacidad/Usado/Libre en grande y rutas de
-  montaje visibles (11 pt, secundario). Con `--volumes-panel` las tres tarjetas (árbol /
-  contenedores / volúmenes) quedan a 1/3; el detalle central conserva el disco seleccionado y la
-  porción del contenedor queda resaltada. Pulsar de nuevo la porción (o la fila de la leyenda)
-  cierra el panel; pulsar un volumen en la tarjeta derecha actualiza el detalle central.
-- Donut: nombres dentro de las porciones grandes y fuera con líneas guía en las pequeñas; hover
-  con tooltip y resaltado de porción/leyenda; clic en una porción de contenedor abre la tarjeta.
-- Maximizar/restaurar en árbol, detalle y volúmenes: la tarjeta ocupa el área de Volumes y se
-  ocultan las tarjetas resumen y las demás columnas; la cabecera, las pestañas y el selector de
-  unidades siguen visibles. `--volumes-maximized` sin panel o sin selección cae al layout normal.
+- Volumes: por defecto árbol 1/3 + detalle 2/3 (sin selección, el árbol ocupa todo); no existe
+  una tercera tarjeta. Capacidad/Usado/Libre en grande y rutas de montaje visibles (11 pt,
+  secundario). La flecha de la cabecera del detalle sube un nivel (volumen → contenedor →
+  partición → disco) y deja el padre seleccionado en el árbol.
+- Barra APFS: una barra apilada con una porción por contenedor (o por volumen dentro de un
+  contenedor) y leyenda con nombre, ruta, `usado / capacidad` y porcentaje. Cada porción muestra
+  `diskXsY - nombre` centrado cuando el texto cabe (p. ej. `disk3s5 - Macintosh HD - Data`); las
+  pequeñas no muestran etiqueta. Hover resalta fila y porción; pulsar una porción o una fila
+  selecciona el ítem en el árbol y actualiza el detalle.
+- Maximizar/restaurar en árbol y detalle: la tarjeta ocupa el área de Volumes y se ocultan las
+  tarjetas resumen y la otra columna; la cabecera, las pestañas y el selector de unidades siguen
+  visibles. `--volumes-maximized details` sin selección cae al layout normal.
 
 La barra inferior debe mostrar métricas de la sección activa y la marca de actualización de su
 fuente (red, inventario de disco, servicios launchd o CPU/memoria).
@@ -782,9 +781,9 @@ Continuidad de estado al cambiar de pestaña (manual):
    desapareció, se limpia).
 2. Daemons: fijar búsqueda, tipo, ámbito, origen, estado y una selección; cambiar de sección y
    volver → todo restaurado; esperar 5 s y comprobar que la selección sigue si el servicio existe.
-3. Disk → Volumes: expandir y colapsar varios nodos, activar la tarjeta Volumes, ir a Analyzer y
-   volver → foco y expansión intactos. Refresh de volúmenes → no se re-expande. Pulsar All →
-   árbol completo expandido y tarjeta All marcada.
+3. Disk → Volumes: expandir y colapsar varios nodos, seleccionar un volumen, ir a Analyzer y
+   volver → selección, foco y expansión intactos. Refresh de volúmenes → no se re-expande. Pulsar
+   All → árbol completo expandido y tarjeta All marcada.
 4. Disk → Analyzer: activar Files y teclear una ruta sin escanear; cambiar de pestaña y volver →
    foco y borrador conservados.
 5. Reiniciar la app: el estado de UI vuelve a los valores iniciales; sección y subpestañas se
@@ -834,12 +833,14 @@ $K --screenshot /tmp/kb-apfs-volume.png --section disk --disk-tab volumes \
   contenedores ISC y Recovery que `diskutil apfs list` no muestra); `diskutil apfs list` sirve
   para los volúmenes y la capacidad en uso del contenedor principal. Con el selector en Decimal
   (por defecto) el gráfico muestra 494,4 GB; en Binario muestra 460,4 GiB.
-  Con varios contenedores, el donut muestra una porción por contenedor (tamaño = capacidad) y la
-  leyenda `usado / capacidad` + número de volúmenes/snapshots.
-- Con un solo contenedor, el donut muestra el desglose de sus volúmenes con el subtítulo
+  Con varios contenedores, la barra apilada muestra una porción por contenedor (tamaño =
+  capacidad) y la leyenda `usado / capacidad` + número de volúmenes/snapshots.
+- Con un solo contenedor, la barra muestra el desglose de sus volúmenes con el subtítulo
   «1 APFS container». Al seleccionar un contenedor o volumen se muestran sus volúmenes,
-  snapshots/metadatos y libre; el volumen seleccionado queda resaltado.
-- Un contenedor sin volumen montado muestra un anillo discontinuo y `—` (nunca `0 B`).
+  snapshots/metadatos y libre; el volumen seleccionado queda resaltado en la leyenda.
+- Pulsar una porción o una fila de la leyenda selecciona ese ítem en el árbol y actualiza el
+  detalle; la flecha de subir nivel recorre volumen → contenedor → partición → disco.
+- Un contenedor sin volumen montado muestra una pista atenuada y `—` (nunca `0 B`).
 - `usado de volúmenes + residual + libre = capacidad`; permitir la diferencia documentada de
   `ATTR_VOL_SPACEUSED` frente a `diskutil`. Si la suma de usado excede lo usable, las porciones se
   escalan y aparece la nota correspondiente.
@@ -847,7 +848,7 @@ $K --screenshot /tmp/kb-apfs-volume.png --section disk --disk-tab volumes \
 - Selector **Decimal/Binary** de la línea de pestañas:
   `--disk-units decimal` muestra `500,3 GB` para disk0 (base 1000, KB/MB/GB);
   `--disk-units binary` muestra `465,9 GiB` (base 1024, KiB/MiB/GiB). Cambian árbol, tarjetas,
-  detalle, donut APFS, analyzer, tablas de I/O, velocidades Read/s/Write/s y la barra de estado.
+  detalle, barra APFS, analyzer, tablas de I/O, velocidades Read/s/Write/s y la barra de estado.
   Las operaciones/s y los contadores no cambian. CPU/Memory/Network conservan su formato. La
   elección del selector se guarda en `UserDefaults`; el flag solo afecta a la sesión/captura.
 
