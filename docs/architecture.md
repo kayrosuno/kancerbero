@@ -116,9 +116,9 @@
   disco → partición → contenedor APFS → volumen, un inspector y `CapacityBar`; Analyzer muestra
   controles de escaneo, progreso, `RadialDiskMap` y las tablas de contenidos y mayores archivos;
   I/O muestra el gráfico Data/Operations y la tabla de procesos por actividad de disco.
-  En Analyzer las tarjetas filtran el contenido; en Volumes la cabecera del gráfico consolida los
-  conteos por disco y el inventario global, y el flag `--volumes-focus` permite filtrar la lista
-  para capturas.
+  En Analyzer las tarjetas filtran el contenido; en Volumes la cabecera de la tarjeta muestra el
+  esquema del componente seleccionado (particiones/contenedores/volúmenes), el gráfico no tiene
+  bloque de resumen y el flag `--volumes-focus` permite filtrar la lista para capturas.
 - `DaemonsView`: inventario launchd deduplicado por label (`DaemonDeduplicator`). Los filtros de
   tipo, ámbito, origen y estado son chips multiselección (`MultiSelectChipBar`): todos los valores
   están pulsados al arrancar, se muestran las filas de los valores pulsados y un grupo sin nada
@@ -345,12 +345,13 @@
     muestra como desconocido, nunca como 0 B; si la suma de usado excede el espacio usable, los
     segmentos se escalan y se avisa.
     Los gráficos usan `DiskPalette` (rampa cálida `#faf6f2 → #7e6a60`): cada nivel toma un par de
-    tonos (particiones sand/paper, contenedores stone/sand, volúmenes taupe/ink) y la cabecera
-    consolida el nombre del disco, los conteos por disco y el inventario global. Las bandas,
+    tonos (particiones sand/paper, contenedores stone/sand, volúmenes taupe/ink). La cabecera de la
+    tarjeta muestra las pills del componente (particiones/contenedores/volúmenes; volúmenes en un
+    contenedor) y el gráfico no tiene bloque de resumen. Las bandas,
     separadores y textos se eligen por la luminancia relativa del relleno
     (`contentColor`/`bandColor`): tinta oscura sobre los tonos claros y blanco/sand sobre `ink`.
-    El sector seleccionado usa un núcleo claro (`paper`) con un halo de tinta; hover y ancestros
-    conservan `contentColor`. Las porciones cuya etiqueta no cabe
+    El sector seleccionado usa un trazo oscuro (`contentColor`; blanco sobre el relleno `ink`);
+    hover y ancestros conservan sus trazos finos. Las porciones cuya etiqueta no cabe
     dentro reciben un callout exterior con línea guía: se reservan gutters laterales (el círculo se
     ajusta), se reparten por lado con anti-solape (`distributedYs`) y se descartan los candidatos
     más pequeños si no caben; las etiquetas son clicables. El centro (más grande, con tipografía
@@ -359,7 +360,8 @@
     `tipo · fs`, y el tooltip añade el punto de montaje o el número de volúmenes. Pulsar el centro
     del círculo selecciona el disco del alcance y muestra su detalle. En el árbol, la barra de un
     volumen representa su parte del usado del contenedor (el resto usa usado/capacidad); el gauge
-    se rotula con el tipo y “of container capacity” en volúmenes. Para contenedores y volúmenes
+    se rotula con el tipo y “of container”/“of capacity”, y CAPACITY se muestra encima de la barra
+    con USED/FREE al lateral. Para contenedores y volúmenes
     APFS se añade una nota de espacio compartido y una fila “Shared with” con el contenedor y los
     volúmenes implicados. El chrome de la tarjeta conserva sus acentos.
   - No se ejecuta ningún proceso externo.

@@ -114,6 +114,9 @@ struct DiskVolumeDetailView: View {
                     .foregroundStyle(.secondary)
             }
 
+            componentSummary
+                .layoutPriority(1)
+
             Spacer(minLength: 0)
 
             if let onToggleMaximize {
@@ -133,6 +136,112 @@ struct DiskVolumeDetailView: View {
             .buttonStyle(.plain)
             .help("Close inspector")
         }
+    }
+
+    private struct ComponentCount: Identifiable {
+        let id: String
+        let value: Int
+        let label: String
+        let icon: String
+        let tint: Color
+    }
+
+    private var componentSummary: some View {
+        let counts = componentCounts
+        return HStack(spacing: 6) {
+            if counts.isEmpty {
+                Text("No nested items")
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.tertiary)
+            } else {
+                ForEach(counts) { count in
+                    HStack(spacing: 3) {
+                        Image(systemName: count.icon)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(count.tint)
+                        Text("\(count.value)")
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(.primary)
+                        Text(count.label)
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 6.5)
+                    .padding(.vertical, 2.5)
+                    .background {
+                        Capsule().fill(.quaternary.opacity(0.22))
+                    }
+                    .overlay {
+                        Capsule().strokeBorder(count.tint.opacity(0.28),
+                                               lineWidth: 0.5)
+                    }
+                }
+            }
+        }
+        .frame(height: 20, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(componentAccessibilityLabel)
+    }
+
+    private var componentCounts: [ComponentCount] {
+        guard item.kind == .physicalDisk
+            || item.kind == .partition
+            || item.kind == .apfsContainer else {
+            return []
+        }
+
+        var partitions = 0
+        var containers = 0
+        var volumes = 0
+
+        if item.kind == .apfsContainer {
+            // Direct volumes are what the container's chart and shared-space
+            // note enumerate; nested volume groups are not separate entries.
+            volumes = item.children.filter { $0.kind == .apfsVolume }.count
+        } else {
+            func visit(_ node: KBDiskItem) {
+                switch node.kind {
+                case .partition: partitions += 1
+                case .apfsContainer: containers += 1
+                case .apfsVolume: volumes += 1
+                default: break
+                }
+                for child in node.children { visit(child) }
+            }
+            for child in item.children { visit(child) }
+        }
+
+        var result: [ComponentCount] = []
+        if partitions > 0 {
+            result.append(ComponentCount(
+                id: "partitions", value: partitions,
+                label: partitions == 1 ? "partition" : "partitions",
+                icon: "square.split.2x1",
+                tint: Color(red: 0.55, green: 0.45, blue: 0.92)))
+        }
+        if containers > 0 {
+            result.append(ComponentCount(
+                id: "containers", value: containers,
+                label: containers == 1 ? "container" : "containers",
+                icon: "square.stack.3d.up",
+                tint: Color(red: 0.16, green: 0.62, blue: 0.94)))
+        }
+        if volumes > 0 {
+            result.append(ComponentCount(
+                id: "volumes", value: volumes,
+                label: volumes == 1 ? "volume" : "volumes",
+                icon: "externaldrive.fill",
+                tint: Color(red: 0.20, green: 0.70, blue: 0.62)))
+        }
+        return result
+    }
+
+    private var componentAccessibilityLabel: String {
+        let counts = componentCounts
+        guard !counts.isEmpty else { return "No nested items" }
+        return counts.map { "\($0.value) \($0.label)" }
+            .joined(separator: ", ")
     }
 
     private var heroStats: [VolumeHierarchyStat] {
@@ -156,7 +265,7 @@ struct DiskVolumeDetailView: View {
     private var usageCaption: String {
         guard item.volumeUsedFraction != nil else { return "usage unknown" }
         return item.kind == .apfsVolume || item.kind == .snapshot
-            ? "of container capacity" : "of capacity"
+            ? "of container" : "of capacity"
     }
 
     private var structureNotes: [String] {
