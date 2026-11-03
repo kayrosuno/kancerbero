@@ -4,6 +4,8 @@ struct CapacityBar: View {
     let fraction: Double
     let tint: Color
     var height: CGFloat = 6
+    /// Optional hairline around the track for very light tints.
+    var outline: Color? = nil
 
     var body: some View {
         GeometryReader { proxy in
@@ -15,6 +17,11 @@ struct CapacityBar: View {
             }
         }
         .frame(height: height)
+        .overlay {
+            if let outline {
+                Capsule().strokeBorder(outline, lineWidth: 0.5)
+            }
+        }
         .accessibilityElement()
         .accessibilityLabel("Capacity used")
         .accessibilityValue(KBFormat.percent(fraction))

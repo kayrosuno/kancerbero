@@ -423,6 +423,34 @@ private func printDiskVolumes() {
     }
 }
 
+private func printDiskUsage(_ identifier: String?) {
+    let snapshot = DiskInventoryCollector().snapshot()
+    let targets: [KBDiskItem]
+    if let identifier {
+        guard let item = snapshot.allItems.first(where: {
+            $0.deviceIdentifier == identifier
+        }) else {
+            fail("disk not found: \(identifier)")
+        }
+        targets = [item]
+    } else {
+        targets = snapshot.allItems
+    }
+
+    for item in targets {
+        let usage = item.spaceUsage
+        let fraction = item.volumeUsedFraction
+        write("usage \(item.deviceIdentifier) kind=\(item.kind.rawValue) "
+              + "size=\(formatBytes(item.sizeBytes)) "
+              + "rawUsed=\(item.usedBytes.map(formatBytes) ?? "-") "
+              + "rawFree=\(item.freeBytes.map(formatBytes) ?? "-") "
+              + "used=\(usage.usedBytes.map(formatBytes) ?? "-") "
+              + "free=\(usage.freeBytes.map(formatBytes) ?? "-") "
+              + "fraction=\(fraction.map { String(format: "%.4f", $0) } ?? "-") "
+              + "partial=\(usage.isPartial ? "yes" : "no")\n")
+    }
+}
+
 private func printDiskInfo(_ identifier: String) {
     let snapshot = DiskInventoryCollector().snapshot()
     guard let item = snapshot.allItems.first(where: { $0.deviceIdentifier == identifier }) else {
@@ -666,6 +694,8 @@ case "disk":
         printDiskInfo(remainder[1])
     case "apfs":
         printDiskAPFS(remainder.count > 1 ? remainder[1] : nil)
+    case "usage":
+        printDiskUsage(remainder.count > 1 ? remainder[1] : nil)
     case "scan":
         guard remainder.count >= 2 else {
             fail("usage: disk scan <path> [--top N] [--hidden]")
@@ -674,7 +704,7 @@ case "disk":
                       top: integerOption("--top", default: 20),
                       includeHidden: remainder.contains("--hidden"))
     default:
-        fail("usage: disk <volumes|info <device>|apfs [device]|scan <path>>")
+        fail("usage: disk <volumes|info <device>|apfs [device]|usage [device]|scan <path>>")
     }
 case "daemon-action":
     guard remainder.count >= 3,

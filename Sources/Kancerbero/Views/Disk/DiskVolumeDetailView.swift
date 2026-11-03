@@ -5,7 +5,6 @@ import KancerberoCore
 struct DiskVolumeDetailView: View {
     let item: KBDiskItem
     let inventory: KBDiskInventorySnapshot?
-    var onSelectSegment: ((APFSSpaceSegment) -> Void)? = nil
     var onSelectItem: ((String) -> Void)? = nil
     var isMaximized = false
     var onToggleMaximize: (() -> Void)? = nil
@@ -14,26 +13,30 @@ struct DiskVolumeDetailView: View {
 
     @Environment(\.byteUnitSystem) private var byteUnitSystem
 
-    private var spaceContext: APFSSpaceContext? {
-        inventory?.apfsSpaceContext(for: item)
-    }
+    private var usage: KBDiskSpaceUsage { item.spaceUsage }
 
     /// A container with no mounted volume reports used/free as 0 in the
-    /// inventory; the chart treats it as unknown, so the stats do too.
+    /// inventory; treat it as unknown in the stats.
     private var containerSpaceUnknown: Bool {
-        item.kind == .apfsContainer && spaceContext?.availability == .unmounted
+        item.kind == .apfsContainer && !usage.isKnown
     }
 
     private var usedText: String {
         containerSpaceUnknown
             ? "—"
-            : (item.usedBytes.map { KBFormat.bytes($0, units: byteUnitSystem) } ?? "—")
+            : (usage.usedBytes.map { KBFormat.bytes($0, units: byteUnitSystem) } ?? "—")
     }
 
     private var freeText: String {
-        containerSpaceUnknown
-            ? "—"
-            : (item.freeBytes.map { KBFormat.bytes($0, units: byteUnitSystem) } ?? "—")
+        if containerSpaceUnknown { return "—" }
+        if item.kind == .apfsVolume || item.kind == .snapshot {
+            return item.freeBytes.map {
+                KBFormat.bytes($0, units: byteUnitSystem)
+            } ?? "—"
+        }
+        return usage.freeBytes.map {
+            KBFormat.bytes($0, units: byteUnitSystem)
+        } ?? "—"
     }
 
     var body: some View {
@@ -41,11 +44,16 @@ struct DiskVolumeDetailView: View {
             VStack(alignment: .leading, spacing: 14) {
                 header
                 Divider().opacity(0.5)
-                stats
-                if let context = spaceContext {
-                    Divider().opacity(0.5)
-                    APFSSpaceBarChart(context: context,
-                                      onSelect: onSelectSegment)
+                if let inventory {
+                    VolumeHierarchyChart(
+                        item: item,
+                        inventory: inventory,
+                        isMaximized: isMaximized,
+                        onSelectItem: onSelectItem,
+                        stats: heroStats,
+                        usageFraction: item.volumeUsedFraction,
+                        usageCaption: usageCaption,
+                        notes: structureNotes)
                 }
                 Divider().opacity(0.5)
                 metadata
@@ -137,42 +145,39 @@ struct DiskVolumeDetailView: View {
         }
     }
 
-    private var stats: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 14) {
-                stat("Capacity", KBFormat.bytes(item.sizeBytes, units: byteUnitSystem))
-                stat("Used", usedText)
-                stat("Free", freeText)
-            }
-            if !containerSpaceUnknown,
-               let used = item.usedBytes,
-               item.sizeBytes > 0 {
-                CapacityBar(fraction: Double(used) / Double(item.sizeBytes),
-                            tint: kindTint,
-                            height: 6)
-                    .padding(.top, 2)
-            }
-            if item.kind == .apfsVolume || item.kind == .apfsContainer {
-                Text("APFS volumes share the container's free space.")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-            }
-        }
+    private var heroStats: [VolumeHierarchyStat] {
+        [
+            VolumeHierarchyStat(
+                id: "capacity",
+                title: "Capacity",
+                value: KBFormat.bytes(item.sizeBytes, units: byteUnitSystem)),
+            VolumeHierarchyStat(
+                id: "used",
+                title: "Used",
+                value: usedText),
+            VolumeHierarchyStat(
+                id: "free",
+                title: item.kind == .apfsVolume || item.kind == .snapshot
+                    ? "Free (container)" : "Free",
+                value: freeText)
+        ]
     }
 
-    private func stat(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(title)
-                .font(.system(size: 10, weight: .semibold))
-                .textCase(.uppercase)
-                .tracking(0.5)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.system(size: 20, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.65)
+    private var usageCaption: String {
+        guard item.volumeUsedFraction != nil else { return "usage unknown" }
+        return item.kind == .apfsVolume || item.kind == .snapshot
+            ? "of container" : "of capacity"
+    }
+
+    private var structureNotes: [String] {
+        var notes: [String] = []
+        if usage.isPartial && !containerSpaceUnknown {
+            notes.append("Some volumes are not mounted; used and free space are partial.")
         }
+        if item.kind == .apfsVolume || item.kind == .apfsContainer {
+            notes.append("APFS volumes share the container's free space.")
+        }
+        return notes
     }
 
     private var metadata: some View {

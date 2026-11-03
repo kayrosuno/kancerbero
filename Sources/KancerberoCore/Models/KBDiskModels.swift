@@ -282,8 +282,8 @@ public struct KBDiskItem: Sendable, Identifiable {
     }
 
     public var volumeUsedFraction: Double? {
-        guard sizeBytes > 0, let usedBytes else { return nil }
-        return min(1, Double(usedBytes) / Double(sizeBytes))
+        guard sizeBytes > 0, let used = spaceUsage.usedBytes else { return nil }
+        return min(1, Double(used) / Double(sizeBytes))
     }
 }
 

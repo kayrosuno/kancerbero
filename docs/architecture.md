@@ -248,9 +248,9 @@
 - Disk → Volumes mantiene `expanded` y `volumesFocus` en `UIState`. La expansión inicial se hace
   una sola vez (`didExpandVolumesOnce`); los refrescos de inventario solo podan ids obsoletos, así
   que el colapso manual se conserva. La tarjeta All limpia el filtro y re-expande el árbol
-  completo. Pulsar una porción o fila de la barra APFS, o la flecha de subir nivel, limpia el
-  foco, expande los ancestros y selecciona el ítem (`DiskModel.select`), de modo que el árbol y
-  el detalle siempre apuntan al mismo elemento.
+  completo. Pulsar un sector o una fila de la leyenda del gráfico radial, o la flecha de subir
+  nivel, limpia el foco, expande los ancestros y selecciona el ítem (`DiskModel.select`), de modo
+  que el árbol y el detalle siempre apuntan al mismo elemento.
 - Captura interna para verificación: `--screenshot`, `--section`, `--tab`, `--disk-tab`,
   `--networking-focus`, `--networking-transport`, `--networking-ip`, `--networking-state`,
   `--networking-connection-search`, `--networking-process-domain`,
@@ -327,18 +327,33 @@
     ATTR_VOL_SPACEAVAIL | ATTR_VOL_SPACEUSED` da el tamaño, libre, disponible y **usado real por
     volumen APFS** (coincide con `CapacityInUse` de `diskutil`).
   - El contenedor APFS hereda el libre de sus volúmenes montados (el espacio es compartido).
-  - El detalle de Volumes incluye una barra APFS apilada (`APFSSpaceContext` +
-    `APFSSpaceBarChart`): para un disco, una porción por contenedor dimensionada por capacidad;
-    para un contenedor o volumen, usado por volumen, residual de
-    snapshots/metadatos/volúmenes desmontados y libre. Un
-    contenedor sin volumen montado se muestra como desconocido (—), nunca como 0 B; si la suma de
-    usado excede el espacio usable (clones/bloques compartidos), las porciones se escalan
-    proporcionalmente y se avisa en una nota. La leyenda muestra nombre, ruta, valor (`usado /
-    capacidad` para contenedores) y porcentaje; las porciones dibujan `diskXsY - nombre` dentro
-    cuando el texto cabe en su ancho (medido con la fuente real, sin invadir las vecinas). El
-    hover resalta fila y porción y atenúa el resto,
-    y al pulsar una porción o fila se selecciona el contenedor/volumen (`onSelect`). Las porciones
-    diminutas siguen siendo accesibles desde la leyenda.
+  - El árbol y el detalle usan `KBDiskItem.spaceUsage` (`KBDiskSpaceUsage`): los contenedores
+    reportan su usado/libre (desconocido si no hay ningún volumen montado, nunca 0 B), los
+    volúmenes solo usado (el libre es compartido del contenedor) y discos/particiones agregan
+    unidades contables (contenedores APFS y particiones montadas no-APFS; nunca volúmenes dentro
+    de un contenedor ya contado ni la partición que lo contiene), marcando `isPartial` si alguna
+    unidad no reporta capacidad. El libre agregado es la suma de libres conocidos (coincide con la
+    tarjeta Free), no `capacidad - usado`.
+  - El detalle de Volumes es una tarjeta hero (`VolumeHierarchyChart`) con el gauge vertical de uso
+    a la izquierda, las cifras del elemento seleccionado entre el gauge y el círculo, y un gráfico
+    radial multianillo grande que sube hasta el disco físico para mantener la forma al navegar:
+    anillo de particiones, anillo de contenedores APFS y anillo de volúmenes. Los dos primeros se
+    dimensionan por capacidad (con una porción “Other” para el espacio no asignado); el de
+    volúmenes reutiliza `APFSSpaceContext` (volúmenes por usado + residual de
+    snapshots/metadatos/volúmenes desmontados + libre). Un contenedor sin volumen montado se
+    muestra como desconocido, nunca como 0 B; si la suma de usado excede el espacio usable, los
+    segmentos se escalan y se avisa.
+    Los gráficos usan `DiskPalette` (rampa cálida `#faf6f2 → #7e6a60`): cada nivel toma un par de
+    tonos (particiones sand/paper, contenedores stone/sand, volúmenes taupe/ink) y las chips
+    numeradas indican el orden de los anillos. Las bandas, separadores, textos y trazos de
+    selección se eligen por la luminancia relativa del relleno (`contentColor`/`bandColor`): tinta
+    oscura sobre los tonos claros y blanco/sand sobre `ink`. Las porciones cuya etiqueta no cabe
+    dentro reciben un callout exterior con línea guía: se reservan gutters laterales (el círculo se
+    ajusta), se reparten por lado con anti-solape (`distributedYs`) y se descartan los candidatos
+    más pequeños si no caben; las etiquetas son clicables. El centro indica el tipo y el sistema de
+    ficheros del elemento seleccionado; la leyenda de dos líneas muestra `id · nombre` y
+    `tipo · fs`, y el tooltip añade el punto de montaje o el número de volúmenes. Las barras del
+    árbol y el gauge usan `DiskPalette.tint(for:)`; tarjetas resumen y chrome conservan sus acentos.
   - No se ejecuta ningún proceso externo.
 - **Escaneo (`DiskScanner`)**
   - Una llamada C a `kb_disk_list_directory` por directorio; la capa C usa `open(O_RDONLY |
