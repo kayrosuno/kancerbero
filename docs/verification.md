@@ -104,6 +104,9 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--disk-io-search <texto>] [--disk-io-selected <pid>] \
   [--disk-io-graph data|operations] \
   [--disk-units decimal|binary] \
+  [--volumes-focus disks|containers|volumes|capacity|free] \
+  [--volumes-panel <diskXsY>] \
+  [--volumes-maximized tree|details|volumes] \
   [--cpu-search <texto>] [--cpu-selected <pid>] \
   [--memory-search <texto>] [--memory-selected <pid>] \
   [--energy-search <texto>] [--energy-selected <pid>] \
@@ -136,7 +139,10 @@ un estado mixto y `--screenshot-size 1340x700` fija el tamaño de la ventana.
 actividad; `--disk-io-search`/`--disk-io-selected` filtran y preseleccionan procesos y
 `--disk-io-graph data|operations` elige el tipo de gráfico. `--disk-units decimal|binary` cambia
 el sistema de unidades de tamaño/velocidad de la pestaña Disk (por defecto decimal); sin el flag
-se usa el valor guardado por el selector. `--cpu-search` aplica el filtro inicial de
+se usa el valor guardado por el selector. `--volumes-panel <diskXsY>` abre la tarjeta de
+volúmenes de ese contenedor (tres columnas) y `--volumes-maximized tree|details|volumes` maximiza
+la tarjeta indicada al área de Volumes; sin panel o sin selección caen al layout normal.
+`--cpu-search` aplica el filtro inicial de
 la tabla de CPU, `--cpu-selected` preselecciona un PID, `--memory-search`/`--memory-selected`
 hacen lo mismo en la tabla de Memory, `--energy-search`/`--energy-selected` en la de Energy,
 `--screenshot-dock` renderiza el icono del Dock a PNG (256×256) y `--dock-style` elige el estilo
@@ -325,12 +331,28 @@ $K --screenshot /tmp/kb-disk-free.png --section disk \
   --disk-tab volumes --volumes-focus free --screenshot-delay 5
 $K --screenshot /tmp/kb-disk-containers.png --section disk \
   --disk-tab volumes --volumes-focus containers --screenshot-delay 5
+$K --screenshot /tmp/kb-vol-3col.png --section disk --disk-tab volumes \
+  --disk-item disk0 --volumes-panel disk3 --screenshot-delay 5
+$K --screenshot /tmp/kb-vol-max.png --section disk --disk-tab volumes \
+  --disk-item disk0 --volumes-panel disk3 --volumes-maximized volumes \
+  --screenshot-delay 5
 $K --screenshot /tmp/kb-disk-folders.png --section disk \
   --disk-tab analyzer --disk-path="$HOME/Documents" --disk-scan \
   --analyzer-focus folders --screenshot-delay 8
 $K --screenshot /tmp/kb-disk-io.png --section disk \
   --disk-tab io --screenshot-delay 6
 ```
+
+- Volumes: por defecto árbol 1/3 + detalle 2/3; Capacidad/Usado/Libre en grande y rutas de
+  montaje visibles (11 pt, secundario). Con `--volumes-panel` las tres tarjetas (árbol /
+  contenedores / volúmenes) quedan a 1/3; el detalle central conserva el disco seleccionado y la
+  porción del contenedor queda resaltada. Pulsar de nuevo la porción (o la fila de la leyenda)
+  cierra el panel; pulsar un volumen en la tarjeta derecha actualiza el detalle central.
+- Donut: nombres dentro de las porciones grandes y fuera con líneas guía en las pequeñas; hover
+  con tooltip y resaltado de porción/leyenda; clic en una porción de contenedor abre la tarjeta.
+- Maximizar/restaurar en árbol, detalle y volúmenes: la tarjeta ocupa el área de Volumes y se
+  ocultan las tarjetas resumen y las demás columnas; la cabecera, las pestañas y el selector de
+  unidades siguen visibles. `--volumes-maximized` sin panel o sin selección cae al layout normal.
 
 La barra inferior debe mostrar métricas de la sección activa y la marca de actualización de su
 fuente (red, inventario de disco, servicios launchd o CPU/memoria).
