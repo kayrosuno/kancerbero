@@ -22,25 +22,6 @@ struct DiskVolumesView: View {
         reduceMotion ? nil : .snappy(duration: 0.28)
     }
 
-    /// APFS container whose volumes card is open.
-    private var panelContainer: KBDiskItem? {
-        guard let inventory = disk.inventory,
-              let id = ui.disk.volumesPanelContainerID else { return nil }
-        return inventory.allItems.first {
-            $0.deviceIdentifier == id && $0.kind == .apfsContainer
-        }
-    }
-
-    private var panelVolumes: [KBDiskItem] {
-        panelContainer?.children
-            .filter { $0.kind == .apfsVolume }
-            .sorted {
-                let left = $0.usedBytes ?? 0
-                let right = $1.usedBytes ?? 0
-                return left == right ? $0.name < $1.name : left > right
-            } ?? []
-    }
-
     private var effectiveMaximized: DiskVolumesPanel? {
         guard let requested = ui.disk.maximizedVolumesPanel else { return nil }
         switch requested {
@@ -48,8 +29,6 @@ struct DiskVolumesView: View {
             return .tree
         case .details:
             return disk.selectedItem == nil ? nil : .details
-        case .volumes:
-            return panelContainer == nil ? nil : .volumes
         }
     }
 
@@ -73,30 +52,25 @@ struct DiskVolumesView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .animation(layoutAnimation, value: disk.selectedItemID)
-        .animation(layoutAnimation, value: ui.disk.volumesPanelContainerID)
         .animation(layoutAnimation, value: effectiveMaximized)
         .task {
             await disk.refreshInventory()
             pruneExpanded()
             expandVolumesIfNeeded()
             reconcileSelection()
-            reconcilePanels()
+            reconcileMaximize()
         }
         .onChange(of: disk.inventory?.generatedAt) { _, _ in
             pruneExpanded()
             expandVolumesIfNeeded()
             reconcileSelection()
-            reconcilePanels()
+            reconcileMaximize()
         }
         .onChange(of: ui.disk.volumesFocus) { _, _ in
             reconcileSelection()
-            reconcilePanels()
         }
         .onChange(of: disk.selectedItemID) { _, _ in
-            reconcilePanels()
-        }
-        .onChange(of: ui.disk.volumesPanelContainerID) { _, _ in
-            reconcilePanels()
+            reconcileMaximize()
         }
         .onDisappear {
             ui.disk.maximizedVolumesPanel = nil
@@ -108,28 +82,18 @@ struct DiskVolumesView: View {
     @ViewBuilder
     private func columns(width: CGFloat, height: CGFloat) -> some View {
         let hasSelection = disk.selectedItem != nil
-        let panel = hasSelection ? panelContainer : nil
-        let count = panel == nil ? (hasSelection ? 2 : 1) : 3
-        let usable = max(0, width - CGFloat(count - 1) * cardSpacing)
+        let usable = max(0, width - (hasSelection ? cardSpacing : 0))
         let third = usable / 3
-        let treeWidth = count == 1 ? width : third
-        let detailWidth = count == 2 ? usable - third : third
-        let volumesWidth = count == 3 ? usable - third * 2 : 0
+        let treeWidth = hasSelection ? third : width
+        let detailWidth = usable - third
 
         HStack(spacing: cardSpacing) {
             treeCard(isMaximized: false)
                 .frame(width: treeWidth, height: height)
-                .transition(.opacity)
 
-            if hasSelection, let item = disk.selectedItem {
+            if let item = disk.selectedItem {
                 detailCard(item: item, isMaximized: false)
                     .frame(width: detailWidth, height: height)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
-            }
-
-            if let panel {
-                volumesCard(container: panel, isMaximized: false)
-                    .frame(width: volumesWidth, height: height)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
@@ -147,11 +111,6 @@ struct DiskVolumesView: View {
                 detailCard(item: item, isMaximized: true)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        case .volumes:
-            if let container = panelContainer {
-                volumesCard(container: container, isMaximized: true)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
         }
     }
 
@@ -159,8 +118,8 @@ struct DiskVolumesView: View {
         DiskVolumeDetailView(
             item: item,
             inventory: disk.inventory,
-            highlightedContainerID: ui.disk.volumesPanelContainerID,
             onSelectSegment: selectSegment,
+            onSelectItem: selectItem,
             isMaximized: isMaximized,
             onToggleMaximize: { toggleMaximize(.details) },
             onAnalyze: onAnalyze,
@@ -317,167 +276,7 @@ struct DiskVolumesView: View {
         .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
     }
 
-    private func volumesCard(container: KBDiskItem, isMaximized: Bool) -> some View {
-        let space = disk.inventory?.apfsSpaceContext(for: container)
-        let spaceUnknown = space?.availability == .unmounted
-        let capacity = container.sizeBytes
-        let used = spaceUnknown ? nil : space?.usedBytes
-        let free = spaceUnknown ? nil : space?.freeBytes
-        let accent = Color(red: 0.16, green: 0.62, blue: 0.94)
-
-        return VStack(spacing: 0) {
-            HStack(alignment: .center, spacing: 6) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Volumes")
-                        .font(.system(size: 11, weight: .semibold))
-                    Text(container.name.isEmpty
-                         ? container.deviceIdentifier
-                         : "\(container.deviceIdentifier) · \(container.name)")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 4)
-                DiskExpandButton(isMaximized: isMaximized, subject: "Volumes panel") {
-                    toggleMaximize(.volumes)
-                }
-                Button(action: closeVolumesPanel) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Close volumes panel")
-                .accessibilityLabel("Close volumes panel")
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-
-            Divider().opacity(0.5)
-
-            HStack(spacing: 14) {
-                volumeStat("Capacity", KBFormat.bytes(capacity, units: byteUnitSystem))
-                volumeStat("Used", used.map { KBFormat.bytes($0, units: byteUnitSystem) } ?? "—")
-                volumeStat("Free", free.map { KBFormat.bytes($0, units: byteUnitSystem) } ?? "—")
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-
-            Divider().opacity(0.5)
-
-            ScrollView {
-                LazyVStack(spacing: 3) {
-                    ForEach(panelVolumes, id: \.deviceIdentifier) { volume in
-                        volumeRow(volume, accent: accent,
-                                  selected: disk.selectedItemID == volume.deviceIdentifier)
-                    }
-                }
-                .padding(8)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background {
-            RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
-                .fill(.regularMaterial)
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
-                .strokeBorder(.quaternary.opacity(0.5), lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
-        .accessibilityElement(children: .contain)
-    }
-
-    private func volumeStat(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .font(.system(size: 8.5, weight: .semibold))
-                .textCase(.uppercase)
-                .tracking(0.4)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-        }
-    }
-
-    private func volumeRow(_ volume: KBDiskItem, accent: Color,
-                           selected: Bool) -> some View {
-        let used = volume.usedBytes
-        let size = panelContainer?.sizeBytes ?? 0
-        let percent: Double? = {
-            guard let used, size > 0 else { return nil }
-            return Double(used) / Double(size)
-        }()
-        let roleText = volume.roles.isEmpty ? nil : volume.roles.joined(separator: ", ")
-
-        return Button {
-            selectVolume(volume)
-        } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Image(systemName: "externaldrive.fill")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(selected ? accent : .secondary)
-                        .frame(width: 14)
-                    Text(volume.name.isEmpty ? volume.deviceIdentifier : volume.name)
-                        .font(.system(size: 12,
-                                      weight: selected ? .semibold : .medium))
-                        .lineLimit(1)
-                    Spacer(minLength: 4)
-                    Text(used.map { KBFormat.bytes($0, units: byteUnitSystem) } ?? "—")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                }
-
-                if let mount = volume.mountPoint, !mount.isEmpty {
-                    Text(mount)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(selected ? Color.primary : Color.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .help(mount)
-                        .padding(.leading, 20)
-                } else if let roleText {
-                    Text(roleText)
-                        .font(.system(size: 9))
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                        .padding(.leading, 20)
-                }
-
-                if let percent {
-                    HStack(spacing: 4) {
-                        CapacityBar(fraction: percent, tint: accent, height: 3)
-                            .frame(maxWidth: .infinity)
-                        Text(KBFormat.percent(percent))
-                            .font(.system(size: 8))
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
-                    .padding(.leading, 20)
-                }
-            }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 5)
-            .background {
-                if selected {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(accent.opacity(0.12))
-                }
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(volume.name.isEmpty ? volume.deviceIdentifier : volume.name)
-        .accessibilityValue(used.map { KBFormat.bytes($0, units: byteUnitSystem) } ?? "Unknown usage")
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
-    // MARK: - Selection and panel state
+    // MARK: - Navigation
 
     private func toggleMaximize(_ panel: DiskVolumesPanel) {
         withAnimation(layoutAnimation) {
@@ -486,52 +285,41 @@ struct DiskVolumesView: View {
         }
     }
 
-    private func selectContainer(_ id: String) {
-        withAnimation(layoutAnimation) {
-            ui.disk.maximizedVolumesPanel = nil
-            ui.disk.volumesPanelContainerID =
-                ui.disk.volumesPanelContainerID == id ? nil : id
-        }
-    }
-
     private func selectSegment(_ segment: APFSSpaceSegment) {
         guard let id = segment.itemID else { return }
-        switch segment.role {
-        case .container:
-            selectContainer(id)
-        case .volume:
-            withAnimation(layoutAnimation) {
-                disk.select(id)
-            }
-        default:
-            break
-        }
+        selectItem(id)
     }
 
-    private func closeVolumesPanel() {
+    private func selectItem(_ id: String) {
+        guard let inventory = disk.inventory,
+              let item = inventory.allItems.first(where: {
+                  $0.deviceIdentifier == id
+              }) else { return }
+
+        if ui.disk.volumesFocus != nil {
+            ui.disk.volumesFocus = nil
+        }
+        revealInTree(item)
         withAnimation(layoutAnimation) {
-            ui.disk.volumesPanelContainerID = nil
-            if ui.disk.maximizedVolumesPanel == .volumes {
-                ui.disk.maximizedVolumesPanel = nil
-            }
+            disk.select(id)
         }
     }
 
     private func closeInspector() {
         withAnimation(layoutAnimation) {
             disk.select(nil)
-            ui.disk.volumesPanelContainerID = nil
             ui.disk.maximizedVolumesPanel = nil
         }
     }
 
-    private func selectVolume(_ volume: KBDiskItem) {
-        if ui.disk.volumesFocus != nil {
-            ui.disk.volumesFocus = nil
-        }
-        revealInTree(volume)
-        withAnimation(layoutAnimation) {
-            disk.select(volume.deviceIdentifier)
+    private func reconcileMaximize() {
+        // The inventory loads asynchronously, so the selected item cannot be
+        // resolved yet on the first pass. Clearing here would drop a
+        // `--volumes-maximized details` set before the row appears.
+        guard disk.inventory != nil else { return }
+        if ui.disk.maximizedVolumesPanel == .details,
+           disk.selectedItem == nil {
+            ui.disk.maximizedVolumesPanel = nil
         }
     }
 
@@ -548,34 +336,6 @@ struct DiskVolumesView: View {
             return false
         }
         _ = expandAncestors(of: item.deviceIdentifier, in: inventory.items)
-    }
-
-    private func reconcilePanels() {
-        guard let inventory = disk.inventory else { return }
-
-        if let id = ui.disk.volumesPanelContainerID {
-            let container = inventory.allItems.first {
-                $0.deviceIdentifier == id && $0.kind == .apfsContainer
-            }
-            var valid = false
-            if let container, let selected = disk.selectedItem {
-                valid = container.item(withID: selected.deviceIdentifier) != nil
-                    || selected.item(withID: container.deviceIdentifier) != nil
-            }
-            if !valid {
-                ui.disk.volumesPanelContainerID = nil
-                if ui.disk.maximizedVolumesPanel == .volumes {
-                    ui.disk.maximizedVolumesPanel = nil
-                }
-            }
-        }
-
-        if ui.disk.maximizedVolumesPanel == .details, disk.selectedItem == nil {
-            ui.disk.maximizedVolumesPanel = nil
-        }
-        if ui.disk.maximizedVolumesPanel == .volumes, panelContainer == nil {
-            ui.disk.maximizedVolumesPanel = nil
-        }
     }
 
     // MARK: - Tree helpers

@@ -24,7 +24,6 @@ enum DiskVolumesFocus: String, CaseIterable, Identifiable, Sendable {
 enum DiskVolumesPanel: String, CaseIterable, Identifiable, Sendable {
     case tree
     case details
-    case volumes
 
     var id: String { rawValue }
 }

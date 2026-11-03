@@ -90,7 +90,7 @@ struct SummaryCard: View {
     private var regularContent: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                iconBadge
+                iconBadge()
                 Spacer(minLength: 2)
                 Text(title)
                     .font(.system(size: 11, weight: .medium))
@@ -127,42 +127,49 @@ struct SummaryCard: View {
     }
 
     private var compactContent: some View {
-        HStack(alignment: .center, spacing: 8) {
-            iconBadge
+        HStack(alignment: .center, spacing: 7) {
+            iconBadge(size: 20, glyph: 10, corner: 5)
 
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(alignment: .firstTextBaseline, spacing: 5) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(value)
-                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                         .contentTransition(.numericText())
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
+
                     Text(title)
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 9.5, weight: .medium))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
+
                     Spacer(minLength: 2)
+
+                    if isSelected { checkmark }
                 }
+
                 Text(caption)
-                    .font(.system(size: 9))
+                    .font(.system(size: 7.5))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
-
-            if isSelected { checkmark }
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
     }
 
-    private var iconBadge: some View {
+    private func iconBadge(size: CGFloat = 22,
+                           glyph: CGFloat = 11,
+                           corner: CGFloat = 6) -> some View {
         Image(systemName: systemImage)
-            .font(.system(size: 11, weight: .semibold))
+            .font(.system(size: glyph, weight: .semibold))
             .foregroundStyle(.white)
-            .frame(width: 22, height: 22)
+            .frame(width: size, height: size)
             .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                RoundedRectangle(cornerRadius: corner, style: .continuous)
                     .fill(KBTheme.gradient(tint))
             )
     }

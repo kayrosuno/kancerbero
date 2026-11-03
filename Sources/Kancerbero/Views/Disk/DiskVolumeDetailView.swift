@@ -5,8 +5,8 @@ import KancerberoCore
 struct DiskVolumeDetailView: View {
     let item: KBDiskItem
     let inventory: KBDiskInventorySnapshot?
-    var highlightedContainerID: String? = nil
     var onSelectSegment: ((APFSSpaceSegment) -> Void)? = nil
+    var onSelectItem: ((String) -> Void)? = nil
     var isMaximized = false
     var onToggleMaximize: (() -> Void)? = nil
     let onAnalyze: (String) -> Void
@@ -44,9 +44,8 @@ struct DiskVolumeDetailView: View {
                 stats
                 if let context = spaceContext {
                     Divider().opacity(0.5)
-                    APFSSpaceDonut(context: context,
-                                   highlightOverride: highlightedContainerID,
-                                   onSelect: onSelectSegment)
+                    APFSSpaceBarChart(context: context,
+                                      onSelect: onSelectSegment)
                 }
                 Divider().opacity(0.5)
                 metadata
@@ -58,54 +57,83 @@ struct DiskVolumeDetailView: View {
         .background {
             RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
                 .fill(.regularMaterial)
+            RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
+                .fill(LinearGradient(
+                    colors: [kindTint.opacity(0.10), .clear],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing))
         }
         .overlay {
             RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
-                .strokeBorder(.quaternary.opacity(0.5), lineWidth: 1)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [kindTint.opacity(0.42),
+                                 kindTint.opacity(0.14)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing),
+                    lineWidth: 1)
         }
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(KBTheme.gradient(AppSection.disk.tint))
-                        .frame(width: 38, height: 38)
-                    Image(systemName: icon)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.name.isEmpty ? item.deviceIdentifier : item.name)
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .lineLimit(2)
-                        .textSelection(.enabled)
-                    Text("\(item.kind.displayName) · \(item.deviceIdentifier)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 0)
-
-                if let onToggleMaximize {
-                    DiskExpandButton(isMaximized: isMaximized,
-                                     subject: "Details panel") {
-                        onToggleMaximize()
-                    }
-                }
-
-                Button {
-                    onClose()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
+        HStack(alignment: .center, spacing: 10) {
+            if let parent = parentItem, let onSelectItem {
+                Button { onSelectItem(parent.deviceIdentifier) } label: {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(kindTint)
+                        .frame(width: 24, height: 24)
+                        .background {
+                            Circle().fill(kindTint.opacity(0.12))
+                        }
+                        .overlay {
+                            Circle().strokeBorder(kindTint.opacity(0.32),
+                                                  lineWidth: 1)
+                        }
                 }
                 .buttonStyle(.plain)
-                .help("Close inspector")
+                .help("Up to \(parent.name.isEmpty ? parent.deviceIdentifier : parent.name)")
+                .accessibilityLabel("Up one level")
             }
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .fill(KBTheme.gradient(kindTint))
+                    .frame(width: 44, height: 44)
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.name.isEmpty ? item.deviceIdentifier : item.name)
+                    .font(.system(size: 19, weight: .semibold, design: .rounded))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+                    .textSelection(.enabled)
+                Text("\(item.kind.displayName) · \(item.deviceIdentifier)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+
+            if let onToggleMaximize {
+                DiskExpandButton(isMaximized: isMaximized,
+                                 subject: "Details panel") {
+                    onToggleMaximize()
+                }
+            }
+
+            Button {
+                onClose()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Close inspector")
         }
     }
 
@@ -115,6 +143,14 @@ struct DiskVolumeDetailView: View {
                 stat("Capacity", KBFormat.bytes(item.sizeBytes, units: byteUnitSystem))
                 stat("Used", usedText)
                 stat("Free", freeText)
+            }
+            if !containerSpaceUnknown,
+               let used = item.usedBytes,
+               item.sizeBytes > 0 {
+                CapacityBar(fraction: Double(used) / Double(item.sizeBytes),
+                            tint: kindTint,
+                            height: 6)
+                    .padding(.top, 2)
             }
             if item.kind == .apfsVolume || item.kind == .apfsContainer {
                 Text("APFS volumes share the container's free space.")
@@ -132,10 +168,10 @@ struct DiskVolumeDetailView: View {
                 .tracking(0.5)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .font(.system(size: 20, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(0.65)
         }
     }
 
@@ -185,7 +221,7 @@ struct DiskVolumeDetailView: View {
             Text(value)
                 .font(.system(size: 11,
                               design: path ? .monospaced : .default))
-                .foregroundStyle(path ? Color.primary : Color.primary)
+                .foregroundStyle(.primary)
                 .textSelection(.enabled)
                 .lineLimit(path ? 2 : 3)
                 .truncationMode(.middle)
@@ -239,6 +275,23 @@ struct DiskVolumeDetailView: View {
             .buttonStyle(.borderedProminent)
             .tint(AppSection.disk.tint)
             .disabled(item.mountPoint == nil)
+        }
+    }
+
+    private var parentItem: KBDiskItem? {
+        guard let parentID = item.parentID else { return nil }
+        return inventory?.allItems.first {
+            $0.deviceIdentifier == parentID
+        }
+    }
+
+    private var kindTint: Color {
+        switch item.kind {
+        case .physicalDisk: return Color(red: 0.94, green: 0.56, blue: 0.18)
+        case .partition: return Color(red: 0.55, green: 0.45, blue: 0.92)
+        case .apfsContainer: return Color(red: 0.16, green: 0.62, blue: 0.94)
+        case .apfsVolume: return Color(red: 0.20, green: 0.70, blue: 0.62)
+        case .snapshot: return Color(red: 0.90, green: 0.42, blue: 0.25)
         }
     }
 
