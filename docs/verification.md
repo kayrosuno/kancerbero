@@ -343,8 +343,12 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
 
 - Volumes: por defecto árbol 1/3 + detalle 2/3 (sin selección, el árbol ocupa todo); no existe
   una tercera tarjeta ni las tarjetas resumen superiores. El árbol es una tabla con cabecera
-  **Name / Size / Used / Free / Mount**, filas de dos líneas (nombre + `id · fs`) e indentación de
-  hijos; a 1/3 se desplaza horizontalmente (~420 pt de contenido). Used muestra el valor y una
+  **Name / Disk / Type / Size / Used / Free / Mounted / Mount**, filas de una línea e indentación
+  de hijos; a 1/3 se desplaza horizontalmente (~682 pt de contenido). Disk muestra el
+  `deviceIdentifier` de cada fila (`disk0`, `disk0s2`, `disk3s1`…) tanto en las filas indentadas
+  como en las filas planas de `--volumes-focus`; Type combina el tipo con el sistema de ficheros
+  (`Volume APFS`, `Partition MS-DOS`) y Mounted Yes/No solo en volúmenes y snapshots (`—` en el
+  resto). Used muestra el valor y una
   mini barra (volúmenes: parte del usado del contenedor; resto: usado/capacidad); Free muestra `—`
   en volúmenes (libre compartido); Mount trunca con tooltip. Un contenedor sin volumen montado
   muestra `—` en Used/Free. La cabecera de la tarjeta muestra pills esquemáticas de lo que

@@ -10,11 +10,16 @@ struct DiskVolumesView: View {
     let onAnalyze: (String) -> Void
 
     private let cardSpacing: CGFloat = 12
-    private let tableMinWidth: CGFloat = 420
+    private let diskColumnWidth: CGFloat = 96
+    private let typeColumnWidth: CGFloat = 92
     private let sizeColumnWidth: CGFloat = 54
     private let usedColumnWidth: CGFloat = 56
     private let freeColumnWidth: CGFloat = 56
+    private let mountedColumnWidth: CGFloat = 56
     private let mountColumnWidth: CGFloat = 64
+    // 150 (Name) + 96 + 92 + 54 + 56 + 56 + 56 (Mounted) + 64 (Mount)
+    // + 7*6 (spacing) + 2*8 (padding) = 682
+    private let tableMinWidth: CGFloat = 682
 
     private var selection: Binding<String?> {
         Binding(
@@ -221,17 +226,23 @@ struct DiskVolumesView: View {
         HStack(spacing: 6) {
             Text("Name")
                 .frame(minWidth: 150, maxWidth: .infinity, alignment: .leading)
+            Text("Disk")
+                .frame(width: diskColumnWidth, alignment: .leading)
+            Text("Type")
+                .frame(width: typeColumnWidth, alignment: .leading)
             Text("Size")
                 .frame(width: sizeColumnWidth, alignment: .trailing)
             Text("Used")
                 .frame(width: usedColumnWidth, alignment: .trailing)
             Text("Free")
                 .frame(width: freeColumnWidth, alignment: .trailing)
+            Text("Mounted")
+                .frame(width: mountedColumnWidth, alignment: .leading)
             Text("Mount")
                 .frame(minWidth: mountColumnWidth, maxWidth: .infinity,
                        alignment: .leading)
         }
-        .font(.system(size: 9.5, weight: .semibold))
+        .font(.system(size: 10, weight: .semibold))
         .textCase(.uppercase)
         .tracking(0.4)
         .foregroundStyle(.secondary)
@@ -255,28 +266,34 @@ struct DiskVolumesView: View {
                     .frame(width: 14, height: 14)
 
                 Image(systemName: kindIcon(item.kind))
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(kindTint(item.kind))
                     .frame(width: 14)
 
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(treeName(item))
-                        .font(.system(size: 11.5, weight: .medium))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Text(treeSecondaryLabel(item))
-                        .font(.system(size: 8.5))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-                .help("\(treeName(item)) · \(treeSecondaryLabel(item))")
+                Text(treeName(item))
+                    .font(.system(size: 12.5, weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(treeName(item))
             }
             .padding(.leading, indent)
             .frame(minWidth: 150, maxWidth: .infinity, alignment: .leading)
 
+            Text(item.deviceIdentifier)
+                .font(.system(size: 10.5, design: .monospaced))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(width: diskColumnWidth, alignment: .leading)
+
+            Text(typeLabel(item))
+                .font(.system(size: 10.5))
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
+                .frame(width: typeColumnWidth, alignment: .leading)
+                .help(typeHelp(item))
+
             Text(KBFormat.bytes(item.sizeBytes, units: byteUnitSystem))
-                .font(.system(size: 9.5))
+                .font(.system(size: 10.5))
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
@@ -307,15 +324,22 @@ struct DiskVolumesView: View {
             .help(usedHelp(item))
 
             Text(treeFreeText(item))
-                .font(.system(size: 9.5))
+                .font(.system(size: 10.5))
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .frame(width: freeColumnWidth, alignment: .trailing)
                 .help(freeHelp(item))
 
+            Text(mountedText(item))
+                .font(.system(size: 10.5))
+                .foregroundStyle(mountedColor(item))
+                .lineLimit(1)
+                .frame(width: mountedColumnWidth, alignment: .leading)
+                .help(mountedHelp(item))
+
             Text(item.mountPoint ?? "—")
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -324,7 +348,7 @@ struct DiskVolumesView: View {
                 .help(item.mountPoint ?? "No mount point")
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 3)
+        .padding(.vertical, 4)
         .frame(width: width)
         .background {
             if selected {
@@ -347,7 +371,7 @@ struct DiskVolumesView: View {
                     toggle(item.deviceIdentifier)
                 } label: {
                     Image(systemName: expanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 8.5, weight: .semibold))
+                        .font(.system(size: 9, weight: .semibold))
                         .frame(width: 14, height: 14)
                 }
                 .buttonStyle(.plain)
@@ -366,10 +390,6 @@ struct DiskVolumesView: View {
 
     private func treeName(_ item: KBDiskItem) -> String {
         item.name.isEmpty ? item.deviceIdentifier : item.name
-    }
-
-    private func treeSecondaryLabel(_ item: KBDiskItem) -> String {
-        "\(item.deviceIdentifier) · \(item.fileSystem ?? "—")"
     }
 
     private func treeUsedText(_ item: KBDiskItem) -> String {
@@ -404,13 +424,100 @@ struct DiskVolumesView: View {
         return "Free space"
     }
 
+    private func kindShortName(_ kind: KBDiskItemKind) -> String {
+        switch kind {
+        case .physicalDisk: return "Disk"
+        case .partition: return "Partition"
+        case .apfsContainer: return "Container"
+        case .apfsVolume: return "Volume"
+        case .snapshot: return "Snapshot"
+        }
+    }
+
+    private func typeLabel(_ item: KBDiskItem) -> String {
+        let kind = kindShortName(item.kind)
+        guard let fileSystem = fileSystemLabel(displayFileSystem(for: item)) else {
+            return kind
+        }
+        return "\(kind) \(fileSystem)"
+    }
+
+    private func typeHelp(_ item: KBDiskItem) -> String {
+        guard let fileSystem = displayFileSystem(for: item), !fileSystem.isEmpty else {
+            return item.kind.displayName
+        }
+        return "\(item.kind.displayName) · \(fileSystem)"
+    }
+
+    /// Partitions that host an APFS container do not report their own
+    /// filesystem; reuse the container's so Type reads "Partition APFS".
+    private func displayFileSystem(for item: KBDiskItem) -> String? {
+        if let fileSystem = item.fileSystem {
+            return fileSystem
+        }
+        guard item.kind == .partition else { return nil }
+        return item.children.first { $0.kind == .apfsContainer }?.fileSystem
+    }
+
+    private func fileSystemLabel(_ fileSystem: String?) -> String? {
+        guard let fileSystem else { return nil }
+        let trimmed = fileSystem.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        switch trimmed.lowercased() {
+        case "apfs": return "APFS"
+        case "hfs": return "HFS"
+        case "msdos": return "MS-DOS"
+        case "exfat": return "exFAT"
+        case "ntfs": return "NTFS"
+        default: return trimmed.uppercased()
+        }
+    }
+
+    private func isMountable(_ kind: KBDiskItemKind) -> Bool {
+        kind == .apfsVolume || kind == .snapshot
+    }
+
+    private func mountStatus(_ item: KBDiskItem) -> Bool? {
+        guard isMountable(item.kind) else { return nil }
+        return item.mountPoint?.isEmpty == false
+    }
+
+    private func mountedText(_ item: KBDiskItem) -> String {
+        guard let mounted = mountStatus(item) else { return "—" }
+        return mounted ? "Yes" : "No"
+    }
+
+    private func mountedColor(_ item: KBDiskItem) -> Color {
+        guard let mounted = mountStatus(item) else {
+            return Color.secondary.opacity(0.6)
+        }
+        return mounted ? .primary : .secondary
+    }
+
+    private func mountedHelp(_ item: KBDiskItem) -> String {
+        guard let mounted = mountStatus(item) else {
+            return "This object type does not report a mount state"
+        }
+        guard mounted else { return "Not mounted" }
+        return "Mounted at \(item.mountPoint ?? "unknown path")"
+    }
+
+    private func mountedAccessibilityText(_ item: KBDiskItem) -> String {
+        guard let mounted = mountStatus(item) else { return "not applicable" }
+        return mounted ? "yes" : "no"
+    }
+
     private func rowAccessibilityLabel(_ item: KBDiskItem) -> String {
         let percent = usageFraction(for: item).map(KBFormat.percent)
         let used = percent.map { "\(treeUsedText(item)) (\($0))" }
             ?? treeUsedText(item)
-        return "\(treeName(item)), \(item.kind.displayName), "
+        let fileSystem = displayFileSystem(for: item)
+            .map { ", filesystem \($0)" } ?? ""
+        return "\(treeName(item)), device \(item.deviceIdentifier), "
+            + "type \(item.kind.displayName)\(fileSystem), "
             + "size \(KBFormat.bytes(item.sizeBytes, units: byteUnitSystem)), "
             + "used \(used), free \(treeFreeText(item)), "
+            + "mounted \(mountedAccessibilityText(item)), "
             + "mount \(item.mountPoint ?? "none")"
     }
 
