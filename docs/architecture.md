@@ -112,9 +112,14 @@
   el árbol ocupa todo); al seleccionar un ítem no se abre ninguna tercera tarjeta. Cada tarjeta
   tiene un botón maximizar/restaurar que la lleva al área de Volumes (oculta la otra columna;
   cabecera y pestañas siguen visibles). El estado vive en `DiskUIState`
-  (`maximizedVolumesPanel`). El árbol es una tabla propia (`Name / Size / Used / Free / Mount`) con
-  filas de dos líneas, chevron e indentación `depth * 10`, cebra y selección por botón de fila;
-  cabecera pegada, scroll vertical y horizontal con ancho mínimo 420 pt. Usa
+  (`maximizedVolumesPanel`). El árbol es una tabla propia (`Name / Disk / Type / Size / Used /
+  Free / Mounted / Mount`) con filas de una línea, chevron e indentación `depth * 10`, cebra y
+  selección por botón de fila; cabecera pegada, scroll vertical y horizontal con ancho mínimo
+  682 pt. Disk muestra el `deviceIdentifier` de cada fila (`disk0`, `disk0s2`, `disk3s1`…); Type
+  combina la etiqueta corta del tipo (Disk/Partition/Container/Volume/Snapshot) con el sistema de
+  ficheros (`Volume APFS`, `Partition MS-DOS`) en vez de `DiskPalette.kindLabel`, cuyas etiquetas
+  largas no caben. Mounted solo se calcula para volúmenes y snapshots (`mountPoint`); el resto
+  muestra `—`. Usa
   `KBDiskItem.spaceUsage` para las celdas, `usageFraction` para la mini barra de Used y `—` en
   Free para volúmenes (libre compartido). Un inspector y `CapacityBar`; Analyzer muestra
   controles de escaneo, progreso, `RadialDiskMap` y las tablas de contenidos y mayores archivos;
