@@ -2,17 +2,17 @@ import AppKit
 import SwiftUI
 import KancerberoCore
 
-/// One big number shown beside the radial chart.
+/// One big number shown beside the chart.
 struct VolumeHierarchyStat: Identifiable {
     let id: String
     let title: String
     let value: String
 }
 
-/// Multi-ring hierarchy of the selected disk: partitions → APFS containers →
+/// Nested treemap of the selected disk: partitions → APFS containers →
 /// volumes. The scope always climbs to the physical disk so the shape stays
 /// stable while the user selects different items; the selected item is
-/// outlined in its ring and in the legend.
+/// outlined in its rectangle.
 struct VolumeHierarchyChart: View {
     let item: KBDiskItem
     let inventory: KBDiskInventorySnapshot
@@ -26,26 +26,19 @@ struct VolumeHierarchyChart: View {
     @Environment(\.byteUnitSystem) private var byteUnitSystem
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hoveredNodeID: String?
-    @State private var chartHoverNodeID: String?
-    @State private var hoverLocation: CGPoint?
 
     var body: some View {
         let scope = scopeItem(in: inventory)
         let nodes = makeNodes(for: scope)
         let highlightID = highlightID(in: nodes)
-        let rows = legendRows(nodes)
 
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center,
-                   spacing: isMaximized ? 14 : 10) {
-                heroInfo
-                circle(nodes: nodes, scope: scope, highlightID: highlightID)
-                    .frame(height: isMaximized ? 760 : 500)
-            }
-            .frame(maxWidth: .infinity, alignment: .center)
-
-            legend(rows, highlightID: highlightID)
+        HStack(alignment: .center, spacing: chartColumnSpacing) {
+            heroInfo
+            treemap(nodes: nodes, scope: scope,
+                    highlightID: highlightID)
+                .frame(height: isMaximized ? 860 : 600)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 6)
         .animation(reduceMotion ? nil : .snappy(duration: 0.25),
                    value: item.deviceIdentifier)
@@ -53,54 +46,26 @@ struct VolumeHierarchyChart: View {
 
     // MARK: - Hero
 
-    private var heroInfo: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let capacity = capacityStat {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(capacity.title)
-                        .font(.system(size: 9.5, weight: .semibold))
-                        .textCase(.uppercase)
-                        .tracking(0.5)
-                        .foregroundStyle(.secondary)
-                    Text(capacity.value)
-                        .font(.system(
-                            size: isMaximized ? 24 : 20,
-                            weight: .semibold,
-                            design: .rounded))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                }
-                .offset(y: -10)
-            }
+    private var chartColumnSpacing: CGFloat { isMaximized ? 18 : 12 }
 
-            HStack(alignment: .center,
-                   spacing: isMaximized ? 12 : 6) {
-                VerticalUsageBar(
-                    fraction: usageFraction,
-                    tint: DiskPalette.tint(for: item.kind),
-                    kindLabel: gaugeKindLabel(for: item.kind),
-                    caption: usageCaption,
-                    height: isMaximized ? 300 : 210,
-                    width: isMaximized ? 54 : 46,
-                    isMaximized: isMaximized)
-                statsColumn
-            }
+    private var heroInfo: some View {
+        HStack(alignment: .center, spacing: isMaximized ? 12 : 6) {
+            VerticalUsageBar(
+                fraction: usageFraction,
+                tint: DiskPalette.tint(for: item.kind),
+                kindLabel: gaugeKindLabel(for: item.kind),
+                caption: usageCaption,
+                height: isMaximized ? 300 : 210,
+                width: isMaximized ? 54 : 46,
+                isMaximized: isMaximized)
+            statsColumn
         }
         .fixedSize(horizontal: true, vertical: false)
     }
 
-    private var capacityStat: VolumeHierarchyStat? {
-        stats.first { $0.id == "capacity" }
-    }
-
-    private var sideStats: [VolumeHierarchyStat] {
-        stats.filter { $0.id != "capacity" }
-    }
-
     private var statsColumn: some View {
         VStack(alignment: .leading, spacing: isMaximized ? 14 : 11) {
-            ForEach(sideStats) { stat in
+            ForEach(stats) { stat in
                 VStack(alignment: .leading, spacing: 1) {
                     Text(stat.title)
                         .font(.system(size: 9.5, weight: .semibold))
@@ -115,6 +80,7 @@ struct VolumeHierarchyChart: View {
                             weight: .semibold,
                             design: .rounded))
                         .monospacedDigit()
+                        .foregroundStyle(.primary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                 }
@@ -153,95 +119,33 @@ struct VolumeHierarchyChart: View {
             + count(volumes, "volume", "volumes")
     }
 
-    // MARK: - Chart
-
-    private func circle(nodes: [HierarchyNode],
-                        scope: KBDiskItem,
-                        highlightID: String?) -> some View {
-        GeometryReader { proxy in
-            let layout = makeLayout(nodes: nodes, in: proxy.size,
-                                    baseLevel: baseLevel(for: scope.kind))
-
-            ZStack(alignment: .topLeading) {
-                halo(layout: layout)
-
-                Canvas { context, _ in
-                    draw(layout: layout, highlightID: highlightID,
-                         context: &context)
-                }
-
-                centerLabel(for: item, centerRadius: layout.centerRadius)
-                    .position(layout.center)
-                    .allowsHitTesting(false)
-
-                if let hovered = hoveredSector(in: layout) {
-                    tooltip(hovered)
-                        .offset(x: tooltipX(in: proxy.size),
-                                y: tooltipY(in: proxy.size))
-                        .allowsHitTesting(false)
-                }
-            }
-            .contentShape(Rectangle())
-            .onContinuousHover { phase in
-                switch phase {
-                case .active(let location):
-                    let hovered = callout(at: location, in: layout)?.node.id
-                        ?? sector(at: location, in: layout)?.node.id
-                    if hovered != hoveredNodeID {
-                        hoveredNodeID = hovered
-                        chartHoverNodeID = hovered
-                    }
-                    hoverLocation = location
-                case .ended:
-                    hoveredNodeID = nil
-                    chartHoverNodeID = nil
-                    hoverLocation = nil
-                }
-            }
-            .gesture(
-                SpatialTapGesture().onEnded { value in
-                    if isInsideCenter(value.location, in: layout) {
-                        onSelectItem?(scope.deviceIdentifier)
-                        return
-                    }
-                    if let callout = callout(at: value.location, in: layout),
-                       callout.node.role.isSelectable,
-                       let itemID = callout.node.itemID {
-                        onSelectItem?(itemID)
-                        return
-                    }
-                    guard let sector = sector(at: value.location, in: layout),
-                          sector.node.role.isSelectable,
-                          let itemID = sector.node.itemID else { return }
-                    onSelectItem?(itemID)
-                }
-            )
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Disk structure")
-            .accessibilityValue(
-                "\(displayName(scope)) (\(scope.deviceIdentifier)) · "
-                    + "\(countsText(for: scope)) · \(kindLine(for: item))")
-            .accessibilityAction(named: Text("Show disk details")) {
-                onSelectItem?(scope.deviceIdentifier)
-            }
+    private var headerUsageSummary: String {
+        var parts: [String] = []
+        if let used = headerUsedBytes {
+            parts.append("\(KBFormat.bytes(used, units: byteUnitSystem)) used")
         }
+        if let free = headerFreeBytes {
+            parts.append("\(KBFormat.bytes(free, units: byteUnitSystem)) free")
+        }
+        if let fraction = item.volumeUsedFraction {
+            parts.append(KBFormat.percent(fraction))
+        }
+        return parts.isEmpty ? "Usage unknown" : parts.joined(separator: " · ")
     }
 
-    private func halo(layout: Layout) -> some View {
-        Circle()
-            .fill(AngularGradient(
-                colors: [
-                    DiskPalette.sand.opacity(0.16),
-                    DiskPalette.stone.opacity(0.14),
-                    DiskPalette.taupe.opacity(0.16),
-                    DiskPalette.sand.opacity(0.16)
-                ],
-                center: .center))
-            .frame(width: layout.maxRadius * 2 + 24,
-                   height: layout.maxRadius * 2 + 24)
-            .blur(radius: 26)
-            .position(layout.center)
-            .allowsHitTesting(false)
+    private var headerUsedBytes: UInt64? {
+        let usage = item.spaceUsage
+        if item.kind == .apfsContainer && !usage.isKnown { return nil }
+        return usage.usedBytes
+    }
+
+    private var headerFreeBytes: UInt64? {
+        if item.kind == .apfsVolume || item.kind == .snapshot {
+            return item.freeBytes
+        }
+        let usage = item.spaceUsage
+        if item.kind == .apfsContainer && !usage.isKnown { return nil }
+        return usage.freeBytes
     }
 
     private func kindLine(for item: KBDiskItem) -> String {
@@ -261,284 +165,838 @@ struct VolumeHierarchyChart: View {
         }
     }
 
-    private func tooltipX(in size: CGSize) -> CGFloat {
-        guard let hoverLocation else { return 8 }
-        return min(max(8, hoverLocation.x + 16),
-                   max(8, size.width - 200))
+    // MARK: - Treemap
+
+    private func treemap(nodes: [HierarchyNode], scope: KBDiskItem,
+                         highlightID: String?) -> some View {
+        GeometryReader { proxy in
+            let headerHeight: CGFloat = isMaximized ? 36 : 34
+            let layout = makeTreemap(nodes: nodes, size: proxy.size,
+                                     scopeID: scope.deviceIdentifier,
+                                     headerHeight: headerHeight)
+
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.primary.opacity(0.035))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14,
+                                         style: .continuous)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [
+                                        DiskPalette.partitionFill.opacity(0.38),
+                                        DiskPalette.containerFill.opacity(0.32),
+                                        DiskPalette.volumeFill.opacity(0.26)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing),
+                                lineWidth: 1)
+                    }
+                    .shadow(color: .black.opacity(0.04),
+                            radius: 8, y: 3)
+
+                Canvas { context, _ in
+                    drawTreemap(layout, highlightID: highlightID,
+                                context: &context)
+                }
+
+                treemapDiskHeader(scope)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity,
+                           alignment: .topLeading)
+                    .allowsHitTesting(false)
+
+                if layout.items.isEmpty {
+                    VStack(spacing: 6) {
+                        Image(systemName: "square.grid.2x2")
+                            .font(.system(size: 18, weight: .medium))
+                        Text("Structure unavailable")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+
+            }
+            .contentShape(Rectangle())
+            .onContinuousHover { phase in
+                switch phase {
+                case .active(let location):
+                    let hovered = treemapItem(at: location, in: layout)?.node.id
+                    if hovered != hoveredNodeID {
+                        withAnimation(reduceMotion ? nil
+                                       : .easeOut(duration: 0.12)) {
+                            hoveredNodeID = hovered
+                        }
+                    }
+                case .ended:
+                    withAnimation(reduceMotion ? nil
+                                   : .easeOut(duration: 0.12)) {
+                        hoveredNodeID = nil
+                    }
+                }
+            }
+            .gesture(
+                SpatialTapGesture().onEnded { value in
+                    guard let hit = treemapItem(at: value.location, in: layout)
+                    else {
+                        onSelectItem?(scope.deviceIdentifier)
+                        return
+                    }
+                    guard hit.node.role.isSelectable,
+                          let itemID = hit.node.itemID else { return }
+                    onSelectItem?(itemID)
+                }
+            )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Disk structure")
+            .accessibilityValue(
+                "\(displayName(scope)) (\(scope.deviceIdentifier)) · "
+                    + "\(countsText(for: scope)) · "
+                    + "Selected \(kindLine(for: item)) "
+                    + "\(item.deviceIdentifier): \(headerUsageSummary)")
+            .accessibilityAction(named: Text("Show disk details")) {
+                onSelectItem?(scope.deviceIdentifier)
+            }
+        }
     }
 
-    private func tooltipY(in size: CGSize) -> CGFloat {
-        guard let hoverLocation else { return 8 }
-        return min(max(8, hoverLocation.y + 16),
-                   max(8, size.height - 150))
-    }
+    private var rootInset: CGFloat { isMaximized ? 13 : 10 }
 
-    private func centerLabel(for item: KBDiskItem,
-                             centerRadius: CGFloat) -> some View {
-        let usage = item.spaceUsage
-        return VStack(spacing: 1) {
-            Image(systemName: icon(for: item.kind))
-                .font(.system(size: isMaximized ? 20 : 15,
-                              weight: .semibold))
-                .foregroundStyle(DiskPalette.ink)
-            Text(kindLine(for: item))
-                .font(.system(size: isMaximized ? 10 : 9,
-                              weight: .semibold))
+    private func treemapDiskHeader(_ scope: KBDiskItem) -> some View {
+        let usage = scope.spaceUsage
+        let capacity = scope.sizeBytes > 0
+            ? KBFormat.bytes(scope.sizeBytes, units: byteUnitSystem) : "—"
+        let used = usage.usedBytes.map {
+            KBFormat.bytes($0, units: byteUnitSystem)
+        } ?? "—"
+        let free = usage.freeBytes.map {
+            KBFormat.bytes($0, units: byteUnitSystem)
+        } ?? "—"
+        let summary = "\(capacity) capacity · \(used) used · \(free) free"
+
+        return HStack(spacing: 6) {
+            Image(systemName: "internaldrive")
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(DiskPalette.tint(for: .physicalDisk))
+            Text(scope.deviceIdentifier)
+                .font(.system(size: 11.5, weight: .semibold,
+                              design: .monospaced))
+                .foregroundStyle(.primary)
+            Text(summary)
+                .font(.system(size: 11, weight: .medium))
+                .monospacedDigit()
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.65)
-            Text(displayName(item))
-                .font(.system(size: isMaximized ? 16 : 13,
-                              weight: .semibold, design: .rounded))
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
                 .minimumScaleFactor(0.7)
-            if let used = usage.usedBytes {
-                Text("\(KBFormat.bytes(used, units: byteUnitSystem)) used")
-                    .font(.system(size: isMaximized ? 12.5 : 10.5,
-                                  weight: .medium))
-                    .monospacedDigit()
-            } else {
-                Text("Usage unknown")
-                    .font(.system(size: isMaximized ? 10 : 8.5))
-                    .foregroundStyle(.secondary)
-            }
-            if let free = usage.freeBytes {
-                Text("\(KBFormat.bytes(free, units: byteUnitSystem)) free")
-                    .font(.system(size: isMaximized ? 11 : 9.5))
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-            }
-            if let fraction = item.volumeUsedFraction {
-                Text(KBFormat.percent(fraction))
-                    .font(.system(size: isMaximized ? 11 : 9.5))
-                    .foregroundStyle(.tertiary)
-                    .monospacedDigit()
-            }
         }
-        .frame(width: centerRadius * 1.7, height: centerRadius * 1.7)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Disk being viewed")
+        .accessibilityValue(
+            "\(displayName(scope)), \(scope.deviceIdentifier), \(summary)")
     }
 
-    private func tooltip(_ sector: Sector) -> some View {
-        let node = sector.node
-        return VStack(alignment: .leading, spacing: 2) {
-            Text(node.label)
-                .font(.system(size: 11, weight: .semibold))
-                .lineLimit(1)
-            Text(subtitle(for: node))
-                .font(.system(size: 9))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            if let detail = node.detail, !detail.isEmpty {
-                Text(detail)
-                    .font(.system(size: 8.5))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-            if let capacity = node.capacityBytes {
-                tooltipRow("Capacity", capacity)
-            }
-            if let used = node.usedBytes {
-                tooltipRow("Used", used)
-            }
-            if let free = node.freeBytes {
-                tooltipRow("Free", free)
-            } else if node.usedBytes == nil && !node.role.isSelectable {
-                tooltipRow("Size", node.bytes)
-            }
-            Text(KBFormat.percent(sector.globalFraction))
-                .font(.system(size: 9))
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-            if node.role.isSelectable && node.itemID != nil {
-                Text("Click to select")
-                    .font(.system(size: 8))
-                    .foregroundStyle(.tertiary)
-            }
-        }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 7)
-        .background {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(.regularMaterial)
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(.quaternary.opacity(0.6), lineWidth: 1)
-        }
+    private func makeTreemap(nodes: [HierarchyNode],
+                             size: CGSize,
+                             scopeID: String,
+                             headerHeight: CGFloat) -> TreemapLayout {
+        let top = rootInset + headerHeight
+        let bounds = CGRect(
+            x: rootInset,
+            y: top,
+            width: max(0, size.width - 2 * rootInset),
+            height: max(0, size.height - top - rootInset))
+        var items: [TreemapItem] = []
+        layoutTreemap(nodes, in: bounds, depth: 0, axis: .rows,
+                      path: "", parentFraction: 1,
+                      ownerID: scopeID, items: &items)
+        return TreemapLayout(bounds: bounds, items: items)
     }
 
-    private func tooltipRow(_ title: String, _ bytes: UInt64) -> some View {
-        HStack(spacing: 6) {
-            Text(title)
-                .font(.system(size: 9))
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 8)
-            Text(KBFormat.bytes(bytes, units: byteUnitSystem))
-                .font(.system(size: 9, weight: .medium))
-                .monospacedDigit()
-        }
-        .frame(minWidth: 150, alignment: .leading)
-    }
+    private func layoutTreemap(_ nodes: [HierarchyNode], in rect: CGRect,
+                               depth: Int, axis: TreemapAxis, path: String,
+                               parentFraction: Double, ownerID: String?,
+                               items: inout [TreemapItem]) {
+        guard rect.width > 0.5, rect.height > 0.5 else { return }
+        guard !nodes.isEmpty else { return }
 
-    private func subtitle(for node: HierarchyNode) -> String {
-        let id = node.itemID.map { "\($0) · " } ?? ""
-        let kind = node.kindLabel ?? ""
-        guard let fileSystem = node.fileSystem,
-              !fileSystem.isEmpty else {
-            return id + kind
-        }
-        return "\(id)\(kind) · \(fileSystem)"
-    }
+        let entries = nodes.filter { $0.fraction.isFinite }
+        guard !entries.isEmpty else { return }
 
-    // MARK: - Legend
+        let length = axis == .rows ? rect.height : rect.width
+        guard length.isFinite, length > 0.5 else { return }
 
-    private struct LegendRow: Identifiable {
-        let id: String
-        let node: HierarchyNode
-        let depth: Int
-    }
+        let gap = adaptiveGap(depth: depth, count: entries.count,
+                              length: length)
+        let available = max(
+            0, length - gap * CGFloat(max(0, entries.count - 1)))
+        guard available > 0.5 else { return }
 
-    private func legend(_ rows: [LegendRow], highlightID: String?) -> some View {
-        LazyVGrid(columns: [
-            GridItem(.adaptive(minimum: 220), spacing: 8)
-        ], spacing: 4) {
-            ForEach(rows) { row in
-                legendRow(row, highlightID: highlightID)
+        let extents = allocateExtents(entries, available: available,
+                                      axis: axis, depth: depth)
+        var offset: CGFloat = 0
+
+        for (node, extent) in zip(entries, extents) {
+            let childRect: CGRect = axis == .rows
+                ? CGRect(x: rect.minX, y: rect.minY + offset,
+                         width: rect.width, height: extent)
+                : CGRect(x: rect.minX + offset, y: rect.minY,
+                         width: extent, height: rect.height)
+            offset += extent + gap
+            guard extent > 0, childRect.width >= 0.5,
+                  childRect.height >= 0.5 else {
+                continue
+            }
+
+            let childPath = "\(path)/\(depth):\(node.id)"
+            let safeFraction = node.fraction.isFinite ? node.fraction : 0
+            let global = parentFraction * safeFraction
+            let resolvedOwner = node.itemID ?? ownerID
+            let inset = adaptiveInset(depth: depth, rect: childRect)
+            let headerHeight = treemapHeaderHeight(
+                for: node, rect: childRect, inset: inset)
+
+            let index = items.count
+            items.append(TreemapItem(
+                id: childPath,
+                node: node,
+                depth: depth,
+                rect: childRect,
+                globalFraction: global,
+                ownerID: resolvedOwner,
+                headerHeight: headerHeight,
+                hasDrawableChildren: false))
+
+            guard !node.children.isEmpty else { continue }
+
+            var inner = childRect.insetBy(dx: inset, dy: inset)
+            if headerHeight > 0 {
+                inner.origin.y += headerHeight
+                inner.size.height = max(0, inner.height - headerHeight)
+            }
+            guard inner.width > 3, inner.height > 3 else {
+                items[index].headerHeight = 0
+                continue
+            }
+
+            let before = items.count
+            layoutTreemap(node.children, in: inner, depth: depth + 1,
+                          axis: axis == .rows ? .columns : .rows,
+                          path: childPath, parentFraction: global,
+                          ownerID: resolvedOwner, items: &items)
+            let hasChildren = items.count > before
+            items[index].hasDrawableChildren = hasChildren
+            if !hasChildren {
+                items[index].headerHeight = 0
             }
         }
     }
 
-    @ViewBuilder
-    private func legendRow(_ row: LegendRow,
-                           highlightID: String?) -> some View {
-        let node = row.node
-        let selected = node.itemID != nil && node.itemID == highlightID
-        let content = HStack(alignment: .top, spacing: 5) {
-            legendSwatch(node)
-                .padding(.top, 2)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(legendLabel(node))
-                    .font(.system(size: 9.5,
-                                  weight: selected ? .semibold : .regular))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .minimumScaleFactor(0.8)
-                Text(legendDetail(node))
-                    .font(.system(size: 8))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .minimumScaleFactor(0.8)
-            }
-            Spacer(minLength: 2)
-            Text(legendValue(node))
-                .font(.system(size: 9))
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 5)
-        .padding(.vertical, 2)
-        .padding(.leading, CGFloat(row.depth) * 9)
-        .background {
-            if hoveredNodeID == node.id || selected {
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(.quaternary.opacity(0.32))
-            }
-        }
-        .contentShape(Rectangle())
-        .onHover { inside in
-            hoveredNodeID = inside ? node.id : nil
+    /// Guarantees a visible floor for every sibling, then spreads the rest
+    /// proportionally to the real fraction.
+    private func allocateExtents(_ entries: [HierarchyNode],
+                                 available: CGFloat,
+                                 axis: TreemapAxis,
+                                 depth: Int) -> [CGFloat] {
+        let count = entries.count
+        guard count > 0, available.isFinite, available > 0 else {
+            return Array(repeating: 0, count: count)
         }
 
-        if node.role.isSelectable, let itemID = node.itemID {
-            Button { onSelectItem?(itemID) } label: { content }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(legendLabel(node)), \(legendDetail(node))")
-                .accessibilityValue(legendValue(node))
+        let requested = entries.map {
+            minimumExtent(for: $0, axis: axis, depth: depth)
+        }
+        let requestedTotal = requested.reduce(0, +)
+        let scale = requestedTotal > available
+            ? available / requestedTotal : 1
+        let mins = requested.map { max(0, $0 * scale) }
+        let remainder = max(0, available - mins.reduce(0, +))
+        let weights = entries.map {
+            $0.fraction.isFinite ? max(0, $0.fraction) : 0
+        }
+        let weightTotal = weights.reduce(0, +)
+
+        var extents: [CGFloat]
+        if weightTotal > 0, weightTotal.isFinite {
+            extents = zip(mins, weights).map { minimum, weight in
+                minimum + remainder * CGFloat(weight / weightTotal)
+            }
         } else {
-            content
-                .accessibilityElement(children: .combine)
+            extents = mins.map { $0 + remainder / CGFloat(count) }
+        }
+
+        let drift = available - extents.reduce(0, +)
+        if abs(drift) > 0.001,
+           let index = extents.indices.max(by: { extents[$0] < extents[$1] }) {
+            extents[index] = max(0, extents[index] + drift)
+        }
+        return extents
+    }
+
+    private func minimumExtent(for node: HierarchyNode,
+                               axis: TreemapAxis,
+                               depth: Int) -> CGFloat {
+        let big = isMaximized
+        if node.fraction.isFinite, node.fraction <= 0 {
+            switch axis {
+            case .rows: return big ? 14 : 12
+            case .columns: return big ? 40 : 36
+            }
+        }
+        switch (node.role, axis) {
+        case (.partition, .rows):
+            if node.children.isEmpty { return big ? 34 : 30 }
+            let required = requiredHeight(for: node, depth: depth)
+            let cap: CGFloat = big ? 220 : 180
+            return min(required, cap)
+        case (.partition, .columns):
+            return big ? 70 : 60
+        case (.container, .rows):
+            return node.children.isEmpty
+                ? (big ? 24 : 22) : (big ? 38 : 32)
+        case (.container, .columns):
+            return big ? 70 : 60
+        case (.volume, .rows):
+            return big ? 18 : 16
+        case (.volume, .columns):
+            return big ? 48 : 44
+        case (_, .rows):
+            return big ? 18 : 16
+        case (_, .columns):
+            return big ? 44 : 40
         }
     }
 
-    /// Shape and color both identify the level: square = partition,
-    /// rounded square = container, circle = volume.
-    @ViewBuilder
-    private func legendSwatch(_ node: HierarchyNode) -> some View {
-        let border = DiskPalette.contentColor(on: node.color).opacity(0.45)
+    /// Height needed for a tile to show its descendants at the current
+    /// nested axes: stacked children add up, side-by-side children share.
+    private func requiredHeight(for node: HierarchyNode, depth: Int) -> CGFloat {
+        let children = node.children.filter { $0.fraction.isFinite }
+        guard !children.isEmpty else {
+            return minimumExtent(for: node, axis: .rows, depth: depth)
+        }
+
+        let inset = nestedInset(depth: depth)
+        let header: CGFloat = isMaximized ? 20 : 18
+        let childHeights = children.map {
+            requiredHeight(for: $0, depth: depth + 1)
+        }
+        let childAxis: TreemapAxis = depth.isMultiple(of: 2)
+            ? .columns : .rows
+        let childContent: CGFloat
+        if childAxis == .rows {
+            let gap = siblingGap(depth: depth + 1)
+            childContent = childHeights.reduce(0, +)
+                + gap * CGFloat(max(0, children.count - 1))
+        } else {
+            childContent = childHeights.max() ?? 0
+        }
+        return header + inset * 2 + childContent
+    }
+
+    private func treemapHeaderHeight(for node: HierarchyNode, rect: CGRect,
+                                     inset: CGFloat) -> CGFloat {
+        guard !node.children.isEmpty else { return 0 }
+        let base: CGFloat = isMaximized ? 20 : 18
+        return rect.height >= base + inset * 2 + 2 ? base : 0
+    }
+
+    private func adaptiveGap(depth: Int, count: Int,
+                             length: CGFloat) -> CGFloat {
+        guard count > 1 else { return 0 }
+        return min(siblingGap(depth: depth),
+                   max(0, length) * 0.18 / CGFloat(count - 1))
+    }
+
+    private func siblingGap(depth: Int) -> CGFloat {
+        switch depth {
+        case 0: return isMaximized ? 8.0 : 6.5
+        case 1: return isMaximized ? 6.5 : 5.5
+        default: return isMaximized ? 2.5 : 2.0
+        }
+    }
+
+    private func nestedInset(depth: Int) -> CGFloat {
+        switch depth {
+        case 0: return isMaximized ? 14 : 12
+        case 1: return isMaximized ? 11 : 9
+        default: return isMaximized ? 8 : 7
+        }
+    }
+
+    private func adaptiveInset(depth: Int, rect: CGRect) -> CGFloat {
+        let configured = nestedInset(depth: depth)
+        let side = min(rect.width, rect.height)
+        let maxInset = max(0, (side - 8) / 2)
+        let target = max(2.5, side * 0.14)
+        return min(configured, target, maxInset)
+    }
+
+    // MARK: - Treemap drawing
+
+    private func drawTreemap(_ layout: TreemapLayout, highlightID: String?,
+                             context: inout GraphicsContext) {
+        for item in layout.items {
+            let path = Path(roundedRect: item.rect,
+                            cornerRadius: cornerRadius(for: item.depth))
+            let base = item.node.color
+            context.fill(path, with: .color(base))
+            context.fill(path, with: .linearGradient(
+                Gradient(colors: [.white.opacity(0.16), .clear]),
+                startPoint: CGPoint(x: item.rect.midX,
+                                    y: item.rect.minY),
+                endPoint: CGPoint(x: item.rect.midX,
+                                  y: item.rect.midY)))
+            let (color, width) = treemapBorder(for: item)
+            context.stroke(path, with: .color(color), lineWidth: width)
+        }
+
+        for item in layout.items {
+            drawTreemapLabel(item, context: &context)
+        }
+
+        for item in layout.items {
+            let content = DiskPalette.contentColor(on: item.node.color)
+            let selected = item.node.itemID != nil
+                && item.node.itemID == highlightID
+            let ancestor = !selected
+                && containsSelection(item.node, highlightID: highlightID)
+            let hovered = hoveredNodeID == item.node.id && !selected
+
+            let minSide = min(item.rect.width, item.rect.height)
+            let selectedWidth = min(2.2, max(1, minSide * 0.18))
+            let selectedInset = min(1.1, selectedWidth / 2)
+            let hoverWidth = min(1, max(0.5, minSide * 0.08))
+            let hoverInset = min(0.5, hoverWidth / 2)
+
+            let inset: CGFloat
+            let color: Color
+            let width: CGFloat
+            if selected {
+                inset = selectedInset
+                color = content
+                width = selectedWidth
+            } else if hovered {
+                inset = hoverInset
+                color = content.opacity(0.60)
+                width = hoverWidth
+            } else if ancestor {
+                inset = 0.375
+                color = content.opacity(0.40)
+                width = 0.75
+            } else {
+                continue
+            }
+
+            let path = Path(
+                roundedRect: item.rect.insetBy(dx: inset, dy: inset),
+                cornerRadius: max(0, cornerRadius(for: item.depth) - inset))
+            context.stroke(path, with: .color(color), lineWidth: width)
+        }
+    }
+
+    private func treemapBorder(for item: TreemapItem) -> (Color, CGFloat) {
+        let content = DiskPalette.contentColor(on: item.node.color)
+        let opacity: CGFloat
+        let width: CGFloat
+        switch item.depth {
+        case 0:
+            opacity = 0.32
+            width = 1.0
+        case 1:
+            opacity = 0.24
+            width = 0.8
+        default:
+            opacity = 0.16
+            width = 0.6
+        }
+        if !item.node.role.isSelectable {
+            return (content.opacity(opacity * 0.8), width * 0.8)
+        }
+        return (content.opacity(opacity), width)
+    }
+
+    private func cornerRadius(for depth: Int) -> CGFloat {
+        switch depth {
+        case 0: return 3
+        case 1: return 2
+        default: return 1.5
+        }
+    }
+
+    private func drawTreemapLabel(_ item: TreemapItem,
+                                  context: inout GraphicsContext) {
+        let node = item.node
+        let color = DiskPalette.contentColor(on: node.color)
+
+        if item.hasDrawableChildren {
+            guard item.headerHeight > 0 else { return }
+            let size = labelNameSize(for: item.depth)
+            let valueSize = labelValueSize(for: item.depth)
+
+            let usage = fittedTreemapLabel(
+                headerUsageCandidates(node),
+                maxWidth: min(item.rect.width * 0.55,
+                              isMaximized ? 300 : 240),
+                size: valueSize,
+                weight: .regular)
+            let usageWidth = usage.map {
+                textWidth($0, size: valueSize, weight: .regular)
+            } ?? 0
+            let nameMaxWidth = item.rect.width - 10
+                - (usage == nil ? 0 : usageWidth + 8)
+
+            guard let text = fittedTreemapLabel(
+                treemapHeaderCandidates(node),
+                maxWidth: max(40, nameMaxWidth),
+                size: size,
+                weight: .semibold) else { return }
+            let resolved = context.resolve(
+                Text(text)
+                    .font(.system(size: size, weight: .semibold))
+                    .foregroundColor(color))
+
+            var headerContext = context
+            headerContext.clip(to: Path(
+                CGRect(x: item.rect.minX, y: item.rect.minY,
+                       width: item.rect.width, height: item.headerHeight)
+                    .insetBy(dx: 2, dy: 1)))
+            headerContext.draw(
+                resolved,
+                at: CGPoint(x: item.rect.minX + 5, y: item.rect.minY + 1.5),
+                anchor: .topLeading)
+
+            if let usage {
+                let resolvedUsage = context.resolve(
+                    Text(usage)
+                        .font(.system(size: valueSize))
+                        .foregroundColor(color.opacity(0.82)))
+                headerContext.draw(
+                    resolvedUsage,
+                    at: CGPoint(
+                        x: item.rect.maxX - 5,
+                        y: item.rect.minY + 1.5 + (size - valueSize) / 2),
+                    anchor: .topTrailing)
+            }
+            return
+        }
+
+        let standardSize = labelNameSize(for: item.depth)
+        let compact = item.rect.height < 2 + standardSize + 3
+        let nameSize = compact
+            ? (isMaximized ? 9.5 : 9.0) : standardSize
+        let nameMinHeight = compact
+            ? 2 + nameSize + 1 : 2 + standardSize + 3
+        guard item.rect.width >= 34,
+              item.rect.height >= nameMinHeight else { return }
+
+        let valueSize = labelValueSize(for: item.depth)
+        let dataY = 2 + nameSize + 2
+        let showsDataLine = !compact
+            && item.rect.width >= 60
+            && item.rect.height >= dataY + valueSize + 4
+        let data = treemapDataText(node)
+
+        let inlineSize = compact
+            ? (isMaximized ? 8.5 : 8.0) : valueSize
+        let inlineData: String? = {
+            guard !showsDataLine, let data else { return nil }
+            return truncatedLabel(
+                data,
+                maxWidth: max(60, item.rect.width * 0.55),
+                size: inlineSize,
+                weight: .regular)
+        }()
+        let inlineWidth = inlineData.map {
+            textWidth($0, size: inlineSize, weight: .regular)
+        } ?? 0
+
+        let mountPoint = node.role == .volume
+            ? node.detail?.trimmingCharacters(in: .whitespacesAndNewlines)
+            : nil
+        let mountSize = compact ? 8.5 : (isMaximized ? 10 : 9.5)
+        let fittedMount = (mountPoint?.isEmpty == false)
+            ? truncatedLabel(
+                mountPoint!,
+                maxWidth: item.rect.width * 0.34,
+                size: mountSize,
+                weight: .regular)
+            : nil
+        let mountWidth = fittedMount.map {
+            textWidth($0, size: mountSize, weight: .regular)
+        } ?? 0
+        let mountOnNameLine = fittedMount != nil
+            && (!showsDataLine || item.rect.height < 60)
+
+        let inlineNameMax = item.rect.width - 8
+            - (inlineData == nil ? 0 : inlineWidth + 8)
+        let centeredNameMax = fittedMount != nil && mountOnNameLine
+            ? max(60, (item.rect.width - mountWidth) / 2 - 20)
+            : item.rect.width
+        let nameMaxWidth = min(inlineNameMax, centeredNameMax)
+
+        guard let name = fittedTreemapLabel(
+            treemapLeafCandidates(node, ownerID: item.ownerID),
+            maxWidth: max(34, nameMaxWidth),
+            size: nameSize,
+            weight: .semibold) else { return }
+        let resolved = context.resolve(
+            Text(name)
+                .font(.system(size: nameSize, weight: .semibold))
+                .foregroundColor(color))
+
+        var labelContext = context
+        labelContext.clip(to: Path(item.rect.insetBy(dx: 2, dy: 1)))
+        labelContext.draw(
+            resolved,
+            at: CGPoint(x: item.rect.minX + 4,
+                        y: item.rect.minY + (compact ? 1.5 : 2)),
+            anchor: .topLeading)
+
+        if let inlineData {
+            let resolvedData = context.resolve(
+                Text(inlineData)
+                    .font(.system(size: inlineSize))
+                    .foregroundColor(color.opacity(0.82)))
+            labelContext.draw(
+                resolvedData,
+                at: CGPoint(x: item.rect.maxX - 4,
+                            y: item.rect.minY + (compact ? 1.5 : 2)),
+                anchor: .topTrailing)
+        } else if showsDataLine,
+                  let data,
+                  let fitted = truncatedLabel(
+                    data,
+                    maxWidth: item.rect.width - 8,
+                    size: valueSize,
+                    weight: .regular) {
+            let resolvedValue = context.resolve(
+                Text(fitted)
+                    .font(.system(size: valueSize))
+                    .foregroundColor(color.opacity(0.82)))
+            labelContext.draw(
+                resolvedValue,
+                at: CGPoint(x: item.rect.minX + 4,
+                            y: item.rect.minY + dataY),
+                anchor: .topLeading)
+        }
+
+        if let fittedMount {
+            let mountY = mountOnNameLine
+                ? item.rect.minY + (compact ? 1.5 : 2) + nameSize / 2
+                : item.rect.midY
+            let resolvedMount = context.resolve(
+                Text(fittedMount)
+                    .font(.system(size: mountSize, design: .monospaced))
+                    .foregroundColor(color.opacity(0.68)))
+            labelContext.draw(
+                resolvedMount,
+                at: CGPoint(x: item.rect.midX, y: mountY),
+                anchor: .center)
+        }
+    }
+
+    private func occupancy(of node: HierarchyNode) -> Double? {
+        guard let used = node.usedBytes, let capacity = node.capacityBytes,
+              capacity > 0 else { return nil }
+        return min(1, Double(used) / Double(capacity))
+    }
+
+    private func treemapDataText(_ node: HierarchyNode) -> String? {
+        if let used = node.usedBytes, let fraction = occupancy(of: node) {
+            return "\(KBFormat.bytes(used, units: byteUnitSystem)) · "
+                + KBFormat.percent(fraction)
+        }
+        if node.role == .volume, node.detail == nil,
+           (node.usedBytes ?? 0) == 0 {
+            return "Not mounted"
+        }
+        if node.role.isSelectable, node.usedBytes == nil {
+            return "Usage unknown"
+        }
+        guard node.bytes > 0 else { return nil }
+        let fraction = node.fraction.isFinite
+            ? min(max(node.fraction, 0), 1) : 0
+        return "\(KBFormat.bytes(node.bytes, units: byteUnitSystem)) · "
+            + KBFormat.percent(fraction)
+    }
+
+    private func headerUsageCandidates(_ node: HierarchyNode) -> [String] {
+        guard node.role == .partition || node.role == .container else {
+            return []
+        }
+        guard let used = node.usedBytes else { return ["Usage unknown"] }
+        let bytes = KBFormat.bytes(used, units: byteUnitSystem)
+        guard let fraction = occupancy(of: node) else {
+            return ["\(bytes) used"]
+        }
+        let percent = KBFormat.percent(fraction)
+        return ["\(bytes) used · \(percent)", "\(bytes) used", percent]
+    }
+
+    private func treemapTypeLabel(_ node: HierarchyNode) -> String {
+        switch node.role {
+        case .partition: return "Partition"
+        case .container: return "APFS container"
+        case .volume: return "APFS volume"
+        case .free: return "Free space"
+        case .residual: return "Snapshots & metadata"
+        case .unallocated: return "Not allocated"
+        case .used: return "Used"
+        case .unknown: return "Usage unknown"
+        }
+    }
+
+    /// Avoids repeating the type when the node name already carries it.
+    private func typeSuffix(for node: HierarchyNode) -> String {
+        let name = node.label.lowercased()
         switch node.role {
         case .partition:
-            RoundedRectangle(cornerRadius: 1, style: .continuous)
-                .fill(node.color)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 1, style: .continuous)
-                        .strokeBorder(border, lineWidth: 0.5)
-                }
-                .frame(width: 8, height: 8)
+            return name.contains("partition") ? "" : "Partition"
         case .container:
-            RoundedRectangle(cornerRadius: 3.5, style: .continuous)
-                .fill(node.color)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 3.5, style: .continuous)
-                        .strokeBorder(border, lineWidth: 0.5)
-                }
-                .frame(width: 8, height: 8)
+            if name.contains("apfs container") { return "" }
+            return name.contains("container") ? "APFS" : "APFS container"
         case .volume:
-            Circle()
-                .fill(node.color)
-                .overlay { Circle().strokeBorder(border, lineWidth: 0.5) }
-                .frame(width: 8, height: 8)
-        case .free, .residual, .unallocated, .used, .unknown:
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(node.color)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .strokeBorder(border, lineWidth: 0.5)
-                }
-                .frame(width: 8, height: 8)
-        }
-    }
-
-    private func legendLabel(_ node: HierarchyNode) -> String {
-        switch node.role {
-        case .partition, .container, .volume:
-            guard let id = node.itemID, id != node.label else {
-                return node.label
-            }
-            return "\(id) · \(node.label)"
+            return name.contains("apfs") ? "" : "APFS volume"
         default:
-            return node.label
+            return treemapTypeLabel(node)
         }
     }
 
-    private func legendDetail(_ node: HierarchyNode) -> String {
-        let kind = node.kindLabel ?? ""
-        guard let fileSystem = node.fileSystem,
-              !fileSystem.isEmpty else {
-            return kind
-        }
-        return "\(kind) · \(fileSystem)"
+    private func nameAddsDetail(_ name: String, type: String) -> Bool {
+        !name.isEmpty && !type.localizedCaseInsensitiveContains(name)
     }
 
-    private func legendValue(_ node: HierarchyNode) -> String {
+    private func treemapHeaderCandidates(_ node: HierarchyNode) -> [String] {
+        let id = node.itemID
+        let name = node.label
+        let type = treemapTypeLabel(node)
+        let suffix = typeSuffix(for: node)
+
+        var idPart: [String] = []
+        if let id, !id.isEmpty { idPart.append(id) }
+
+        var full = idPart
+        if !name.isEmpty && name != id { full.append(name) }
+        if !suffix.isEmpty { full.append(suffix) }
+
+        let idType = (idPart + [type]).joined(separator: " · ")
+
+        var nameType: [String] = []
+        if !name.isEmpty && name != id { nameType.append(name) }
+        if !suffix.isEmpty { nameType.append(suffix) }
+
+        return [full.joined(separator: " · "),
+                idType,
+                nameType.joined(separator: " · "),
+                name,
+                id ?? ""]
+    }
+
+    private func treemapLeafCandidates(_ node: HierarchyNode,
+                                       ownerID: String?) -> [String] {
+        let id = node.itemID ?? ownerID
+        let name = node.label
+        let type = treemapTypeLabel(node)
+        let suffix = typeSuffix(for: node)
+
+        var idPart: [String] = []
+        if let id, !id.isEmpty { idPart.append(id) }
+
         switch node.role {
-        case .partition, .container, .volume:
-            guard let used = node.usedBytes else { return "—" }
-            return KBFormat.bytes(used, units: byteUnitSystem)
-        case .residual, .free, .unallocated, .used, .unknown:
-            return KBFormat.bytes(node.bytes, units: byteUnitSystem)
+        case .free, .residual, .unallocated, .used, .unknown:
+            var full = idPart
+            if nameAddsDetail(name, type: type) {
+                full.append(name)
+            }
+            full.append(type)
+            return [full.joined(separator: " · "),
+                    (idPart + [type]).joined(separator: " · "),
+                    id ?? ""]
+        default:
+            var full = idPart
+            if !name.isEmpty && name != id { full.append(name) }
+            if !suffix.isEmpty { full.append(suffix) }
+
+            var nameType: [String] = []
+            if !name.isEmpty && name != id { nameType.append(name) }
+            if !suffix.isEmpty { nameType.append(suffix) }
+
+            return [full.joined(separator: " · "),
+                    nameType.joined(separator: " · "),
+                    name,
+                    (idPart + [type]).joined(separator: " · "),
+                    id ?? ""]
         }
     }
 
-    private func legendRows(_ nodes: [HierarchyNode],
-                            depth: Int = 0) -> [LegendRow] {
-        nodes.flatMap { node in
-            [LegendRow(id: node.id, node: node, depth: depth)]
-                + legendRows(node.children, depth: depth + 1)
+    private func fittedTreemapLabel(_ candidates: [String], maxWidth: CGFloat,
+                                    size: CGFloat,
+                                    weight: NSFont.Weight) -> String? {
+        let usable = candidates.filter { !$0.isEmpty }
+        for candidate in usable
+            where textWidth(candidate, size: size, weight: weight) <= maxWidth {
+            return candidate
         }
+        for candidate in usable {
+            if let truncated = truncatedLabel(candidate, maxWidth: maxWidth,
+                                              size: size, weight: weight) {
+                return truncated
+            }
+        }
+        return nil
+    }
+
+    private func labelNameSize(for depth: Int) -> CGFloat {
+        let base: CGFloat = depth == 0 ? 11.5 : (depth == 1 ? 11 : 10.5)
+        return isMaximized ? base + 1 : base
+    }
+
+    private func labelValueSize(for depth: Int) -> CGFloat {
+        let base: CGFloat = depth == 0 ? 10 : (depth == 1 ? 9.5 : 9)
+        return isMaximized ? base + 1 : base
+    }
+
+    private func truncatedLabel(_ text: String, maxWidth: CGFloat,
+                                size: CGFloat,
+                                weight: NSFont.Weight) -> String? {
+        guard maxWidth > 8 else { return nil }
+        if textWidth(text, size: size, weight: weight) <= maxWidth {
+            return text
+        }
+        let ellipsis = "…"
+        guard textWidth(ellipsis, size: size, weight: weight) <= maxWidth else {
+            return nil
+        }
+        var result = text
+        while !result.isEmpty {
+            result.removeLast()
+            let candidate = result + ellipsis
+            if textWidth(candidate, size: size, weight: weight) <= maxWidth {
+                return candidate
+            }
+        }
+        return ellipsis
+    }
+
+    private func textWidth(_ text: String, size: CGFloat,
+                           weight: NSFont.Weight) -> CGFloat {
+        (text as NSString).size(withAttributes: [
+            .font: NSFont.systemFont(ofSize: size, weight: weight)
+        ]).width
+    }
+
+    // MARK: - Hit testing
+
+    private func treemapItem(at location: CGPoint,
+                             in layout: TreemapLayout) -> TreemapItem? {
+        var best: TreemapItem?
+        for item in layout.items where item.rect.contains(location) {
+            if best == nil || item.depth >= best!.depth {
+                best = item
+            }
+        }
+        return best
     }
 
     // MARK: - Data
@@ -569,35 +1027,23 @@ struct VolumeHierarchyChart: View {
     private func makeNodes(for scope: KBDiskItem) -> [HierarchyNode] {
         switch scope.kind {
         case .physicalDisk:
-            var containerCount = 0
-            var volumeCount = 0
-            return partitionNodes(for: scope,
-                                  containerCount: &containerCount,
-                                  volumeCount: &volumeCount)
+            return partitionNodes(for: scope)
         case .partition:
-            var containerCount = 0
-            var volumeCount = 0
             let containers = containerNodes(
                 for: scope,
-                parentBytes: scope.sizeBytes,
-                containerCount: &containerCount,
-                volumeCount: &volumeCount)
+                parentBytes: scope.sizeBytes)
             return containers.isEmpty ? usageNodes(for: scope) : containers
         case .apfsContainer:
-            var volumeCount = 0
-            return volumeNodes(for: scope, volumeCount: &volumeCount)
+            return volumeNodes(for: scope)
         case .apfsVolume, .snapshot:
             guard let container = inventory.apfsContainer(enclosing: scope) else {
                 return []
             }
-            var volumeCount = 0
-            return volumeNodes(for: container, volumeCount: &volumeCount)
+            return volumeNodes(for: container)
         }
     }
 
-    private func partitionNodes(for scope: KBDiskItem,
-                                containerCount: inout Int,
-                                volumeCount: inout Int) -> [HierarchyNode] {
+    private func partitionNodes(for scope: KBDiskItem) -> [HierarchyNode] {
         let partitions = scope.children
             .filter { $0.kind != .snapshot && $0.sizeBytes > 0 }
             .sorted { $0.sizeBytes > $1.sizeBytes }
@@ -610,14 +1056,12 @@ struct VolumeHierarchyChart: View {
         let denominator = max(scope.sizeBytes, accounted)
         var nodes: [HierarchyNode] = []
 
-        for (index, partition) in partitions.enumerated() {
-            let color = DiskPalette.fill(level: 0, index: index)
+        for partition in partitions {
+            let color = DiskPalette.fill(level: 0)
             let usage = partition.spaceUsage
             let children = containerNodes(
                 for: partition,
-                parentBytes: partition.sizeBytes,
-                containerCount: &containerCount,
-                volumeCount: &volumeCount)
+                parentBytes: partition.sizeBytes)
             nodes.append(HierarchyNode(
                 id: "partition:\(partition.deviceIdentifier)",
                 itemID: partition.deviceIdentifier,
@@ -658,9 +1102,7 @@ struct VolumeHierarchyChart: View {
     }
 
     private func containerNodes(for partition: KBDiskItem,
-                                parentBytes: UInt64,
-                                containerCount: inout Int,
-                                volumeCount: inout Int) -> [HierarchyNode] {
+                                parentBytes: UInt64) -> [HierarchyNode] {
         let containers = partition.children
             .filter { $0.kind == .apfsContainer && $0.sizeBytes > 0 }
             .sorted { $0.sizeBytes > $1.sizeBytes }
@@ -674,8 +1116,7 @@ struct VolumeHierarchyChart: View {
         var nodes: [HierarchyNode] = []
 
         for container in containers {
-            let color = DiskPalette.fill(level: 1, index: containerCount)
-            containerCount += 1
+            let color = DiskPalette.fill(level: 1)
             let usage = container.spaceUsage
             let volumes = container.children.filter { $0.kind == .apfsVolume }
             nodes.append(HierarchyNode(
@@ -692,8 +1133,7 @@ struct VolumeHierarchyChart: View {
                 freeBytes: usage.freeBytes,
                 fraction: Double(container.sizeBytes) / Double(max(denominator, 1)),
                 color: color,
-                children: volumeNodes(for: container,
-                                      volumeCount: &volumeCount)))
+                children: volumeNodes(for: container)))
         }
 
         if parentBytes > accounted {
@@ -717,8 +1157,7 @@ struct VolumeHierarchyChart: View {
         return nodes
     }
 
-    private func volumeNodes(for container: KBDiskItem,
-                             volumeCount: inout Int) -> [HierarchyNode] {
+    private func volumeNodes(for container: KBDiskItem) -> [HierarchyNode] {
         guard let context = inventory.apfsSpaceContext(for: container) else {
             return []
         }
@@ -740,8 +1179,7 @@ struct VolumeHierarchyChart: View {
             let color: Color
             switch role {
             case .volume:
-                color = DiskPalette.fill(level: 2, index: volumeCount)
-                volumeCount += 1
+                color = DiskPalette.fill(level: 2)
             case .free:
                 color = DiskPalette.free
             case .residual:
@@ -749,7 +1187,7 @@ struct VolumeHierarchyChart: View {
             case .unknown:
                 color = DiskPalette.unknown
             case .container:
-                color = DiskPalette.fill(level: 1, index: 0)
+                color = DiskPalette.fill(level: 1)
             case .partition, .unallocated, .used:
                 color = DiskPalette.unallocated
             }
@@ -791,14 +1229,14 @@ struct VolumeHierarchyChart: View {
             }
         }
 
-        // Unmounted or empty volumes have no arc; keep them selectable from
-        // the legend.
+        // Unmounted or empty volumes have no area; keep them selectable in
+        // the chart.
         let missing = container.children
             .filter { $0.kind == .apfsVolume }
             .filter { !represented.contains($0.deviceIdentifier) }
         for volume in missing {
             nodes.append(HierarchyNode(
-                id: "legend:\(container.deviceIdentifier):\(volume.deviceIdentifier)",
+                id: "missing:\(container.deviceIdentifier):\(volume.deviceIdentifier)",
                 itemID: volume.deviceIdentifier,
                 role: .volume,
                 label: displayName(volume),
@@ -810,9 +1248,8 @@ struct VolumeHierarchyChart: View {
                 usedBytes: volume.usedBytes,
                 freeBytes: nil,
                 fraction: 0,
-                color: DiskPalette.fill(level: 2, index: volumeCount),
+                color: DiskPalette.fill(level: 2),
                 children: []))
-            volumeCount += 1
         }
         return nodes
     }
@@ -838,7 +1275,7 @@ struct VolumeHierarchyChart: View {
                 usedBytes: used,
                 freeBytes: nil,
                 fraction: Double(used) / Double(total),
-                color: DiskPalette.fill(level: 0, index: 0),
+                color: DiskPalette.usedFill,
                 children: [])
         ]
         if free > 0 {
@@ -893,6 +1330,20 @@ struct VolumeHierarchyChart: View {
         }
     }
 
+    private func containsSelection(_ node: HierarchyNode,
+                                   highlightID: String?) -> Bool {
+        guard let highlightID else { return false }
+        return nodeContains(node, identifier: highlightID)
+    }
+
+    private func nodeContains(_ node: HierarchyNode,
+                              identifier: String) -> Bool {
+        node.itemID == identifier
+            || node.children.contains {
+                nodeContains($0, identifier: identifier)
+            }
+    }
+
     private func displayName(_ item: KBDiskItem) -> String {
         item.name.isEmpty ? item.deviceIdentifier : item.name
     }
@@ -902,17 +1353,7 @@ struct VolumeHierarchyChart: View {
         return overflow ? UInt64.max : sum
     }
 
-    private func icon(for kind: KBDiskItemKind) -> String {
-        switch kind {
-        case .physicalDisk: return "internaldrive"
-        case .partition: return "square.split.2x1"
-        case .apfsContainer: return "square.stack.3d.up"
-        case .apfsVolume: return "externaldrive.fill"
-        case .snapshot: return "clock.arrow.circlepath"
-        }
-    }
-
-    // MARK: - Layout
+    // MARK: - Types
 
     private enum SliceRole: String {
         case partition
@@ -941,575 +1382,31 @@ struct VolumeHierarchyChart: View {
         let capacityBytes: UInt64?
         let usedBytes: UInt64?
         let freeBytes: UInt64?
-        /// Share of the parent's angular span (0...1).
+        /// Share of the parent's extent (0...1).
         let fraction: Double
         let color: Color
         let children: [HierarchyNode]
     }
 
-    private struct Sector: Identifiable {
+    private enum TreemapAxis {
+        case rows
+        case columns
+    }
+
+    private struct TreemapItem: Identifiable {
         let id: String
         let node: HierarchyNode
         let depth: Int
-        /// 0 = partitions, 1 = containers, 2 = volumes.
-        let level: Int
-        let startAngle: Double
-        let endAngle: Double
-        let innerRadius: CGFloat
-        let outerRadius: CGFloat
-
-        var globalFraction: Double {
-            (endAngle - startAngle) / (2 * Double.pi)
-        }
+        let rect: CGRect
+        let globalFraction: Double
+        let ownerID: String?
+        var headerHeight: CGFloat
+        var hasDrawableChildren: Bool
     }
 
-    private struct Callout: Identifiable {
-        let id: String
-        let node: HierarchyNode
-        let text: String
-        let anchor: CGPoint
-        let outerEdge: CGPoint
-        let elbowX: CGFloat
-        let textPoint: CGPoint
-        let textRect: CGRect
-        let rightSide: Bool
-    }
-
-    private struct Layout {
-        let sectors: [Sector]
-        let callouts: [Callout]
-        let center: CGPoint
-        let centerRadius: CGFloat
-        let maxRadius: CGFloat
-        let side: CGFloat
-    }
-
-    private func makeLayout(nodes: [HierarchyNode], in size: CGSize,
-                            baseLevel: Int) -> Layout {
-        let minGutter: CGFloat = isMaximized ? 56 : 46
-        let gutteredSide = min(size.height,
-                               max(0, size.width - 2 * minGutter))
-        let guttered = gutteredSide >= 240
-            && (size.width - gutteredSide) / 2 >= 32
-        let side = guttered ? gutteredSide
-                            : min(size.width, size.height)
-        let gutter = max(0, (size.width - side) / 2)
-        let center = CGPoint(x: size.width / 2, y: size.height / 2)
-        let maxRadius = max(0, side / 2 - 10)
-        let centerRadius = max(60,
-                               min(isMaximized ? 100 : 66, side * 0.15))
-        let rings = max(1, depth(of: nodes))
-        let ringWidth = max(0, (maxRadius - centerRadius) / CGFloat(rings))
-
-        var sectors: [Sector] = []
-        append(nodes, depth: 0,
-               start: -Double.pi / 2,
-               end: 3 * Double.pi / 2,
-               centerRadius: centerRadius,
-               ringWidth: ringWidth,
-               baseLevel: baseLevel,
-               sectors: &sectors)
-
-        let callouts = guttered
-            ? makeCallouts(sectors: sectors, size: size, center: center,
-                           maxRadius: maxRadius, gutter: gutter)
-            : []
-        return Layout(sectors: sectors, callouts: callouts, center: center,
-                      centerRadius: centerRadius,
-                      maxRadius: maxRadius, side: side)
-    }
-
-    private func makeCallouts(sectors: [Sector], size: CGSize,
-                              center: CGPoint, maxRadius: CGFloat,
-                              gutter: CGFloat) -> [Callout] {
-        let textBudget = max(24, gutter - 4)
-        let nameSize: CGFloat = isMaximized ? 9.5 : 8.5
-
-        struct Candidate {
-            let sector: Sector
-            let text: String
-            let mid: Double
-            let idealY: CGFloat
-            var rightSide: Bool
-            let fraction: Double
-        }
-
-        var candidates: [Candidate] = []
-        for sector in sectors {
-            guard !canDrawInside(sector) else { continue }
-            let span = sector.endAngle - sector.startAngle
-            guard span >= 0.001 else { continue }
-            let text = truncatedCallout(calloutText(for: sector.node),
-                                        maxWidth: textBudget,
-                                        size: nameSize)
-            guard !text.isEmpty else { continue }
-            let mid = (sector.startAngle + sector.endAngle) / 2
-            candidates.append(Candidate(
-                sector: sector,
-                text: text,
-                mid: mid,
-                idealY: center.y + CGFloat(sin(mid)) * (maxRadius + 8),
-                rightSide: cos(mid) >= 0,
-                fraction: span / (2 * Double.pi)))
-        }
-
-        // Slices near the top or bottom are nearly vertical: spread them over
-        // both gutters instead of piling every label on one side.
-        var leftCount = candidates.filter {
-            !$0.rightSide && abs(cos($0.mid)) > 0.15
-        }.count
-        var rightCount = candidates.filter {
-            $0.rightSide && abs(cos($0.mid)) > 0.15
-        }.count
-        for index in candidates.indices
-        where abs(cos(candidates[index].mid)) <= 0.15 {
-            if leftCount <= rightCount {
-                candidates[index].rightSide = false
-                leftCount += 1
-            } else {
-                candidates[index].rightSide = true
-                rightCount += 1
-            }
-        }
-
-        var result: [Callout] = []
-        let minY: CGFloat = 12
-        let maxY = max(minY, size.height - 12)
-
-        for right in [false, true] {
-            var side = candidates
-                .filter { $0.rightSide == right }
-                .sorted { $0.idealY < $1.idealY }
-
-            while !side.isEmpty {
-                guard let ys = distributedYs(side.map(\.idealY),
-                                             minY: minY, maxY: maxY,
-                                             spacing: isMaximized ? 16 : 13) else {
-                    let drop = side.indices.min {
-                        side[$0].fraction < side[$1].fraction
-                    }!
-                    side.remove(at: drop)
-                    continue
-                }
-
-                let elbowX = center.x + (right ? 1 : -1) * (maxRadius + 8)
-                let textX = elbowX + (right ? 4 : -4)
-                for (candidate, y) in zip(side, ys) {
-                    let mid = (candidate.sector.startAngle
-                               + candidate.sector.endAngle) / 2
-                    let anchorRadius = min(candidate.sector.outerRadius,
-                                           maxRadius)
-                    let anchor = point(center: center, radius: anchorRadius,
-                                       angle: mid)
-                    let outerEdge = point(center: center, radius: maxRadius,
-                                          angle: mid)
-                    let width = textWidth(candidate.text, size: nameSize,
-                                          weight: .semibold)
-                    let rect = right
-                        ? CGRect(x: textX - 2, y: y - 9,
-                                 width: width + 4, height: 18)
-                        : CGRect(x: textX - width - 2, y: y - 9,
-                                 width: width + 4, height: 18)
-                    result.append(Callout(
-                        id: "callout:\(candidate.sector.id)",
-                        node: candidate.sector.node,
-                        text: candidate.text,
-                        anchor: anchor,
-                        outerEdge: outerEdge,
-                        elbowX: elbowX,
-                        textPoint: CGPoint(x: textX, y: y),
-                        textRect: rect,
-                        rightSide: right))
-                }
-                break
-            }
-        }
-        return result
-    }
-
-    private func distributedYs(_ ideal: [CGFloat], minY: CGFloat,
-                               maxY: CGFloat, spacing: CGFloat) -> [CGFloat]? {
-        guard !ideal.isEmpty else { return [] }
-        var ys = ideal.map { min(max($0, minY), maxY) }
-        for index in 1..<ys.count {
-            ys[index] = max(ys[index], ys[index - 1] + spacing)
-        }
-        if let last = ys.last, last > maxY {
-            ys[ys.count - 1] = maxY
-            if ys.count > 1 {
-                for index in stride(from: ys.count - 2, through: 0, by: -1) {
-                    ys[index] = min(ys[index], ys[index + 1] - spacing)
-                }
-            }
-        }
-        return (ys.first ?? minY) >= minY ? ys : nil
-    }
-
-    private func truncatedCallout(_ text: String, maxWidth: CGFloat,
-                                  size: CGFloat) -> String {
-        if textWidth(text, size: size, weight: .semibold) <= maxWidth {
-            return text
-        }
-        var candidate = text
-        while !candidate.isEmpty {
-            candidate.removeLast()
-            let value = candidate + "…"
-            if textWidth(value, size: size, weight: .semibold) <= maxWidth {
-                return value
-            }
-        }
-        return ""
-    }
-
-    private func calloutText(for node: HierarchyNode) -> String {
-        switch node.role {
-        case .partition, .container:
-            return node.itemID ?? node.label
-        case .volume:
-            return node.label
-        case .free:
-            return "Free"
-        case .residual:
-            return node.label.hasPrefix("Snapshots")
-                ? "Snapshots" : "Metadata"
-        case .unallocated:
-            return "Other"
-        case .unknown:
-            return "Unknown"
-        case .used:
-            return "Used"
-        }
-    }
-
-    private func point(center: CGPoint, radius: CGFloat,
-                       angle: Double) -> CGPoint {
-        CGPoint(x: center.x + cos(angle) * radius,
-                y: center.y + sin(angle) * radius)
-    }
-
-    private func baseLevel(for kind: KBDiskItemKind) -> Int {
-        switch kind {
-        case .physicalDisk: return 0
-        case .partition: return 1
-        case .apfsContainer: return 2
-        case .apfsVolume, .snapshot: return 2
-        }
-    }
-
-    private func depth(of nodes: [HierarchyNode]) -> Int {
-        nodes.map { 1 + depth(of: $0.children) }.max() ?? 0
-    }
-
-    private func level(for role: SliceRole) -> Int? {
-        switch role {
-        case .partition: return 0
-        case .container: return 1
-        case .volume: return 2
-        case .free, .residual, .unallocated, .used, .unknown: return nil
-        }
-    }
-
-    private func append(_ nodes: [HierarchyNode], depth: Int,
-                        start: Double, end: Double,
-                        centerRadius: CGFloat, ringWidth: CGFloat,
-                        baseLevel: Int,
-                        sectors: inout [Sector]) {
-        let inner = centerRadius + CGFloat(depth) * ringWidth
-        let outer = inner + ringWidth
-        let ringLevel = nodes.compactMap { level(for: $0.role) }.first
-            ?? baseLevel
-        var angle = start
-
-        for node in nodes {
-            let span = (end - start) * node.fraction
-            guard span > 0.0005 else { continue }
-            let nodeLevel = level(for: node.role) ?? ringLevel
-
-            sectors.append(Sector(
-                id: "\(node.id)|\(depth)",
-                node: node,
-                depth: depth,
-                level: nodeLevel,
-                startAngle: angle,
-                endAngle: angle + span,
-                innerRadius: inner,
-                outerRadius: outer))
-
-            if !node.children.isEmpty {
-                append(node.children, depth: depth + 1,
-                       start: angle, end: angle + span,
-                       centerRadius: centerRadius, ringWidth: ringWidth,
-                       baseLevel: nodeLevel,
-                       sectors: &sectors)
-            }
-            angle += span
-        }
-    }
-
-    // MARK: - Drawing
-
-    private func draw(layout: Layout, highlightID: String?,
-                      context: inout GraphicsContext) {
-        for sector in layout.sectors {
-            let node = sector.node
-            let content = DiskPalette.contentColor(on: node.color)
-            let separator = content.opacity(0.18)
-            let ancestorStroke = content.opacity(0.35)
-            let hoverStroke = content.opacity(0.65)
-            let hovered = hoveredNodeID == node.id
-            let selected = node.itemID != nil && node.itemID == highlightID
-            let ancestor = !selected && containsSelection(node, highlightID: highlightID)
-
-            let path = sectorPath(sector, center: layout.center)
-            context.fill(path, with: .color(node.color))
-            context.stroke(path, with: .color(separator), lineWidth: 0.3)
-
-            drawLevelBand(sector, layout: layout, context: &context)
-
-            if selected {
-                context.stroke(
-                    path,
-                    with: .color(DiskPalette.contentColor(on: node.color)),
-                    lineWidth: 3)
-            } else if ancestor {
-                context.stroke(path, with: .color(ancestorStroke),
-                               lineWidth: 0.75)
-            }
-            if hovered && !selected {
-                context.stroke(path, with: .color(hoverStroke),
-                               lineWidth: 1.0)
-            }
-
-            drawLabel(sector, layout: layout, context: &context)
-        }
-
-        let centerRect = CGRect(
-            x: layout.center.x - layout.centerRadius,
-            y: layout.center.y - layout.centerRadius,
-            width: layout.centerRadius * 2,
-            height: layout.centerRadius * 2)
-        let centerPath = Path(ellipseIn: centerRect)
-        context.fill(centerPath, with: .color(Color(nsColor: .controlBackgroundColor)))
-        let centerTint = DiskPalette.tint(for: item.kind)
-        context.stroke(centerPath, with: .color(centerTint.opacity(0.85)),
-                       lineWidth: 1.0)
-
-        drawCallouts(layout, highlightID: highlightID, context: &context)
-    }
-
-    private func drawCallouts(_ layout: Layout, highlightID: String?,
-                              context: inout GraphicsContext) {
-        for callout in layout.callouts {
-            let active = callout.node.id == hoveredNodeID
-                || (callout.node.itemID != nil
-                    && callout.node.itemID == highlightID)
-
-            if callout.anchor != callout.outerEdge {
-                var radial = Path()
-                radial.move(to: callout.anchor)
-                radial.addLine(to: callout.outerEdge)
-                context.stroke(
-                    radial,
-                    with: .color(.secondary.opacity(0.40)),
-                    style: StrokeStyle(lineWidth: 1,
-                                       lineCap: .round,
-                                       dash: [2, 2]))
-            }
-
-            var line = Path()
-            line.move(to: callout.outerEdge)
-            line.addLine(to: CGPoint(x: callout.elbowX,
-                                     y: callout.textPoint.y))
-            line.addLine(to: callout.textPoint)
-            context.stroke(line, with: .color(.secondary.opacity(0.45)),
-                           lineWidth: 1)
-
-            let dotRect = CGRect(x: callout.anchor.x - 1.5,
-                                 y: callout.anchor.y - 1.5,
-                                 width: 3, height: 3)
-            let dotColor = DiskPalette.bandColor(on: callout.node.color)
-            context.fill(Path(ellipseIn: dotRect),
-                         with: .color(dotColor))
-
-            let text = context.resolve(
-                Text(callout.text)
-                    .font(.system(size: isMaximized ? 9.5 : 8.5,
-                                  weight: active ? .semibold : .regular))
-                    .foregroundColor(.primary.opacity(active ? 0.95 : 0.75)))
-            context.draw(text, at: callout.textPoint,
-                         anchor: callout.rightSide ? .leading : .trailing)
-        }
-    }
-
-    private func drawLevelBand(_ sector: Sector, layout: Layout,
-                               context: inout GraphicsContext) {
-        let span = sector.endAngle - sector.startAngle
-        guard span >= 0.02 else { return }
-
-        let width: CGFloat = isMaximized ? 0.8 : 0.6
-        let radius = max(0, sector.outerRadius - width / 2 - 0.5)
-        let epsilon = min(0.012, span * 0.2, 1.2 / max(radius, 1))
-        var path = Path()
-        path.addArc(center: layout.center, radius: radius,
-                    startAngle: .radians(sector.startAngle + epsilon),
-                    endAngle: .radians(sector.endAngle - epsilon),
-                    clockwise: false)
-
-        let band = DiskPalette.bandColor(on: sector.node.color)
-        let opacity = sector.node.role.isSelectable ? 1.0 : 0.7
-        context.stroke(
-            path,
-            with: .color(band.opacity(opacity)),
-            style: StrokeStyle(lineWidth: width, lineCap: .butt))
-    }
-
-    private func sectorPath(_ sector: Sector, center: CGPoint) -> Path {
-        var path = Path()
-        path.addArc(center: center, radius: sector.outerRadius,
-                    startAngle: .radians(sector.startAngle),
-                    endAngle: .radians(sector.endAngle), clockwise: false)
-        path.addArc(center: center, radius: sector.innerRadius,
-                    startAngle: .radians(sector.endAngle),
-                    endAngle: .radians(sector.startAngle), clockwise: true)
-        path.closeSubpath()
-        return path
-    }
-
-    private func containsSelection(_ node: HierarchyNode,
-                                   highlightID: String?) -> Bool {
-        guard let highlightID else { return false }
-        return nodeContains(node, identifier: highlightID)
-    }
-
-    private func nodeContains(_ node: HierarchyNode,
-                              identifier: String) -> Bool {
-        node.itemID == identifier
-            || node.children.contains {
-                nodeContains($0, identifier: identifier)
-            }
-    }
-
-    private var labelNameSize: CGFloat { isMaximized ? 11.5 : 9.5 }
-    private var labelValueSize: CGFloat { isMaximized ? 9.5 : 8 }
-
-    /// Single source of truth for inside labels and callout generation, so a
-    /// slice never gets both or neither.
-    private func canDrawInside(_ sector: Sector) -> Bool {
-        let span = sector.endAngle - sector.startAngle
-        guard span >= (isMaximized ? 0.12 : 0.16),
-              sector.outerRadius - sector.innerRadius >= 20 else {
-            return false
-        }
-        let radius = (sector.innerRadius + sector.outerRadius) / 2
-        let chord = 2 * radius * sin(span / 2)
-        let available = span >= Double.pi ? 2 * radius - 8 : chord
-        let name = labelText(sector.node)
-        return textWidth(name, size: labelNameSize, weight: .semibold) + 4
-            <= available
-    }
-
-    private func drawLabel(_ sector: Sector, layout: Layout,
-                           context: inout GraphicsContext) {
-        guard canDrawInside(sector) else { return }
-
-        let span = sector.endAngle - sector.startAngle
-        let node = sector.node
-        let middle = (sector.startAngle + sector.endAngle) / 2
-        let radius = (sector.innerRadius + sector.outerRadius) / 2
-        let chord = 2 * radius * sin(span / 2)
-        let nameSize = labelNameSize
-        let valueSize = labelValueSize
-
-        let name = labelText(node)
-        let value = KBFormat.bytes(node.bytes, units: byteUnitSystem)
-        let nameWidth = textWidth(name, size: nameSize,
-                                  weight: .semibold)
-        let valueWidth = textWidth(value, size: valueSize,
-                                   weight: .regular)
-        // For arcs above a half circle the chord shrinks again; use the ring
-        // width at the label radius as the available room instead.
-        let available = span >= Double.pi ? 2 * radius - 8 : chord
-        guard nameWidth + 4 <= available else { return }
-
-        let contentColor = DiskPalette.contentColor(on: node.color)
-        let point = CGPoint(
-            x: layout.center.x + cos(middle) * radius,
-            y: layout.center.y + sin(middle) * radius)
-
-        let nameText = context.resolve(
-            Text(name)
-                .font(.system(size: nameSize, weight: .semibold))
-                .foregroundColor(contentColor))
-        context.draw(nameText,
-                     at: CGPoint(x: point.x,
-                                 y: point.y - (isMaximized ? 6 : 5)),
-                     anchor: .center)
-
-        if valueWidth + 4 <= available {
-            let valueText = context.resolve(
-                Text(value)
-                    .font(.system(size: valueSize))
-                    .foregroundColor(contentColor))
-            context.draw(valueText,
-                         at: CGPoint(x: point.x,
-                                     y: point.y + (isMaximized ? 7 : 6)),
-                         anchor: .center)
-        }
-    }
-
-    private func labelText(_ node: HierarchyNode) -> String {
-        switch node.role {
-        case .partition, .container:
-            return node.itemID ?? node.label
-        default:
-            return node.label
-        }
-    }
-
-    private func textWidth(_ text: String, size: CGFloat,
-                           weight: NSFont.Weight) -> CGFloat {
-        (text as NSString).size(withAttributes: [
-            .font: NSFont.systemFont(ofSize: size, weight: weight)
-        ]).width
-    }
-
-    // MARK: - Hit testing
-
-    private func hoveredSector(in layout: Layout) -> Sector? {
-        guard let chartHoverNodeID else { return nil }
-        return layout.sectors.first { $0.node.id == chartHoverNodeID }
-    }
-
-    private func callout(at location: CGPoint, in layout: Layout) -> Callout? {
-        layout.callouts.first { $0.textRect.contains(location) }
-    }
-
-    private func isInsideCenter(_ location: CGPoint,
-                                in layout: Layout) -> Bool {
-        let dx = location.x - layout.center.x
-        let dy = location.y - layout.center.y
-        return dx * dx + dy * dy
-            <= layout.centerRadius * layout.centerRadius
-    }
-
-    private func sector(at location: CGPoint, in layout: Layout) -> Sector? {
-        let dx = location.x - layout.center.x
-        let dy = location.y - layout.center.y
-        let distance = sqrt(dx * dx + dy * dy)
-        guard distance >= layout.centerRadius,
-              distance <= layout.maxRadius else { return nil }
-
-        var angle = atan2(dy, dx)
-        if angle < -Double.pi / 2 {
-            angle += 2 * Double.pi
-        }
-
-        return layout.sectors.first { sector in
-            distance >= sector.innerRadius
-                && distance <= sector.outerRadius
-                && angle >= sector.startAngle
-                && angle < sector.endAngle
-        }
+    private struct TreemapLayout {
+        let bounds: CGRect
+        let items: [TreemapItem]
     }
 }
 
@@ -1561,26 +1458,26 @@ private struct VerticalUsageBar: View {
                     if clamped > 0 {
                         Capsule()
                             .fill(LinearGradient(
-                                colors: [tint.opacity(0.85), tint],
+                                gradient: Gradient(stops: [
+                                    .init(color: tint, location: 0),
+                                    .init(color: tint.opacity(0.75),
+                                          location: 0.55),
+                                    .init(color: tint.opacity(0.35),
+                                          location: 1)
+                                ]),
                                 startPoint: .bottom,
                                 endPoint: .top))
                             .frame(height: fillHeight)
-                            .shadow(color: tint.opacity(0.35),
+                            .shadow(color: tint.opacity(0.20),
                                     radius: 5, y: -1)
-                            .overlay(alignment: .top) {
-                                Capsule()
-                                    .fill(.white.opacity(0.55))
-                                    .frame(height: 2)
-                                    .padding(.horizontal, 4)
-                            }
                     }
 
                     VStack(spacing: 0) {
                         ForEach(0..<3, id: \.self) { _ in
                             Spacer(minLength: 0)
                             Rectangle()
-                                .fill(.primary.opacity(0.08))
-                                .frame(height: 1)
+                                .fill(.primary.opacity(0.20))
+                                .frame(height: 0.75)
                         }
                         Spacer(minLength: 0)
                     }
@@ -1588,8 +1485,22 @@ private struct VerticalUsageBar: View {
                 .clipShape(Capsule())
                 .overlay {
                     Capsule()
-                        .strokeBorder(DiskPalette.ink.opacity(0.28),
+                        .strokeBorder(.quaternary.opacity(0.50),
                                       lineWidth: 0.5)
+                }
+                .overlay(alignment: .bottom) {
+                    if clamped > 0 {
+                        Circle()
+                            .fill(.white)
+                            .frame(width: 7, height: 7)
+                            .overlay {
+                                Circle()
+                                    .strokeBorder(tint, lineWidth: 1.5)
+                            }
+                            .shadow(color: tint.opacity(0.30),
+                                    radius: 4)
+                            .offset(y: -max(0, fillHeight - 3.5))
+                    }
                 }
                 .animation(reduceMotion ? nil : .snappy(duration: 0.4),
                            value: clamped)

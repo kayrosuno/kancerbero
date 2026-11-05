@@ -88,8 +88,9 @@ El detalle de binarios, permisos, instalación y librerías está en
   - **Volumes** — jerarquía nativa de discos físicos, particiones, contenedores APFS y volúmenes
     (IOKit + DiskArbitration + `getmntinfo`/`getattrlist`), con capacidad, usado, libre, punto de
     montaje, UUID, roles APFS, modelo/protocolo y cifrado. No ejecuta procesos externos. La
-    cabecera de la tarjeta muestra de forma esquemática lo que contiene el componente seleccionado
-    (particiones, contenedores y volúmenes) y el árbol muestra la jerarquía completa. El flag
+    cabecera de la tarjeta muestra el disco que se está viendo con el chip de capacidad resaltado y
+    los chips de Capacity/Partitions/Containers/Volumes (icono + nombre + número); cuando no caben
+    en una línea pasan a una segunda bajo el título; el árbol muestra la jerarquía completa. El flag
     `--volumes-focus` sigue permitiendo filtrar la lista para capturas. El árbol es una tabla con
     columnas **Name / Disk / Type / Size / Used / Free / Mounted / Mount**, filas de una línea e
     indentación de los hijos; en el panel de 1/3 la tabla se desplaza horizontalmente si no caben
@@ -100,21 +101,39 @@ El detalle de binarios, permisos, instalación y librerías está en
     del contenedor; resto: usado/capacidad) y Free muestra `—` en volúmenes (espacio compartido).
     El árbol ocupa 1/3 del ancho y el detalle 2/3
     (sin selección, el árbol ocupa todo). Al seleccionar cualquier elemento, el detalle muestra
-    una tarjeta hero con el gauge vertical de uso a la izquierda, Capacidad/Usado/Libre entre el
-    gauge y el círculo, y un gráfico circular multianillo grande con la estructura del disco
-    (particiones → contenedores APFS → volúmenes, con libre y residual). Los gráficos de Volumes
-    usan la paleta cálida `#faf6f2 #e9dccf #d4c1b1 #b8a293 #7e6a60`: cada anillo toma un tramo de
-    la rampa (particiones claras, contenedores medias, volúmenes oscuras) con bandas y texto de
-    contraste. Sobre el gauge se indica el tipo del elemento y CAPACITY se muestra encima de la
-    barra; USED y FREE quedan al lateral. El centro muestra el tipo y el
-    sistema de ficheros del elemento seleccionado; la leyenda y el tooltip añaden tipo, fs y punto
-    de montaje. Si el elemento es un contenedor o volumen APFS se indica el espacio compartido y
-    con qué volúmenes/contenedor.
-    Las porciones cuyo título no cabe dentro se etiquetan fuera con líneas guía. El elemento
+    una tarjeta hero con el gauge vertical de uso a la izquierda y Capacity/Used/Free en la misma
+    columna lateral, y un treemap rectangular anidado con la estructura del disco (particiones →
+    contenedores APFS → volúmenes, con libre, residual y espacio no asignado). La cabecera de la
+    tarjeta muestra el nombre del disco y no cambia al seleccionar un volumen o contenedor. Cada
+    rectángulo
+    tiene un tamaño mínimo visible, así que todas las particiones y volúmenes aparecen aunque las
+    áreas dejen de ser estrictamente proporcionales al uso; el texto de los tiles es mayor y el
+    treemap crece a 600/860 pt. Todos los contenedores y volúmenes muestran su uso/% (inline en
+    filas compactas); los tiles suficientemente grandes
+    muestran nombre, usado y porcentaje (los volúmenes vacíos, `Not mounted`). Cada etiqueta
+    incluye el identificador y el tipo (`disk3s5 · Macintosh HD - Data · APFS volume`), y las
+    particiones/contenedores dejan un marco visible (inset 12/9/7 pt) alrededor de sus hijos. Todas
+    las particiones comparten azul muy claro, todos los contenedores azul pastel medio y todos los
+    volúmenes azul pastel algo más profundo; cada partición muestra su usado y porcentaje alineado
+    a la derecha en la cabecera. La cabecera de la tarjeta muestra el nombre del disco con el chip
+    de capacidad resaltado y los chips de componentes con sus nombres (icono + nombre + número);
+    dentro del panel del treemap, en la franja gris superior, se muestran `disk0`, capacidad, usado
+    y libre. La
+    tarjeta de detalle vuelve al material claro de la app, con un lavado ámbar/teal, borde y sombra
+    suaves. Los gráficos de Volumes usan la paleta azul pastel
+    `#d9e8f7 #bfd8f0 #a6cbe8` (free `#e7f2fb`, residual `#c9d9ec`), con bordes y texto en tinta
+    oscura. Sobre el gauge
+    se indica el tipo del elemento y su porcentaje; tiene tres líneas de cuartos, degradado más
+    oscuro abajo y claro arriba, y un punto blanco con aro azul en la punta. El mountpoint de cada
+    volumen se muestra centrado en su tile; no hay pop/tooltip sobre el treemap.
+    Si el elemento es un contenedor o volumen APFS se indica el espacio compartido y con qué
+    volúmenes/contenedor.
+    Las actions (Reveal, Copy ID, Analyze) van en una sola línea por encima de la metadata. No hay
+    leyenda debajo
+    del treemap: el rectángulo ocupa ese espacio. El elemento
     seleccionado queda resaltado y las barras del árbol y el gauge usan la misma paleta. Al pulsar
-    un sector, una etiqueta con línea o una fila de la leyenda se selecciona ese elemento en el
-    árbol y el detalle se actualiza; pulsar el centro del círculo selecciona el disco. Una flecha
-    sube un nivel (volumen → contenedor → partición → disco).
+    un rectángulo se selecciona ese elemento en el árbol y el detalle se
+    actualiza; pulsar el fondo del treemap selecciona el disco.
     Cada tarjeta se puede maximizar al área de Volumes y restaurar. El
     selector **Decimal/Binary** de la línea de
     pestañas cambia todas las cifras de Disk: Decimal (por defecto, como Finder) usa KB/MB/GB con

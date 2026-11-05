@@ -2,52 +2,61 @@ import AppKit
 import SwiftUI
 import KancerberoCore
 
-/// Warm-neutral palette used by the Disk → Volumes graphs.
+/// Light pastel-blue palette used by the Disk → Volumes graphs.
 ///
-/// The five hex values form a light→dark ramp. Charts map one family per
-/// hierarchy level, while text/strokes pick a contrasting tone from the
-/// fill's luminance so the same palette works on every slice.
+/// Each hierarchy level keeps a slightly different blue while text and
+/// strokes use a dark ink so the tiles stay readable on the app's light
+/// materials.
 enum DiskPalette {
-    static let paper = Color(.sRGB, red: 0.980, green: 0.965,
-                             blue: 0.949, opacity: 1)
-    static let sand = Color(.sRGB, red: 0.914, green: 0.863,
-                            blue: 0.812, opacity: 1)
-    static let stone = Color(.sRGB, red: 0.831, green: 0.757,
-                             blue: 0.694, opacity: 1)
-    static let taupe = Color(.sRGB, red: 0.722, green: 0.635,
-                             blue: 0.576, opacity: 1)
-    static let ink = Color(.sRGB, red: 0.494, green: 0.416,
-                           blue: 0.376, opacity: 1)
-    /// Darker warm ink for text and strokes over the lighter fills; `ink`
-    /// itself does not reach accessible contrast on stone/taupe.
-    static let textInk = Color(.sRGB, red: 0.227, green: 0.188,
-                               blue: 0.169, opacity: 1)
+    static let paper = Color(.sRGB, red: 0.973, green: 0.965,
+                             blue: 0.980, opacity: 1)
+    static let sand = Color(.sRGB, red: 0.851, green: 0.910,
+                            blue: 0.969, opacity: 1)
+    static let stone = Color(.sRGB, red: 0.749, green: 0.847,
+                             blue: 0.941, opacity: 1)
+    static let taupe = Color(.sRGB, red: 0.651, green: 0.796,
+                             blue: 0.910, opacity: 1)
+    static let ink = Color(.sRGB, red: 0.122, green: 0.161,
+                           blue: 0.216, opacity: 1)
+    static let textInk = ink
 
-    static let partitionFills = [sand, paper]
-    static let containerFills = [stone, sand]
-    static let volumeFills = [taupe, ink]
+    static let partitionFill = sand
+    static let containerFill = stone
+    static let volumeFill = taupe
+    static let usedFill = Color(.sRGB, red: 0.773, green: 0.863,
+                                blue: 0.949, opacity: 1)
 
-    static let free = sand
-    static let residual = stone
-    static let unknown = paper
-    static let unallocated = stone
+    static let free = Color(.sRGB, red: 0.906, green: 0.949,
+                            blue: 0.984, opacity: 1)
+    static let residual = Color(.sRGB, red: 0.788, green: 0.851,
+                                blue: 0.925, opacity: 1)
+    static let unknown = Color(.sRGB, red: 0.922, green: 0.949,
+                               blue: 0.976, opacity: 1)
+    static let unallocated = Color(.sRGB, red: 0.843, green: 0.882,
+                                   blue: 0.925, opacity: 1)
 
-    static func fill(level: Int, index: Int) -> Color {
-        let fills: [Color]
+    static func fill(level: Int) -> Color {
         switch level {
-        case 0: fills = partitionFills
-        case 1: fills = containerFills
-        default: fills = volumeFills
+        case 0: return partitionFill
+        case 1: return containerFill
+        default: return volumeFill
         }
-        return fills[index % fills.count]
     }
 
     static func tint(for kind: KBDiskItemKind) -> Color {
         switch kind {
-        case .physicalDisk: return ink
-        case .partition: return stone
-        case .apfsContainer: return taupe
-        case .apfsVolume, .snapshot: return ink
+        case .physicalDisk:
+            return Color(.sRGB, red: 0.310, green: 0.576,
+                         blue: 0.800, opacity: 1)
+        case .partition:
+            return Color(.sRGB, red: 0.435, green: 0.663,
+                         blue: 0.839, opacity: 1)
+        case .apfsContainer:
+            return Color(.sRGB, red: 0.357, green: 0.596,
+                         blue: 0.780, opacity: 1)
+        case .apfsVolume, .snapshot:
+            return Color(.sRGB, red: 0.310, green: 0.576,
+                         blue: 0.800, opacity: 1)
         }
     }
 
@@ -66,7 +75,7 @@ enum DiskPalette {
     }
 
     static func isLight(_ fill: Color) -> Bool {
-        relativeLuminance(fill) > 0.20
+        relativeLuminance(fill) > 0.28
     }
 
     static func contentColor(on fill: Color) -> Color {
