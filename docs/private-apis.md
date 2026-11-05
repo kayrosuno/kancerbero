@@ -198,9 +198,9 @@ anuncia como “Disk Space Analyzer”) y de `/System/Applications/Utilities/Dis
   milisegundos). IOKit expone `AppleAPFSMedia`/`AppleAPFSVolume` y `Whole`/`Content`/`Role`
   exactamente como los muestra `ioreg`.
 - SMART no está expuesto por APIs públicas; se omite o se muestra “Unavailable”.
-- El gráfico radial de Volumes (`APFSSpaceContext` + `KBDiskSpaceUsage`) se calcula solo con estos
-  datos públicos: anillos de particiones y contenedores por capacidad y, en el anillo exterior,
-  una porción por volumen (usado) más el residual «Snapshots & metadata» —que cubre snapshots,
+- El treemap de Volumes (`APFSSpaceContext` + `KBDiskSpaceUsage`) se calcula solo con estos datos
+  públicos: niveles de particiones y contenedores por capacidad y, en el nivel de volúmenes, un
+  rectángulo por volumen (usado) más el residual «Snapshots & metadata» —que cubre snapshots,
   metadatos y volúmenes desmontados— y el libre. Un contenedor sin volumen montado se muestra como
   desconocido (no como 0 B).
 

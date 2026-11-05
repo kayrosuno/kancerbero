@@ -125,8 +125,10 @@
   controles de escaneo, progreso, `RadialDiskMap` y las tablas de contenidos y mayores archivos;
   I/O muestra el gráfico Data/Operations y la tabla de procesos por actividad de disco.
   En Analyzer las tarjetas filtran el contenido; en Volumes la cabecera de la tarjeta muestra el
-  esquema del componente seleccionado (particiones/contenedores/volúmenes), el gráfico no tiene
-  bloque de resumen y el flag `--volumes-focus` permite filtrar la lista para capturas.
+  disco que se está viendo con los chips de capacidad y de
+  particiones/contenedores/volúmenes (con nombre y número; pasan a una segunda línea si no caben)
+  y no cambia con la selección; el gráfico no tiene bloque de resumen y el flag `--volumes-focus`
+  permite filtrar la lista para capturas.
 - `DaemonsView`: inventario launchd deduplicado por label (`DaemonDeduplicator`). Los filtros de
   tipo, ámbito, origen y estado son chips multiselección (`MultiSelectChipBar`): todos los valores
   están pulsados al arrancar, se muestran las filas de los valores pulsados y un grupo sin nada
@@ -257,9 +259,8 @@
 - Disk → Volumes mantiene `expanded` y `volumesFocus` en `UIState`. La expansión inicial se hace
   una sola vez (`didExpandVolumesOnce`); los refrescos de inventario solo podan ids obsoletos, así
   que el colapso manual se conserva. La tarjeta All limpia el filtro y re-expande el árbol
-  completo. Pulsar un sector o una fila de la leyenda del gráfico radial, o la flecha de subir
-  nivel, limpia el foco, expande los ancestros y selecciona el ítem (`DiskModel.select`), de modo
-  que el árbol y el detalle siempre apuntan al mismo elemento.
+  completo. Pulsar un rectángulo del treemap limpia el foco, expande los ancestros y selecciona el
+  ítem (`DiskModel.select`), de modo que el árbol y el detalle siempre apuntan al mismo elemento.
 - Captura interna para verificación: `--screenshot`, `--section`, `--tab`, `--disk-tab`,
   `--networking-focus`, `--networking-transport`, `--networking-ip`, `--networking-state`,
   `--networking-connection-search`, `--networking-process-domain`,
@@ -344,32 +345,52 @@
     unidad no reporta capacidad. El libre agregado es la suma de libres conocidos (coincide con la
     tarjeta Free), no `capacidad - usado`.
   - El detalle de Volumes es una tarjeta hero (`VolumeHierarchyChart`) con el gauge vertical de uso
-    a la izquierda, las cifras del elemento seleccionado entre el gauge y el círculo, y un gráfico
-    radial multianillo grande que sube hasta el disco físico para mantener la forma al navegar:
-    anillo de particiones, anillo de contenedores APFS y anillo de volúmenes. Los dos primeros se
-    dimensionan por capacidad (con una porción “Other” para el espacio no asignado); el de
-    volúmenes reutiliza `APFSSpaceContext` (volúmenes por usado + residual de
-    snapshots/metadatos/volúmenes desmontados + libre). Un contenedor sin volumen montado se
-    muestra como desconocido, nunca como 0 B; si la suma de usado excede el espacio usable, los
-    segmentos se escalan y se avisa.
-    Los gráficos usan `DiskPalette` (rampa cálida `#faf6f2 → #7e6a60`): cada nivel toma un par de
-    tonos (particiones sand/paper, contenedores stone/sand, volúmenes taupe/ink). La cabecera de la
-    tarjeta muestra las pills del componente (particiones/contenedores/volúmenes; volúmenes en un
-    contenedor) y el gráfico no tiene bloque de resumen. Las bandas,
-    separadores y textos se eligen por la luminancia relativa del relleno
-    (`contentColor`/`bandColor`): tinta oscura sobre los tonos claros y blanco/sand sobre `ink`.
-    El sector seleccionado usa un trazo oscuro (`contentColor`; blanco sobre el relleno `ink`);
-    hover y ancestros conservan sus trazos finos. Las porciones cuya etiqueta no cabe
-    dentro reciben un callout exterior con línea guía: se reservan gutters laterales (el círculo se
-    ajusta), se reparten por lado con anti-solape (`distributedYs`) y se descartan los candidatos
-    más pequeños si no caben; las etiquetas son clicables. El centro (más grande, con tipografía
-    algo mayor) indica el tipo y el sistema de
-    ficheros del elemento seleccionado; la leyenda de dos líneas muestra `id · nombre` y
-    `tipo · fs`, y el tooltip añade el punto de montaje o el número de volúmenes. Pulsar el centro
-    del círculo selecciona el disco del alcance y muestra su detalle. En el árbol, la barra de un
+    a la izquierda y Capacity/Used/Free en la misma columna lateral, y un treemap rectangular
+    anidado que sube hasta el disco físico para mantener la forma al navegar: filas de particiones,
+    columnas de contenedores APFS dentro de cada partición y filas de volúmenes dentro de cada
+    contenedor. Los dos primeros niveles se dimensionan por capacidad (con una porción “Other” para
+    el espacio no asignado); el de volúmenes reutiliza `APFSSpaceContext` (volúmenes por usado +
+    residual de snapshots/metadatos/volúmenes desmontados + libre). Un contenedor sin volumen
+    montado se muestra como desconocido, nunca como 0 B; si la suma de usado excede el espacio
+    usable, los segmentos se escalan y se avisa. Cada rectángulo recibe un **mínimo visible** por
+    rol y eje (`minimumExtent`) y el resto se reparte proporcional a la fracción, de modo que todas
+    las particiones y volúmenes aparecen aunque las áreas sean aproximadas; los volúmenes con
+    fracción 0 (desmontados) reciben un tile compacto (12/14 pt) para que su contenido siga visible.
+    Los tiles grandes muestran nombre +
+    usado + porcentaje (o `Not mounted`). Cada etiqueta incluye el identificador del dispositivo y
+    el tipo (`disk3s5 · Macintosh HD - Data · APFS volume`, `disk0s2 · Container · Partition`) y
+    los padres dejan un inset visible (12/9/7 pt normal) alrededor de los hijos para leer la
+    contención. Cada partición muestra además su usado y porcentaje alineado a la derecha en la
+    cabecera. Cada partición reserva además altura suficiente para los volúmenes que contiene
+    (altura recursiva con tope 180/220 pt), de modo que las particiones pequeñas muestran su
+    contenido; el gauge se centra verticalmente con el treemap y no hay leyenda debajo del gráfico:
+    el rectángulo ocupa esa altura (600 pt normal / 860 maximizado). El texto de los tiles es mayor
+    y cada contenedor/volumen muestra su uso/% (inline en filas compactas).
+    Los gráficos usan `DiskPalette` (azules pastel: particiones `#d9e8f7`, contenedores
+    `#bfd8f0`, volúmenes `#a6cbe8`; free `#e7f2fb`, residual `#c9d9ec`, unallocated `#d7e1ec`,
+    unknown `#ebf2f9`), con tinta oscura para textos y bordes. La tarjeta de detalle vuelve al
+    material claro de la app con un lavado ámbar/teal, borde fino y sombra suave; el gauge usa
+    azules de la app, tiene tres líneas de cuartos, degradado más oscuro abajo y claro arriba, y un
+    punto blanco con aro azul en la
+    punta, y los valores Capacity/Used/Free son primarios. La cabecera de la tarjeta
+    muestra el nombre del disco con el chip de capacidad resaltado y los chips de
+    particiones/contenedores/volúmenes con nombre y número (una o dos líneas según el ancho);
+    dentro del panel del treemap, en la franja gris superior, se muestran `diskN`, capacidad,
+    usado y libre.
+    No cambia al seleccionar un elemento y el
+    gráfico no tiene bloque de resumen de conteos. Los bordes y textos se eligen por la
+    luminancia relativa del relleno (`contentColor`/`bandColor`): tinta oscura sobre los tonos
+    claros. El rectángulo seleccionado usa un trazo de tinta de 2 pt; hover y ancestros conservan
+    trazos finos. Las
+    particiones y contenedores reservan una banda superior para su etiqueta (`id · nombre · tipo`) y
+    los volúmenes/free/residual se etiquetan dentro si caben; el mountpoint de cada volumen se
+    dibuja centrado en su tile y no hay pop/tooltip sobre el treemap. El gauge y la metadata
+    describen el elemento seleccionado. Las actions (Reveal, Copy ID, Analyze) van en una línea
+    por encima de la metadata. Pulsar un rectángulo selecciona el ítem; pulsar el fondo
+    del treemap selecciona el disco del alcance. En el árbol, la barra de un
     volumen representa su parte del usado del contenedor (el resto usa usado/capacidad); el gauge
-    se rotula con el tipo y “of container”/“of capacity”, y CAPACITY se muestra encima de la barra
-    con USED/FREE al lateral. Para contenedores y volúmenes
+    se rotula con el tipo y “of container”/“of capacity”, y Capacity/Used/Free comparten la
+    columna lateral. Para contenedores y volúmenes
     APFS se añade una nota de espacio compartido y una fila “Shared with” con el contenedor y los
     volúmenes implicados. El chrome de la tarjeta conserva sus acentos.
   - No se ejecuta ningún proceso externo.

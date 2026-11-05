@@ -43,7 +43,7 @@ struct DiskVolumeDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 header
-                Divider().opacity(0.5)
+                softRule
                 if let inventory {
                     VolumeHierarchyChart(
                         item: item,
@@ -55,67 +55,117 @@ struct DiskVolumeDetailView: View {
                         usageCaption: usageCaption,
                         notes: structureNotes)
                 }
-                Divider().opacity(0.5)
-                metadata
-                Divider().opacity(0.5)
+                softRule
                 actions
+                    .padding(10)
+                    .background {
+                        RoundedRectangle(cornerRadius: 12,
+                                         style: .continuous)
+                            .fill(Color.primary.opacity(0.035))
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12,
+                                         style: .continuous)
+                            .strokeBorder(.quaternary.opacity(0.35),
+                                          lineWidth: 0.5)
+                    }
+                softRule
+                metadata
+                    .padding(10)
+                    .background {
+                        RoundedRectangle(cornerRadius: 12,
+                                         style: .continuous)
+                            .fill(Color.primary.opacity(0.035))
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12,
+                                         style: .continuous)
+                            .strokeBorder(.quaternary.opacity(0.35),
+                                          lineWidth: 0.5)
+                    }
             }
             .padding(14)
         }
         .background {
-            RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: KBTheme.cardRadius,
+                             style: .continuous)
                 .fill(.regularMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: KBTheme.cardRadius,
+                                     style: .continuous)
+                        .fill(LinearGradient(
+                            colors: [diskTint.opacity(0.07),
+                                     softTeal.opacity(0.035),
+                                     .clear],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing))
+                }
         }
         .overlay {
-            RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
-                .strokeBorder(.quaternary.opacity(0.5), lineWidth: 1)
+            RoundedRectangle(cornerRadius: KBTheme.cardRadius,
+                             style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [diskTint.opacity(0.26),
+                                 softTeal.opacity(0.18),
+                                 Color.white.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing),
+                    lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
     }
 
-    private var header: some View {
-        HStack(alignment: .center, spacing: 10) {
-            if let parent = parentItem, let onSelectItem {
-                Button { onSelectItem(parent.deviceIdentifier) } label: {
-                    Image(systemName: "arrow.up")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(kindTint)
-                        .frame(width: 24, height: 24)
-                        .background {
-                            Circle().fill(kindTint.opacity(0.12))
-                        }
-                        .overlay {
-                            Circle().strokeBorder(kindTint.opacity(0.32),
-                                                  lineWidth: 1)
-                        }
-                }
-                .buttonStyle(.plain)
-                .help("Up to \(parent.name.isEmpty ? parent.deviceIdentifier : parent.name)")
-                .accessibilityLabel("Up one level")
-            }
+    private var diskTint: Color { AppSection.disk.tint }
 
+    private var capacityTint: Color {
+        Color(.sRGB, red: 0.161, green: 0.620, blue: 0.941, opacity: 1)
+    }
+
+    private var softTeal: Color {
+        Color(.sRGB, red: 0.200, green: 0.702, blue: 0.620, opacity: 1)
+    }
+
+    private var softRule: some View {
+        Rectangle()
+            .fill(LinearGradient(
+                colors: [diskTint.opacity(0.22),
+                         softTeal.opacity(0.14),
+                         .clear],
+                startPoint: .leading,
+                endPoint: .trailing))
+            .frame(height: 1)
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(KBTheme.gradient(kindTint))
+                    .fill(KBTheme.gradient(diskTint))
                     .frame(width: 44, height: 44)
-                Image(systemName: icon)
+                    .shadow(color: .black.opacity(0.08),
+                            radius: 4, y: 2)
+                Image(systemName: "internaldrive")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.white)
             }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.name.isEmpty ? item.deviceIdentifier : item.name)
-                    .font(.system(size: 19, weight: .semibold, design: .rounded))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.8)
-                    .textSelection(.enabled)
-                Text("\(item.kind.displayName) · \(item.deviceIdentifier)")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-            }
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 10) {
+                    diskTitleLabel
+                    capacityChip
+                    componentSummary
+                }
 
-            componentSummary
-                .layoutPriority(1)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .center, spacing: 10) {
+                        diskTitleLabel
+                        capacityChip
+                    }
+                    componentSummary
+                }
+            }
+            .layoutPriority(1)
 
             Spacer(minLength: 0)
 
@@ -138,6 +188,67 @@ struct DiskVolumeDetailView: View {
         }
     }
 
+    /// The detail title always describes the physical disk being viewed, so it
+    /// stays stable while the user selects volumes or containers.
+    private var scopeDisk: KBDiskItem {
+        guard let inventory else { return item }
+        var byID: [String: KBDiskItem] = [:]
+        for entry in inventory.allItems {
+            byID[entry.deviceIdentifier] = entry
+        }
+
+        var current = item
+        var depth = 0
+        while depth < 64,
+              let parentID = current.parentID,
+              let parent = byID[parentID] {
+            if parent.kind == .physicalDisk { return parent }
+            current = parent
+            depth += 1
+        }
+        return item
+    }
+
+    private var diskCapacityText: String {
+        let disk = scopeDisk
+        return disk.sizeBytes > 0
+            ? KBFormat.bytes(disk.sizeBytes, units: byteUnitSystem) : "—"
+    }
+
+    private var diskTitleLabel: some View {
+        Text(displayName(scopeDisk))
+            .font(.system(size: 19, weight: .semibold, design: .rounded))
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .textSelection(.enabled)
+    }
+
+    private var capacityChip: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "internaldrive")
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(capacityTint)
+            Text("Capacity")
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(.secondary)
+            Text(diskCapacityText)
+                .font(.system(size: 12, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background {
+            Capsule().fill(capacityTint.opacity(0.16))
+        }
+        .overlay {
+            Capsule().strokeBorder(capacityTint.opacity(0.45),
+                                   lineWidth: 0.75)
+        }
+        .fixedSize()
+        .help("Disk capacity")
+    }
+
     private struct ComponentCount: Identifiable {
         let id: String
         let value: Int
@@ -151,43 +262,45 @@ struct DiskVolumeDetailView: View {
         return HStack(spacing: 6) {
             if counts.isEmpty {
                 Text("No nested items")
-                    .font(.system(size: 9.5))
+                    .font(.system(size: 10.5))
                     .foregroundStyle(.tertiary)
             } else {
                 ForEach(counts) { count in
-                    HStack(spacing: 3) {
+                    HStack(spacing: 4) {
                         Image(systemName: count.icon)
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.system(size: 11.5, weight: .semibold))
                             .foregroundStyle(count.tint)
+                        Text(count.label.capitalized)
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundStyle(.secondary)
                         Text("\(count.value)")
-                            .font(.system(size: 10.5, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                             .monospacedDigit()
                             .foregroundStyle(.primary)
-                        Text(count.label)
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(.secondary)
                     }
-                    .padding(.horizontal, 6.5)
-                    .padding(.vertical, 2.5)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
                     .background {
-                        Capsule().fill(.quaternary.opacity(0.22))
+                        Capsule().fill(count.tint.opacity(0.14))
                     }
                     .overlay {
-                        Capsule().strokeBorder(count.tint.opacity(0.28),
-                                               lineWidth: 0.5)
+                        Capsule().strokeBorder(count.tint.opacity(0.32),
+                                               lineWidth: 0.75)
                     }
+                    .help("\(count.value) \(count.label)")
                 }
             }
         }
-        .frame(height: 20, alignment: .leading)
+        .frame(height: 26, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(componentAccessibilityLabel)
     }
 
     private var componentCounts: [ComponentCount] {
-        guard item.kind == .physicalDisk
-            || item.kind == .partition
-            || item.kind == .apfsContainer else {
+        let disk = scopeDisk
+        guard disk.kind == .physicalDisk
+            || disk.kind == .partition
+            || disk.kind == .apfsContainer else {
             return []
         }
 
@@ -195,10 +308,10 @@ struct DiskVolumeDetailView: View {
         var containers = 0
         var volumes = 0
 
-        if item.kind == .apfsContainer {
+        if disk.kind == .apfsContainer {
             // Direct volumes are what the container's chart and shared-space
             // note enumerate; nested volume groups are not separate entries.
-            volumes = item.children.filter { $0.kind == .apfsVolume }.count
+            volumes = disk.children.filter { $0.kind == .apfsVolume }.count
         } else {
             func visit(_ node: KBDiskItem) {
                 switch node.kind {
@@ -209,7 +322,7 @@ struct DiskVolumeDetailView: View {
                 }
                 for child in node.children { visit(child) }
             }
-            for child in item.children { visit(child) }
+            for child in disk.children { visit(child) }
         }
 
         var result: [ComponentCount] = []
@@ -408,78 +521,43 @@ struct DiskVolumeDetailView: View {
     }
 
     private var actions: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Actions")
-                .font(.system(size: 10, weight: .semibold))
-                .textCase(.uppercase)
-                .tracking(0.5)
-                .foregroundStyle(.secondary)
-
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                Button {
-                    if let mount = item.mountPoint {
-                        NSWorkspace.shared.activateFileViewerSelecting([
-                            URL(fileURLWithPath: mount)
-                        ])
-                    }
-                } label: {
-                    Label("Reveal", systemImage: "folder")
-                        .font(.system(size: 11, weight: .medium))
-                        .frame(maxWidth: .infinity)
+        HStack(spacing: 8) {
+            Button {
+                if let mount = item.mountPoint {
+                    NSWorkspace.shared.activateFileViewerSelecting([
+                        URL(fileURLWithPath: mount)
+                    ])
                 }
-                .buttonStyle(.bordered)
-                .disabled(item.mountPoint == nil)
-
-                Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(item.deviceIdentifier, forType: .string)
-                } label: {
-                    Label("Copy ID", systemImage: "doc.on.doc")
-                        .font(.system(size: 11, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
+            } label: {
+                Label("Reveal", systemImage: "folder")
             }
+            .buttonStyle(.bordered)
+            .disabled(item.mountPoint == nil)
+
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(item.deviceIdentifier,
+                                               forType: .string)
+            } label: {
+                Label("Copy ID", systemImage: "doc.on.doc")
+            }
+            .buttonStyle(.bordered)
 
             Button {
                 if let mount = item.mountPoint {
                     onAnalyze(mount)
                 }
             } label: {
-                Label("Analyze this volume", systemImage: "chart.pie")
-                    .frame(maxWidth: .infinity)
+                Label("Analyze", systemImage: "chart.pie")
             }
             .buttonStyle(.borderedProminent)
-            .tint(AppSection.disk.tint)
+            .tint(diskTint)
             .disabled(item.mountPoint == nil)
-        }
-    }
 
-    private var parentItem: KBDiskItem? {
-        guard let parentID = item.parentID else { return nil }
-        return inventory?.allItems.first {
-            $0.deviceIdentifier == parentID
+            Spacer(minLength: 0)
         }
-    }
-
-    private var kindTint: Color {
-        switch item.kind {
-        case .physicalDisk: return Color(red: 0.94, green: 0.56, blue: 0.18)
-        case .partition: return Color(red: 0.55, green: 0.45, blue: 0.92)
-        case .apfsContainer: return Color(red: 0.16, green: 0.62, blue: 0.94)
-        case .apfsVolume: return Color(red: 0.20, green: 0.70, blue: 0.62)
-        case .snapshot: return Color(red: 0.90, green: 0.42, blue: 0.25)
-        }
-    }
-
-    private var icon: String {
-        switch item.kind {
-        case .physicalDisk: return "internaldrive"
-        case .partition: return "square.split.2x1"
-        case .apfsContainer: return "square.stack.3d.up"
-        case .apfsVolume: return "externaldrive.fill"
-        case .snapshot: return "clock.arrow.circlepath"
-        }
+        .controlSize(.small)
+        .font(.system(size: 11, weight: .medium))
     }
 
     private func yesNo(_ value: Bool?) -> String {

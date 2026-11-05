@@ -351,26 +351,35 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   resto). Used muestra el valor y una
   mini barra (volúmenes: parte del usado del contenedor; resto: usado/capacidad); Free muestra `—`
   en volúmenes (libre compartido); Mount trunca con tooltip. Un contenedor sin volumen montado
-  muestra `—` en Used/Free. La cabecera de la tarjeta muestra pills esquemáticas de lo que
-  contiene el componente (disco: particiones/contenedores/volúmenes; contenedor: volúmenes;
-  volumen: “No nested items”). La flecha de la cabecera del detalle sube un nivel (volumen →
-  contenedor → partición → disco) y deja el padre seleccionado en el árbol.
-- Gráfico radial: tarjeta hero con el gauge vertical a la izquierda, CAPACITY encima de la barra,
-  USED/FREE en la columna lateral y un círculo grande (~430 pt normal; ~740 maximizado) con
-  particiones → contenedores APFS → volúmenes (y “Other” para el espacio no asignado). Usa la
-  paleta cálida `#faf6f2 #e9dccf #d4c1b1 #b8a293 #7e6a60`: cada anillo toma un tramo de la rampa
-  (particiones claras, contenedores medias, volúmenes oscuras), con bandas y texto de contraste
-  según la luminancia del relleno. El centro es grande (tipo + nombre + usado/libre/%) y los
-  anillos algo estrechos. **No hay bloque-resumen sobre el gráfico** (ni DISK STRUCTURE, ni
-  Inventory); el esquema está en la cabecera de la tarjeta. El sector seleccionado usa un trazo
-  oscuro (`contentColor`; blanco sobre el relleno `ink`), distinto del hover/ancestros.
-  El centro muestra el tipo y el sistema de ficheros del elemento seleccionado (p. ej.
-  `APFS VOLUME · apfs`); la leyenda de dos líneas muestra `id · nombre` y `tipo · fs`, y el
-  tooltip añade el punto de montaje o el número de volúmenes. Las porciones cuyo título no cabe
-  dentro se etiquetan fuera con línea guía y punto; hover resalta porción, etiqueta y fila.
-- Las barras del árbol y el gauge usan la paleta cálida; sobre el gauge se rotula DISK/PARTITION/
-  CONTAINER/VOLUME, y el caption dice “of container”/“of capacity”. CAPACITY aparece solo encima
-  de la barra (sin duplicarse en la columna lateral). Al seleccionar un contenedor/volumen APFS
+  muestra `—` en Used/Free. La cabecera de la tarjeta muestra el nombre del disco con los chips de
+  capacidad y de particiones/contenedores/volúmenes con nombre y número (pasan a una segunda línea
+  si no caben). No hay flecha
+  de subir nivel.
+- Treemap: tarjeta hero con el gauge vertical a la izquierda y Capacity/Used/Free en la misma
+  columna lateral; el gauge se centra verticalmente con el rectángulo. El gráfico es un rectángulo
+  anidado (particiones → contenedores APFS → volúmenes, con “Other” para el espacio no asignado,
+  residual y libre) que ocupa ~600 pt normal y ~860 maximizado, con texto de tile mayor. Usa la
+  paleta azul pastel
+  `#d9e8f7 #bfd8f0 #a6cbe8` (particiones azul claro, contenedores azul medio, volúmenes azul
+  profundo; free `#e7f2fb`, residual `#c9d9ec`), con bordes y texto en tinta oscura. La tarjeta es
+  un panel material claro con lavado ámbar/teal, borde y sombra suaves; el gauge usa azules de la
+  app, tres líneas de cuartos, degradado más oscuro abajo y claro arriba, y un punto blanco con aro
+  azul. Dentro del panel del treemap, en la franja gris superior, se muestran `disk0`, capacidad,
+  usado y libre; la cabecera de la tarjeta muestra el nombre del disco con los chips de capacidad y
+  de componentes con nombre y número (una o dos líneas según el ancho).
+  **No hay bloque-resumen sobre el gráfico ni leyenda
+  debajo**; el rectángulo ocupa ese espacio. La cabecera no cambia al seleccionar un volumen o
+  contenedor; la línea sobre el gráfico y el gauge/metadata describen el disco y el seleccionado
+  respectivamente. Cada contenedor y volumen muestra su uso/% (inline si la fila es compacta).
+  El rectángulo seleccionado usa un trazo de tinta de 2 pt, distinto del hover/ancestros. No hay
+  pop/tooltip sobre el treemap; el mountpoint de cada volumen se dibuja centrado en su tile. Las
+  particiones y contenedores etiquetan su banda superior. Hover
+  resalta rectángulo. No hay flecha de subir nivel: la navegación es por el árbol y los
+  rectángulos. Las actions (Reveal, Copy ID, Analyze) van en una línea por encima de la metadata.
+- Las barras del árbol y el gauge usan los acentos de la app; sobre el gauge se rotula DISK/PARTITION/
+  CONTAINER/VOLUME, y el caption dice “of container”/“of capacity”. Capacity, Used y Free
+  comparten la columna lateral; el gauge tiene cuartos, degradado y un punto blanco con aro azul
+  en la punta. Al seleccionar un contenedor/volumen APFS
   aparece la nota de espacio compartido y la fila “Shared with” con el contenedor y los volúmenes
   (nombre+id); no se muestra para discos, particiones ni snapshots.
 - Maximizar/restaurar en árbol y detalle: la tarjeta ocupa el área de Volumes y se oculta la otra
@@ -837,7 +846,7 @@ diskutil info disk3s5
 grep -R "diskutil" Sources/ || echo "sin diskutil en el código"
 ```
 
-Estructura radial del detalle (Volumes):
+Estructura del detalle (Volumes):
 
 ```bash
 ./build/Build/Products/Debug/KancerberoProbe disk apfs
@@ -860,48 +869,65 @@ $K --screenshot /tmp/kb-hero-min.png --section disk --disk-tab volumes \
   --disk-item disk0 --screenshot-size 1340x700 --screenshot-delay 5 --cards-collapsed
 ```
 
-- La cabecera de la tarjeta muestra el nombre, el subtítulo de tipo/id y las pills esquemáticas
-  del componente (disco: particiones/contenedores/volúmenes; contenedor: volúmenes; volumen:
-  “No nested items”). Encima del gráfico no queda ningún bloque-resumen; el círculo empieza
-  directamente. Cada anillo usa su tramo de la paleta y las bandas/texto se eligen por luminancia
-  (tinta sobre claros, blanco/sand sobre ink).
-- El gauge vertical está a la izquierda; CAPACITY (título+valor) aparece encima de la barra y
-  USED/FREE en la columna lateral. El gauge llena de abajo arriba, muestra el tipo, el porcentaje
-  y “of container”/“of capacity”; sin datos muestra `—` y el track vacío. El centro del círculo
-  muestra el elemento seleccionado, su tipo y su sistema de ficheros.
-- Los sectores pequeños sin título interior muestran un callout exterior con línea guía, punto de
-  color y texto truncado si hace falta; no hay solapes ni etiquetas duplicadas con las interiores.
-  Hover/clic sobre la etiqueta externa resalta/selecciona su sector. Pulsar el centro del círculo
-  selecciona el disco del alcance y muestra su detalle. Los bordes de los sectores son una línea
-  fina (0.6 pt; 0.8 maximizado); el sector seleccionado usa un trazo oscuro de 3 pt (blanco sobre
-  el relleno `ink`).
-- El círculo se ajusta para reservar gutters (~430 pt normal, ~360 en 1340×700, ~740 maximizado);
-  a 1340×700 la tarjeta hace scroll vertical. La leyenda queda debajo del hero, con dos líneas por
-  fila (nombre + tipo/fs), y sigue siendo clicable.
+- La cabecera de la tarjeta muestra el nombre del disco con los chips de capacidad y de
+  particiones/contenedores/volúmenes con nombre y número (pasan a una segunda línea si no caben);
+  el título no cambia al seleccionar un volumen o contenedor. Dentro del panel del treemap, en la
+  franja gris superior, se muestran `disk0`, capacidad, usado y libre; no queda ningún bloque de
+  resumen de conteos ni cabecera de selección encima del gráfico. Las actions van en una línea por
+  encima de la metadata. Cada nivel usa su tramo de la paleta azul pastel y los bordes/texto se
+  eligen por luminancia (tinta sobre claros).
+- El gauge vertical está a la izquierda; Capacity, Used y Free comparten la columna lateral. El
+  gauge llena de abajo arriba, muestra el tipo, el porcentaje y “of container”/“of capacity”, y
+  tiene tres líneas de cuartos, degradado más oscuro abajo y claro arriba, y un punto blanco con
+  aro azul en la punta; sin datos muestra `—` y el track vacío. El gauge y la metadata describen el
+  elemento seleccionado.
+- El treemap anida filas de particiones, columnas de contenedores y filas de volúmenes; cada
+  rectángulo tiene un mínimo visible por rol/eje y el resto se reparte proporcional a la fracción,
+  de modo que todas las particiones y volúmenes aparecen (incluidos los desmontados, con
+  `Not mounted` y un tile compacto de 12/14 pt). Las áreas son aproximadas. Partición/contenedor
+  con hijos reservan una banda
+  superior para su etiqueta y dejan un inset visible (12/9/7 pt normal, 14/11/8 maximizado)
+  alrededor de los hijos; los volúmenes se etiquetan dentro, muestran su mountpoint centrado y, si
+  el tile es grande, añaden `usado · %`. Todas las etiquetas incluyen el identificador y el tipo
+  (`disk3s5 · Macintosh HD - Data · APFS volume`, `disk0s2 · Container · Partition`,
+  `disk3 · Free space`). Cada partición, contenedor y volumen muestra su usado y porcentaje
+  inline a la derecha de la cabecera/fila (o `Usage unknown`/`Not mounted`). Los colores son fijos
+  por nivel sobre la tarjeta material:
+  particiones azul claro `#d9e8f7`, contenedores azul medio `#bfd8f0`, volúmenes azul profundo
+  `#a6cbe8`; free `#e7f2fb`, residual `#c9d9ec`, unallocated `#d7e1ec`, unknown `#ebf2f9`; cada
+  tile lleva un brillo blanco sutil.
+  No hay callouts exteriores ni leyenda debajo del treemap. Hover resalta el rectángulo; pulsar
+  el fondo del treemap selecciona el disco del alcance. Los bordes son líneas finas (0.6–1.0 pt;
+  maximizado algo más); el rectángulo seleccionado usa un trazo de 2 pt en tinta, que se reduce en
+  tiles pequeños.
+- El treemap ocupa ~600 pt normal y ~860 maximizado, con texto de tile mayor; el gauge se centra
+  con él y no hay leyenda debajo. Cada partición reserva una altura recursiva según sus volúmenes
+  (tope 180/220 pt) para que su contenido se vea; a 1340×700 la tarjeta hace scroll vertical.
 
 - El número de contenedores del disco debe coincidir con `diskutil list` (incluye los
   contenedores ISC y Recovery que `diskutil apfs list` no muestra); `diskutil apfs list` sirve
   para los volúmenes y la capacidad en uso del contenedor principal. Con el selector en Decimal
   (por defecto) el gráfico muestra 494,4 GB; en Binario muestra 460,4 GiB.
-  Con varios contenedores, el anillo de particiones y el de contenedores muestran una porción por
-  unidad (tamaño = capacidad), con “Other” para el espacio no asignado.
-- El anillo exterior muestra el desglose de volúmenes del contenedor (usado + residual +
+  Con varios contenedores, las filas de particiones y contenedores muestran un rectángulo por
+  unidad (tamaño aproximado = capacidad, con mínimos visibles), con “Other” para el espacio no
+  asignado.
+- Los volúmenes del contenedor muestran el desglose por usado (usado + residual +
   snapshots/metadatos + libre). Al seleccionar un contenedor o volumen, el elemento y sus
-  ancestros quedan resaltados en sus anillos y en la leyenda.
-- Pulsar un sector o una fila de la leyenda selecciona ese ítem en el árbol y actualiza el
-  detalle; la flecha de subir nivel recorre volumen → contenedor → partición → disco.
-- Un contenedor sin volumen montado muestra un arco desconocido y `—` (nunca `0 B`).
+  ancestros quedan resaltados en sus rectángulos.
+- Pulsar un rectángulo selecciona ese ítem en el árbol y actualiza el detalle. No hay flecha de
+  subir nivel; la navegación es por el árbol y los rectángulos.
+- Un contenedor sin volumen montado muestra un rectángulo desconocido y `—` (nunca `0 B`).
 - `usado de volúmenes + residual + libre = capacidad`; permitir la diferencia documentada de
   `ATTR_VOL_SPACEUSED` frente a `diskutil`. Si la suma de usado excede lo usable, las porciones se
   escalan y aparece la nota correspondiente.
 - El árbol muestra usado/free por fila (volúmenes con Free `—`) y la barra de Used con el criterio
   correcto. `disk usage` debe dar las mismas cifras agregadas y `partial=yes` cuando falte algún
-  volumen montado; un disco/partición no APFS usa el anillo usado/libre y, sin datos, omite el
-  gráfico.
+  volumen montado; un disco/partición no APFS usa el treemap usado/libre y, sin datos, muestra
+  “Structure unavailable”.
 - Selector **Decimal/Binary** de la línea de pestañas:
   `--disk-units decimal` muestra `500,3 GB` para disk0 (base 1000, KB/MB/GB);
   `--disk-units binary` muestra `465,9 GiB` (base 1024, KiB/MiB/GiB). Cambian árbol, tarjetas,
-  detalle, gráfico radial, analyzer, tablas de I/O, velocidades Read/s/Write/s y la barra de estado.
+  detalle, treemap, analyzer, tablas de I/O, velocidades Read/s/Write/s y la barra de estado.
   Las operaciones/s y los contadores no cambian. CPU/Memory/Network conservan su formato. La
   elección del selector se guarda en `UserDefaults`; el flag solo afecta a la sesión/captura.
 
