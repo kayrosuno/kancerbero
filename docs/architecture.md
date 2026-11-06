@@ -108,14 +108,21 @@
   Decimal (por defecto) usa base 1000 con KB/MB/GB; Binary usa base 1024 con KiB/MiB/GiB. El
   valor vive en `UserDefaults` (`diskByteUnitSystem`) y `DiskView` lo propaga con
   `EnvironmentValues.byteUnitSystem`; fuera de Disk el valor por defecto es binario para no
-  alterar CPU/Memory/Network. Volumes muestra el árbol a 1/3 y el detalle a 2/3 (sin selección,
-  el árbol ocupa todo); al seleccionar un ítem no se abre ninguna tercera tarjeta. Cada tarjeta
+  alterar CPU/Memory/Network. Volumes muestra las tablas a 1/3 y el detalle a 2/3 (sin selección,
+  las tablas ocupan todo); al seleccionar un ítem no se abre ninguna tercera tarjeta. Cada tarjeta
   tiene un botón maximizar/restaurar que la lleva al área de Volumes (oculta la otra columna;
   cabecera y pestañas siguen visibles). El estado vive en `DiskUIState`
-  (`maximizedVolumesPanel`). El árbol es una tabla propia (`Name / Disk / Type / Size / Used /
-  Free / Mounted / Mount`) con filas de una línea, chevron e indentación `depth * 10`, cebra y
-  selección por botón de fila; cabecera pegada, scroll vertical y horizontal con ancho mínimo
-  682 pt. Disk muestra el `deviceIdentifier` de cada fila (`disk0`, `disk0s2`, `disk3s1`…); Type
+  (`maximizedVolumesPanel`). El panel izquierdo es una pila de tablas, una por disco, con cabecera
+  colapsable (chevron + nombre/id + usado/libre), todas abiertas por defecto; cada tabla repite las
+  columnas `Name / Disk / Type / Size / Used / Free / Mounted / Mount`, con filas de una línea,
+  chevron, sin indentación (la jerarquía se lee por el chevron y la cabecera de la sección), cebra
+  y selección por botón de fila. La cabecera dibuja separadores arrastrables para redimensionar
+  cada columna (Name 90–400, Disk 70–150, Type 60–180, Size 48–100, Used/Free 48–110, Mounted
+  48–90 pt); los anchos viven en `DiskUIState.volumeColumnWidths` para compartirse entre tablas y
+  conservarse durante la sesión, y Mount absorbe el espacio sobrante. Scroll vertical único y
+  horizontal por tabla cuando no cabe el mínimo (682 pt con los valores por defecto). Disk muestra
+  el `deviceIdentifier` de cada fila
+  (`disk0`, `disk0s2`, `disk3s1`…); Type
   combina la etiqueta corta del tipo (Disk/Partition/Container/Volume/Snapshot) con el sistema de
   ficheros (`Volume APFS`, `Partition MS-DOS`) en vez de `DiskPalette.kindLabel`, cuyas etiquetas
   largas no caben. Mounted solo se calcula para volúmenes y snapshots (`mountPoint`); el resto
@@ -212,7 +219,7 @@
   ventana abre Settings/Finder y usa SMAppService; no ejecuta sudo ni scripts.
 - Persistencia: `@AppStorage("selectedSection")`, `@AppStorage("networkingTab")`,
   `@AppStorage("diskTab")` y `@AppStorage("dockIconStyle")`. El estado de UI de cada sección (filtros, tarjeta activa, selección,
-  panel de detalle y árbol expandido) vive en `UIState`, un `@Observable` inyectado desde
+  panel de detalle y tablas expandidas) vive en `UIState`, un `@Observable` inyectado desde
   `KancerberoApp`. Es **solo de sesión**: sobrevive a la destrucción de las vistas al cambiar de
   sección/subpestaña, pero no se guarda en disco. Los overrides `--networking-focus`,
   `--networking-transport`, `--networking-ip` y `--networking-state` (listas separadas por comas;
@@ -256,11 +263,13 @@
   la ventana reincorpora flujos aún presentes en `lastActivityNanoseconds` y bajarla los descarta
   en el siguiente refresco; la caption/hint del tile se actualizan en vivo vía `@AppStorage`.
   Sparklines, hover, paneles de detalle, filtros/foco y LiveDot no se tocan.
-- Disk → Volumes mantiene `expanded` y `volumesFocus` en `UIState`. La expansión inicial se hace
-  una sola vez (`didExpandVolumesOnce`); los refrescos de inventario solo podan ids obsoletos, así
-  que el colapso manual se conserva. La tarjeta All limpia el filtro y re-expande el árbol
-  completo. Pulsar un rectángulo del treemap limpia el foco, expande los ancestros y selecciona el
-  ítem (`DiskModel.select`), de modo que el árbol y el detalle siempre apuntan al mismo elemento.
+- Disk → Volumes mantiene `expanded`, `volumesFocus` y `volumeColumnWidths` en `UIState`. La
+  expansión inicial se hace una sola vez (`didExpandVolumesOnce`); los refrescos de inventario solo
+  podan ids obsoletos, así que el colapso manual se conserva. Los anchos de columna se comparten
+  entre todas las tablas y sobreviven a cambiar de disco o de sección (solo se conservan en la
+  sesión, no en `UserDefaults`). La tarjeta All limpia el filtro y re-expande las tablas completas.
+  Pulsar un rectángulo del treemap limpia el foco, expande los ancestros y selecciona el ítem
+  (`DiskModel.select`), de modo que las tablas y el detalle siempre apuntan al mismo elemento.
 - Captura interna para verificación: `--screenshot`, `--section`, `--tab`, `--disk-tab`,
   `--networking-focus`, `--networking-transport`, `--networking-ip`, `--networking-state`,
   `--networking-connection-search`, `--networking-process-domain`,
@@ -337,7 +346,7 @@
     ATTR_VOL_SPACEAVAIL | ATTR_VOL_SPACEUSED` da el tamaño, libre, disponible y **usado real por
     volumen APFS** (coincide con `CapacityInUse` de `diskutil`).
   - El contenedor APFS hereda el libre de sus volúmenes montados (el espacio es compartido).
-  - El árbol y el detalle usan `KBDiskItem.spaceUsage` (`KBDiskSpaceUsage`): los contenedores
+  - Las tablas y el detalle usan `KBDiskItem.spaceUsage` (`KBDiskSpaceUsage`): los contenedores
     reportan su usado/libre (desconocido si no hay ningún volumen montado, nunca 0 B), los
     volúmenes solo usado (el libre es compartido del contenedor) y discos/particiones agregan
     unidades contables (contenedores APFS y particiones montadas no-APFS; nunca volúmenes dentro
@@ -370,8 +379,8 @@
     `#bfd8f0`, volúmenes `#a6cbe8`; free `#e7f2fb`, residual `#c9d9ec`, unallocated `#d7e1ec`,
     unknown `#ebf2f9`), con tinta oscura para textos y bordes. La tarjeta de detalle vuelve al
     material claro de la app con un lavado ámbar/teal, borde fino y sombra suave; el gauge usa
-    azules de la app, tiene tres líneas de cuartos, degradado más oscuro abajo y claro arriba, y un
-    punto blanco con aro azul en la
+    azules de la app, tiene tres líneas de cuartos, degradado más oscuro abajo y claro arriba, borde
+    reforzado y un punto blanco con aro azul en la
     punta, y los valores Capacity/Used/Free son primarios. La cabecera de la tarjeta
     muestra el nombre del disco con el chip de capacidad resaltado y los chips de
     particiones/contenedores/volúmenes con nombre y número (una o dos líneas según el ancho);
@@ -387,7 +396,7 @@
     dibuja centrado en su tile y no hay pop/tooltip sobre el treemap. El gauge y la metadata
     describen el elemento seleccionado. Las actions (Reveal, Copy ID, Analyze) van en una línea
     por encima de la metadata. Pulsar un rectángulo selecciona el ítem; pulsar el fondo
-    del treemap selecciona el disco del alcance. En el árbol, la barra de un
+    del treemap selecciona el disco del alcance. En las tablas, la barra de un
     volumen representa su parte del usado del contenedor (el resto usa usado/capacidad); el gauge
     se rotula con el tipo y “of container”/“of capacity”, y Capacity/Used/Free comparten la
     columna lateral. Para contenedores y volúmenes

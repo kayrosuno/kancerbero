@@ -90,17 +90,22 @@ El detalle de binarios, permisos, instalación y librerías está en
     montaje, UUID, roles APFS, modelo/protocolo y cifrado. No ejecuta procesos externos. La
     cabecera de la tarjeta muestra el disco que se está viendo con el chip de capacidad resaltado y
     los chips de Capacity/Partitions/Containers/Volumes (icono + nombre + número); cuando no caben
-    en una línea pasan a una segunda bajo el título; el árbol muestra la jerarquía completa. El flag
-    `--volumes-focus` sigue permitiendo filtrar la lista para capturas. El árbol es una tabla con
-    columnas **Name / Disk / Type / Size / Used / Free / Mounted / Mount**, filas de una línea e
-    indentación de los hijos; en el panel de 1/3 la tabla se desplaza horizontalmente si no caben
-    todas las columnas (mínimo 682 pt). Disk muestra el identificador del dispositivo de cada fila
-    (`disk0`, `disk0s2`, `disk3s1`…); Type combina el tipo y el sistema de ficheros
+    en una línea pasan a una segunda bajo el título; las tablas por disco muestran la jerarquía
+    completa. El flag `--volumes-focus` sigue permitiendo filtrar las tablas para capturas. El
+    panel izquierdo es una pila de tablas, una por disco, con cabecera colapsable (chevron,
+    nombre, id y usado/libre); por defecto están todas abiertas. Cada tabla repite las columnas
+    **Name / Disk / Type / Size / Used / Free / Mounted / Mount**, con filas de una línea y sin
+    indentación (la jerarquía se sigue por los chevrons y la cabecera de cada disco). La cabecera
+    separa las columnas con líneas arrastrables para redimensionarlas; los anchos se comparten
+    entre tablas y se conservan durante la sesión, y Mount absorbe el espacio sobrante. Si las
+    columnas no caben, cada tabla se desplaza horizontalmente (682 pt con los anchos por defecto).
+    Disk muestra el identificador del dispositivo de cada fila (`disk0`, `disk0s2`, `disk3s1`…);
+    Type combina el tipo y el sistema de ficheros
     (`Volume APFS`, `Partition MS-DOS`, `Container APFS`; nombre completo en el tooltip) y Mounted
     Yes/No en volúmenes y snapshots, `—` en el resto. Used incluye una mini barra (volúmenes: parte del usado
     del contenedor; resto: usado/capacidad) y Free muestra `—` en volúmenes (espacio compartido).
-    El árbol ocupa 1/3 del ancho y el detalle 2/3
-    (sin selección, el árbol ocupa todo). Al seleccionar cualquier elemento, el detalle muestra
+    El panel de tablas ocupa 1/3 del ancho y el detalle 2/3
+    (sin selección, las tablas ocupan todo). Al seleccionar cualquier elemento, el detalle muestra
     una tarjeta hero con el gauge vertical de uso a la izquierda y Capacity/Used/Free en la misma
     columna lateral, y un treemap rectangular anidado con la estructura del disco (particiones →
     contenedores APFS → volúmenes, con libre, residual y espacio no asignado). La cabecera de la
@@ -124,15 +129,16 @@ El detalle de binarios, permisos, instalación y librerías está en
     `#d9e8f7 #bfd8f0 #a6cbe8` (free `#e7f2fb`, residual `#c9d9ec`), con bordes y texto en tinta
     oscura. Sobre el gauge
     se indica el tipo del elemento y su porcentaje; tiene tres líneas de cuartos, degradado más
-    oscuro abajo y claro arriba, y un punto blanco con aro azul en la punta. El mountpoint de cada
+    oscuro abajo y claro arriba, borde reforzado y un punto blanco con aro azul en la punta. El
+    mountpoint de cada
     volumen se muestra centrado en su tile; no hay pop/tooltip sobre el treemap.
     Si el elemento es un contenedor o volumen APFS se indica el espacio compartido y con qué
     volúmenes/contenedor.
     Las actions (Reveal, Copy ID, Analyze) van en una sola línea por encima de la metadata. No hay
     leyenda debajo
     del treemap: el rectángulo ocupa ese espacio. El elemento
-    seleccionado queda resaltado y las barras del árbol y el gauge usan la misma paleta. Al pulsar
-    un rectángulo se selecciona ese elemento en el árbol y el detalle se
+    seleccionado queda resaltado y las barras de las tablas y el gauge usan la misma paleta. Al
+    pulsar un rectángulo se selecciona ese elemento en las tablas y el detalle se
     actualiza; pulsar el fondo del treemap selecciona el disco.
     Cada tarjeta se puede maximizar al área de Volumes y restaurar. El
     selector **Decimal/Binary** de la línea de
@@ -222,7 +228,7 @@ Extension y aprobar la system extension; el detalle de binario y permisos está 
 `docs/daemons-and-libraries.md` y las pruebas en `docs/verification.md`.
 
 Las selecciones y configuraciones de cada sección (filtros, tarjeta activa, fila seleccionada,
-panel de detalle y árbol expandido) se conservan al cambiar de pestaña o sección durante la
+panel de detalle y tablas expandidas) se conservan al cambiar de pestaña o sección durante la
 sesión; al reiniciar la app se vuelven a los valores iniciales. **Kancerbero → Settings… (⌘,)** o el
 botón **Settings** (engranaje) al pie del sidebar permiten ajustar las animaciones de cambio de
 sección/subpestaña y del resaltado del sidebar y las píldoras, las animaciones de los valores de

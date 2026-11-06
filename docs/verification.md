@@ -229,10 +229,10 @@ $K --screenshot /tmp/kb-col-disk-analyzer.png --section disk --disk-tab analyzer
 ```
 
 - En todas: título/subtítulo y botón `Show cards` visibles; tarjetas ocultas; filtros, controles,
-  banners, árbol/mapa y tabla intactos; la tabla ocupa el espacio liberado sin recortes.
+  banners, tablas/mapa y tabla intactos; la tabla ocupa el espacio liberado sin recortes.
 - Reset de filtros ocultos: `--section disk --disk-tab volumes --volumes-focus capacity
-  --screenshot-delay 4 --cards-collapsed` muestra el árbol jerárquico (no la lista plana de
-  capacidad); `--section networking --tab interfaces --networking-focus connections
+  --screenshot-delay 4 --cards-collapsed` muestra las tablas jerárquicas por disco (no la lista
+  plana de capacidad); `--section networking --tab interfaces --networking-focus connections
   --screenshot-delay 4 --cards-collapsed` muestra «N interfaces», no «N of M».
 - Estado mixto: `--cards-collapsed-sections networking,disk,daemons,memory,energy,applications`
   con `--section cpu` deja las tarjetas de CPU visibles y el resto ocultas. El botón global pasa a
@@ -323,7 +323,8 @@ Comprobar además:
   cumpliendo el filtro.
 
 Disk (filtros CLI de Volumes): las antiguas tarjetas resumen ya no existen; `--volumes-focus`
-sigue filtrando el árbol para capturas y el árbol muestra la jerarquía completa sin foco.
+sigue filtrando las tablas por disco para capturas y, sin foco, las tablas muestran la jerarquía
+completa.
 
 ```bash
 $K --screenshot /tmp/kb-disk-free.png --section disk \
@@ -334,6 +335,10 @@ $K --screenshot /tmp/kb-vol-2col.png --section disk --disk-tab volumes \
   --disk-item disk3s1s1 --screenshot-delay 5
 $K --screenshot /tmp/kb-vol-max.png --section disk --disk-tab volumes \
   --disk-item disk3s1s1 --volumes-maximized details --screenshot-delay 5
+$K --screenshot /tmp/kb-vol-cols.png --section disk --disk-tab volumes \
+  --disk-item disk0 --volumes-maximized tree --screenshot-delay 5
+$K --screenshot /tmp/kb-vol-cols-narrow.png --section disk --disk-tab volumes \
+  --disk-item disk0 --screenshot-size 1340x700 --screenshot-delay 5
 $K --screenshot /tmp/kb-disk-folders.png --section disk \
   --disk-tab analyzer --disk-path="$HOME/Documents" --disk-scan \
   --analyzer-focus folders --screenshot-delay 8
@@ -341,12 +346,20 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   --disk-tab io --screenshot-delay 6
 ```
 
-- Volumes: por defecto árbol 1/3 + detalle 2/3 (sin selección, el árbol ocupa todo); no existe
-  una tercera tarjeta ni las tarjetas resumen superiores. El árbol es una tabla con cabecera
-  **Name / Disk / Type / Size / Used / Free / Mounted / Mount**, filas de una línea e indentación
-  de hijos; a 1/3 se desplaza horizontalmente (~682 pt de contenido). Disk muestra el
-  `deviceIdentifier` de cada fila (`disk0`, `disk0s2`, `disk3s1`…) tanto en las filas indentadas
-  como en las filas planas de `--volumes-focus`; Type combina el tipo con el sistema de ficheros
+- Volumes: por defecto tablas 1/3 + detalle 2/3 (sin selección, las tablas ocupan todo); no existe
+  una tercera tarjeta ni las tarjetas resumen superiores. El panel izquierdo es una pila de tablas,
+  una por disco, con cabecera colapsable (chevron, nombre/id, usado/libre) y todas abiertas por
+  defecto. Cada tabla repite la cabecera
+  **Name / Disk / Type / Size / Used / Free / Mounted / Mount**, con filas de una línea y sin
+  indentación (la jerarquía se lee por los chevrons y la cabecera de la sección). La cabecera
+  muestra separadores verticales arrastrables: al arrastrar uno, la columna cambia de ancho, Mount
+  absorbe el espacio sobrante y el ancho se mantiene al cambiar de disco, sección o tamaño de
+  ventana. Los anchos son de sesión y se comparten entre todas las tablas. A 1/3 se desplaza
+  horizontalmente (~682 pt de contenido); al seleccionar un disco la sección se alinea arriba para
+  que se vean su cabecera y la de columnas. Disk muestra el
+  `deviceIdentifier` de cada fila (`disk0`, `disk0s2`, `disk3s1`…) tanto en las filas de la
+  jerarquía como en las filas planas de `--volumes-focus`; Type combina el tipo con el sistema de
+  ficheros
   (`Volume APFS`, `Partition MS-DOS`) y Mounted Yes/No solo en volúmenes y snapshots (`—` en el
   resto). Used muestra el valor y una
   mini barra (volúmenes: parte del usado del contenedor; resto: usado/capacidad); Free muestra `—`
@@ -355,6 +368,12 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   capacidad y de particiones/contenedores/volúmenes con nombre y número (pasan a una segunda línea
   si no caben). No hay flecha
   de subir nivel.
+- Columnas: en `kb-vol-cols.png` (árbol maximizado) se ven las ocho cabeceras y los separadores
+  verticales; en `kb-vol-cols-narrow.png` se comprueba que la tabla estrecha conserva la cabecera
+  y hace scroll horizontal. Arrastrar un separador a izquierda/derecha cambia el ancho, Mount
+  absorbe el sobrante y el valor se mantiene al cambiar de disco o de sección (interacción manual).
+  Las filas de un mismo panel comparten el mismo borde izquierdo, sin indentación, y los chevrons
+  siguen expandiendo/colapsando la jerarquía.
 - Treemap: tarjeta hero con el gauge vertical a la izquierda y Capacity/Used/Free en la misma
   columna lateral; el gauge se centra verticalmente con el rectángulo. El gráfico es un rectángulo
   anidado (particiones → contenedores APFS → volúmenes, con “Other” para el espacio no asignado,
@@ -363,7 +382,8 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   `#d9e8f7 #bfd8f0 #a6cbe8` (particiones azul claro, contenedores azul medio, volúmenes azul
   profundo; free `#e7f2fb`, residual `#c9d9ec`), con bordes y texto en tinta oscura. La tarjeta es
   un panel material claro con lavado ámbar/teal, borde y sombra suaves; el gauge usa azules de la
-  app, tres líneas de cuartos, degradado más oscuro abajo y claro arriba, y un punto blanco con aro
+  app, tres líneas de cuartos, degradado más oscuro abajo y claro arriba, borde reforzado y un
+  punto blanco con aro
   azul. Dentro del panel del treemap, en la franja gris superior, se muestran `disk0`, capacidad,
   usado y libre; la cabecera de la tarjeta muestra el nombre del disco con los chips de capacidad y
   de componentes con nombre y número (una o dos líneas según el ancho).
@@ -374,15 +394,16 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   El rectángulo seleccionado usa un trazo de tinta de 2 pt, distinto del hover/ancestros. No hay
   pop/tooltip sobre el treemap; el mountpoint de cada volumen se dibuja centrado en su tile. Las
   particiones y contenedores etiquetan su banda superior. Hover
-  resalta rectángulo. No hay flecha de subir nivel: la navegación es por el árbol y los
+  resalta rectángulo. No hay flecha de subir nivel: la navegación es por las tablas y los
   rectángulos. Las actions (Reveal, Copy ID, Analyze) van en una línea por encima de la metadata.
-- Las barras del árbol y el gauge usan los acentos de la app; sobre el gauge se rotula DISK/PARTITION/
+- Las barras de las tablas y el gauge usan los acentos de la app; sobre el gauge se rotula DISK/PARTITION/
   CONTAINER/VOLUME, y el caption dice “of container”/“of capacity”. Capacity, Used y Free
-  comparten la columna lateral; el gauge tiene cuartos, degradado y un punto blanco con aro azul
+  comparten la columna lateral; el gauge tiene cuartos, degradado más oscuro abajo y claro arriba,
+  borde reforzado y un punto blanco con aro azul
   en la punta. Al seleccionar un contenedor/volumen APFS
   aparece la nota de espacio compartido y la fila “Shared with” con el contenedor y los volúmenes
   (nombre+id); no se muestra para discos, particiones ni snapshots.
-- Maximizar/restaurar en árbol y detalle: la tarjeta ocupa el área de Volumes y se oculta la otra
+- Maximizar/restaurar en tablas y detalle: la tarjeta ocupa el área de Volumes y se oculta la otra
   columna; la cabecera, las pestañas y el selector de unidades siguen visibles.
   `--volumes-maximized details` sin selección cae al layout normal.
 
@@ -816,7 +837,7 @@ Continuidad de estado al cambiar de pestaña (manual):
    volver → todo restaurado; esperar 5 s y comprobar que la selección sigue si el servicio existe.
 3. Disk → Volumes: expandir y colapsar varios nodos, seleccionar un volumen, ir a Analyzer y
    volver → selección, foco y expansión intactos. Refresh de volúmenes → no se re-expande. Pulsar
-   All → árbol completo expandido y tarjeta All marcada.
+   All → tablas completas expandidas y tarjeta All marcada.
 4. Disk → Analyzer: activar Files y teclear una ruta sin escanear; cambiar de pestaña y volver →
    foco y borrador conservados.
 5. Reiniciar la app: el estado de UI vuelve a los valores iniciales; sección y subpestañas se
@@ -878,8 +899,8 @@ $K --screenshot /tmp/kb-hero-min.png --section disk --disk-tab volumes \
   eligen por luminancia (tinta sobre claros).
 - El gauge vertical está a la izquierda; Capacity, Used y Free comparten la columna lateral. El
   gauge llena de abajo arriba, muestra el tipo, el porcentaje y “of container”/“of capacity”, y
-  tiene tres líneas de cuartos, degradado más oscuro abajo y claro arriba, y un punto blanco con
-  aro azul en la punta; sin datos muestra `—` y el track vacío. El gauge y la metadata describen el
+  tiene tres líneas de cuartos, degradado más oscuro abajo y claro arriba, borde reforzado y un
+  punto blanco con aro azul en la punta; sin datos muestra `—` y el track vacío. El gauge y la metadata describen el
   elemento seleccionado.
 - El treemap anida filas de particiones, columnas de contenedores y filas de volúmenes; cada
   rectángulo tiene un mínimo visible por rol/eje y el resto se reparte proporcional a la fracción,
@@ -914,19 +935,20 @@ $K --screenshot /tmp/kb-hero-min.png --section disk --disk-tab volumes \
 - Los volúmenes del contenedor muestran el desglose por usado (usado + residual +
   snapshots/metadatos + libre). Al seleccionar un contenedor o volumen, el elemento y sus
   ancestros quedan resaltados en sus rectángulos.
-- Pulsar un rectángulo selecciona ese ítem en el árbol y actualiza el detalle. No hay flecha de
-  subir nivel; la navegación es por el árbol y los rectángulos.
+- Pulsar un rectángulo selecciona ese ítem en las tablas y actualiza el detalle. No hay flecha de
+  subir nivel; la navegación es por las tablas y los rectángulos. Las tablas por disco tienen
+  cabecera colapsable y abren todas por defecto; el chevron colapsa solo la tabla de ese disco.
 - Un contenedor sin volumen montado muestra un rectángulo desconocido y `—` (nunca `0 B`).
 - `usado de volúmenes + residual + libre = capacidad`; permitir la diferencia documentada de
   `ATTR_VOL_SPACEUSED` frente a `diskutil`. Si la suma de usado excede lo usable, las porciones se
   escalan y aparece la nota correspondiente.
-- El árbol muestra usado/free por fila (volúmenes con Free `—`) y la barra de Used con el criterio
+- Las tablas muestran usado/free por fila (volúmenes con Free `—`) y la barra de Used con el criterio
   correcto. `disk usage` debe dar las mismas cifras agregadas y `partial=yes` cuando falte algún
   volumen montado; un disco/partición no APFS usa el treemap usado/libre y, sin datos, muestra
   “Structure unavailable”.
 - Selector **Decimal/Binary** de la línea de pestañas:
   `--disk-units decimal` muestra `500,3 GB` para disk0 (base 1000, KB/MB/GB);
-  `--disk-units binary` muestra `465,9 GiB` (base 1024, KiB/MiB/GiB). Cambian árbol, tarjetas,
+  `--disk-units binary` muestra `465,9 GiB` (base 1024, KiB/MiB/GiB). Cambian las tablas, tarjetas,
   detalle, treemap, analyzer, tablas de I/O, velocidades Read/s/Write/s y la barra de estado.
   Las operaciones/s y los contadores no cambian. CPU/Memory/Network conservan su formato. La
   elección del selector se guarda en `UserDefaults`; el flag solo afecta a la sesión/captura.
