@@ -36,7 +36,7 @@ struct VolumeHierarchyChart: View {
             heroInfo
             treemap(nodes: nodes, scope: scope,
                     highlightID: highlightID)
-                .frame(height: isMaximized ? 860 : 600)
+                .frame(height: adaptiveTreemapHeight(for: nodes))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 6)
@@ -170,42 +170,27 @@ struct VolumeHierarchyChart: View {
     private func treemap(nodes: [HierarchyNode], scope: KBDiskItem,
                          highlightID: String?) -> some View {
         GeometryReader { proxy in
-            let headerHeight: CGFloat = isMaximized ? 36 : 34
             let layout = makeTreemap(nodes: nodes, size: proxy.size,
-                                     scopeID: scope.deviceIdentifier,
-                                     headerHeight: headerHeight)
+                                     scopeID: scope.deviceIdentifier)
 
             ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.primary.opacity(0.035))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 14,
-                                         style: .continuous)
-                            .strokeBorder(
-                                LinearGradient(
-                                    colors: [
-                                        DiskPalette.partitionFill.opacity(0.38),
-                                        DiskPalette.containerFill.opacity(0.32),
-                                        DiskPalette.volumeFill.opacity(0.26)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing),
-                                lineWidth: 1)
-                    }
-                    .shadow(color: .black.opacity(0.04),
-                            radius: 8, y: 3)
-
                 Canvas { context, _ in
-                    drawTreemap(layout, highlightID: highlightID,
+                    drawTreemap(layout, scope: scope,
+                                highlightID: highlightID,
+                                diskSelected: item.deviceIdentifier
+                                    == scope.deviceIdentifier,
                                 context: &context)
                 }
 
-                treemapDiskHeader(scope)
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity,
-                           alignment: .topLeading)
-                    .allowsHitTesting(false)
+                VStack(spacing: 0) {
+                    treemapDiskHeader(scope)
+                        .padding(.horizontal, rootInset + 8)
+                        .frame(height: diskHeaderHeight, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Spacer(minLength: 0)
+                }
+                .padding(.top, rootInset)
+                .allowsHitTesting(false)
 
                 if layout.items.isEmpty {
                     VStack(spacing: 6) {
@@ -264,6 +249,14 @@ struct VolumeHierarchyChart: View {
 
     private var rootInset: CGFloat { isMaximized ? 13 : 10 }
 
+    private var diskHeaderHeight: CGFloat { isMaximized ? 36 : 34 }
+
+    private var diskContentInset: CGFloat { isMaximized ? 6 : 5 }
+
+    private var treemapMinimumHeight: CGFloat { isMaximized ? 460 : 420 }
+
+    private var treemapMaximumHeight: CGFloat { 860 }
+
     private func treemapDiskHeader(_ scope: KBDiskItem) -> some View {
         let usage = scope.spaceUsage
         let capacity = scope.sizeBytes > 0
@@ -279,15 +272,15 @@ struct VolumeHierarchyChart: View {
         return HStack(spacing: 6) {
             Image(systemName: "internaldrive")
                 .font(.system(size: 11.5, weight: .semibold))
-                .foregroundStyle(DiskPalette.tint(for: .physicalDisk))
+                .foregroundStyle(DiskPalette.textInk.opacity(0.8))
             Text(scope.deviceIdentifier)
                 .font(.system(size: 11.5, weight: .semibold,
                               design: .monospaced))
-                .foregroundStyle(.primary)
+                .foregroundStyle(DiskPalette.textInk)
             Text(summary)
                 .font(.system(size: 11, weight: .medium))
                 .monospacedDigit()
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DiskPalette.textInk.opacity(0.72))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
@@ -299,19 +292,25 @@ struct VolumeHierarchyChart: View {
 
     private func makeTreemap(nodes: [HierarchyNode],
                              size: CGSize,
-                             scopeID: String,
-                             headerHeight: CGFloat) -> TreemapLayout {
-        let top = rootInset + headerHeight
-        let bounds = CGRect(
+                             scopeID: String) -> TreemapLayout {
+        let diskRect = CGRect(
             x: rootInset,
-            y: top,
+            y: rootInset,
             width: max(0, size.width - 2 * rootInset),
-            height: max(0, size.height - top - rootInset))
+            height: max(0, size.height - 2 * rootInset))
+        let bounds = CGRect(
+            x: diskRect.minX + diskContentInset,
+            y: diskRect.minY + diskHeaderHeight,
+            width: max(0, diskRect.width - 2 * diskContentInset),
+            height: max(0, diskRect.height - diskHeaderHeight
+                - diskContentInset))
         var items: [TreemapItem] = []
         layoutTreemap(nodes, in: bounds, depth: 0, axis: .rows,
                       path: "", parentFraction: 1,
                       ownerID: scopeID, items: &items)
-        return TreemapLayout(bounds: bounds, items: items)
+        return TreemapLayout(bounds: bounds, items: items,
+                             diskRect: diskRect,
+                             diskHeaderHeight: diskHeaderHeight)
     }
 
     private func layoutTreemap(_ nodes: [HierarchyNode], in rect: CGRect,
@@ -440,15 +439,16 @@ struct VolumeHierarchyChart: View {
         let big = isMaximized
         if node.fraction.isFinite, node.fraction <= 0 {
             switch axis {
-            case .rows: return big ? 14 : 12
+            case .rows: return big ? 22 : 20
             case .columns: return big ? 40 : 36
             }
         }
         switch (node.role, axis) {
         case (.partition, .rows):
             if node.children.isEmpty { return big ? 34 : 30 }
-            let required = requiredHeight(for: node, depth: depth)
-            let cap: CGFloat = big ? 220 : 180
+            let required = nodeContentHeight(node, axis: .rows,
+                                             depth: depth)
+            let cap: CGFloat = big ? 600 : 520
             return min(required, cap)
         case (.partition, .columns):
             return big ? 70 : 60
@@ -458,11 +458,11 @@ struct VolumeHierarchyChart: View {
         case (.container, .columns):
             return big ? 70 : 60
         case (.volume, .rows):
-            return big ? 18 : 16
+            return big ? 24 : 22
         case (.volume, .columns):
             return big ? 48 : 44
         case (_, .rows):
-            return big ? 18 : 16
+            return big ? 22 : 20
         case (_, .columns):
             return big ? 44 : 40
         }
@@ -470,7 +470,28 @@ struct VolumeHierarchyChart: View {
 
     /// Height needed for a tile to show its descendants at the current
     /// nested axes: stacked children add up, side-by-side children share.
-    private func requiredHeight(for node: HierarchyNode, depth: Int) -> CGFloat {
+    private func childAxis(of axis: TreemapAxis) -> TreemapAxis {
+        axis == .rows ? .columns : .rows
+    }
+
+    private func contentHeight(of nodes: [HierarchyNode],
+                               axis: TreemapAxis,
+                               depth: Int) -> CGFloat {
+        guard !nodes.isEmpty else { return 0 }
+        let heights = nodes.map {
+            nodeContentHeight($0, axis: axis, depth: depth)
+        }
+        if axis == .rows {
+            let gap = siblingGap(depth: depth)
+            return heights.reduce(0, +)
+                + gap * CGFloat(max(0, nodes.count - 1))
+        }
+        return heights.max() ?? 0
+    }
+
+    private func nodeContentHeight(_ node: HierarchyNode,
+                                   axis: TreemapAxis,
+                                   depth: Int) -> CGFloat {
         let children = node.children.filter { $0.fraction.isFinite }
         guard !children.isEmpty else {
             return minimumExtent(for: node, axis: .rows, depth: depth)
@@ -478,20 +499,18 @@ struct VolumeHierarchyChart: View {
 
         let inset = nestedInset(depth: depth)
         let header: CGFloat = isMaximized ? 20 : 18
-        let childHeights = children.map {
-            requiredHeight(for: $0, depth: depth + 1)
-        }
-        let childAxis: TreemapAxis = depth.isMultiple(of: 2)
-            ? .columns : .rows
-        let childContent: CGFloat
-        if childAxis == .rows {
-            let gap = siblingGap(depth: depth + 1)
-            childContent = childHeights.reduce(0, +)
-                + gap * CGFloat(max(0, children.count - 1))
-        } else {
-            childContent = childHeights.max() ?? 0
-        }
+        let childContent = contentHeight(
+            of: children,
+            axis: childAxis(of: axis),
+            depth: depth + 1)
         return header + inset * 2 + childContent
+    }
+
+    private func adaptiveTreemapHeight(for nodes: [HierarchyNode]) -> CGFloat {
+        let content = contentHeight(of: nodes, axis: .rows, depth: 0)
+        let chrome = 2 * rootInset + diskHeaderHeight + diskContentInset
+        return min(max(content + chrome, treemapMinimumHeight),
+                   treemapMaximumHeight)
     }
 
     private func treemapHeaderHeight(for node: HierarchyNode, rect: CGRect,
@@ -534,8 +553,51 @@ struct VolumeHierarchyChart: View {
 
     // MARK: - Treemap drawing
 
-    private func drawTreemap(_ layout: TreemapLayout, highlightID: String?,
+    private func drawDiskRoot(_ layout: TreemapLayout, scope: KBDiskItem,
+                              highlightID: String?,
+                              diskSelected: Bool,
+                              context: inout GraphicsContext) {
+        let rect = layout.diskRect
+        let radius: CGFloat = isMaximized ? 9 : 8
+        let path = Path(roundedRect: rect, cornerRadius: radius)
+        context.fill(path, with: .color(DiskPalette.paper))
+
+        var headerContext = context
+        headerContext.clip(to: path)
+        let band = CGRect(x: rect.minX, y: rect.minY,
+                          width: rect.width,
+                          height: layout.diskHeaderHeight)
+        headerContext.fill(Path(band),
+                           with: .color(DiskPalette.sand.opacity(0.45)))
+
+        let separatorY = rect.minY + layout.diskHeaderHeight
+        var separator = Path()
+        separator.move(to: CGPoint(x: rect.minX + 8, y: separatorY))
+        separator.addLine(to: CGPoint(x: rect.maxX - 8, y: separatorY))
+        context.stroke(separator,
+                       with: .color(DiskPalette.textInk.opacity(0.16)),
+                       lineWidth: 0.75)
+        context.stroke(path,
+                       with: .color(DiskPalette.textInk.opacity(0.22)),
+                       lineWidth: 1)
+
+        if diskSelected || highlightID == scope.deviceIdentifier {
+            let inset: CGFloat = 1.1
+            let selected = Path(
+                roundedRect: rect.insetBy(dx: inset, dy: inset),
+                cornerRadius: max(0, radius - inset))
+            context.stroke(selected,
+                           with: .color(DiskPalette.textInk),
+                           lineWidth: 2)
+        }
+    }
+
+    private func drawTreemap(_ layout: TreemapLayout, scope: KBDiskItem,
+                             highlightID: String?,
+                             diskSelected: Bool,
                              context: inout GraphicsContext) {
+        drawDiskRoot(layout, scope: scope, highlightID: highlightID,
+                     diskSelected: diskSelected, context: &context)
         for item in layout.items {
             let path = Path(roundedRect: item.rect,
                             cornerRadius: cornerRadius(for: item.depth))
@@ -552,7 +614,8 @@ struct VolumeHierarchyChart: View {
         }
 
         for item in layout.items {
-            drawTreemapLabel(item, context: &context)
+            drawTreemapLabel(item, mountColumnX: layout.bounds.midX,
+                             context: &context)
         }
 
         for item in layout.items {
@@ -625,6 +688,7 @@ struct VolumeHierarchyChart: View {
     }
 
     private func drawTreemapLabel(_ item: TreemapItem,
+                                  mountColumnX: CGFloat,
                                   context: inout GraphicsContext) {
         let node = item.node
         let color = DiskPalette.contentColor(on: node.color)
@@ -682,28 +746,42 @@ struct VolumeHierarchyChart: View {
         }
 
         let standardSize = labelNameSize(for: item.depth)
-        let compact = item.rect.height < 2 + standardSize + 3
-        let nameSize = compact
-            ? (isMaximized ? 9.5 : 9.0) : standardSize
-        let nameMinHeight = compact
-            ? 2 + nameSize + 1 : 2 + standardSize + 3
+        let standardLine = labelLineHeight(standardSize)
+        let compact = item.rect.height < 2 + standardLine + 3
+        let nameSize = compact ? minimumTileTextSize : standardSize
+        let nameTop: CGFloat = compact ? 1.5 : 2
+        let nameLine = labelLineHeight(nameSize)
+        let nameBottom = item.rect.minY + nameTop + nameLine
+        let nameMinHeight = nameTop + nameLine + 1
         guard item.rect.width >= 34,
               item.rect.height >= nameMinHeight else { return }
 
         let valueSize = labelValueSize(for: item.depth)
-        let dataY = 2 + nameSize + 2
-        let showsDataLine = !compact
-            && item.rect.width >= 60
-            && item.rect.height >= dataY + valueSize + 4
+        let dataTop = nameBottom + 2
+        let dataLine = labelLineHeight(valueSize)
+        let dataBottom = dataTop + dataLine
         let data = treemapDataText(node)
 
-        let inlineSize = compact
-            ? (isMaximized ? 8.5 : 8.0) : valueSize
+        let mountPoint = node.role == .volume
+            ? node.detail?.trimmingCharacters(in: .whitespacesAndNewlines)
+            : nil
+        let mountSize = minimumTileTextSize
+        let dataFits = dataBottom <= item.rect.maxY - 2
+        let showsDataLine = !compact
+            && item.rect.width >= 60
+            && dataFits
+
+        let inlineSize = compact ? minimumTileTextSize : valueSize
         let inlineData: String? = {
-            guard !showsDataLine, let data else { return nil }
+            guard !showsDataLine, let data, item.rect.width >= 60 else {
+                return nil
+            }
+            let available = item.rect.width - 8
+            let proposed = max(24, min(available * 0.55, 110))
+            guard available - (proposed + 8) >= 34 else { return nil }
             return truncatedLabel(
                 data,
-                maxWidth: max(60, item.rect.width * 0.55),
+                maxWidth: proposed,
                 size: inlineSize,
                 weight: .regular)
         }()
@@ -711,29 +789,29 @@ struct VolumeHierarchyChart: View {
             textWidth($0, size: inlineSize, weight: .regular)
         } ?? 0
 
-        let mountPoint = node.role == .volume
-            ? node.detail?.trimmingCharacters(in: .whitespacesAndNewlines)
-            : nil
-        let mountSize = compact ? 8.5 : (isMaximized ? 10 : 9.5)
-        let fittedMount = (mountPoint?.isEmpty == false)
+        let mountColumnInside = mountPoint?.isEmpty == false
+            && mountColumnX >= item.rect.minX + 42
+            && mountColumnX <= item.rect.maxX - 42
+        let rightReserve = 4 + (inlineData == nil ? 0 : inlineWidth + 8)
+        let mountMaxWidth = max(
+            0,
+            item.rect.maxX - rightReserve - mountColumnX - 6)
+        let fittedMount = (mountPoint?.isEmpty == false
+            && mountColumnInside
+            && mountMaxWidth > 8)
             ? truncatedLabel(
                 mountPoint!,
-                maxWidth: item.rect.width * 0.34,
+                maxWidth: mountMaxWidth,
                 size: mountSize,
-                weight: .regular)
+                weight: .regular,
+                monospaced: true)
             : nil
-        let mountWidth = fittedMount.map {
-            textWidth($0, size: mountSize, weight: .regular)
-        } ?? 0
-        let mountOnNameLine = fittedMount != nil
-            && (!showsDataLine || item.rect.height < 60)
 
-        let inlineNameMax = item.rect.width - 8
+        let baseNameMax = item.rect.width - 8
             - (inlineData == nil ? 0 : inlineWidth + 8)
-        let centeredNameMax = fittedMount != nil && mountOnNameLine
-            ? max(60, (item.rect.width - mountWidth) / 2 - 20)
-            : item.rect.width
-        let nameMaxWidth = min(inlineNameMax, centeredNameMax)
+        let nameMaxWidth = fittedMount != nil
+            ? min(baseNameMax, mountColumnX - item.rect.minX - 8)
+            : baseNameMax
 
         guard let name = fittedTreemapLabel(
             treemapLeafCandidates(node, ownerID: item.ownerID),
@@ -750,7 +828,7 @@ struct VolumeHierarchyChart: View {
         labelContext.draw(
             resolved,
             at: CGPoint(x: item.rect.minX + 4,
-                        y: item.rect.minY + (compact ? 1.5 : 2)),
+                        y: item.rect.minY + nameTop),
             anchor: .topLeading)
 
         if let inlineData {
@@ -761,7 +839,7 @@ struct VolumeHierarchyChart: View {
             labelContext.draw(
                 resolvedData,
                 at: CGPoint(x: item.rect.maxX - 4,
-                            y: item.rect.minY + (compact ? 1.5 : 2)),
+                            y: item.rect.minY + nameTop),
                 anchor: .topTrailing)
         } else if showsDataLine,
                   let data,
@@ -777,22 +855,21 @@ struct VolumeHierarchyChart: View {
             labelContext.draw(
                 resolvedValue,
                 at: CGPoint(x: item.rect.minX + 4,
-                            y: item.rect.minY + dataY),
+                            y: dataTop),
                 anchor: .topLeading)
         }
 
         if let fittedMount {
-            let mountY = mountOnNameLine
-                ? item.rect.minY + (compact ? 1.5 : 2) + nameSize / 2
-                : item.rect.midY
             let resolvedMount = context.resolve(
                 Text(fittedMount)
                     .font(.system(size: mountSize, design: .monospaced))
-                    .foregroundColor(color.opacity(0.68)))
+                    .foregroundColor(color.opacity(0.9)))
             labelContext.draw(
                 resolvedMount,
-                at: CGPoint(x: item.rect.midX, y: mountY),
-                anchor: .center)
+                at: CGPoint(
+                    x: mountColumnX,
+                    y: item.rect.minY + nameTop + nameLine / 2),
+                anchor: .leading)
         }
     }
 
@@ -947,32 +1024,48 @@ struct VolumeHierarchyChart: View {
         return nil
     }
 
+    private var minimumTileTextSize: CGFloat {
+        isMaximized ? 12.5 : 11.5
+    }
+
+    private func labelLineHeight(_ size: CGFloat,
+                                 monospaced: Bool = false) -> CGFloat {
+        let font = monospaced
+            ? NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+            : NSFont.systemFont(ofSize: size)
+        return ceil(font.ascender - font.descender + font.leading)
+    }
+
     private func labelNameSize(for depth: Int) -> CGFloat {
         let base: CGFloat = depth == 0 ? 11.5 : (depth == 1 ? 11 : 10.5)
-        return isMaximized ? base + 1 : base
+        return max(minimumTileTextSize, isMaximized ? base + 1 : base)
     }
 
     private func labelValueSize(for depth: Int) -> CGFloat {
         let base: CGFloat = depth == 0 ? 10 : (depth == 1 ? 9.5 : 9)
-        return isMaximized ? base + 1 : base
+        return max(minimumTileTextSize, isMaximized ? base + 1 : base)
     }
 
     private func truncatedLabel(_ text: String, maxWidth: CGFloat,
                                 size: CGFloat,
-                                weight: NSFont.Weight) -> String? {
+                                weight: NSFont.Weight,
+                                monospaced: Bool = false) -> String? {
         guard maxWidth > 8 else { return nil }
-        if textWidth(text, size: size, weight: weight) <= maxWidth {
+        if textWidth(text, size: size, weight: weight,
+                     monospaced: monospaced) <= maxWidth {
             return text
         }
         let ellipsis = "…"
-        guard textWidth(ellipsis, size: size, weight: weight) <= maxWidth else {
+        guard textWidth(ellipsis, size: size, weight: weight,
+                        monospaced: monospaced) <= maxWidth else {
             return nil
         }
         var result = text
         while !result.isEmpty {
             result.removeLast()
             let candidate = result + ellipsis
-            if textWidth(candidate, size: size, weight: weight) <= maxWidth {
+            if textWidth(candidate, size: size, weight: weight,
+                         monospaced: monospaced) <= maxWidth {
                 return candidate
             }
         }
@@ -980,10 +1073,12 @@ struct VolumeHierarchyChart: View {
     }
 
     private func textWidth(_ text: String, size: CGFloat,
-                           weight: NSFont.Weight) -> CGFloat {
-        (text as NSString).size(withAttributes: [
-            .font: NSFont.systemFont(ofSize: size, weight: weight)
-        ]).width
+                           weight: NSFont.Weight,
+                           monospaced: Bool = false) -> CGFloat {
+        let font = monospaced
+            ? NSFont.monospacedSystemFont(ofSize: size, weight: weight)
+            : NSFont.systemFont(ofSize: size, weight: weight)
+        return (text as NSString).size(withAttributes: [.font: font]).width
     }
 
     // MARK: - Hit testing
@@ -1407,6 +1502,8 @@ struct VolumeHierarchyChart: View {
     private struct TreemapLayout {
         let bounds: CGRect
         let items: [TreemapItem]
+        let diskRect: CGRect
+        let diskHeaderHeight: CGFloat
     }
 }
 

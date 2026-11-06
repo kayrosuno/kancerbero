@@ -2,38 +2,38 @@ import AppKit
 import SwiftUI
 import KancerberoCore
 
-/// Light pastel-blue palette used by the Disk → Volumes graphs.
+/// Warm bone/ivory palette used by the Disk → Volumes treemap.
 ///
-/// Each hierarchy level keeps a slightly different blue while text and
-/// strokes use a dark ink so the tiles stay readable on the app's light
-/// materials.
+/// Each hierarchy level keeps a slightly darker bone tone while text and
+/// strokes use a warm dark ink so the tiles stay readable.
 enum DiskPalette {
-    static let paper = Color(.sRGB, red: 0.973, green: 0.965,
-                             blue: 0.980, opacity: 1)
-    static let sand = Color(.sRGB, red: 0.851, green: 0.910,
-                            blue: 0.969, opacity: 1)
-    static let stone = Color(.sRGB, red: 0.749, green: 0.847,
-                             blue: 0.941, opacity: 1)
-    static let taupe = Color(.sRGB, red: 0.651, green: 0.796,
-                             blue: 0.910, opacity: 1)
+    static let paper = Color(.sRGB, red: 0.969, green: 0.953,
+                             blue: 0.918, opacity: 1)
+    static let sand = Color(.sRGB, red: 0.910, green: 0.886,
+                            blue: 0.843, opacity: 1)
+    static let stone = Color(.sRGB, red: 0.851, green: 0.820,
+                             blue: 0.765, opacity: 1)
+    static let taupe = Color(.sRGB, red: 0.788, green: 0.749,
+                             blue: 0.682, opacity: 1)
     static let ink = Color(.sRGB, red: 0.122, green: 0.161,
                            blue: 0.216, opacity: 1)
-    static let textInk = ink
+    static let textInk = Color(.sRGB, red: 0.196, green: 0.165,
+                               blue: 0.125, opacity: 1)
 
     static let partitionFill = sand
     static let containerFill = stone
     static let volumeFill = taupe
-    static let usedFill = Color(.sRGB, red: 0.773, green: 0.863,
-                                blue: 0.949, opacity: 1)
+    static let usedFill = Color(.sRGB, red: 0.871, green: 0.824,
+                                blue: 0.749, opacity: 1)
 
-    static let free = Color(.sRGB, red: 0.906, green: 0.949,
-                            blue: 0.984, opacity: 1)
-    static let residual = Color(.sRGB, red: 0.788, green: 0.851,
-                                blue: 0.925, opacity: 1)
-    static let unknown = Color(.sRGB, red: 0.922, green: 0.949,
-                               blue: 0.976, opacity: 1)
-    static let unallocated = Color(.sRGB, red: 0.843, green: 0.882,
-                                   blue: 0.925, opacity: 1)
+    static let free = Color(.sRGB, red: 0.969, green: 0.953,
+                            blue: 0.918, opacity: 1)
+    static let residual = Color(.sRGB, red: 0.824, green: 0.788,
+                                blue: 0.729, opacity: 1)
+    static let unknown = Color(.sRGB, red: 0.929, green: 0.910,
+                               blue: 0.871, opacity: 1)
+    static let unallocated = Color(.sRGB, red: 0.867, green: 0.835,
+                                   blue: 0.780, opacity: 1)
 
     static func fill(level: Int) -> Color {
         switch level {

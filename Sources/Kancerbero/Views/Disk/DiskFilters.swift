@@ -23,28 +23,47 @@ enum DiskVolumesFocus: String, CaseIterable, Identifiable, Sendable {
 /// Session-only widths for the Disk → Volumes tables. Stored in `DiskUIState`
 /// so every disk table shares the same columns while the section is visible.
 struct DiskVolumeColumnWidths: Equatable {
-    var name: CGFloat = 150
-    var disk: CGFloat = 96
-    var type: CGFloat = 92
-    var size: CGFloat = 54
-    var used: CGFloat = 56
-    var free: CGFloat = 56
-    var mounted: CGFloat = 56
+    var name: CGFloat = 132
+    var disk: CGFloat = 70
+    var type: CGFloat = 72
+    var size: CGFloat = 46
+    var used: CGFloat = 46
+    var free: CGFloat = 46
+    var mounted: CGFloat = 50
     /// The Mount column absorbs any width left over by the other columns.
-    var mountMinimum: CGFloat = 64
+    var mountMinimum: CGFloat = 40
 
     static let nameRange: ClosedRange<CGFloat> = 90...400
-    static let diskRange: ClosedRange<CGFloat> = 70...150
-    static let typeRange: ClosedRange<CGFloat> = 60...180
-    static let sizeRange: ClosedRange<CGFloat> = 48...100
-    static let usedRange: ClosedRange<CGFloat> = 48...110
-    static let freeRange: ClosedRange<CGFloat> = 48...110
-    static let mountedRange: ClosedRange<CGFloat> = 48...90
-    static let mountMinimumRange: ClosedRange<CGFloat> = 56...400
+    static let diskRange: ClosedRange<CGFloat> = 62...150
+    static let typeRange: ClosedRange<CGFloat> = 58...180
+    static let sizeRange: ClosedRange<CGFloat> = 44...100
+    static let usedRange: ClosedRange<CGFloat> = 44...110
+    static let freeRange: ClosedRange<CGFloat> = 44...110
+    static let mountedRange: ClosedRange<CGFloat> = 50...90
+    static let mountMinimumRange: ClosedRange<CGFloat> = 40...400
 
     static func clamp(_ value: CGFloat,
                       to range: ClosedRange<CGFloat>) -> CGFloat {
         min(max(value, range.lowerBound), range.upperBound)
+    }
+}
+
+/// Layout constants and clamping for the two-panel Volumes layout.
+enum DiskVolumesSplit {
+    static let dividerWidth: CGFloat = 10
+    static let treeMinimumWidth: CGFloat = 300
+    static let detailsMinimumWidth: CGFloat = 360
+    static let defaultFraction: CGFloat = 0.5
+
+    static func clampedFraction(_ fraction: CGFloat,
+                                availableWidth: CGFloat) -> CGFloat {
+        guard availableWidth > 0, fraction.isFinite else {
+            return defaultFraction
+        }
+        let lower = treeMinimumWidth / availableWidth
+        let upper = 1 - detailsMinimumWidth / availableWidth
+        guard lower < upper else { return defaultFraction }
+        return min(max(fraction, lower), upper)
     }
 }
 
