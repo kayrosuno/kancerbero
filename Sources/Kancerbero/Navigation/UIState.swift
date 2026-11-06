@@ -307,6 +307,8 @@ struct DiskUIState: Equatable {
     var volumesFocus: DiskVolumesFocus?
     var expanded: Set<String> = []
     var didExpandVolumesOnce = false
+    /// Session-only column widths shared by every disk table.
+    var volumeColumnWidths = DiskVolumeColumnWidths()
     /// Detail card maximized over the Volumes area.
     var maximizedVolumesPanel: DiskVolumesPanel?
     var analyzerFocus: DiskAnalyzerFocus = .scanned

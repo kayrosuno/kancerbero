@@ -1485,8 +1485,8 @@ private struct VerticalUsageBar: View {
                 .clipShape(Capsule())
                 .overlay {
                     Capsule()
-                        .strokeBorder(.quaternary.opacity(0.50),
-                                      lineWidth: 0.5)
+                        .strokeBorder(tint.opacity(0.45),
+                                      lineWidth: 1.0)
                 }
                 .overlay(alignment: .bottom) {
                     if clamped > 0 {

@@ -10,16 +10,6 @@ struct DiskVolumesView: View {
     let onAnalyze: (String) -> Void
 
     private let cardSpacing: CGFloat = 12
-    private let diskColumnWidth: CGFloat = 96
-    private let typeColumnWidth: CGFloat = 92
-    private let sizeColumnWidth: CGFloat = 54
-    private let usedColumnWidth: CGFloat = 56
-    private let freeColumnWidth: CGFloat = 56
-    private let mountedColumnWidth: CGFloat = 56
-    private let mountColumnWidth: CGFloat = 64
-    // 150 (Name) + 96 + 92 + 54 + 56 + 56 + 56 (Mounted) + 64 (Mount)
-    // + 7*6 (spacing) + 2*8 (padding) = 682
-    private let tableMinWidth: CGFloat = 682
 
     private var selection: Binding<String?> {
         Binding(
@@ -153,7 +143,7 @@ struct DiskVolumesView: View {
             Divider().opacity(0.5)
 
             if let inventory = disk.inventory, !inventory.items.isEmpty {
-                treeTable(inventory: inventory)
+                diskTables(inventory: inventory)
             } else if disk.isLoadingInventory {
                 ProgressView("Reading disks…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -178,89 +168,284 @@ struct DiskVolumesView: View {
         .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
     }
 
-    // MARK: - Table
+    // MARK: - Tables
 
-    private func treeTable(inventory: KBDiskInventorySnapshot) -> some View {
+    private func diskTables(inventory: KBDiskInventorySnapshot) -> some View {
         GeometryReader { proxy in
-            let tableWidth = max(proxy.size.width, tableMinWidth)
-            ScrollView(.horizontal, showsIndicators: true) {
-                VStack(spacing: 0) {
-                    tableHeader(width: tableWidth)
-                    Divider().opacity(0.5)
-                    ScrollViewReader { scrollProxy in
-                        ScrollView(.vertical) {
-                            LazyVStack(spacing: 0) {
-                                let rows = displayedRows(inventory)
-                                ForEach(Array(rows.enumerated()),
-                                        id: \.element.item.deviceIdentifier) { pair in
-                                    tableRow(pair.element, index: pair.offset,
-                                             width: tableWidth)
-                                        .id(pair.element.item.deviceIdentifier)
-                                }
-                            }
+            let visibleWidth = max(0, proxy.size.width - 12)
+            let layout = columnLayout(availableWidth: visibleWidth)
+
+            ScrollViewReader { scrollProxy in
+                ScrollView(.vertical) {
+                    LazyVStack(spacing: 10) {
+                        ForEach(visibleDisks(inventory)) { diskItem in
+                            diskSection(diskItem,
+                                        layout: layout,
+                                        visibleWidth: visibleWidth)
+                                .id(diskItem.deviceIdentifier)
                         }
-                        .onChange(of: disk.selectedItemID) { _, id in
-                            guard let id else { return }
-                            withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) {
-                                scrollProxy.scrollTo(id, anchor: .center)
-                            }
-                        }
-                        .onAppear {
-                            guard let id = disk.selectedItemID else { return }
-                            DispatchQueue.main.async {
-                                scrollProxy.scrollTo(id, anchor: .center)
+                    }
+                    .padding(6)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+                .onChange(of: disk.selectedItemID) { _, id in
+                    guard let id else { return }
+                    scrollSelection(id, proxy: scrollProxy)
+                }
+                .onAppear {
+                    guard let id = disk.selectedItemID else { return }
+                    scrollSelection(id, proxy: scrollProxy)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func diskSection(_ diskItem: KBDiskItem,
+                             layout: VolumeColumnLayout,
+                             visibleWidth: CGFloat) -> some View {
+        let expanded = ui.disk.expanded.contains(diskItem.deviceIdentifier)
+        let rows = sectionRows(for: diskItem, expanded: expanded)
+        let showsTable = expanded && !rows.isEmpty
+
+        return VStack(spacing: 0) {
+            diskSectionHeader(diskItem, expanded: expanded,
+                              width: visibleWidth)
+
+            if showsTable {
+                Divider().opacity(0.4)
+                ScrollView(.horizontal, showsIndicators: true) {
+                    VStack(spacing: 0) {
+                        tableHeader(layout: layout)
+                        Divider().opacity(0.5)
+                        VStack(spacing: 0) {
+                            ForEach(Array(rows.enumerated()),
+                                    id: \.element.item.deviceIdentifier) { pair in
+                                tableRow(pair.element, index: pair.offset,
+                                         layout: layout)
+                                    .id(pair.element.item.deviceIdentifier)
                             }
                         }
                     }
+                    .frame(width: layout.tableWidth, alignment: .topLeading)
                 }
-                .frame(width: tableWidth, height: proxy.size.height,
-                       alignment: .topLeading)
+                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
             }
-            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(6)
+        .background {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.primary.opacity(0.03))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(.quaternary.opacity(0.25), lineWidth: 0.5)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
-    private func tableHeader(width: CGFloat) -> some View {
-        HStack(spacing: 6) {
-            Text("Name")
-                .frame(minWidth: 150, maxWidth: .infinity, alignment: .leading)
-            Text("Disk")
-                .frame(width: diskColumnWidth, alignment: .leading)
-            Text("Type")
-                .frame(width: typeColumnWidth, alignment: .leading)
-            Text("Size")
-                .frame(width: sizeColumnWidth, alignment: .trailing)
-            Text("Used")
-                .frame(width: usedColumnWidth, alignment: .trailing)
-            Text("Free")
-                .frame(width: freeColumnWidth, alignment: .trailing)
-            Text("Mounted")
-                .frame(width: mountedColumnWidth, alignment: .leading)
+    private func diskSectionHeader(_ diskItem: KBDiskItem,
+                                   expanded: Bool,
+                                   width: CGFloat) -> some View {
+        let selected = disk.selectedItemID == diskItem.deviceIdentifier
+        let content = HStack(spacing: 6) {
+            Color.clear
+                .frame(width: 14, height: 14)
+
+            Image(systemName: "internaldrive")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(kindTint(.physicalDisk))
+                .frame(width: 14)
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(treeName(diskItem))
+                    .font(.system(size: 12.5, weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(diskItem.deviceIdentifier)
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 4)
+
+            Text("\(treeUsedText(diskItem)) used · \(treeFreeText(diskItem)) free")
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .frame(width: width)
+        .background {
+            if selected {
+                Color.accentColor.opacity(0.14)
+            } else {
+                Color.primary.opacity(0.035)
+            }
+        }
+        .contentShape(Rectangle())
+
+        return Button {
+            selection.wrappedValue = diskItem.deviceIdentifier
+        } label: {
+            content
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .leading) {
+            if !diskItem.children.isEmpty
+                && ui.disk.volumesFocus != .disks {
+                Button {
+                    toggle(diskItem.deviceIdentifier)
+                } label: {
+                    Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .frame(width: 14, height: 14)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .padding(.leading, 8)
+                .accessibilityLabel(
+                    expanded
+                        ? "Collapse \(treeName(diskItem)) table"
+                        : "Expand \(treeName(diskItem)) table")
+            }
+        }
+        .accessibilityLabel(
+            "\(treeName(diskItem)), disk \(diskItem.deviceIdentifier), "
+                + "used \(treeUsedText(diskItem)), free \(treeFreeText(diskItem))")
+        .accessibilityHint("Shows details")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func columnLayout(availableWidth: CGFloat) -> VolumeColumnLayout {
+        let stored = ui.disk.volumeColumnWidths
+        let name = DiskVolumeColumnWidths.clamp(
+            stored.name, to: DiskVolumeColumnWidths.nameRange)
+        let disk = DiskVolumeColumnWidths.clamp(
+            stored.disk, to: DiskVolumeColumnWidths.diskRange)
+        let type = DiskVolumeColumnWidths.clamp(
+            stored.type, to: DiskVolumeColumnWidths.typeRange)
+        let size = DiskVolumeColumnWidths.clamp(
+            stored.size, to: DiskVolumeColumnWidths.sizeRange)
+        let used = DiskVolumeColumnWidths.clamp(
+            stored.used, to: DiskVolumeColumnWidths.usedRange)
+        let free = DiskVolumeColumnWidths.clamp(
+            stored.free, to: DiskVolumeColumnWidths.freeRange)
+        let mounted = DiskVolumeColumnWidths.clamp(
+            stored.mounted, to: DiskVolumeColumnWidths.mountedRange)
+        let mountMinimum = DiskVolumeColumnWidths.clamp(
+            stored.mountMinimum, to: DiskVolumeColumnWidths.mountMinimumRange)
+
+        let fixed = name + disk + type + size + used + free + mounted
+        let chrome = VolumeColumnMetrics.spacing * 7
+            + VolumeColumnMetrics.horizontalPadding * 2
+        let mount = max(mountMinimum, availableWidth - fixed - chrome)
+
+        return VolumeColumnLayout(
+            name: name,
+            disk: disk,
+            type: type,
+            size: size,
+            used: used,
+            free: free,
+            mounted: mounted,
+            mount: mount
+        )
+    }
+
+    private func tableHeader(layout: VolumeColumnLayout) -> some View {
+        HStack(spacing: VolumeColumnMetrics.spacing) {
+            headerCell(
+                "Name", width: layout.name, alignment: .leading,
+                resize: VolumeColumnResize(
+                    range: DiskVolumeColumnWidths.nameRange
+                ) { value in
+                    ui.disk.volumeColumnWidths.name = value
+                })
+            headerCell(
+                "Disk", width: layout.disk, alignment: .leading,
+                resize: VolumeColumnResize(
+                    range: DiskVolumeColumnWidths.diskRange
+                ) { value in
+                    ui.disk.volumeColumnWidths.disk = value
+                })
+            headerCell(
+                "Type", width: layout.type, alignment: .leading,
+                resize: VolumeColumnResize(
+                    range: DiskVolumeColumnWidths.typeRange
+                ) { value in
+                    ui.disk.volumeColumnWidths.type = value
+                })
+            headerCell(
+                "Size", width: layout.size, alignment: .trailing,
+                resize: VolumeColumnResize(
+                    range: DiskVolumeColumnWidths.sizeRange
+                ) { value in
+                    ui.disk.volumeColumnWidths.size = value
+                })
+            headerCell(
+                "Used", width: layout.used, alignment: .trailing,
+                resize: VolumeColumnResize(
+                    range: DiskVolumeColumnWidths.usedRange
+                ) { value in
+                    ui.disk.volumeColumnWidths.used = value
+                })
+            headerCell(
+                "Free", width: layout.free, alignment: .trailing,
+                resize: VolumeColumnResize(
+                    range: DiskVolumeColumnWidths.freeRange
+                ) { value in
+                    ui.disk.volumeColumnWidths.free = value
+                })
+            headerCell(
+                "Mounted", width: layout.mounted, alignment: .leading,
+                resize: VolumeColumnResize(
+                    range: DiskVolumeColumnWidths.mountedRange
+                ) { value in
+                    ui.disk.volumeColumnWidths.mounted = value
+                })
             Text("Mount")
-                .frame(minWidth: mountColumnWidth, maxWidth: .infinity,
-                       alignment: .leading)
+                .frame(width: layout.mount, alignment: .leading)
         }
         .font(.system(size: 10, weight: .semibold))
         .textCase(.uppercase)
         .tracking(0.4)
         .foregroundStyle(.secondary)
-        .padding(.horizontal, 8)
+        .padding(.horizontal, VolumeColumnMetrics.horizontalPadding)
         .padding(.vertical, 6)
-        .frame(width: width)
+        .frame(width: layout.tableWidth)
         .background(.quaternary.opacity(0.12))
     }
 
+    private func headerCell(_ title: String, width: CGFloat,
+                            alignment: Alignment,
+                            resize: VolumeColumnResize? = nil) -> some View {
+        Text(title)
+            .frame(width: width, alignment: alignment)
+            .overlay(alignment: .trailing) {
+                if let resize {
+                    VolumeColumnResizeHandle(
+                        title: title,
+                        width: width,
+                        range: resize.range,
+                        onResize: resize.set
+                    )
+                }
+            }
+    }
+
     private func tableRow(_ row: VisibleRow, index: Int,
-                          width: CGFloat) -> some View {
+                          layout: VolumeColumnLayout) -> some View {
         let item = row.item
         let selected = disk.selectedItemID == item.deviceIdentifier
         let focused = ui.disk.volumesFocus != nil
         let expanded = ui.disk.expanded.contains(item.deviceIdentifier)
-        let indent = focused ? 0 : CGFloat(row.depth) * 10
 
-        let content = HStack(alignment: .center, spacing: 6) {
+        let content = HStack(alignment: .center,
+                             spacing: VolumeColumnMetrics.spacing) {
             HStack(alignment: .center, spacing: 4) {
                 Color.clear
                     .frame(width: 14, height: 14)
@@ -276,20 +461,19 @@ struct DiskVolumesView: View {
                     .truncationMode(.middle)
                     .help(treeName(item))
             }
-            .padding(.leading, indent)
-            .frame(minWidth: 150, maxWidth: .infinity, alignment: .leading)
+            .frame(width: layout.name, alignment: .leading)
 
             Text(item.deviceIdentifier)
                 .font(.system(size: 10.5, design: .monospaced))
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .frame(width: diskColumnWidth, alignment: .leading)
+                .frame(width: layout.disk, alignment: .leading)
 
             Text(typeLabel(item))
                 .font(.system(size: 10.5))
                 .lineLimit(1)
                 .minimumScaleFactor(0.9)
-                .frame(width: typeColumnWidth, alignment: .leading)
+                .frame(width: layout.type, alignment: .leading)
                 .help(typeHelp(item))
 
             Text(KBFormat.bytes(item.sizeBytes, units: byteUnitSystem))
@@ -297,7 +481,7 @@ struct DiskVolumesView: View {
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
-                .frame(width: sizeColumnWidth, alignment: .trailing)
+                .frame(width: layout.size, alignment: .trailing)
                 .help(item.kind == .apfsVolume
                       ? "The volume's size is its container's capacity"
                       : "Capacity")
@@ -320,7 +504,7 @@ struct DiskVolumesView: View {
                         .accessibilityHidden(true)
                 }
             }
-            .frame(width: usedColumnWidth, alignment: .trailing)
+            .frame(width: layout.used, alignment: .trailing)
             .help(usedHelp(item))
 
             Text(treeFreeText(item))
@@ -328,14 +512,14 @@ struct DiskVolumesView: View {
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
-                .frame(width: freeColumnWidth, alignment: .trailing)
+                .frame(width: layout.free, alignment: .trailing)
                 .help(freeHelp(item))
 
             Text(mountedText(item))
                 .font(.system(size: 10.5))
                 .foregroundStyle(mountedColor(item))
                 .lineLimit(1)
-                .frame(width: mountedColumnWidth, alignment: .leading)
+                .frame(width: layout.mounted, alignment: .leading)
                 .help(mountedHelp(item))
 
             Text(item.mountPoint ?? "—")
@@ -343,13 +527,12 @@ struct DiskVolumesView: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .frame(minWidth: mountColumnWidth, maxWidth: .infinity,
-                       alignment: .leading)
+                .frame(width: layout.mount, alignment: .leading)
                 .help(item.mountPoint ?? "No mount point")
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, VolumeColumnMetrics.horizontalPadding)
         .padding(.vertical, 4)
-        .frame(width: width)
+        .frame(width: layout.tableWidth)
         .background {
             if selected {
                 Color.accentColor.opacity(0.14)
@@ -376,7 +559,7 @@ struct DiskVolumesView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .padding(.leading, 8 + indent)
+                .padding(.leading, 8)
                 .accessibilityLabel(
                     expanded
                         ? "Collapse \(treeName(item))"
@@ -618,30 +801,79 @@ struct DiskVolumesView: View {
         return rows
     }
 
-    private func displayedRows(_ inventory: KBDiskInventorySnapshot) -> [VisibleRow] {
-        guard let focus = ui.disk.volumesFocus else { return visibleRows(inventory.items) }
+    private func visibleDisks(_ inventory: KBDiskInventorySnapshot) -> [KBDiskItem] {
+        guard let focus = ui.disk.volumesFocus else {
+            return inventory.items
+        }
+        if focus == .disks { return inventory.items }
+        return inventory.items.filter {
+            !focusedRows(for: $0, focus: focus).isEmpty
+        }
+    }
+
+    private func sectionRows(for diskItem: KBDiskItem,
+                             expanded: Bool) -> [VisibleRow] {
+        guard expanded else { return [] }
+        guard let focus = ui.disk.volumesFocus else {
+            return visibleRows(diskItem.children)
+        }
+        if focus == .disks { return [] }
+        return focusedRows(for: diskItem, focus: focus)
+    }
+
+    private func focusedRows(for diskItem: KBDiskItem,
+                             focus: DiskVolumesFocus) -> [VisibleRow] {
+        var descendants: [KBDiskItem] = []
+        func visit(_ node: KBDiskItem) {
+            descendants.append(node)
+            for child in node.children { visit(child) }
+        }
+        for child in diskItem.children { visit(child) }
+
+        let filtered: [KBDiskItem]
         switch focus {
         case .disks:
-            return inventory.items.map { VisibleRow(item: $0, depth: 0) }
+            return []
         case .containers:
-            return inventory.allItems
+            filtered = descendants
                 .filter { $0.kind == .apfsContainer }
                 .sorted { $0.sizeBytes > $1.sizeBytes }
-                .map { VisibleRow(item: $0, depth: 0) }
         case .volumes:
-            return inventory.mountedVolumes
+            filtered = descendants
+                .filter { $0.mountPoint?.isEmpty == false }
                 .sorted { $0.sizeBytes > $1.sizeBytes }
-                .map { VisibleRow(item: $0, depth: 0) }
         case .capacity:
-            return inventory.allItems
+            filtered = descendants
                 .filter { $0.kind != .snapshot }
                 .sorted { $0.sizeBytes > $1.sizeBytes }
-                .map { VisibleRow(item: $0, depth: 0) }
         case .free:
-            return inventory.allItems
+            filtered = descendants
                 .filter { $0.freeBytes != nil }
                 .sorted { ($0.freeBytes ?? 0) < ($1.freeBytes ?? 0) }
-                .map { VisibleRow(item: $0, depth: 0) }
+        }
+        return filtered.map { VisibleRow(item: $0, depth: 0) }
+    }
+
+    private func scrollSelection(_ id: String, proxy: ScrollViewProxy) {
+        guard let inventory = disk.inventory,
+              let item = inventory.allItems.first(where: {
+                  $0.deviceIdentifier == id
+              }) else {
+            DispatchQueue.main.async {
+                withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) {
+                    proxy.scrollTo(id, anchor: .center)
+                }
+            }
+            return
+        }
+        revealInTree(item)
+        // A disk is the section header, so centering it would hide the column
+        // names above its table. Align the section to the top instead.
+        let anchor: UnitPoint = item.kind == .physicalDisk ? .top : .center
+        DispatchQueue.main.async {
+            withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) {
+                proxy.scrollTo(id, anchor: anchor)
+            }
         }
     }
 
@@ -659,8 +891,25 @@ struct DiskVolumesView: View {
     private func reconcileSelection() {
         guard let inventory = disk.inventory,
               let selected = disk.selectedItemID else { return }
-        let visible = displayedRows(inventory)
-            .contains { $0.item.deviceIdentifier == selected }
+
+        let visible: Bool
+        if let focus = ui.disk.volumesFocus {
+            if focus == .disks {
+                visible = inventory.items.contains {
+                    $0.deviceIdentifier == selected
+                }
+            } else {
+                visible = inventory.items.contains { diskItem in
+                    focusedRows(for: diskItem, focus: focus).contains {
+                        $0.item.deviceIdentifier == selected
+                    }
+                }
+            }
+        } else {
+            visible = inventory.allItems.contains {
+                $0.deviceIdentifier == selected
+            }
+        }
         if !visible {
             disk.select(nil)
         }
@@ -711,5 +960,83 @@ struct DiskVolumesView: View {
         }
         guard let used = item.usedBytes, sum > 0 else { return nil }
         return min(1, Double(used) / Double(sum))
+    }
+}
+
+// MARK: - Column metrics
+
+private enum VolumeColumnMetrics {
+    static let spacing: CGFloat = 6
+    static let horizontalPadding: CGFloat = 8
+    static let handleWidth: CGFloat = 9
+}
+
+private struct VolumeColumnLayout {
+    let name: CGFloat
+    let disk: CGFloat
+    let type: CGFloat
+    let size: CGFloat
+    let used: CGFloat
+    let free: CGFloat
+    let mounted: CGFloat
+    let mount: CGFloat
+
+    var tableWidth: CGFloat {
+        name + disk + type + size + used + free + mounted + mount
+            + VolumeColumnMetrics.spacing * 7
+            + VolumeColumnMetrics.horizontalPadding * 2
+    }
+}
+
+private struct VolumeColumnResize {
+    let range: ClosedRange<CGFloat>
+    let set: (CGFloat) -> Void
+}
+
+private struct VolumeColumnResizeHandle: View {
+    let title: String
+    let width: CGFloat
+    let range: ClosedRange<CGFloat>
+    let onResize: (CGFloat) -> Void
+
+    @State private var startWidth: CGFloat?
+    @State private var hovering = false
+
+    var body: some View {
+        Rectangle()
+            .fill(hovering
+                  ? Color.accentColor.opacity(0.8)
+                  : Color.primary.opacity(0.18))
+            .frame(width: 0.75)
+            .frame(width: VolumeColumnMetrics.handleWidth, alignment: .trailing)
+            .contentShape(Rectangle())
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                    .onChanged { value in
+                        let base = startWidth ?? width
+                        if startWidth == nil {
+                            startWidth = width
+                        }
+                        let next = DiskVolumeColumnWidths.clamp(
+                            base + value.translation.width, to: range)
+                        if next != width {
+                            onResize(next)
+                        }
+                    }
+                    .onEnded { _ in
+                        startWidth = nil
+                    }
+            )
+            .onHover { inside in
+                hovering = inside
+                if inside {
+                    NSCursor.resizeLeftRight.set()
+                } else {
+                    NSCursor.arrow.set()
+                }
+            }
+            .help("Drag to resize the \(title.lowercased()) column")
+            .accessibilityLabel("Resize \(title) column")
+            .accessibilityHint("Drag left or right")
     }
 }
