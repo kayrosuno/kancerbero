@@ -9,8 +9,6 @@ struct DiskVolumesView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let onAnalyze: (String) -> Void
 
-    private let cardSpacing: CGFloat = 12
-
     private var selection: Binding<String?> {
         Binding(
             get: { disk.selectedItemID },
@@ -77,16 +75,28 @@ struct DiskVolumesView: View {
     @ViewBuilder
     private func columns(width: CGFloat, height: CGFloat) -> some View {
         let hasSelection = disk.selectedItem != nil
-        let usable = max(0, width - (hasSelection ? cardSpacing : 0))
-        let third = usable / 3
-        let treeWidth = hasSelection ? third : width
-        let detailWidth = usable - third
+        let available = hasSelection
+            ? max(0, width - DiskVolumesSplit.dividerWidth)
+            : width
+        let fraction = DiskVolumesSplit.clampedFraction(
+            ui.disk.volumesSplitFraction,
+            availableWidth: available)
+        let treeWidth = hasSelection
+            ? (available * fraction).rounded(.toNearestOrAwayFromZero)
+            : width
+        let detailWidth = max(0, available - treeWidth)
 
-        HStack(spacing: cardSpacing) {
+        HStack(spacing: 0) {
             treeCard(isMaximized: false)
                 .frame(width: treeWidth, height: height)
 
             if let item = disk.selectedItem {
+                VolumePanelDivider(
+                    height: height,
+                    fraction: fraction,
+                    availableWidth: available,
+                    onResize: { ui.disk.volumesSplitFraction = $0 }
+                )
                 detailCard(item: item, isMaximized: false)
                     .frame(width: detailWidth, height: height)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
@@ -175,27 +185,16 @@ struct DiskVolumesView: View {
             let visibleWidth = max(0, proxy.size.width - 12)
             let layout = columnLayout(availableWidth: visibleWidth)
 
-            ScrollViewReader { scrollProxy in
-                ScrollView(.vertical) {
-                    LazyVStack(spacing: 10) {
-                        ForEach(visibleDisks(inventory)) { diskItem in
-                            diskSection(diskItem,
-                                        layout: layout,
-                                        visibleWidth: visibleWidth)
-                                .id(diskItem.deviceIdentifier)
-                        }
+            ScrollView(.vertical) {
+                LazyVStack(spacing: 10) {
+                    ForEach(visibleDisks(inventory)) { diskItem in
+                        diskSection(diskItem,
+                                    layout: layout,
+                                    visibleWidth: visibleWidth)
                     }
-                    .padding(6)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
-                .onChange(of: disk.selectedItemID) { _, id in
-                    guard let id else { return }
-                    scrollSelection(id, proxy: scrollProxy)
-                }
-                .onAppear {
-                    guard let id = disk.selectedItemID else { return }
-                    scrollSelection(id, proxy: scrollProxy)
-                }
+                .padding(6)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -223,7 +222,6 @@ struct DiskVolumesView: View {
                                     id: \.element.item.deviceIdentifier) { pair in
                                 tableRow(pair.element, index: pair.offset,
                                          layout: layout)
-                                    .id(pair.element.item.deviceIdentifier)
                             }
                         }
                     }
@@ -256,25 +254,26 @@ struct DiskVolumesView: View {
                 .foregroundStyle(kindTint(.physicalDisk))
                 .frame(width: 14)
 
-            VStack(alignment: .leading, spacing: 0) {
-                Text(treeName(diskItem))
-                    .font(.system(size: 12.5, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text(diskItem.deviceIdentifier)
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
+            Text("\(treeName(diskItem)) — \(diskItem.deviceIdentifier)")
+                .font(.system(size: 13.5, weight: .semibold))
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            Text("· \(diskMediaDescription(diskItem))")
+                .font(.system(size: 10.5))
+                .foregroundStyle(Color.primary.opacity(0.62))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
 
             Spacer(minLength: 4)
 
-            Text("\(treeUsedText(diskItem)) used · \(treeFreeText(diskItem)) free")
-                .font(.system(size: 9))
-                .foregroundStyle(.secondary)
+            Text("\(treeCapacityText(diskItem)) · \(treeUsedText(diskItem)) used · \(treeFreeText(diskItem)) free")
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(Color.primary.opacity(0.82))
                 .monospacedDigit()
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.7)
+                .layoutPriority(1)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
@@ -314,7 +313,9 @@ struct DiskVolumesView: View {
             }
         }
         .accessibilityLabel(
-            "\(treeName(diskItem)), disk \(diskItem.deviceIdentifier), "
+            "\(treeName(diskItem)) — \(diskItem.deviceIdentifier), "
+                + "\(diskMediaDescription(diskItem)), "
+                + "capacity \(treeCapacityText(diskItem)), "
                 + "used \(treeUsedText(diskItem)), free \(treeFreeText(diskItem))")
         .accessibilityHint("Shows details")
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -387,33 +388,35 @@ struct DiskVolumesView: View {
                     ui.disk.volumeColumnWidths.size = value
                 })
             headerCell(
-                "Used", width: layout.used, alignment: .trailing,
+                "Used", width: layout.used, alignment: .center,
                 resize: VolumeColumnResize(
                     range: DiskVolumeColumnWidths.usedRange
                 ) { value in
                     ui.disk.volumeColumnWidths.used = value
                 })
             headerCell(
-                "Free", width: layout.free, alignment: .trailing,
+                "Free", width: layout.free, alignment: .center,
                 resize: VolumeColumnResize(
                     range: DiskVolumeColumnWidths.freeRange
                 ) { value in
                     ui.disk.volumeColumnWidths.free = value
                 })
             headerCell(
-                "Mounted", width: layout.mounted, alignment: .leading,
+                "Mounted", width: layout.mounted, alignment: .center,
                 resize: VolumeColumnResize(
                     range: DiskVolumeColumnWidths.mountedRange
                 ) { value in
                     ui.disk.volumeColumnWidths.mounted = value
                 })
             Text("Mount")
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .frame(width: layout.mount, alignment: .leading)
         }
-        .font(.system(size: 10, weight: .semibold))
+        .font(.system(size: 10.5, weight: .semibold))
         .textCase(.uppercase)
         .tracking(0.4)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Color.primary.opacity(0.75))
         .padding(.horizontal, VolumeColumnMetrics.horizontalPadding)
         .padding(.vertical, 6)
         .frame(width: layout.tableWidth)
@@ -424,6 +427,9 @@ struct DiskVolumesView: View {
                             alignment: Alignment,
                             resize: VolumeColumnResize? = nil) -> some View {
         Text(title)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 2)
             .frame(width: width, alignment: alignment)
             .overlay(alignment: .trailing) {
                 if let resize {
@@ -519,12 +525,11 @@ struct DiskVolumesView: View {
                 .font(.system(size: 10.5))
                 .foregroundStyle(mountedColor(item))
                 .lineLimit(1)
-                .frame(width: layout.mounted, alignment: .leading)
+                .frame(width: layout.mounted, alignment: .center)
                 .help(mountedHelp(item))
 
             Text(item.mountPoint ?? "—")
                 .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .frame(width: layout.mount, alignment: .leading)
@@ -578,6 +583,34 @@ struct DiskVolumesView: View {
     private func treeUsedText(_ item: KBDiskItem) -> String {
         guard let used = item.spaceUsage.usedBytes else { return "—" }
         return KBFormat.bytes(used, units: byteUnitSystem)
+    }
+
+    private func treeCapacityText(_ item: KBDiskItem) -> String {
+        guard item.sizeBytes > 0 else { return "—" }
+        return KBFormat.bytes(item.sizeBytes, units: byteUnitSystem)
+    }
+
+    private func diskMediaDescription(_ item: KBDiskItem) -> String {
+        if item.isInternal == true { return "Internal" }
+
+        let model = item.deviceModel?.lowercased() ?? ""
+        let name = item.name.lowercased()
+        let protocolName = item.deviceProtocol?.lowercased() ?? ""
+        if model.contains("disk image")
+            || name.contains("disk image")
+            || protocolName.contains("virtual interface") {
+            return "Disk Image"
+        }
+
+        let bus = item.busName?.lowercased() ?? ""
+        if protocolName.contains("usb") || bus.contains("usb") {
+            return "USB"
+        }
+        if item.isRemovable == true { return "Removable" }
+        if let protocolName = item.deviceProtocol, !protocolName.isEmpty {
+            return protocolName
+        }
+        return item.isInternal == false ? "External" : "Disk"
     }
 
     private func treeFreeText(_ item: KBDiskItem) -> String {
@@ -854,29 +887,6 @@ struct DiskVolumesView: View {
         return filtered.map { VisibleRow(item: $0, depth: 0) }
     }
 
-    private func scrollSelection(_ id: String, proxy: ScrollViewProxy) {
-        guard let inventory = disk.inventory,
-              let item = inventory.allItems.first(where: {
-                  $0.deviceIdentifier == id
-              }) else {
-            DispatchQueue.main.async {
-                withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) {
-                    proxy.scrollTo(id, anchor: .center)
-                }
-            }
-            return
-        }
-        revealInTree(item)
-        // A disk is the section header, so centering it would hide the column
-        // names above its table. Align the section to the top instead.
-        let anchor: UnitPoint = item.kind == .physicalDisk ? .top : .center
-        DispatchQueue.main.async {
-            withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) {
-                proxy.scrollTo(id, anchor: anchor)
-            }
-        }
-    }
-
     private func expandVolumesIfNeeded() {
         guard !ui.disk.didExpandVolumesOnce, disk.inventory != nil else { return }
         expandAll()
@@ -966,8 +976,8 @@ struct DiskVolumesView: View {
 // MARK: - Column metrics
 
 private enum VolumeColumnMetrics {
-    static let spacing: CGFloat = 6
-    static let horizontalPadding: CGFloat = 8
+    static let spacing: CGFloat = 5
+    static let horizontalPadding: CGFloat = 6
     static let handleWidth: CGFloat = 9
 }
 
@@ -1038,5 +1048,64 @@ private struct VolumeColumnResizeHandle: View {
             .help("Drag to resize the \(title.lowercased()) column")
             .accessibilityLabel("Resize \(title) column")
             .accessibilityHint("Drag left or right")
+    }
+}
+
+private struct VolumePanelDivider: View {
+    let height: CGFloat
+    let fraction: CGFloat
+    let availableWidth: CGFloat
+    let onResize: (CGFloat) -> Void
+
+    @State private var startFraction: CGFloat?
+    @State private var hovering = false
+
+    var body: some View {
+        ZStack {
+            Color.clear
+            Rectangle()
+                .fill(hovering
+                      ? Color.accentColor.opacity(0.8)
+                      : Color.primary.opacity(0.18))
+                .frame(width: 1)
+            Capsule()
+                .fill(hovering
+                      ? Color.accentColor.opacity(0.9)
+                      : Color.primary.opacity(0.22))
+                .frame(width: 3, height: 36)
+        }
+        .frame(width: DiskVolumesSplit.dividerWidth, height: height)
+        .contentShape(Rectangle())
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                .onChanged { value in
+                    let base = startFraction ?? fraction
+                    if startFraction == nil {
+                        startFraction = fraction
+                    }
+                    guard availableWidth > 0 else { return }
+                    let candidate = base
+                        + value.translation.width / availableWidth
+                    let next = DiskVolumesSplit.clampedFraction(
+                        candidate, availableWidth: availableWidth)
+                    if next != fraction {
+                        onResize(next)
+                    }
+                }
+                .onEnded { _ in
+                    startFraction = nil
+                }
+        )
+        .onHover { inside in
+            hovering = inside
+            (inside ? NSCursor.resizeLeftRight : NSCursor.arrow).set()
+        }
+        .onDisappear {
+            NSCursor.arrow.set()
+        }
+        .help("Drag to resize the panels")
+        .accessibilityLabel("Resize disk panels")
+        .accessibilityHint("Drag left or right")
+        .accessibilityValue("\(Int((fraction * 100).rounded())) percent")
     }
 }

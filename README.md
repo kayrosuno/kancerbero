@@ -92,46 +92,58 @@ El detalle de binarios, permisos, instalación y librerías está en
     los chips de Capacity/Partitions/Containers/Volumes (icono + nombre + número); cuando no caben
     en una línea pasan a una segunda bajo el título; las tablas por disco muestran la jerarquía
     completa. El flag `--volumes-focus` sigue permitiendo filtrar las tablas para capturas. El
-    panel izquierdo es una pila de tablas, una por disco, con cabecera colapsable (chevron,
-    nombre, id y usado/libre); por defecto están todas abiertas. Cada tabla repite las columnas
+    panel izquierdo es una pila de tablas, una por disco, con cabecera colapsable en una línea
+    (chevron, `Nombre — disk0`, tipo de medio más tenue y, a la derecha, capacidad · usado ·
+    libre), con textos en tinta contrastada; por defecto están todas abiertas. Cada tabla repite las columnas
     **Name / Disk / Type / Size / Used / Free / Mounted / Mount**, con filas de una línea y sin
-    indentación (la jerarquía se sigue por los chevrons y la cabecera de cada disco). La cabecera
+    indentación (la jerarquía se sigue por los chevrons y la cabecera de cada disco). Los títulos
+    de Used, Free y Mounted van centrados, y los valores de Mounted también. La cabecera
     separa las columnas con líneas arrastrables para redimensionarlas; los anchos se comparten
-    entre tablas y se conservan durante la sesión, y Mount absorbe el espacio sobrante. Si las
-    columnas no caben, cada tabla se desplaza horizontalmente (682 pt con los anchos por defecto).
+    entre tablas y se conservan durante la sesión, y Mount absorbe el espacio sobrante. Con los
+    anchos por defecto las ocho columnas caben en el panel a 1/2 en una ventana de 1440, sin barra
+    horizontal; si no caben, cada tabla se desplaza horizontalmente.
     Disk muestra el identificador del dispositivo de cada fila (`disk0`, `disk0s2`, `disk3s1`…);
     Type combina el tipo y el sistema de ficheros
     (`Volume APFS`, `Partition MS-DOS`, `Container APFS`; nombre completo en el tooltip) y Mounted
-    Yes/No en volúmenes y snapshots, `—` en el resto. Used incluye una mini barra (volúmenes: parte del usado
+    Yes/No en volúmenes y snapshots, `—` en el resto. Mount usa el mismo color de tinta que el
+    resto de celdas, no un gris más claro. Used incluye una mini barra (volúmenes: parte del usado
     del contenedor; resto: usado/capacidad) y Free muestra `—` en volúmenes (espacio compartido).
-    El panel de tablas ocupa 1/3 del ancho y el detalle 2/3
-    (sin selección, las tablas ocupan todo). Al seleccionar cualquier elemento, el detalle muestra
-    una tarjeta hero con el gauge vertical de uso a la izquierda y Capacity/Used/Free en la misma
+    El panel de tablas y el de detalle se reparten el ancho a la mitad
+    (sin selección, las tablas ocupan todo); el divisor central se puede arrastrar para cambiar el
+    reparto y la proporción se conserva durante la sesión. La tabla conserva su posición de scroll
+    al seleccionar un elemento. El detalle muestra una tarjeta hero con el gauge vertical de uso a
+    la izquierda y Capacity/Used/Free en la misma
     columna lateral, y un treemap rectangular anidado con la estructura del disco (particiones →
     contenedores APFS → volúmenes, con libre, residual y espacio no asignado). La cabecera de la
     tarjeta muestra el nombre del disco y no cambia al seleccionar un volumen o contenedor. Cada
     rectángulo
     tiene un tamaño mínimo visible, así que todas las particiones y volúmenes aparecen aunque las
-    áreas dejen de ser estrictamente proporcionales al uso; el texto de los tiles es mayor y el
-    treemap crece a 600/860 pt. Todos los contenedores y volúmenes muestran su uso/% (inline en
+    áreas dejen de ser estrictamente proporcionales al uso; el texto de los tiles es mayor y la
+    altura del treemap se adapta al contenido (420/460–860 pt) para que quepan las etiquetas sin
+    crecer de más. Todos los contenedores y
+    volúmenes muestran su uso/% (inline en
     filas compactas); los tiles suficientemente grandes
     muestran nombre, usado y porcentaje (los volúmenes vacíos, `Not mounted`). Cada etiqueta
     incluye el identificador y el tipo (`disk3s5 · Macintosh HD - Data · APFS volume`), y las
     particiones/contenedores dejan un marco visible (inset 12/9/7 pt) alrededor de sus hijos. Todas
-    las particiones comparten azul muy claro, todos los contenedores azul pastel medio y todos los
-    volúmenes azul pastel algo más profundo; cada partición muestra su usado y porcentaje alineado
-    a la derecha en la cabecera. La cabecera de la tarjeta muestra el nombre del disco con el chip
+    las particiones comparten un hueso claro, los contenedores un hueso medio y los volúmenes un
+    hueso algo más profundo (`#e8e2d7 #d9d1c3 #c9bfae`; free `#f7f3ea`, residual `#d2c9ba`); cada
+    partición muestra su usado y porcentaje alineado a la derecha en la cabecera. El texto de los
+    tiles tiene un mínimo legible de 11.5 pt (12.5 maximizado): si no cabe se trunca con elipsis,
+    nunca se reduce por debajo. La cabecera de la tarjeta muestra el nombre del disco con el chip
     de capacidad resaltado y los chips de componentes con sus nombres (icono + nombre + número);
-    dentro del panel del treemap, en la franja gris superior, se muestran `disk0`, capacidad, usado
-    y libre. La
+    el disco aparece como contenedor raíz dentro del treemap, con su banda de cabecera
+    (`disk0`, capacidad, usado y libre) y las particiones dentro; el gráfico no lleva fondo ni
+    recuadro exterior, se apoya directamente en la tarjeta de detalle. La
     tarjeta de detalle vuelve al material claro de la app, con un lavado ámbar/teal, borde y sombra
-    suaves. Los gráficos de Volumes usan la paleta azul pastel
-    `#d9e8f7 #bfd8f0 #a6cbe8` (free `#e7f2fb`, residual `#c9d9ec`), con bordes y texto en tinta
-    oscura. Sobre el gauge
+    suaves. El treemap usa esa paleta hueso, con bordes y texto en tinta oscura cálida; el gauge y
+    las barras de la tabla siguen en azul. Sobre el gauge
     se indica el tipo del elemento y su porcentaje; tiene tres líneas de cuartos, degradado más
     oscuro abajo y claro arriba, borde reforzado y un punto blanco con aro azul en la punta. El
-    mountpoint de cada
-    volumen se muestra centrado en su tile; no hay pop/tooltip sobre el treemap.
+    mount point de cada volumen se dibuja en la misma línea que el nombre (a la izquierda) y el
+    tamaño/uso (a la derecha), empezando en una columna central común del treemap y alineado a la
+    izquierda; las hojas que no cruzan esa columna no muestran el mount. No hay pop/tooltip sobre
+    el treemap.
     Si el elemento es un contenedor o volumen APFS se indica el espacio compartido y con qué
     volúmenes/contenedor.
     Las actions (Reveal, Copy ID, Analyze) van en una sola línea por encima de la metadata. No hay

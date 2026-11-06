@@ -108,20 +108,29 @@
   Decimal (por defecto) usa base 1000 con KB/MB/GB; Binary usa base 1024 con KiB/MiB/GiB. El
   valor vive en `UserDefaults` (`diskByteUnitSystem`) y `DiskView` lo propaga con
   `EnvironmentValues.byteUnitSystem`; fuera de Disk el valor por defecto es binario para no
-  alterar CPU/Memory/Network. Volumes muestra las tablas a 1/3 y el detalle a 2/3 (sin selección,
-  las tablas ocupan todo); al seleccionar un ítem no se abre ninguna tercera tarjeta. Cada tarjeta
+  alterar CPU/Memory/Network. Volumes reparte tablas y detalle a la mitad (sin selección, las
+  tablas ocupan todo); el divisor central es arrastrable y la proporción
+  (`volumesSplitFraction`) se conserva durante la sesión. Al seleccionar un ítem no se abre
+  ninguna tercera tarjeta ni se desplaza la tabla. Cada tarjeta
   tiene un botón maximizar/restaurar que la lleva al área de Volumes (oculta la otra columna;
   cabecera y pestañas siguen visibles). El estado vive en `DiskUIState`
   (`maximizedVolumesPanel`). El panel izquierdo es una pila de tablas, una por disco, con cabecera
-  colapsable (chevron + nombre/id + usado/libre), todas abiertas por defecto; cada tabla repite las
+  colapsable en una línea (chevron + `Nombre — disk0` + tipo de medio más tenue y
+  capacidad/usado/libre a la derecha, con textos
+  de tinta contrastada), todas abiertas por defecto; cada tabla repite las
   columnas `Name / Disk / Type / Size / Used / Free / Mounted / Mount`, con filas de una línea,
   chevron, sin indentación (la jerarquía se lee por el chevron y la cabecera de la sección), cebra
-  y selección por botón de fila. La cabecera dibuja separadores arrastrables para redimensionar
-  cada columna (Name 90–400, Disk 70–150, Type 60–180, Size 48–100, Used/Free 48–110, Mounted
-  48–90 pt); los anchos viven en `DiskUIState.volumeColumnWidths` para compartirse entre tablas y
-  conservarse durante la sesión, y Mount absorbe el espacio sobrante. Scroll vertical único y
-  horizontal por tabla cuando no cabe el mínimo (682 pt con los valores por defecto). Disk muestra
-  el `deviceIdentifier` de cada fila
+  y selección por botón de fila. Los títulos de Used, Free y Mounted van centrados, y los valores
+  de Mounted también; la celda Mount usa el mismo color de tinta que el resto, sin gris
+  secundario. La cabecera dibuja separadores arrastrables para redimensionar cada columna
+  (Name 90–400, Disk 62–150, Type 58–180, Size 44–100, Used/Free 44–110, Mounted 50–90 pt); por
+  defecto Name 132, Disk 70, Type 72, Size/Used/Free 46, Mounted 50 y Mount mínimo 40, con
+  spacing 5 y padding horizontal 6 (mínimo ≈549 pt). Los anchos viven en
+  `DiskUIState.volumeColumnWidths` para compartirse entre tablas y conservarse durante la sesión,
+  y Mount absorbe el espacio sobrante; el scroll vertical es único. En el panel a 1/2 de una
+  ventana de 1440 (≈559 pt) las ocho
+  columnas caben sin scroll horizontal; en ventanas más estrechas aparece scroll por tabla. Disk
+  muestra el `deviceIdentifier` de cada fila
   (`disk0`, `disk0s2`, `disk3s1`…); Type
   combina la etiqueta corta del tipo (Disk/Partition/Container/Volume/Snapshot) con el sistema de
   ficheros (`Volume APFS`, `Partition MS-DOS`) en vez de `DiskPalette.kindLabel`, cuyas etiquetas
@@ -263,13 +272,16 @@
   la ventana reincorpora flujos aún presentes en `lastActivityNanoseconds` y bajarla los descarta
   en el siguiente refresco; la caption/hint del tile se actualizan en vivo vía `@AppStorage`.
   Sparklines, hover, paneles de detalle, filtros/foco y LiveDot no se tocan.
-- Disk → Volumes mantiene `expanded`, `volumesFocus` y `volumeColumnWidths` en `UIState`. La
+- Disk → Volumes mantiene `expanded`, `volumesFocus`, `volumeColumnWidths` y
+  `volumesSplitFraction` en `UIState`. La
   expansión inicial se hace una sola vez (`didExpandVolumesOnce`); los refrescos de inventario solo
   podan ids obsoletos, así que el colapso manual se conserva. Los anchos de columna se comparten
   entre todas las tablas y sobreviven a cambiar de disco o de sección (solo se conservan en la
-  sesión, no en `UserDefaults`). La tarjeta All limpia el filtro y re-expande las tablas completas.
+  sesión, no en `UserDefaults`). El reparto de los dos paneles (por defecto 0.5) también es de
+  sesión. La tarjeta All limpia el filtro y re-expande las tablas completas.
   Pulsar un rectángulo del treemap limpia el foco, expande los ancestros y selecciona el ítem
-  (`DiskModel.select`), de modo que las tablas y el detalle siempre apuntan al mismo elemento.
+  (`DiskModel.select`), de modo que las tablas y el detalle siempre apuntan al mismo elemento; la
+  tabla no hace scroll-to-selection, así que su posición vertical no cambia.
 - Captura interna para verificación: `--screenshot`, `--section`, `--tab`, `--disk-tab`,
   `--networking-focus`, `--networking-transport`, `--networking-ip`, `--networking-state`,
   `--networking-connection-search`, `--networking-process-domain`,
@@ -364,36 +376,47 @@
     usable, los segmentos se escalan y se avisa. Cada rectángulo recibe un **mínimo visible** por
     rol y eje (`minimumExtent`) y el resto se reparte proporcional a la fracción, de modo que todas
     las particiones y volúmenes aparecen aunque las áreas sean aproximadas; los volúmenes con
-    fracción 0 (desmontados) reciben un tile compacto (12/14 pt) para que su contenido siga visible.
+    fracción 0 (desmontados) reciben un tile compacto (20/22 pt) para que su contenido siga visible.
     Los tiles grandes muestran nombre +
     usado + porcentaje (o `Not mounted`). Cada etiqueta incluye el identificador del dispositivo y
     el tipo (`disk3s5 · Macintosh HD - Data · APFS volume`, `disk0s2 · Container · Partition`) y
     los padres dejan un inset visible (12/9/7 pt normal) alrededor de los hijos para leer la
     contención. Cada partición muestra además su usado y porcentaje alineado a la derecha en la
     cabecera. Cada partición reserva además altura suficiente para los volúmenes que contiene
-    (altura recursiva con tope 180/220 pt), de modo que las particiones pequeñas muestran su
-    contenido; el gauge se centra verticalmente con el treemap y no hay leyenda debajo del gráfico:
-    el rectángulo ocupa esa altura (600 pt normal / 860 maximizado). El texto de los tiles es mayor
-    y cada contenedor/volumen muestra su uso/% (inline en filas compactas).
-    Los gráficos usan `DiskPalette` (azules pastel: particiones `#d9e8f7`, contenedores
-    `#bfd8f0`, volúmenes `#a6cbe8`; free `#e7f2fb`, residual `#c9d9ec`, unallocated `#d7e1ec`,
-    unknown `#ebf2f9`), con tinta oscura para textos y bordes. La tarjeta de detalle vuelve al
+    (altura recursiva con tope 520/600 pt), de modo que las particiones pequeñas muestran su
+    contenido; el gauge se centra verticalmente con el treemap y no hay leyenda debajo del gráfico.
+    La altura del treemap es adaptativa al contenido (420/460…860 pt): se calcula con los ejes,
+    mínimos, insets y gaps reales, así que un disco con pocos volúmenes usa menos alto y no fuerza
+    scroll de más. El texto
+    de los tiles nunca
+    baja de 11.5 pt (12.5 maximizado) y se trunca antes que reducirse; cada contenedor/volumen
+    muestra su uso/% (inline en filas compactas); las hojas usan un mínimo de fila de 22/24 pt y
+    las de fracción 0 20/22 pt, suficiente para su línea.
+    Los gráficos usan `DiskPalette` (paleta hueso: particiones `#e8e2d7`, contenedores
+    `#d9d1c3`, volúmenes `#c9bfae`; free `#f7f3ea`, residual `#d2c9ba`, unallocated `#ddd5c7`,
+    unknown `#ede8de`), con tinta cálida oscura para textos y bordes. La tarjeta de detalle vuelve al
     material claro de la app con un lavado ámbar/teal, borde fino y sombra suave; el gauge usa
     azules de la app, tiene tres líneas de cuartos, degradado más oscuro abajo y claro arriba, borde
     reforzado y un punto blanco con aro azul en la
     punta, y los valores Capacity/Used/Free son primarios. La cabecera de la tarjeta
     muestra el nombre del disco con el chip de capacidad resaltado y los chips de
     particiones/contenedores/volúmenes con nombre y número (una o dos líneas según el ancho);
-    dentro del panel del treemap, en la franja gris superior, se muestran `diskN`, capacidad,
-    usado y libre.
+    el disco aparece como contenedor raíz dentro del treemap, con su banda de cabecera
+    (`diskN`, capacidad, usado y libre) y las particiones anidadas dentro; el treemap no tiene
+    fondo ni recuadro exterior, se apoya en la tarjeta de detalle.
     No cambia al seleccionar un elemento y el
-    gráfico no tiene bloque de resumen de conteos. Los bordes y textos se eligen por la
-    luminancia relativa del relleno (`contentColor`/`bandColor`): tinta oscura sobre los tonos
-    claros. El rectángulo seleccionado usa un trazo de tinta de 2 pt; hover y ancestros conservan
-    trazos finos. Las
+    gráfico no tiene bloque de resumen de conteos. El treemap usa la paleta hueso (`#e8e2d7`
+    particiones, `#d9d1c3` contenedores, `#c9bfae` volúmenes; `#f7f3ea` free, `#d2c9ba` residual) y
+    elige los bordes/textos por la
+    luminancia relativa del relleno (`contentColor`/`bandColor`): tinta cálida oscura sobre los
+    tonos claros. El rectángulo seleccionado usa un trazo de tinta de 2 pt; hover y ancestros
+    conservan trazos finos. Las
     particiones y contenedores reservan una banda superior para su etiqueta (`id · nombre · tipo`) y
-    los volúmenes/free/residual se etiquetan dentro si caben; el mountpoint de cada volumen se
-    dibuja centrado en su tile y no hay pop/tooltip sobre el treemap. El gauge y la metadata
+    los volúmenes/free/residual se etiquetan dentro si caben; el texto de los tiles nunca baja de
+    11.5 pt (12.5 maximizado) y se trunca con elipsis antes que reducirse. El mount point de cada
+    volumen se dibuja en la misma línea que el nombre (izquierda) y el tamaño/uso (derecha),
+    comenzando en una columna central común (`layout.bounds.midX`) y alineado a la izquierda; las
+    hojas que no cruzan esa columna no lo muestran. No hay pop/tooltip sobre el treemap. El gauge y la metadata
     describen el elemento seleccionado. Las actions (Reveal, Copy ID, Analyze) van en una línea
     por encima de la metadata. Pulsar un rectángulo selecciona el ítem; pulsar el fondo
     del treemap selecciona el disco del alcance. En las tablas, la barra de un

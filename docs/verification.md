@@ -339,6 +339,42 @@ $K --screenshot /tmp/kb-vol-cols.png --section disk --disk-tab volumes \
   --disk-item disk0 --volumes-maximized tree --screenshot-delay 5
 $K --screenshot /tmp/kb-vol-cols-narrow.png --section disk --disk-tab volumes \
   --disk-item disk0 --screenshot-size 1340x700 --screenshot-delay 5
+$K --screenshot /tmp/kb-vol-5050.png --section disk --disk-tab volumes \
+  --disk-item disk0 --disk-units decimal --screenshot-size 1440x900 \
+  --screenshot-delay 5 --cards-expanded
+$K --screenshot /tmp/kb-vol-noselect.png --section disk --disk-tab volumes \
+  --volumes-focus disks --disk-units decimal --screenshot-size 1440x900 \
+  --screenshot-delay 5 --cards-expanded
+$K --screenshot /tmp/kb-vol-noscroll.png --section disk --disk-tab volumes \
+  --disk-item disk4 --disk-units decimal --screenshot-size 1440x900 \
+  --screenshot-delay 5 --cards-expanded
+$K --screenshot /tmp/kb-vol-compact-1440.png --section disk --disk-tab volumes \
+  --disk-item disk0 --disk-units decimal --screenshot-size 1440x900 \
+  --screenshot-delay 5 --cards-expanded
+$K --screenshot /tmp/kb-vol-compact-1340.png --section disk --disk-tab volumes \
+  --disk-item disk0 --disk-units decimal --screenshot-size 1340x700 \
+  --screenshot-delay 5 --cards-expanded
+$K --screenshot /tmp/kb-vol-treemap-bone.png --section disk --disk-tab volumes \
+  --disk-item disk0 --disk-units decimal --volumes-maximized details \
+  --screenshot-size 1440x900 --screenshot-delay 5 --cards-expanded
+$K --screenshot /tmp/kb-mountline-1440.png --section disk --disk-tab volumes \
+  --disk-item disk0 --disk-units decimal --screenshot-size 1440x900 \
+  --screenshot-delay 5 --cards-expanded
+$K --screenshot /tmp/kb-mountline-details.png --section disk --disk-tab volumes \
+  --disk-item disk0 --disk-units decimal --volumes-maximized details \
+  --screenshot-size 1440x900 --screenshot-delay 5 --cards-expanded
+$K --screenshot /tmp/kb-mediakind-1440.png --section disk --disk-tab volumes \
+  --disk-item disk0 --disk-units decimal --screenshot-size 1440x900 \
+  --screenshot-delay 5 --cards-expanded
+$K --screenshot /tmp/kb-mediakind-tree.png --section disk --disk-tab volumes \
+  --disk-item disk0 --disk-units decimal --volumes-maximized tree \
+  --screenshot-size 1440x900 --screenshot-delay 5 --cards-expanded
+$K --screenshot /tmp/kb-headers-1340.png --section disk --disk-tab volumes \
+  --disk-item disk0 --disk-units decimal --screenshot-size 1340x700 \
+  --screenshot-delay 5 --cards-expanded
+$K --screenshot /tmp/kb-follow-disk4.png --section disk --disk-tab volumes \
+  --disk-item disk4 --disk-units decimal --screenshot-size 1440x900 \
+  --screenshot-delay 5 --cards-expanded
 $K --screenshot /tmp/kb-disk-folders.png --section disk \
   --disk-tab analyzer --disk-path="$HOME/Documents" --disk-scan \
   --analyzer-focus folders --screenshot-delay 8
@@ -346,17 +382,24 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   --disk-tab io --screenshot-delay 6
 ```
 
-- Volumes: por defecto tablas 1/3 + detalle 2/3 (sin selección, las tablas ocupan todo); no existe
-  una tercera tarjeta ni las tarjetas resumen superiores. El panel izquierdo es una pila de tablas,
-  una por disco, con cabecera colapsable (chevron, nombre/id, usado/libre) y todas abiertas por
+- Volumes: por defecto tablas 1/2 + detalle 1/2 (sin selección, las tablas ocupan todo); no existe
+  una tercera tarjeta ni las tarjetas resumen superiores. El divisor central se puede arrastrar
+  para repartir el ancho entre ambos paneles (mínimos de 300 pt para las tablas y 360 pt para el
+  detalle) y la proporción se conserva durante la sesión. El panel izquierdo es una pila de tablas,
+  una por disco, con cabecera colapsable en una línea (chevron, `Nombre — disk0`, tipo de medio más
+  tenue y capacidad · usado · libre a la derecha, con textos contrastados) y todas abiertas por
   defecto. Cada tabla repite la cabecera
   **Name / Disk / Type / Size / Used / Free / Mounted / Mount**, con filas de una línea y sin
-  indentación (la jerarquía se lee por los chevrons y la cabecera de la sección). La cabecera
+  indentación (la jerarquía se lee por los chevrons y la cabecera de la sección). Los títulos de
+  Used, Free y Mounted van centrados, y los valores de Mounted también. La cabecera
   muestra separadores verticales arrastrables: al arrastrar uno, la columna cambia de ancho, Mount
   absorbe el espacio sobrante y el ancho se mantiene al cambiar de disco, sección o tamaño de
-  ventana. Los anchos son de sesión y se comparten entre todas las tablas. A 1/3 se desplaza
-  horizontalmente (~682 pt de contenido); al seleccionar un disco la sección se alinea arriba para
-  que se vean su cabecera y la de columnas. Disk muestra el
+  ventana. Los anchos son de sesión y se comparten entre todas las tablas; los defaults son
+  Name 132, Disk 70, Type 72, Size/Used/Free 46 y Mounted 50. Con esos anchos (~549 pt de mínimo)
+  las ocho columnas caben a 1/2 en una ventana de 1440 sin barra horizontal; en 1340 cada tabla se
+  desplaza horizontalmente si no caben. La tabla conserva su
+  posición de scroll al seleccionar un elemento: ya no se centra ni se alinea la sección; solo
+  cambian el resaltado y el detalle. Disk muestra el
   `deviceIdentifier` de cada fila (`disk0`, `disk0s2`, `disk3s1`…) tanto en las filas de la
   jerarquía como en las filas planas de `--volumes-focus`; Type combina el tipo con el sistema de
   ficheros
@@ -374,28 +417,57 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   absorbe el sobrante y el valor se mantiene al cambiar de disco o de sección (interacción manual).
   Las filas de un mismo panel comparten el mismo borde izquierdo, sin indentación, y los chevrons
   siguen expandiendo/colapsando la jerarquía.
+- Tabla compacta: en `kb-vol-compact-1440.png` las ocho columnas caben en el panel a 1/2 sin barra
+  horizontal; USED/FREE/MOUNTED están centrados, MOUNTED no se corta, Mounted muestra Yes/No/—
+  centrado y Mount queda estrecho, con el texto del mount en el mismo color de tinta que el resto
+  de celdas (no gris). Disk y Mounted son más estrechos que antes. En
+  `kb-vol-compact-1340.png` se comprueba el comportamiento en la ventana mínima (puede requerir
+  scroll por el ancho del panel).
+- Cabeceras por disco: en `kb-mediakind-1440.png` cada cabecera muestra `Nombre — disk0` en una
+  sola línea, sin identificador suelto, seguido del tipo de medio más tenue (`Internal`, `USB`,
+  `Disk Image`…), y a la derecha `capacidad · usado · libre`. Los textos del título, tipo, resumen
+  y cabecera de columnas usan tinta contrastada. En `kb-mediakind-tree.png` se comprueban disk0
+  `Internal`, disk4/disk10 `USB` y disk6/disk8 `Disk Image`.
+- Divisor de paneles: en `kb-vol-5050.png` las dos tarjetas ocupan aproximadamente la mitad y el
+  divisor queda centrado; en `kb-vol-noselect.png` no hay divisor y la tabla ocupa todo el ancho.
+  Arrastrar el divisor cambia el reparto, respeta los mínimos (300 pt tablas / 360 pt detalle) y la
+  proporción se conserva al cambiar de disco, sección o pestaña. En `kb-vol-noscroll.png` la tabla
+  sigue arriba (sección disk0) mientras el detalle muestra disk4: la selección no desplaza la
+  tabla; `kb-vol-2col.png` puede abrir con la fila seleccionada fuera del área visible, sin
+  centrarla.
 - Treemap: tarjeta hero con el gauge vertical a la izquierda y Capacity/Used/Free en la misma
   columna lateral; el gauge se centra verticalmente con el rectángulo. El gráfico es un rectángulo
   anidado (particiones → contenedores APFS → volúmenes, con “Other” para el espacio no asignado,
-  residual y libre) que ocupa ~600 pt normal y ~860 maximizado, con texto de tile mayor. Usa la
-  paleta azul pastel
-  `#d9e8f7 #bfd8f0 #a6cbe8` (particiones azul claro, contenedores azul medio, volúmenes azul
-  profundo; free `#e7f2fb`, residual `#c9d9ec`), con bordes y texto en tinta oscura. La tarjeta es
-  un panel material claro con lavado ámbar/teal, borde y sombra suaves; el gauge usa azules de la
-  app, tres líneas de cuartos, degradado más oscuro abajo y claro arriba, borde reforzado y un
-  punto blanco con aro
-  azul. Dentro del panel del treemap, en la franja gris superior, se muestran `disk0`, capacidad,
-  usado y libre; la cabecera de la tarjeta muestra el nombre del disco con los chips de capacidad y
+  residual y libre) que adapta su altura al contenido (420/460…860 pt) para
+  evitar scroll innecesario, con texto de
+  tile mayor. Usa la
+  paleta hueso
+  `#e8e2d7 #d9d1c3 #c9bfae` (particiones hueso claro, contenedores hueso medio, volúmenes hueso
+  profundo; free `#f7f3ea`, residual `#d2c9ba`), con bordes y texto en tinta cálida oscura. La
+  tarjeta es un panel material claro con lavado ámbar/teal, borde y sombra suaves; el gauge usa
+  azules de la app, tres líneas de cuartos, degradado más oscuro abajo y claro arriba, borde
+  reforzado y un punto blanco con aro
+  azul. El disco aparece como contenedor raíz dentro del treemap, con su banda de cabecera
+  (`disk0`, capacidad, usado y libre) y las particiones anidadas; la cabecera de la tarjeta muestra
+  el nombre del disco con los chips de capacidad y
   de componentes con nombre y número (una o dos líneas según el ancho).
   **No hay bloque-resumen sobre el gráfico ni leyenda
   debajo**; el rectángulo ocupa ese espacio. La cabecera no cambia al seleccionar un volumen o
   contenedor; la línea sobre el gráfico y el gauge/metadata describen el disco y el seleccionado
   respectivamente. Cada contenedor y volumen muestra su uso/% (inline si la fila es compacta).
-  El rectángulo seleccionado usa un trazo de tinta de 2 pt, distinto del hover/ancestros. No hay
-  pop/tooltip sobre el treemap; el mountpoint de cada volumen se dibuja centrado en su tile. Las
-  particiones y contenedores etiquetan su banda superior. Hover
+  El texto de los tiles tiene un mínimo de 11.5 pt (12.5 maximizado): si no cabe se trunca con
+  elipsis, nunca se reduce. El rectángulo seleccionado usa un trazo de tinta de 2 pt, distinto del
+  hover/ancestros. No hay pop/tooltip sobre el treemap; el mount point de cada volumen se dibuja en
+  la misma línea que el nombre (izquierda) y el tamaño/uso (derecha), comenzando en una columna
+  central común y alineado a la izquierda; las hojas que no cruzan la columna no lo muestran. Las particiones y contenedores etiquetan su banda superior. Hover
   resalta rectángulo. No hay flecha de subir nivel: la navegación es por las tablas y los
   rectángulos. Las actions (Reveal, Copy ID, Analyze) van en una línea por encima de la metadata.
+- Disco raíz, línea de mount y altura: en `kb-mountline-1440.png` se ve `disk0` como contenedor
+  raíz con banda de cabecera y sin fondo/recuadro exterior; el mount de cada volumen aparece en su
+  línea de nombre/tamaño, empezando en la columna central común. En `kb-mountline-details.png`
+  se comprueba que `disk0s3` muestra `disk2` y sus volúmenes `Recovery`/`Update` con
+  `Not mounted`. En un disco con pocos volúmenes (p. ej. `kb-follow-disk4.png`) el treemap baja a
+  ~420/460 pt; el máximo sigue siendo 860.
 - Las barras de las tablas y el gauge usan los acentos de la app; sobre el gauge se rotula DISK/PARTITION/
   CONTAINER/VOLUME, y el caption dice “of container”/“of capacity”. Capacity, Used y Free
   comparten la columna lateral; el gauge tiene cuartos, degradado más oscuro abajo y claro arriba,
@@ -892,11 +964,12 @@ $K --screenshot /tmp/kb-hero-min.png --section disk --disk-tab volumes \
 
 - La cabecera de la tarjeta muestra el nombre del disco con los chips de capacidad y de
   particiones/contenedores/volúmenes con nombre y número (pasan a una segunda línea si no caben);
-  el título no cambia al seleccionar un volumen o contenedor. Dentro del panel del treemap, en la
-  franja gris superior, se muestran `disk0`, capacidad, usado y libre; no queda ningún bloque de
+  el título no cambia al seleccionar un volumen o contenedor. El disco aparece como contenedor
+  raíz dentro del treemap, con su banda de cabecera (`disk0`, capacidad, usado y libre) y las
+  particiones dentro; no queda ningún bloque de
   resumen de conteos ni cabecera de selección encima del gráfico. Las actions van en una línea por
-  encima de la metadata. Cada nivel usa su tramo de la paleta azul pastel y los bordes/texto se
-  eligen por luminancia (tinta sobre claros).
+  encima de la metadata. Cada nivel usa su tramo de la paleta hueso y los bordes/texto se eligen
+  por luminancia (tinta cálida sobre claros).
 - El gauge vertical está a la izquierda; Capacity, Used y Free comparten la columna lateral. El
   gauge llena de abajo arriba, muestra el tipo, el porcentaje y “of container”/“of capacity”, y
   tiene tres líneas de cuartos, degradado más oscuro abajo y claro arriba, borde reforzado y un
@@ -905,25 +978,30 @@ $K --screenshot /tmp/kb-hero-min.png --section disk --disk-tab volumes \
 - El treemap anida filas de particiones, columnas de contenedores y filas de volúmenes; cada
   rectángulo tiene un mínimo visible por rol/eje y el resto se reparte proporcional a la fracción,
   de modo que todas las particiones y volúmenes aparecen (incluidos los desmontados, con
-  `Not mounted` y un tile compacto de 12/14 pt). Las áreas son aproximadas. Partición/contenedor
+  `Not mounted` y un tile compacto de 20/22 pt). Las áreas son aproximadas. Partición/contenedor
   con hijos reservan una banda
   superior para su etiqueta y dejan un inset visible (12/9/7 pt normal, 14/11/8 maximizado)
-  alrededor de los hijos; los volúmenes se etiquetan dentro, muestran su mountpoint centrado y, si
-  el tile es grande, añaden `usado · %`. Todas las etiquetas incluyen el identificador y el tipo
+  alrededor de los hijos; los volúmenes se etiquetan dentro, muestran su mount point en la línea
+  del nombre/tamaño, comenzando en la columna central común y alineado a la izquierda, y si el
+  tile es grande añaden `usado · %`. El texto de los tiles nunca baja de 11.5 pt
+  (12.5 maximizado) y se trunca antes que reducirse. Todas las etiquetas incluyen el identificador
+  y el tipo
   (`disk3s5 · Macintosh HD - Data · APFS volume`, `disk0s2 · Container · Partition`,
   `disk3 · Free space`). Cada partición, contenedor y volumen muestra su usado y porcentaje
   inline a la derecha de la cabecera/fila (o `Usage unknown`/`Not mounted`). Los colores son fijos
   por nivel sobre la tarjeta material:
-  particiones azul claro `#d9e8f7`, contenedores azul medio `#bfd8f0`, volúmenes azul profundo
-  `#a6cbe8`; free `#e7f2fb`, residual `#c9d9ec`, unallocated `#d7e1ec`, unknown `#ebf2f9`; cada
+  particiones hueso claro `#e8e2d7`, contenedores hueso medio `#d9d1c3`, volúmenes hueso profundo
+  `#c9bfae`; free `#f7f3ea`, residual `#d2c9ba`, unallocated `#ddd5c7`, unknown `#ede8de`; cada
   tile lleva un brillo blanco sutil.
   No hay callouts exteriores ni leyenda debajo del treemap. Hover resalta el rectángulo; pulsar
   el fondo del treemap selecciona el disco del alcance. Los bordes son líneas finas (0.6–1.0 pt;
   maximizado algo más); el rectángulo seleccionado usa un trazo de 2 pt en tinta, que se reduce en
   tiles pequeños.
-- El treemap ocupa ~600 pt normal y ~860 maximizado, con texto de tile mayor; el gauge se centra
+- El treemap adapta su altura al contenido (420/460…860 pt), con texto de tile
+  mayor; el gauge se centra
   con él y no hay leyenda debajo. Cada partición reserva una altura recursiva según sus volúmenes
-  (tope 180/220 pt) para que su contenido se vea; a 1340×700 la tarjeta hace scroll vertical.
+  (tope 520/600 pt) para que su contenido se vea; un disco con pocos volúmenes no ocupa 860 de más.
+  A 1340×700 la tarjeta puede hacer scroll vertical si el contenido lo necesita.
 
 - El número de contenedores del disco debe coincidir con `diskutil list` (incluye los
   contenedores ISC y Recovery que `diskutil apfs list` no muestra); `diskutil apfs list` sirve
