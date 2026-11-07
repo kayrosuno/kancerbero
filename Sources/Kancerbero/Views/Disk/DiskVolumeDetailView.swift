@@ -90,7 +90,6 @@ struct DiskVolumeDetailView: View {
                     stats: heroStats,
                     usageFraction: item.volumeUsedFraction,
                     usageCaption: usageCaption,
-                    notes: structureNotes,
                     availableHeight: viewportHeight,
                     selectedFreeContainerID: $freeSelectionContainerID,
                     detailSelectionHidden: $hidesDetailSelection)
@@ -364,12 +363,22 @@ struct DiskVolumeDetailView: View {
             .joined(separator: ", ")
     }
 
+    private var capacityTitle: String {
+        switch item.kind {
+        case .physicalDisk: return "Disk capacity"
+        case .partition: return "Partition capacity"
+        case .apfsContainer: return "Container capacity"
+        case .apfsVolume, .snapshot: return "Container capacity"
+        }
+    }
+
     private var heroStats: [VolumeHierarchyStat] {
         [
             VolumeHierarchyStat(
                 id: "capacity",
-                title: "Capacity",
-                value: KBFormat.bytes(item.sizeBytes, units: byteUnitSystem)),
+                title: capacityTitle,
+                value: KBFormat.bytes(item.sizeBytes, units: byteUnitSystem),
+                subtitle: capacitySubtitle),
             VolumeHierarchyStat(
                 id: "free",
                 title: item.kind == .apfsVolume || item.kind == .snapshot
@@ -388,28 +397,39 @@ struct DiskVolumeDetailView: View {
             ? "of container" : "of capacity"
     }
 
-    private var structureNotes: [String] {
+    /// Capacity context shown as the subtitle of the Capacity stat: who the
+    /// space is shared with, plus the partial-usage caveat when it applies.
+    private var capacityNotes: [String] {
         var notes: [String] = []
-        if usage.isPartial && !containerSpaceUnknown {
-            notes.append("Some volumes are not mounted; used and free space are partial.")
-        }
-        if item.kind == .apfsContainer {
+        switch item.kind {
+        case .apfsContainer:
             let volumes = containerVolumes
             if volumes.isEmpty {
                 notes.append("No volumes in this container.")
             } else {
-                notes.append("Shared free space · \(volumes.count) volume\(volumes.count == 1 ? "" : "s")")
+                notes.append("Shared with \(volumes.count) volume\(volumes.count == 1 ? "" : "s")")
             }
-        } else if item.kind == .apfsVolume,
-                  let container = inventory?.apfsContainer(enclosing: item) {
-            let others = siblingVolumes(of: container)
-            if others.isEmpty {
-                notes.append("Shares free space with \(container.deviceIdentifier)")
-            } else {
-                notes.append("Shares free space with \(container.deviceIdentifier) and \(others.count) other volume\(others.count == 1 ? "" : "s")")
+        case .apfsVolume, .snapshot:
+            if let container = inventory?.apfsContainer(enclosing: item) {
+                let others = siblingVolumes(of: container)
+                if others.isEmpty {
+                    notes.append("Shared with \(container.deviceIdentifier)")
+                } else {
+                    notes.append("Shared with \(container.deviceIdentifier) and \(others.count) other volume\(others.count == 1 ? "" : "s")")
+                }
             }
+        case .physicalDisk, .partition:
+            break
+        }
+        if usage.isPartial && !containerSpaceUnknown {
+            notes.append("Usage is partial: some volumes are not mounted.")
         }
         return notes
+    }
+
+    private var capacitySubtitle: String? {
+        let notes = capacityNotes
+        return notes.isEmpty ? nil : notes.joined(separator: "\n")
     }
 
     private var containerVolumes: [KBDiskItem] {

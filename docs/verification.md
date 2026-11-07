@@ -249,6 +249,29 @@ $K --screenshot /tmp/kb-col-disk-analyzer.png --section disk --disk-tab analyzer
 - Reduce Motion o “Animate tab changes” desactivado: el cambio es instantáneo. El estado no se
   guarda en `UserDefaults` y desaparece al reiniciar.
 
+## Apariencia
+
+El primer botón del toolbar alterna claro/oscuro y su menú contextual vuelve a `system`. El valor
+persiste en `UserDefaults` (`appearanceMode`); para las capturas se puede forzar sin escribir la
+preferencia pasando una clave del dominio de argumentos:
+
+```bash
+K=./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
+$K -appearanceMode light --screenshot /tmp/kb-light.png --section disk \
+  --disk-tab volumes --disk-item disk3s1s1 --screenshot-delay 5
+$K -appearanceMode dark --screenshot /tmp/kb-dark.png --section disk \
+  --disk-tab volumes --disk-item disk3s1s1 --screenshot-delay 5
+$K --screenshot /tmp/kb-system.png --section disk --screenshot-delay 5
+```
+
+- Claro y oscuro: sidebar, tarjetas, tablas, treemap, barra de estado y barra de título cambian a
+  la vez; el modo oscuro usa la rampa grafito del treemap.
+- `system` (o sin clave) sigue la apariencia de macOS y reacciona a sus cambios.
+- Las ventanas System status, Filter rules y Settings heredan el modo por `NSApp.appearance`.
+- Las capturas de `--screenshot` solo incluyen el `contentView`, así que el botón del toolbar no
+  aparece en ellas; comprobar manualmente el icono `moon`/`sun.max`, la alternancia y el menú
+  “Use System Appearance”.
+
 ## Daemons
 
 ```bash
@@ -444,16 +467,22 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   El grupo seleccionado pasa a un degradado cian-azul con un contorno luminoso (un volumen, todas
   las secciones de un contenedor con su libre, o todo el disco/partición); el resto queda en azul
   grisáceo oscuro. Used se coloca a la altura de la sección seleccionada con una línea horizontal
-  hasta la barra; Capacity y Free quedan arriba. Al seleccionar un bloque free en el treemap, su
-  sección se destaca en la barra (y en el treemap) y Used vuelve a su posición superior. Pulsar de
-  nuevo el elemento seleccionado en el treemap, o su tramo resaltado en la barra, quita el
-  resaltado del detalle sin cambiar la selección de las tablas; un clic fuera del treemap y de la
-  barra también lo quita. El panel sigue mostrando todo el contenido sin ningún tile o tramo
+  hasta la barra; arriba queda la capacidad rotulada según el alcance (`Disk capacity`,
+  `Partition capacity`, `Container capacity`) con su subtítulo de capacidad compartida, y Free
+  debajo. Al seleccionar un bloque free en el treemap, su
+  sección se destaca en la barra (y en el treemap) y Used vuelve a su posición superior. Pulsar un
+  tramo de la barra selecciona el volumen/partición/contenedor que representa; los tramos libres
+  mantienen su resaltado. Pulsar de nuevo el tramo del elemento ya seleccionado, o el elemento en
+  el treemap, quita el resaltado del detalle sin cambiar la selección de las tablas; un clic fuera
+  del treemap y de la barra también lo quita. El panel sigue mostrando todo el contenido sin
+  ningún tile o tramo
   resaltado; volver a pulsar restaura el resaltado y la x lo cierra. No hay conectores
   barra-treemap. El
   gráfico es un rectángulo anidado (particiones → contenedores APFS → volúmenes, con “Other” para
   el espacio no asignado, residual y libre) que adapta su altura al contenido (420/460…860 pt)
-  para evitar scroll innecesario, con texto de tile mayor. Particiones y contenedores usan la
+  para evitar scroll innecesario, con texto de tile mayor. Si el disco no tiene tabla de
+  particiones, el contenedor APFS cuelga directamente del disco y sus volúmenes se dibujan igual,
+  apilados en filas (p. ej. `disk11 → disk12 → disk12s1`). Particiones y contenedores usan la
   paleta hueso (`#e8e2d7`, `#d9d1c3`); los volúmenes usan por defecto los tres azules grisáceos
   (`#c9cbd0` `#b9bcc2` `#a9adb4`) y el volumen seleccionado pasa al azul `#4f93cc`. Free
   `#f7f3ea`, residual `#d2c9ba`. Bordes y texto en tinta cálida oscura. La tarjeta es un panel
@@ -481,10 +510,10 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   se comprueba que `disk0s3` muestra `disk2` y sus volúmenes `Recovery`/`Update` con
   `Not mounted`. En un disco con pocos volúmenes (p. ej. `kb-follow-disk4.png`) el treemap baja a
   ~420/460 pt; el máximo sigue siendo 860.
-- Barra: no hay id rotado, pop ni conectores barra-treemap; el tipo y el porcentaje van encima y
-  la leyenda “of container”/“of capacity” debajo. Capacity y Free quedan arriba, Used a la altura
-  de la sección seleccionada con su línea horizontal, y la nota de espacio compartido debajo. Al
-  seleccionar un contenedor/volumen
+- Barra: no hay id rotado, pop ni conectores barra-treemap; no lleva tipo ni porcentaje encima y
+  sí la leyenda “of container”/“of capacity” debajo. La capacidad va arriba rotulada por alcance y
+  con el subtítulo de espacio compartido; Free queda debajo y Used a la altura de la sección
+  seleccionada con su línea horizontal. Al seleccionar un contenedor/volumen
   APFS aparece la fila “Shared with” con el contenedor y los volúmenes (nombre+id); no se muestra
   para discos, particiones ni snapshots. Las barras de las tablas siguen en azul.
 - Maximizar/restaurar en tablas y detalle: la tarjeta ocupa el área de Volumes y se oculta la otra

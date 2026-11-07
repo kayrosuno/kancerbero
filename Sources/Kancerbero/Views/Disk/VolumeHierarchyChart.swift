@@ -7,6 +7,7 @@ struct VolumeHierarchyStat: Identifiable {
     let id: String
     let title: String
     let value: String
+    var subtitle: String? = nil
 }
 
 /// Nested treemap of the selected disk: partitions → APFS containers →
@@ -21,7 +22,6 @@ struct VolumeHierarchyChart: View {
     var stats: [VolumeHierarchyStat] = []
     var usageFraction: Double? = nil
     var usageCaption: String? = nil
-    var notes: [String] = []
     /// Height of the detail-card viewport. The chart and the bar are capped
     /// to it so the bar stays fully visible when the window shrinks.
     var availableHeight: CGFloat? = nil
@@ -30,7 +30,12 @@ struct VolumeHierarchyChart: View {
 
     @Environment(\.byteUnitSystem) private var byteUnitSystem
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     @State private var hoveredNodeID: String?
+
+    private var palette: DiskTreemapPalette {
+        DiskPalette.treemap(for: colorScheme)
+    }
 
     var body: some View {
         let scope = scopeItem(in: inventory)
@@ -115,30 +120,59 @@ struct VolumeHierarchyChart: View {
         }
     }
 
-    /// A hidden detail selection comes back when the bar is clicked; with a
-    /// visible selection, clicking a highlighted segment hides it.
+    /// Clicking a bar segment selects the disk item behind it. Free-space
+    /// segments keep their own container highlight, and clicking the already
+    /// selected item toggles the detail highlight as before.
     private func handleBarTap(_ slice: VolumeBarSlice) {
-        if detailSelectionHidden {
+        if slice.isFree {
             detailSelectionHidden = false
+            selectedFreeContainerID =
+                selectedFreeContainerID == slice.ownerID
+                    ? nil : slice.ownerID
             return
         }
-        guard slice.isHighlighted else { return }
-        if selectedFreeContainerID != nil {
-            selectedFreeContainerID = nil
-        } else {
+        selectedFreeContainerID = nil
+        guard let itemID = slice.ownerID else { return }
+        if itemID == item.deviceIdentifier && !detailSelectionHidden {
             detailSelectionHidden = true
+            return
         }
-    }
-
-    /// Distance from the hero top to the top of the bar: the kind label and
-    /// percentage sit above the capsule inside the bar column.
-    private var barTopOffset: CGFloat {
-        labelLineHeight(7.5) + 5
-            + labelLineHeight(isMaximized ? 14 : 12) + 5
+        detailSelectionHidden = false
+        if itemID != item.deviceIdentifier {
+            onSelectItem?(itemID)
+        }
     }
 
     private var statRowHeight: CGFloat {
         labelLineHeight(9.5) + 1 + labelLineHeight(statValueSize)
+    }
+
+    private var statSubtitleSize: CGFloat { isMaximized ? 10 : 9 }
+
+    private var capacitySubtitle: String? {
+        stats.first { $0.id == "capacity" }?.subtitle
+    }
+
+    /// Height reserved under the Capacity value for its sharing note, so the
+    /// Used row keeps its alignment with the selected bar segment.
+    private var capacitySubtitleHeight: CGFloat {
+        guard let subtitle = capacitySubtitle, !subtitle.isEmpty else {
+            return 0
+        }
+        let font = NSFont.systemFont(ofSize: statSubtitleSize)
+        let bounding = (subtitle as NSString).boundingRect(
+            with: CGSize(width: statsWidth,
+                         height: CGFloat.greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font])
+        return ceil(bounding.height) + 1
+    }
+
+    private var capacitySubtitleBlock: CGFloat {
+        guard let subtitle = capacitySubtitle, !subtitle.isEmpty else {
+            return 0
+        }
+        return capacitySubtitleHeight + 1
     }
 
     /// Offset of the value line inside a stat row, used to align Used with
@@ -151,6 +185,7 @@ struct VolumeHierarchyChart: View {
     /// portion. It never overlaps Capacity and Free.
     private func usedRowTop(trackHeight: CGFloat) -> CGFloat {
         let minimumTop = statRowHeight * 2 + columnSpacing * 2
+            + capacitySubtitleBlock
         // A free-space selection is highlighted in the bar but has no Used
         // leader: the Used value keeps its normal position.
         guard !detailSelectionHidden,
@@ -160,7 +195,7 @@ struct VolumeHierarchyChart: View {
                   isMaximized: isMaximized) else {
             return minimumTop
         }
-        let target = barTopOffset + center - usedValueMidOffset
+        let target = center - usedValueMidOffset
         return max(minimumTop, target)
     }
 
@@ -172,6 +207,7 @@ struct VolumeHierarchyChart: View {
         let used = stats.first { $0.id == "used" }
         let usedTop = usedRowTop(trackHeight: trackHeight)
         let freeBottom = statRowHeight * 2 + columnSpacing
+            + capacitySubtitleBlock
         let spacer = max(0, usedTop - freeBottom)
         return VStack(alignment: .leading, spacing: 0) {
             if let capacity {
@@ -187,15 +223,6 @@ struct VolumeHierarchyChart: View {
                         anchorID: !detailSelectionHidden
                             && selectedFreeContainerID == nil
                             ? "used" : nil)
-            }
-            Color.clear.frame(height: columnSpacing)
-            ForEach(notes, id: \.self) { note in
-                Text(note)
-                    .font(.system(size: isMaximized ? 11 : 10))
-                    .foregroundStyle(.secondary)
-                    .lineSpacing(1)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .frame(width: statsWidth, alignment: .leading)
@@ -222,6 +249,14 @@ struct VolumeHierarchyChart: View {
                                   value: .bounds) { anchor in
                     anchorID.map { [$0: anchor] } ?? [:]
                 }
+            if let subtitle = stat.subtitle, !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(.system(size: statSubtitleSize))
+                    .foregroundStyle(.secondary)
+                    .lineSpacing(1)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
     }
 
@@ -233,6 +268,9 @@ struct VolumeHierarchyChart: View {
         let containerID: String
         let bytes: UInt64
         let isFree: Bool
+        /// Text shown inside the bar segment: the device identifier, or
+        /// "Free" for free space.
+        let label: String
     }
 
     /// The bar always shows the deepest blocks of the disk being viewed
@@ -263,7 +301,9 @@ struct VolumeHierarchyChart: View {
                 id: block.id,
                 fraction: fraction,
                 isFree: block.isFree,
-                isHighlighted: highlighted)
+                isHighlighted: highlighted,
+                label: block.label,
+                ownerID: block.ownerID)
         }
     }
 
@@ -300,7 +340,8 @@ struct VolumeHierarchyChart: View {
                     ownerID: container.deviceIdentifier,
                     containerID: container.deviceIdentifier,
                     bytes: free.bytes,
-                    isFree: true))
+                    isFree: true,
+                    label: "Free"))
             }
             let volumes = container.children
                 .filter { $0.kind == .apfsVolume }
@@ -311,7 +352,8 @@ struct VolumeHierarchyChart: View {
                     ownerID: volume.deviceIdentifier,
                     containerID: container.deviceIdentifier,
                     bytes: volume.usedBytes ?? 0,
-                    isFree: false))
+                    isFree: false,
+                    label: volume.deviceIdentifier))
             }
         }
 
@@ -325,7 +367,8 @@ struct VolumeHierarchyChart: View {
                     ownerID: node.deviceIdentifier,
                     containerID: node.parentID ?? node.deviceIdentifier,
                     bytes: node.usedBytes ?? 0,
-                    isFree: false))
+                    isFree: false,
+                    label: node.deviceIdentifier))
             case .physicalDisk, .partition:
                 for child in node.children where child.kind != .snapshot {
                     visit(child)
@@ -360,7 +403,8 @@ struct VolumeHierarchyChart: View {
                         ownerID: node.deviceIdentifier,
                         containerID: node.deviceIdentifier,
                         bytes: max(node.sizeBytes, 1),
-                        isFree: false))
+                        isFree: false,
+                        label: node.deviceIdentifier))
                 } else {
                     for child in children { visit(child) }
                 }
@@ -372,7 +416,8 @@ struct VolumeHierarchyChart: View {
                     ownerID: node.deviceIdentifier,
                     containerID: node.deviceIdentifier,
                     bytes: max(node.usedBytes ?? node.sizeBytes, 1),
-                    isFree: false))
+                    isFree: false,
+                    label: node.deviceIdentifier))
             case .snapshot:
                 break
             }
@@ -390,7 +435,8 @@ struct VolumeHierarchyChart: View {
                 ownerID: scope.deviceIdentifier,
                 containerID: scope.deviceIdentifier,
                 bytes: used,
-                isFree: false))
+                isFree: false,
+                label: scope.deviceIdentifier))
         }
         if free > 0 {
             blocks.append(BarBlock(
@@ -398,7 +444,8 @@ struct VolumeHierarchyChart: View {
                 ownerID: scope.deviceIdentifier,
                 containerID: scope.deviceIdentifier,
                 bytes: free,
-                isFree: true))
+                isFree: true,
+                label: "Free"))
         }
         return blocks
     }
@@ -497,7 +544,7 @@ struct VolumeHierarchyChart: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Spacer(minLength: 0)
                 }
-                .padding(.top, rootInset)
+                .padding(.top, treemapTopInset)
                 .allowsHitTesting(false)
 
                 if layout.items.isEmpty {
@@ -583,6 +630,10 @@ struct VolumeHierarchyChart: View {
 
     private var rootInset: CGFloat { isMaximized ? 13 : 10 }
 
+    /// The bar has no header above it, so the disk panel starts flush with
+    /// the top of the hero instead of leaving the usual inset there.
+    private var treemapTopInset: CGFloat { 0 }
+
     private var diskHeaderHeight: CGFloat { isMaximized ? 36 : 34 }
 
     private var diskContentInset: CGFloat { isMaximized ? 6 : 5 }
@@ -606,15 +657,15 @@ struct VolumeHierarchyChart: View {
         return HStack(spacing: 6) {
             Image(systemName: "internaldrive")
                 .font(.system(size: 11.5, weight: .semibold))
-                .foregroundStyle(DiskPalette.textInk.opacity(0.8))
+                .foregroundStyle(palette.textInk.opacity(0.8))
             Text(scope.deviceIdentifier)
                 .font(.system(size: 11.5, weight: .semibold,
                               design: .monospaced))
-                .foregroundStyle(DiskPalette.textInk)
+                .foregroundStyle(palette.textInk)
             Text(summary)
                 .font(.system(size: 11, weight: .medium))
                 .monospacedDigit()
-                .foregroundStyle(DiskPalette.textInk.opacity(0.72))
+                .foregroundStyle(palette.textInk.opacity(0.72))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
@@ -629,9 +680,9 @@ struct VolumeHierarchyChart: View {
                              scopeID: String) -> TreemapLayout {
         let diskRect = CGRect(
             x: rootInset,
-            y: rootInset,
+            y: treemapTopInset,
             width: max(0, size.width - 2 * rootInset),
-            height: max(0, size.height - 2 * rootInset))
+            height: max(0, size.height - treemapTopInset - rootInset))
         let bounds = CGRect(
             x: diskRect.minX + diskContentInset,
             y: diskRect.minY + diskHeaderHeight,
@@ -715,7 +766,7 @@ struct VolumeHierarchyChart: View {
 
             let before = items.count
             layoutTreemap(node.children, in: inner, depth: depth + 1,
-                          axis: axis == .rows ? .columns : .rows,
+                          axis: childAxis(for: node),
                           path: childPath, parentFraction: global,
                           ownerID: resolvedOwner, items: &items)
             let hasChildren = items.count > before
@@ -787,8 +838,11 @@ struct VolumeHierarchyChart: View {
         case (.partition, .columns):
             return big ? 70 : 60
         case (.container, .rows):
-            return node.children.isEmpty
-                ? (big ? 24 : 22) : (big ? 38 : 32)
+            if node.children.isEmpty { return big ? 24 : 22 }
+            let required = nodeContentHeight(node, axis: .rows,
+                                             depth: depth)
+            let cap: CGFloat = big ? 600 : 520
+            return min(required, cap)
         case (.container, .columns):
             return big ? 70 : 60
         case (.volume, .rows):
@@ -802,10 +856,15 @@ struct VolumeHierarchyChart: View {
         }
     }
 
-    /// Height needed for a tile to show its descendants at the current
-    /// nested axes: stacked children add up, side-by-side children share.
-    private func childAxis(of axis: TreemapAxis) -> TreemapAxis {
-        axis == .rows ? .columns : .rows
+    /// Children are arranged by their parent's role, not by depth, so a
+    /// container directly under a physical disk (no partition level) still
+    /// stacks its volumes as rows like every other container.
+    private func childAxis(for node: HierarchyNode) -> TreemapAxis {
+        switch node.role {
+        case .partition: return .columns
+        case .container: return .rows
+        default: return .rows
+        }
     }
 
     private func contentHeight(of nodes: [HierarchyNode],
@@ -835,14 +894,15 @@ struct VolumeHierarchyChart: View {
         let header: CGFloat = isMaximized ? 20 : 18
         let childContent = contentHeight(
             of: children,
-            axis: childAxis(of: axis),
+            axis: childAxis(for: node),
             depth: depth + 1)
         return header + inset * 2 + childContent
     }
 
     private func adaptiveTreemapHeight(for nodes: [HierarchyNode]) -> CGFloat {
         let content = contentHeight(of: nodes, axis: .rows, depth: 0)
-        let chrome = 2 * rootInset + diskHeaderHeight + diskContentInset
+        let chrome = treemapTopInset + rootInset
+            + diskHeaderHeight + diskContentInset
         return min(max(content + chrome, treemapMinimumHeight),
                    treemapMaximumHeight)
     }
@@ -894,7 +954,7 @@ struct VolumeHierarchyChart: View {
         let rect = layout.diskRect
         let radius: CGFloat = isMaximized ? 9 : 8
         let path = Path(roundedRect: rect, cornerRadius: radius)
-        context.fill(path, with: .color(DiskPalette.paper))
+        context.fill(path, with: .color(palette.paper))
 
         var headerContext = context
         headerContext.clip(to: path)
@@ -902,17 +962,17 @@ struct VolumeHierarchyChart: View {
                           width: rect.width,
                           height: layout.diskHeaderHeight)
         headerContext.fill(Path(band),
-                           with: .color(DiskPalette.sand.opacity(0.45)))
+                           with: .color(palette.sand.opacity(0.45)))
 
         let separatorY = rect.minY + layout.diskHeaderHeight
         var separator = Path()
         separator.move(to: CGPoint(x: rect.minX + 8, y: separatorY))
         separator.addLine(to: CGPoint(x: rect.maxX - 8, y: separatorY))
         context.stroke(separator,
-                       with: .color(DiskPalette.textInk.opacity(0.16)),
+                       with: .color(palette.textInk.opacity(0.16)),
                        lineWidth: 0.75)
         context.stroke(path,
-                       with: .color(DiskPalette.textInk.opacity(0.22)),
+                       with: .color(palette.textInk.opacity(0.22)),
                        lineWidth: 1)
 
         if diskSelected || highlightID == scope.deviceIdentifier {
@@ -921,7 +981,7 @@ struct VolumeHierarchyChart: View {
                 roundedRect: rect.insetBy(dx: inset, dy: inset),
                 cornerRadius: max(0, radius - inset))
             context.stroke(selected,
-                           with: .color(DiskPalette.textInk),
+                           with: .color(palette.textInk),
                            lineWidth: 2)
         }
     }
@@ -938,7 +998,9 @@ struct VolumeHierarchyChart: View {
             let base = item.node.color
             context.fill(path, with: .color(base))
             context.fill(path, with: .linearGradient(
-                Gradient(colors: [.white.opacity(0.16), .clear]),
+                Gradient(colors: [.white.opacity(colorScheme == .dark
+                                                ? 0.10 : 0.16),
+                                  .clear]),
                 startPoint: CGPoint(x: item.rect.midX,
                                     y: item.rect.minY),
                 endPoint: CGPoint(x: item.rect.midX,
@@ -997,6 +1059,7 @@ struct VolumeHierarchyChart: View {
 
     private func treemapBorder(for item: TreemapItem) -> (Color, CGFloat) {
         let content = DiskPalette.contentColor(on: item.node.color)
+        let schemeScale: CGFloat = colorScheme == .dark ? 0.7 : 1
         let opacity: CGFloat
         let width: CGFloat
         switch item.depth {
@@ -1011,9 +1074,10 @@ struct VolumeHierarchyChart: View {
             width = 0.6
         }
         if !item.node.role.isSelectable {
-            return (content.opacity(opacity * 0.8), width * 0.8)
+            return (content.opacity(opacity * 0.8 * schemeScale),
+                    width * 0.8)
         }
-        return (content.opacity(opacity), width)
+        return (content.opacity(opacity * schemeScale), width)
     }
 
     private func cornerRadius(for depth: Int) -> CGFloat {
@@ -1475,40 +1539,48 @@ struct VolumeHierarchyChart: View {
         }
     }
 
+    /// Children of a physical disk can be partitions or, when the disk has no
+    /// partition scheme, APFS containers directly (disk images and other
+    /// synthesized stores). Both shapes must reach the treemap.
     private func partitionNodes(for scope: KBDiskItem) -> [HierarchyNode] {
-        let partitions = scope.children
+        let entries = scope.children
             .filter { $0.kind != .snapshot && $0.sizeBytes > 0 }
             .sorted { $0.sizeBytes > $1.sizeBytes }
-        guard !partitions.isEmpty else { return usageNodes(for: scope) }
+        guard !entries.isEmpty else { return usageNodes(for: scope) }
 
         var accounted: UInt64 = 0
-        for partition in partitions {
-            accounted = adding(accounted, partition.sizeBytes)
+        for entry in entries {
+            accounted = adding(accounted, entry.sizeBytes)
         }
         let denominator = max(scope.sizeBytes, accounted)
         var nodes: [HierarchyNode] = []
 
-        for partition in partitions {
-            let color = DiskPalette.fill(level: 0)
-            let usage = partition.spaceUsage
+        for entry in entries {
+            if entry.kind == .apfsContainer {
+                nodes.append(containerNode(for: entry,
+                                           denominator: denominator))
+                continue
+            }
+
+            let usage = entry.spaceUsage
             let children = containerNodes(
-                for: partition,
-                parentBytes: partition.sizeBytes)
+                for: entry,
+                parentBytes: entry.sizeBytes)
             nodes.append(HierarchyNode(
-                id: "partition:\(partition.deviceIdentifier)",
-                itemID: partition.deviceIdentifier,
+                id: "partition:\(entry.deviceIdentifier)",
+                itemID: entry.deviceIdentifier,
                 role: .partition,
-                label: displayName(partition),
-                detail: partition.mountPoint,
+                label: displayName(entry),
+                detail: entry.mountPoint,
                 kindLabel: "Partition",
-                fileSystem: partition.fileSystem
-                    ?? partition.children.first?.fileSystem,
-                bytes: partition.sizeBytes,
-                capacityBytes: partition.sizeBytes,
+                fileSystem: entry.fileSystem
+                    ?? entry.children.first?.fileSystem,
+                bytes: entry.sizeBytes,
+                capacityBytes: entry.sizeBytes,
                 usedBytes: usage.usedBytes,
                 freeBytes: usage.freeBytes,
-                fraction: Double(partition.sizeBytes) / Double(max(denominator, 1)),
-                color: color,
+                fraction: Double(entry.sizeBytes) / Double(max(denominator, 1)),
+                color: palette.fill(level: 0),
                 children: children))
         }
 
@@ -1527,7 +1599,7 @@ struct VolumeHierarchyChart: View {
                 usedBytes: nil,
                 freeBytes: nil,
                 fraction: Double(other) / Double(max(denominator, 1)),
-                color: DiskPalette.unallocated,
+                color: palette.unallocated,
                 children: []))
         }
         return nodes
@@ -1548,24 +1620,8 @@ struct VolumeHierarchyChart: View {
         var nodes: [HierarchyNode] = []
 
         for container in containers {
-            let color = DiskPalette.fill(level: 1)
-            let usage = container.spaceUsage
-            let volumes = container.children.filter { $0.kind == .apfsVolume }
-            nodes.append(HierarchyNode(
-                id: "container:\(container.deviceIdentifier)",
-                itemID: container.deviceIdentifier,
-                role: .container,
-                label: displayName(container),
-                detail: "\(volumes.count) volume\(volumes.count == 1 ? "" : "s")",
-                kindLabel: "APFS container",
-                fileSystem: container.fileSystem,
-                bytes: container.sizeBytes,
-                capacityBytes: container.sizeBytes,
-                usedBytes: usage.usedBytes,
-                freeBytes: usage.freeBytes,
-                fraction: Double(container.sizeBytes) / Double(max(denominator, 1)),
-                color: color,
-                children: volumeNodes(for: container)))
+            nodes.append(containerNode(for: container,
+                                       denominator: denominator))
         }
 
         if parentBytes > accounted {
@@ -1583,10 +1639,31 @@ struct VolumeHierarchyChart: View {
                 usedBytes: nil,
                 freeBytes: nil,
                 fraction: Double(other) / Double(max(denominator, 1)),
-                color: DiskPalette.unallocated,
+                color: palette.unallocated,
                 children: []))
         }
         return nodes
+    }
+
+    private func containerNode(for container: KBDiskItem,
+                               denominator: UInt64) -> HierarchyNode {
+        let usage = container.spaceUsage
+        let volumes = container.children.filter { $0.kind == .apfsVolume }
+        return HierarchyNode(
+            id: "container:\(container.deviceIdentifier)",
+            itemID: container.deviceIdentifier,
+            role: .container,
+            label: displayName(container),
+            detail: "\(volumes.count) volume\(volumes.count == 1 ? "" : "s")",
+            kindLabel: "APFS container",
+            fileSystem: container.fileSystem,
+            bytes: container.sizeBytes,
+            capacityBytes: container.sizeBytes,
+            usedBytes: usage.usedBytes,
+            freeBytes: usage.freeBytes,
+            fraction: Double(container.sizeBytes) / Double(max(denominator, 1)),
+            color: palette.fill(level: 1),
+            children: volumeNodes(for: container))
     }
 
     private func volumeNodes(for container: KBDiskItem) -> [HierarchyNode] {
@@ -1595,10 +1672,26 @@ struct VolumeHierarchyChart: View {
         }
 
         var nodes: [HierarchyNode] = []
-        var represented = Set<String>()
         let selectedVolumeID = item.kind == .apfsVolume
             ? item.deviceIdentifier : nil
-        var volumeIndex = 0
+
+        // Bands depend on the whole volume set, including the unmounted or
+        // empty volumes that only get a minimum-size tile.
+        let represented = Set(context.segments.compactMap { segment in
+            segment.role == .volume ? segment.itemID : nil
+        })
+        let missing = container.children
+            .filter { $0.kind == .apfsVolume }
+            .filter { !represented.contains($0.deviceIdentifier) }
+        var volumeSizes: [(id: String, bytes: UInt64)] = []
+        for segment in context.segments where segment.role == .volume {
+            guard let itemID = segment.itemID else { continue }
+            volumeSizes.append((itemID, segment.bytes))
+        }
+        volumeSizes.append(contentsOf: missing.map {
+            ($0.deviceIdentifier, $0.usedBytes ?? 0)
+        })
+        let volumeBands = volumeCapacityBands(for: volumeSizes)
 
         for segment in context.segments where segment.fraction > 0 {
             let id = "\(container.deviceIdentifier):\(segment.id)"
@@ -1618,19 +1711,21 @@ struct VolumeHierarchyChart: View {
                    segment.itemID == selectedVolumeID {
                     color = DiskPalette.tint(for: .apfsVolume)
                 } else {
-                    color = DiskPalette.mutedVolume(volumeIndex)
+                    let band = segment.itemID.flatMap {
+                        volumeBands[$0]
+                    } ?? 1
+                    color = palette.volumeShade(band)
                 }
-                volumeIndex += 1
             case .free:
-                color = DiskPalette.free
+                color = palette.free
             case .residual:
-                color = DiskPalette.residual
+                color = palette.residual
             case .unknown:
-                color = DiskPalette.unknown
+                color = palette.unknown
             case .container:
-                color = DiskPalette.fill(level: 1)
+                color = palette.fill(level: 1)
             case .partition, .unallocated, .used:
-                color = DiskPalette.unallocated
+                color = palette.unallocated
             }
 
             let segmentItem = inventory.allItems
@@ -1665,23 +1760,17 @@ struct VolumeHierarchyChart: View {
                 fraction: segment.fraction,
                 color: color,
                 children: []))
-            if let itemID = segment.itemID {
-                represented.insert(itemID)
-            }
         }
 
         // Unmounted or empty volumes have no area; keep them selectable in
         // the chart.
-        let missing = container.children
-            .filter { $0.kind == .apfsVolume }
-            .filter { !represented.contains($0.deviceIdentifier) }
         for volume in missing {
             let isSelected = selectedVolumeID != nil
                 && volume.deviceIdentifier == selectedVolumeID
             let color: Color = isSelected
                 ? DiskPalette.tint(for: .apfsVolume)
-                : DiskPalette.mutedVolume(volumeIndex)
-            volumeIndex += 1
+                : palette.volumeShade(
+                    volumeBands[volume.deviceIdentifier] ?? 1)
             nodes.append(HierarchyNode(
                 id: "missing:\(container.deviceIdentifier):\(volume.deviceIdentifier)",
                 itemID: volume.deviceIdentifier,
@@ -1699,6 +1788,33 @@ struct VolumeHierarchyChart: View {
                 children: []))
         }
         return nodes
+    }
+
+    /// Up to three capacity bands: 0 is the smallest volume and 2 the
+    /// largest. Equal sizes share a band; one distinct size keeps the middle
+    /// shade and two distinct sizes use the light/dark extremes.
+    private func volumeCapacityBands(
+        for volumes: [(id: String, bytes: UInt64)]
+    ) -> [String: Int] {
+        guard !volumes.isEmpty else { return [:] }
+        let sizes = Set(volumes.map(\.bytes)).sorted()
+        var bandBySize: [UInt64: Int] = [:]
+        if sizes.count == 1 {
+            bandBySize[sizes[0]] = 1
+        } else if sizes.count == 2 {
+            bandBySize[sizes[0]] = 0
+            bandBySize[sizes[1]] = 2
+        } else {
+            for (index, size) in sizes.enumerated() {
+                bandBySize[size] = min(2, index * 3 / sizes.count)
+            }
+        }
+
+        var bands: [String: Int] = [:]
+        for volume in volumes {
+            bands[volume.id] = bandBySize[volume.bytes] ?? 1
+        }
+        return bands
     }
 
     /// Fallback for a disk/partition without any APFS container: used vs free.
@@ -1722,7 +1838,7 @@ struct VolumeHierarchyChart: View {
                 usedBytes: used,
                 freeBytes: nil,
                 fraction: Double(used) / Double(total),
-                color: DiskPalette.usedFill,
+                color: palette.usedFill,
                 children: [])
         ]
         if free > 0 {
@@ -1739,7 +1855,7 @@ struct VolumeHierarchyChart: View {
                 usedBytes: nil,
                 freeBytes: nil,
                 fraction: Double(free) / Double(total),
-                color: DiskPalette.free,
+                color: palette.free,
                 children: []))
         }
         return nodes
@@ -1885,22 +2001,6 @@ private struct VerticalUsageBar: View {
 
     var body: some View {
         VStack(spacing: 5) {
-            if let kindLabel {
-                Text(kindLabel)
-                    .font(.system(size: 7.5, weight: .semibold))
-                    .textCase(.uppercase)
-                    .tracking(0.3)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-                    .frame(width: width)
-            }
-            Text(percentText)
-                .font(.system(size: isMaximized ? 14 : 12,
-                              weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(fraction == nil ? .secondary : .primary)
-
             VolumeBarView(
                 slices: slices,
                 width: width,

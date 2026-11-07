@@ -7,6 +7,11 @@ struct VolumeBarSlice: Identifiable {
     let fraction: Double
     let isFree: Bool
     let isHighlighted: Bool
+    /// Text drawn inside the segment: the volume's device identifier, or
+    /// "Free" for a container's free-space block.
+    var label: String? = nil
+    /// Disk item represented by the segment. Tapping the segment selects it.
+    var ownerID: String? = nil
 }
 
 /// Shared geometry between the bar and the hero stats, so the Used label and
@@ -99,6 +104,18 @@ struct VolumeBarView: View {
         slices.filter { $0.isHighlighted }.count
     }
 
+    private var accessibilityValueText: String {
+        var parts = ["\(slices.count) blocks"]
+        if selectedCount > 0 {
+            parts.append("\(selectedCount) selected")
+        }
+        let labels = slices.compactMap(\.label)
+        if !labels.isEmpty {
+            parts.append(labels.joined(separator: ", "))
+        }
+        return parts.joined(separator: ", ")
+    }
+
     var body: some View {
         Canvas { context, size in
             var context = context
@@ -107,10 +124,7 @@ struct VolumeBarView: View {
         .frame(width: width, height: height)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Volume bar")
-        .accessibilityValue(
-            selectedCount > 0
-                ? "\(slices.count) blocks, \(selectedCount) selected"
-                : "\(slices.count) blocks")
+        .accessibilityValue(accessibilityValueText)
         .highPriorityGesture(
             SpatialTapGesture().onEnded { value in
                 guard let index = VolumeBarLayout.sliceIndex(
@@ -161,6 +175,10 @@ struct VolumeBarView: View {
                               width: contentRect.width,
                               height: sliceHeight)
             drawSlice(context: &content, rect: rect, slice: slice)
+            if let label = slice.label {
+                drawLabel(context: &content, rect: rect, label: label,
+                          sliceHeight: sliceHeight)
+            }
             frames.append(SliceFrame(slice: slice, top: top,
                                      bottom: bottom))
             if index < slices.count - 1 {
@@ -247,6 +265,24 @@ struct VolumeBarView: View {
             drawSliceEdges(context: &context, rect: rect,
                            opacity: selected ? 0.45 : 0.25)
         }
+    }
+
+    /// A tiny monospaced device identifier (or "Free") centered in the
+    /// segment. Segments too short for a legible line stay unlabeled.
+    private func drawLabel(context: inout GraphicsContext, rect: CGRect,
+                           label: String, sliceHeight: CGFloat) {
+        let minimumHeight: CGFloat = isMaximized ? 11 : 10
+        guard sliceHeight >= minimumHeight else { return }
+        let font = Font.system(size: isMaximized ? 8.5 : 8,
+                               weight: .semibold, design: .monospaced)
+        var resolved = context.resolve(Text(label).font(font))
+        resolved.shading = .color(.white.opacity(0.92))
+        var labelContext = context
+        labelContext.addFilter(.shadow(color: .black.opacity(0.55),
+                                       radius: 1, x: 0, y: 0.5))
+        labelContext.draw(resolved,
+                          at: CGPoint(x: rect.midX, y: rect.midY),
+                          anchor: .center)
     }
 
     private func drawFreeSlice(context: inout GraphicsContext,

@@ -17,6 +17,9 @@ enum KBPreferences {
     static let diskUnitSystemKey = "diskByteUnitSystem"
     static let diskUnitSystemDefault = KBByteUnitSystem.decimal.rawValue
 
+    static let appearanceModeKey = "appearanceMode"
+    static let appearanceModeDefault = KBAppearanceMode.system.rawValue
+
     /// Window (seconds) in which a connection that moved data still counts as
     /// active. The list is the set of supported values; the default is 10 and
     /// the effective minimum is 5.
