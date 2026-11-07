@@ -12,6 +12,8 @@ struct DiskVolumeDetailView: View {
     let onClose: () -> Void
 
     @Environment(\.byteUnitSystem) private var byteUnitSystem
+    @State private var freeSelectionContainerID: String?
+    @State private var hidesDetailSelection = false
 
     private var usage: KBDiskSpaceUsage { item.spaceUsage }
 
@@ -40,80 +42,96 @@ struct DiskVolumeDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                header
-                softRule
-                if let inventory {
-                    VolumeHierarchyChart(
-                        item: item,
-                        inventory: inventory,
-                        isMaximized: isMaximized,
-                        onSelectItem: onSelectItem,
-                        stats: heroStats,
-                        usageFraction: item.volumeUsedFraction,
-                        usageCaption: usageCaption,
-                        notes: structureNotes)
-                }
-                softRule
-                actions
-                    .padding(10)
-                    .background {
-                        RoundedRectangle(cornerRadius: 12,
-                                         style: .continuous)
-                            .fill(Color.primary.opacity(0.035))
-                    }
+        GeometryReader { proxy in
+            ScrollView {
+                content(viewportHeight: proxy.size.height)
+            }
+            .background {
+                RoundedRectangle(cornerRadius: KBTheme.cardRadius,
+                                 style: .continuous)
+                    .fill(.regularMaterial)
                     .overlay {
-                        RoundedRectangle(cornerRadius: 12,
+                        RoundedRectangle(cornerRadius: KBTheme.cardRadius,
                                          style: .continuous)
-                            .strokeBorder(.quaternary.opacity(0.35),
-                                          lineWidth: 0.5)
-                    }
-                softRule
-                metadata
-                    .padding(10)
-                    .background {
-                        RoundedRectangle(cornerRadius: 12,
-                                         style: .continuous)
-                            .fill(Color.primary.opacity(0.035))
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 12,
-                                         style: .continuous)
-                            .strokeBorder(.quaternary.opacity(0.35),
-                                          lineWidth: 0.5)
+                            .fill(LinearGradient(
+                                colors: [diskTint.opacity(0.07),
+                                         softTeal.opacity(0.035),
+                                         .clear],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing))
                     }
             }
-            .padding(14)
-        }
-        .background {
-            RoundedRectangle(cornerRadius: KBTheme.cardRadius,
-                             style: .continuous)
-                .fill(.regularMaterial)
-                .overlay {
-                    RoundedRectangle(cornerRadius: KBTheme.cardRadius,
-                                     style: .continuous)
-                        .fill(LinearGradient(
-                            colors: [diskTint.opacity(0.07),
-                                     softTeal.opacity(0.035),
-                                     .clear],
+            .overlay {
+                RoundedRectangle(cornerRadius: KBTheme.cardRadius,
+                                 style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [diskTint.opacity(0.26),
+                                     softTeal.opacity(0.18),
+                                     Color.white.opacity(0.05)],
                             startPoint: .topLeading,
-                            endPoint: .bottomTrailing))
+                            endPoint: .bottomTrailing),
+                        lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
+        }
+    }
+
+    private func content(viewportHeight: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            header
+            softRule
+            if let inventory {
+                VolumeHierarchyChart(
+                    item: item,
+                    inventory: inventory,
+                    isMaximized: isMaximized,
+                    onSelectItem: onSelectItem,
+                    stats: heroStats,
+                    usageFraction: item.volumeUsedFraction,
+                    usageCaption: usageCaption,
+                    notes: structureNotes,
+                    availableHeight: viewportHeight,
+                    selectedFreeContainerID: $freeSelectionContainerID,
+                    detailSelectionHidden: $hidesDetailSelection)
+            }
+            softRule
+            actions
+                .padding(10)
+                .background {
+                    RoundedRectangle(cornerRadius: 12,
+                                     style: .continuous)
+                        .fill(Color.primary.opacity(0.035))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12,
+                                     style: .continuous)
+                        .strokeBorder(.quaternary.opacity(0.35),
+                                      lineWidth: 0.5)
+                }
+            softRule
+            metadata
+                .padding(10)
+                .background {
+                    RoundedRectangle(cornerRadius: 12,
+                                     style: .continuous)
+                        .fill(Color.primary.opacity(0.035))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12,
+                                     style: .continuous)
+                        .strokeBorder(.quaternary.opacity(0.35),
+                                      lineWidth: 0.5)
                 }
         }
-        .overlay {
-            RoundedRectangle(cornerRadius: KBTheme.cardRadius,
-                             style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [diskTint.opacity(0.26),
-                                 softTeal.opacity(0.18),
-                                 Color.white.opacity(0.05)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing),
-                    lineWidth: 1)
+        .padding(14)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // Clicking outside the treemap and the bar removes the detail's
+            // selection highlight; the panel and its data stay visible.
+            hidesDetailSelection = true
+            freeSelectionContainerID = nil
         }
-        .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
     }
 
     private var diskTint: Color { AppSection.disk.tint }

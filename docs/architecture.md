@@ -389,18 +389,27 @@
     mínimos, insets y gaps reales, así que un disco con pocos volúmenes usa menos alto y no fuerza
     scroll de más. El texto de los tiles nunca baja de 11.5 pt (12.5 maximizado) y se trunca antes
     que reducirse.
-    La barra mide 4/5 de la altura del treemap y no dibuja líneas de unión con él. Es un carril
-    oscuro de esquinas redondeadas que recorre las hojas del disco del alcance: una sección por
-    volumen APFS y una por el espacio libre de cada contenedor; las particiones y los contenedores
-    no se dibujan. Los volúmenes usan un degradado azul y el espacio libre una trama diagonal. Cada
-    sección recibe una altura mínima visible (`VolumeBarView.minimumSliceHeight`) y el resto se
-    reparte por bytes, así que los bloques mayores crecen cuando hay sitio. La selección se
-    resuelve con `selectedSubtreeIDs()`: las secciones del subárbol seleccionado se agrupan en
-    runs contiguos, pasan a un degradado cian-azul y se rodean de un contorno luminoso (glow +
-    línea) con los extremos redondeados. El resto de la barra queda en azul grisáceo oscuro. El
-    tipo y el porcentaje del elemento seleccionado van sobre la barra; la leyenda “of
-    container”/“of capacity”, debajo. La columna Capacity/Free/Used queda a la izquierda, con la
-    nota de espacio compartido debajo, sin líneas de llamada ni anclas de layout.
+    La barra mide 4/5 de la altura del treemap, se acota con `availableHeight` al alto de la
+    ventana para que quepa al redimensionar y no dibuja líneas de unión con el treemap. Es un
+    carril oscuro de esquinas redondeadas que recorre las hojas del disco del alcance: una sección
+    por volumen APFS y una por el espacio libre de cada contenedor; las particiones y los
+    contenedores no se dibujan. Los volúmenes usan un degradado azul y el espacio libre una trama
+    diagonal. Cada sección recibe una altura mínima visible (`VolumeBarLayout.minimumSliceHeight`)
+    y el resto se reparte por bytes, así que los bloques mayores crecen cuando hay sitio. La
+    selección se resuelve con `selectedSubtreeIDs()`: las secciones del subárbol seleccionado se
+    agrupan en runs contiguos, pasan a un degradado cian-azul y se rodean de un contorno luminoso
+    (glow + línea) con los extremos redondeados. El resto de la barra queda en azul grisáceo
+    oscuro. El tipo y el porcentaje del elemento seleccionado van sobre la barra; la leyenda “of
+    container”/“of capacity”, debajo. Capacity y Free quedan arriba en la columna izquierda; Used
+    se coloca a la altura de la sección seleccionada (calculada con
+    `VolumeBarLayout.selectedCenterY`) y se une a la barra con una línea horizontal
+    (`UsedLeaderAnchorKey`). La nota de espacio compartido queda debajo. Cuando se selecciona un
+    bloque free en el treemap, `selectedFreeContainerID` lo destaca en la barra y en el treemap y
+    Used conserva su posición normal. Pulsar de nuevo el elemento seleccionado en el treemap, o su
+    tramo resaltado en la barra (`handleBarTap`), quita el resaltado del detalle sin cambiar la
+    selección de las tablas; un clic fuera del treemap y de la barra también lo quita. El panel
+    sigue mostrando todo el contenido sin ningún tile o tramo resaltado; volver a pulsar restaura
+    el resaltado y la x cierra el panel. El treemap y la barra consumen sus propios clics.
     Los gráficos usan `DiskPalette` (paleta hueso: particiones `#e8e2d7`, contenedores
     `#d9d1c3`; los volúmenes usan por defecto la paleta azul grisácea `#c9cbd0` `#b9bcc2`
     `#a9adb4`; free `#f7f3ea`, residual `#d2c9ba`, unallocated `#ddd5c7`, unknown `#ede8de`), con

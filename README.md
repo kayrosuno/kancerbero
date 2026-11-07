@@ -140,7 +140,8 @@ El detalle de binarios, permisos, instalación y librerías está en
     la tarjeta de detalle. La tarjeta de detalle vuelve al material claro de la app, con un lavado
     ámbar/teal, borde y sombra suaves. El treemap usa esa paleta hueso, con bordes y texto en
     tinta oscura cálida; las barras de la tabla siguen en azul.
-    La barra mide 4/5 de la altura del treemap y no tiene líneas de unión con él. Es un carril
+    La barra mide 4/5 de la altura del treemap, se acota al alto disponible de la tarjeta para
+    que quepa al redimensionar la ventana y no tiene líneas de unión con el treemap. Es un carril
     oscuro de esquinas redondeadas: una sección por cada volumen APFS del disco y una por el
     espacio libre de cada contenedor (las particiones y los contenedores no se dibujan). Los
     volúmenes llevan un degradado azul y el espacio libre se distingue por una trama diagonal. El
@@ -150,8 +151,15 @@ El detalle de binarios, permisos, instalación y librerías está en
     selección abarca el subárbol del elemento: un volumen destaca su sección; un contenedor, todas
     sus secciones y su espacio libre; una partición o el disco, todo su subárbol. Sobre la barra se
     muestran el tipo y el porcentaje del elemento seleccionado; debajo, la leyenda "of
-    container"/"of capacity". La columna Capacity/Free/Used queda a la izquierda, con la nota de
-    espacio compartido debajo, sin líneas de llamada.
+    container"/"of capacity". La columna Capacity/Free/Used queda a la izquierda: Capacity y Free
+    arriba, y Used a la altura de la porción seleccionada, unido a la barra con una línea
+    horizontal; la nota de espacio compartido queda debajo. Si se selecciona el espacio libre en el
+    treemap, esa sección se destaca también en la barra (Used vuelve a su posición superior).
+    Pulsar de nuevo el elemento seleccionado en el treemap, o su tramo resaltado en la barra,
+    quita el resaltado del detalle sin cambiar la selección de las tablas; un clic fuera del
+    treemap y de la barra también lo quita. El panel de detalles sigue mostrando todo
+    (estadísticas, treemap, barra y metadata) sin ningún tile o tramo resaltado; volver a pulsar
+    el elemento o la barra restaura el resaltado y la x cierra el panel.
     El mount point de cada volumen se dibuja en la misma línea que el nombre (a la izquierda) y el
     tamaño/uso (a la derecha), empezando en una columna central común del treemap y alineado a la
     izquierda; las hojas que no cruzan esa columna no muestran el mount. No hay pop/tooltip sobre
