@@ -111,9 +111,9 @@ El detalle de binarios, permisos, instalación y librerías está en
     El panel de tablas y el de detalle se reparten el ancho a la mitad
     (sin selección, las tablas ocupan todo); el divisor central se puede arrastrar para cambiar el
     reparto y la proporción se conserva durante la sesión. La tabla conserva su posición de scroll
-    al seleccionar un elemento. El detalle muestra una tarjeta hero con el gauge vertical de uso a
-    la izquierda y Capacity/Used/Free en la misma
-    columna lateral, y un treemap rectangular anidado con la estructura del disco (particiones →
+    al seleccionar un elemento. El detalle muestra una tarjeta hero con Capacity/Free/Used a la
+    izquierda y el gauge vertical de uso en medio, y un treemap rectangular anidado con la
+    estructura del disco (particiones →
     contenedores APFS → volúmenes, con libre, residual y espacio no asignado). La cabecera de la
     tarjeta muestra el nombre del disco y no cambia al seleccionar un volumen o contenedor. Cada
     rectángulo
@@ -127,7 +127,9 @@ El detalle de binarios, permisos, instalación y librerías está en
     incluye el identificador y el tipo (`disk3s5 · Macintosh HD - Data · APFS volume`), y las
     particiones/contenedores dejan un marco visible (inset 12/9/7 pt) alrededor de sus hijos. Todas
     las particiones comparten un hueso claro, los contenedores un hueso medio y los volúmenes un
-    hueso algo más profundo (`#e8e2d7 #d9d1c3 #c9bfae`; free `#f7f3ea`, residual `#d2c9ba`); cada
+    hueso algo más profundo (`#e8e2d7 #d9d1c3 #c9bfae`; free `#f7f3ea`, residual `#d2c9ba`). Si hay
+    un volumen seleccionado, ese pasa al azul del gauge (`#4f93cc`) y los demás volúmenes a tres
+    grises neutros alternos (`#c9cbd0 #b9bcc2 #a9adb4`), como desactivados pero distinguibles; cada
     partición muestra su usado y porcentaje alineado a la derecha en la cabecera. El texto de los
     tiles tiene un mínimo legible de 11.5 pt (12.5 maximizado): si no cabe se trunca con elipsis,
     nunca se reduce por debajo. La cabecera de la tarjeta muestra el nombre del disco con el chip
@@ -136,10 +138,21 @@ El detalle de binarios, permisos, instalación y librerías está en
     (`disk0`, capacidad, usado y libre) y las particiones dentro; el gráfico no lleva fondo ni
     recuadro exterior, se apoya directamente en la tarjeta de detalle. La
     tarjeta de detalle vuelve al material claro de la app, con un lavado ámbar/teal, borde y sombra
-    suaves. El treemap usa esa paleta hueso, con bordes y texto en tinta oscura cálida; el gauge y
-    las barras de la tabla siguen en azul. Sobre el gauge
-    se indica el tipo del elemento y su porcentaje; tiene tres líneas de cuartos, degradado más
-    oscuro abajo y claro arriba, borde reforzado y un punto blanco con aro azul en la punta. El
+    suaves. El treemap usa esa paleta hueso, con bordes y texto en tinta oscura cálida; las barras
+    de la tabla siguen en azul. Sobre el gauge se indica el tipo del elemento y su porcentaje. El
+    gauge es una composición segmentada con una sección por cada hijo del elemento seleccionado
+    (disco → particiones, container → volúmenes, volumen → volúmenes de su container), con las
+    mismas proporciones y colores que el treemap y separadas por finas líneas; no hay leyenda. El
+    volumen seleccionado se marca en azul en la barra y en su tile del treemap, y el resto de
+    volúmenes usa los grises; el borde del gauge sigue en azul. El tramo azul conserva el degradado
+    original (más claro hacia arriba). La barra mide lo mismo que el treemap (420–860 pt) y reserva
+    dos líneas para su leyenda inferior; la nota de espacio compartido usa 10 pt (11 maximizado).
+    Cada sección con identificador muestra su id rotado dentro de la barra; al pasar el ratón, un
+    pop muestra el id completo (o el nombre de la sección si no tiene id). Cuando la barra tiene
+    varias secciones, cada una se conecta con una línea fina hasta el borde izquierdo del treemap,
+    a la altura de su tile, sin leyenda. La columna va a la izquierda de la barra: Capacity queda
+    arriba y Free/Used se colocan en el centro de su sección (libre y usada), cada uno con su línea
+    horizontal hasta la barra; la nota de espacio compartido queda debajo del más bajo. El
     mount point de cada volumen se dibuja en la misma línea que el nombre (a la izquierda) y el
     tamaño/uso (a la derecha), empezando en una columna central común del treemap y alineado a la
     izquierda; las hojas que no cruzan esa columna no muestran el mount. No hay pop/tooltip sobre
@@ -149,7 +162,8 @@ El detalle de binarios, permisos, instalación y librerías está en
     Las actions (Reveal, Copy ID, Analyze) van en una sola línea por encima de la metadata. No hay
     leyenda debajo
     del treemap: el rectángulo ocupa ese espacio. El elemento
-    seleccionado queda resaltado y las barras de las tablas y el gauge usan la misma paleta. Al
+    seleccionado queda resaltado; el gauge comparte los colores del treemap y las barras de las
+    tablas siguen en azul. Al
     pulsar un rectángulo se selecciona ese elemento en las tablas y el detalle se
     actualiza; pulsar el fondo del treemap selecciona el disco.
     Cada tarjeta se puede maximizar al área de Volumes y restaurar. El

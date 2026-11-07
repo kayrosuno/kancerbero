@@ -365,9 +365,9 @@
     de un contenedor ya contado ni la partición que lo contiene), marcando `isPartial` si alguna
     unidad no reporta capacidad. El libre agregado es la suma de libres conocidos (coincide con la
     tarjeta Free), no `capacidad - usado`.
-  - El detalle de Volumes es una tarjeta hero (`VolumeHierarchyChart`) con el gauge vertical de uso
-    a la izquierda y Capacity/Used/Free en la misma columna lateral, y un treemap rectangular
-    anidado que sube hasta el disco físico para mantener la forma al navegar: filas de particiones,
+  - El detalle de Volumes es una tarjeta hero (`VolumeHierarchyChart`) con Capacity/Free/Used a la
+    izquierda, el gauge vertical en medio y un treemap rectangular anidado que sube hasta el disco
+    físico para mantener la forma al navegar: filas de particiones,
     columnas de contenedores APFS dentro de cada partición y filas de volúmenes dentro de cada
     contenedor. Los dos primeros niveles se dimensionan por capacidad (con una porción “Other” para
     el espacio no asignado); el de volúmenes reutiliza `APFSSpaceContext` (volúmenes por usado +
@@ -384,7 +384,19 @@
     contención. Cada partición muestra además su usado y porcentaje alineado a la derecha en la
     cabecera. Cada partición reserva además altura suficiente para los volúmenes que contiene
     (altura recursiva con tope 520/600 pt), de modo que las particiones pequeñas muestran su
-    contenido; el gauge se centra verticalmente con el treemap y no hay leyenda debajo del gráfico.
+    contenido y no hay leyenda debajo del treemap.
+    El gauge es una composición segmentada con una sección por cada hijo del elemento seleccionado
+    (disco → particiones, container → volúmenes, volumen → volúmenes de su container), en el mismo
+    orden y con los mismos colores que el treemap y separadas por finas líneas; no hay leyenda. El
+    volumen seleccionado se marca en azul en el gauge y en su tile del treemap, y su tramo conserva
+    el degradado azul original (más claro hacia arriba). Cada sección con identificador dibuja su id
+    rotado dentro de la barra; al pasar el ratón, un pop muestra el id completo (o el nombre si no
+    tiene id). Cuando hay varias secciones, cada una se conecta con una línea fina hasta el borde
+    izquierdo del treemap a la altura de su tile. La barra mide lo mismo que el treemap (420–860 pt)
+    y reserva dos líneas para su leyenda inferior. La columna va a la izquierda de la barra:
+    Capacity queda arriba y Free/Used en el centro de su sección (libre y usada), cada uno con su
+    línea horizontal hasta la barra (con anclas de layout); la nota de espacio compartido queda
+    debajo del más bajo.
     La altura del treemap es adaptativa al contenido (420/460…860 pt): se calcula con los ejes,
     mínimos, insets y gaps reales, así que un disco con pocos volúmenes usa menos alto y no fuerza
     scroll de más. El texto
@@ -394,11 +406,12 @@
     las de fracción 0 20/22 pt, suficiente para su línea.
     Los gráficos usan `DiskPalette` (paleta hueso: particiones `#e8e2d7`, contenedores
     `#d9d1c3`, volúmenes `#c9bfae`; free `#f7f3ea`, residual `#d2c9ba`, unallocated `#ddd5c7`,
-    unknown `#ede8de`), con tinta cálida oscura para textos y bordes. La tarjeta de detalle vuelve al
-    material claro de la app con un lavado ámbar/teal, borde fino y sombra suave; el gauge usa
-    azules de la app, tiene tres líneas de cuartos, degradado más oscuro abajo y claro arriba, borde
-    reforzado y un punto blanco con aro azul en la
-    punta, y los valores Capacity/Used/Free son primarios. La cabecera de la tarjeta
+    unknown `#ede8de`), con tinta cálida oscura para textos y bordes. Con un volumen seleccionado,
+    ese pasa al azul del gauge (`#4f93cc`) y los demás volúmenes usan tres grises neutros alternos
+    (`#c9cbd0` `#b9bcc2` `#a9adb4`) para que se lean como desactivados sin perder la distinción
+    entre tiles. La tarjeta de detalle vuelve al material claro de la app con un lavado ámbar/teal,
+    borde fino y sombra suave; el gauge usa el azul de la app para el borde y la sección
+    seleccionada, y los valores Capacity/Free/Used son primarios. La cabecera de la tarjeta
     muestra el nombre del disco con el chip de capacidad resaltado y los chips de
     particiones/contenedores/volúmenes con nombre y número (una o dos líneas según el ancho);
     el disco aparece como contenedor raíz dentro del treemap, con su banda de cabecera
@@ -421,8 +434,8 @@
     por encima de la metadata. Pulsar un rectángulo selecciona el ítem; pulsar el fondo
     del treemap selecciona el disco del alcance. En las tablas, la barra de un
     volumen representa su parte del usado del contenedor (el resto usa usado/capacidad); el gauge
-    se rotula con el tipo y “of container”/“of capacity”, y Capacity/Used/Free comparten la
-    columna lateral. Para contenedores y volúmenes
+    se rotula con el tipo y “of container”/“of capacity”, y Capacity/Free/Used van a su izquierda.
+    Para contenedores y volúmenes
     APFS se añade una nota de espacio compartido y una fila “Shared with” con el contenedor y los
     volúmenes implicados. El chrome de la tarjeta conserva sus acentos.
   - No se ejecuta ningún proceso externo.
