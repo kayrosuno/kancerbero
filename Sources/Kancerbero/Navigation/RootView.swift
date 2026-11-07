@@ -13,7 +13,10 @@ struct RootView: View {
     @AppStorage("diskTab") private var diskTabRaw = DiskTab.volumes.rawValue
     @AppStorage(KBPreferences.tabAnimationsKey)
     private var tabAnimations = KBPreferences.tabAnimationsDefault
+    @AppStorage(KBPreferences.appearanceModeKey)
+    private var appearanceRaw = KBPreferences.appearanceModeDefault
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     @State private var columnVisibility: NavigationSplitViewVisibility
     /// Request currently on screen. A real state binding (unlike a read-only
     /// Binding over `filter.pending`) so `dismiss()` always closes the sheet.
@@ -96,6 +99,20 @@ struct RootView: View {
         columnVisibility == .detailOnly ? Self.contentMinWidth : Self.windowMinWidth
     }
 
+    private var appearanceMode: KBAppearanceMode {
+        KBAppearanceMode(rawValue: appearanceRaw) ?? .system
+    }
+
+    private var appearanceIsDark: Bool {
+        colorScheme == .dark
+    }
+
+    private var appearanceHelp: String {
+        appearanceIsDark
+            ? "Switch to Light Appearance"
+            : "Switch to Dark Appearance"
+    }
+
     var body: some View {
         @Bindable var model = model
 
@@ -139,6 +156,19 @@ struct RootView: View {
         .navigationSplitViewStyle(.balanced)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+                Button(action: toggleAppearance) {
+                    Image(systemName: appearanceIsDark ? "sun.max" : "moon")
+                }
+                .help(appearanceHelp)
+                .accessibilityLabel(appearanceHelp)
+                .accessibilityIdentifier("toolbar.appearance")
+                .contextMenu {
+                    Button("Use System Appearance") {
+                        useSystemAppearance()
+                    }
+                    .disabled(appearanceMode == .system)
+                }
+
                 Button(action: toggleAllCards) {
                     Image(systemName: ui.allCardsCollapsed
                           ? "rectangle.expand.vertical"
@@ -195,6 +225,10 @@ struct RootView: View {
         .onChange(of: filter.pending) { _, pending in
             syncApproval(pending)
         }
+        .onChange(of: appearanceRaw) { _, raw in
+            KBAppearance.apply(
+                KBAppearanceMode(rawValue: raw) ?? .system)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .kbSelectSection)) { notification in
             guard let raw = notification.object as? String,
                   let section = AppSection(rawValue: raw) else { return }
@@ -212,6 +246,17 @@ struct RootView: View {
         withAnimation(cardsAnimation) {
             ui.setAllCardsCollapsed(!ui.allCardsCollapsed)
         }
+    }
+
+    private func toggleAppearance() {
+        let next: KBAppearanceMode = appearanceIsDark ? .light : .dark
+        appearanceRaw = next.rawValue
+        KBAppearance.apply(next)
+    }
+
+    private func useSystemAppearance() {
+        appearanceRaw = KBAppearanceMode.system.rawValue
+        KBAppearance.apply(.system)
     }
 
     private func refreshCurrentSection() {

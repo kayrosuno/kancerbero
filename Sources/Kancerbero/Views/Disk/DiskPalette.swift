@@ -20,9 +20,6 @@ enum DiskPalette {
     static let textInk = Color(.sRGB, red: 0.196, green: 0.165,
                                blue: 0.125, opacity: 1)
 
-    static let partitionFill = sand
-    static let containerFill = stone
-    static let volumeFill = taupe
     static let usedFill = Color(.sRGB, red: 0.871, green: 0.824,
                                 blue: 0.749, opacity: 1)
 
@@ -44,20 +41,8 @@ enum DiskPalette {
     static let mutedVolume3 = Color(.sRGB, red: 0.663, green: 0.678,
                                     blue: 0.706, opacity: 1)
 
-    static func mutedVolume(_ index: Int) -> Color {
-        switch index % 3 {
-        case 0: return mutedVolume1
-        case 1: return mutedVolume2
-        default: return mutedVolume3
-        }
-    }
-
-    static func fill(level: Int) -> Color {
-        switch level {
-        case 0: return partitionFill
-        case 1: return containerFill
-        default: return volumeFill
-        }
+    static func treemap(for scheme: ColorScheme) -> DiskTreemapPalette {
+        scheme == .dark ? .dark : .light
     }
 
     static func tint(for kind: KBDiskItemKind) -> Color {
@@ -112,4 +97,81 @@ enum DiskPalette {
         case .snapshot: return "Snapshot"
         }
     }
+}
+
+/// Treemap colors resolved per appearance. The light variant keeps the
+/// original warm bone/ivory palette; the dark one uses a cool graphite
+/// ramp so the map integrates with the app's dark glass surfaces.
+struct DiskTreemapPalette {
+    let paper: Color
+    let sand: Color
+    let stone: Color
+    let taupe: Color
+    let textInk: Color
+    let usedFill: Color
+    let free: Color
+    let residual: Color
+    let unknown: Color
+    let unallocated: Color
+    /// Volume fills ordered from the smallest capacity to the largest, so
+    /// the biggest volume always gets the darkest shade.
+    let volumeShades: [Color]
+
+    func fill(level: Int) -> Color {
+        switch level {
+        case 0: return sand
+        case 1: return stone
+        default: return taupe
+        }
+    }
+
+    func volumeShade(_ level: Int) -> Color {
+        guard !volumeShades.isEmpty else { return taupe }
+        return volumeShades[min(max(level, 0), volumeShades.count - 1)]
+    }
+
+    static let light = DiskTreemapPalette(
+        paper: DiskPalette.paper,
+        sand: DiskPalette.sand,
+        stone: DiskPalette.stone,
+        taupe: DiskPalette.taupe,
+        textInk: DiskPalette.textInk,
+        usedFill: DiskPalette.usedFill,
+        free: DiskPalette.free,
+        residual: DiskPalette.residual,
+        unknown: DiskPalette.unknown,
+        unallocated: DiskPalette.unallocated,
+        volumeShades: [DiskPalette.mutedVolume1,
+                       DiskPalette.mutedVolume2,
+                       DiskPalette.mutedVolume3])
+
+    static let dark = DiskTreemapPalette(
+        paper: Color(.sRGB, red: 0.086, green: 0.106,
+                     blue: 0.133, opacity: 1),
+        sand: Color(.sRGB, red: 0.125, green: 0.149,
+                    blue: 0.184, opacity: 1),
+        stone: Color(.sRGB, red: 0.161, green: 0.192,
+                     blue: 0.231, opacity: 1),
+        taupe: Color(.sRGB, red: 0.200, green: 0.235,
+                     blue: 0.282, opacity: 1),
+        textInk: Color(.sRGB, red: 0.925, green: 0.906,
+                       blue: 0.871, opacity: 1),
+        usedFill: Color(.sRGB, red: 0.227, green: 0.267,
+                        blue: 0.318, opacity: 1),
+        free: Color(.sRGB, red: 0.102, green: 0.125,
+                    blue: 0.153, opacity: 1),
+        residual: Color(.sRGB, red: 0.208, green: 0.188,
+                        blue: 0.173, opacity: 1),
+        unknown: Color(.sRGB, red: 0.141, green: 0.169,
+                       blue: 0.204, opacity: 1),
+        unallocated: Color(.sRGB, red: 0.114, green: 0.137,
+                           blue: 0.169, opacity: 1),
+        volumeShades: [
+            Color(.sRGB, red: 0.333, green: 0.384,
+                  blue: 0.447, opacity: 1),
+            Color(.sRGB, red: 0.282, green: 0.329,
+                  blue: 0.388, opacity: 1),
+            Color(.sRGB, red: 0.231, green: 0.275,
+                  blue: 0.329, opacity: 1)
+        ])
 }

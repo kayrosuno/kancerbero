@@ -283,6 +283,12 @@
   Pulsar un rectángulo del treemap limpia el foco, expande los ancestros y selecciona el ítem
   (`DiskModel.select`), de modo que las tablas y el detalle siempre apuntan al mismo elemento; la
   tabla no hace scroll-to-selection, así que su posición vertical no cambia.
+- Apariencia: el primer botón del toolbar alterna claro/oscuro con un icono `moon`/`sun.max` según
+  el modo efectivo. `appearanceMode` persiste en `@AppStorage` (`system` por defecto; valores
+  `light`/`dark`); `KBAppearance.apply` asigna `NSApp.appearance`, por lo que el cambio alcanza
+  también a las ventanas secundarias y a los menús. El menú contextual del botón ofrece
+  “Use System Appearance” para volver a seguir macOS y `KancerberoApp.init` aplica el valor
+  guardado antes de crear la primera ventana.
 - Captura interna para verificación: `--screenshot`, `--section`, `--tab`, `--disk-tab`,
   `--networking-focus`, `--networking-transport`, `--networking-ip`, `--networking-state`,
   `--networking-connection-search`, `--networking-process-domain`,
@@ -292,7 +298,8 @@
   `--disk-io-search`, `--disk-io-selected`,
   `--disk-io-graph`, `--cpu-search`, `--cpu-selected`, `--memory-search`,
   `--memory-selected`, `--energy-search`, `--energy-selected`, `--screenshot-dock`,
-  `--dock-style`, filtros `--daemon-*` y `--sidebar-collapsed` (ver `docs/verification.md`).
+  `--dock-style`, filtros `--daemon-*`, `--sidebar-collapsed` y la clave de `UserDefaults`
+  `-appearanceMode light|dark` (ver `docs/verification.md`).
 
 ## Flujo de datos
 
@@ -370,7 +377,11 @@
     izquierda, una barra vertical de volúmenes en medio y un treemap rectangular anidado que sube
     hasta el disco físico para mantener la forma al navegar: filas de particiones,
     columnas de contenedores APFS dentro de cada partición y filas de volúmenes dentro de cada
-    contenedor. Los dos primeros niveles se dimensionan por capacidad (con una porción “Other”
+    contenedor. Si el disco no tiene tabla de particiones, el contenedor APFS es hijo directo del
+    disco y se dibuja como primer nivel (imágenes de disco y stores sintetizados, p. ej.
+    `disk11 → disk12 → disk12s1`); sus volúmenes siguen apilándose en filas porque el eje se decide
+    por rol (partición/contenedor/volumen), no por profundidad. Los dos primeros niveles se
+    dimensionan por capacidad (con una porción “Other”
     para el espacio no asignado); el de volúmenes reutiliza `APFSSpaceContext` (volúmenes por
     usado + residual de snapshots/metadatos/volúmenes desmontados + libre). Un contenedor sin
     volumen montado se muestra como desconocido, nunca como 0 B; si la suma de usado excede el
@@ -399,21 +410,32 @@
     selección se resuelve con `selectedSubtreeIDs()`: las secciones del subárbol seleccionado se
     agrupan en runs contiguos, pasan a un degradado cian-azul y se rodean de un contorno luminoso
     (glow + línea) con los extremos redondeados. El resto de la barra queda en azul grisáceo
-    oscuro. El tipo y el porcentaje del elemento seleccionado van sobre la barra; la leyenda “of
-    container”/“of capacity”, debajo. Capacity y Free quedan arriba en la columna izquierda; Used
-    se coloca a la altura de la sección seleccionada (calculada con
-    `VolumeBarLayout.selectedCenterY`) y se une a la barra con una línea horizontal
-    (`UsedLeaderAnchorKey`). La nota de espacio compartido queda debajo. Cuando se selecciona un
+    oscuro. La barra no lleva tipo ni porcentaje encima; solo la leyenda “of container”/“of
+    capacity” debajo. La columna izquierda rotula la capacidad según el alcance (`Disk capacity`,
+    `Partition capacity`, `Container capacity`) y bajo el valor muestra con quién se comparte
+    (incluido el aviso de uso parcial); Free queda debajo. Used se coloca a la altura de la sección
+    seleccionada (calculada con `VolumeBarLayout.selectedCenterY`) y se une a la barra con una
+    línea horizontal (`UsedLeaderAnchorKey`), reservando la altura del subtítulo de capacidad para
+    no desalinearse. Cuando se selecciona un
     bloque free en el treemap, `selectedFreeContainerID` lo destaca en la barra y en el treemap y
-    Used conserva su posición normal. Pulsar de nuevo el elemento seleccionado en el treemap, o su
-    tramo resaltado en la barra (`handleBarTap`), quita el resaltado del detalle sin cambiar la
+    Used conserva su posición normal. Cada tramo de la barra lleva el `deviceIdentifier` del
+    elemento que representa y, al pulsarlo, lo selecciona (`onSelectItem`); los tramos de espacio
+    libre mantienen su propio resaltado. Pulsar de nuevo el tramo del elemento ya seleccionado, o
+    el elemento en el treemap (`handleBarTap`), quita el resaltado del detalle sin cambiar la
     selección de las tablas; un clic fuera del treemap y de la barra también lo quita. El panel
     sigue mostrando todo el contenido sin ningún tile o tramo resaltado; volver a pulsar restaura
     el resaltado y la x cierra el panel. El treemap y la barra consumen sus propios clics.
-    Los gráficos usan `DiskPalette` (paleta hueso: particiones `#e8e2d7`, contenedores
-    `#d9d1c3`; los volúmenes usan por defecto la paleta azul grisácea `#c9cbd0` `#b9bcc2`
-    `#a9adb4`; free `#f7f3ea`, residual `#d2c9ba`, unallocated `#ddd5c7`, unknown `#ede8de`), con
-    tinta cálida oscura para textos y bordes. Con un volumen seleccionado, ese pasa al azul de la
+    Los gráficos usan `DiskPalette` (paleta hueso para el modo claro: particiones `#e8e2d7`,
+    contenedores `#d9d1c3`; los volúmenes usan por defecto la paleta azul grisácea `#c9cbd0`
+    `#b9bcc2` `#a9adb4`; free `#f7f3ea`, residual `#d2c9ba`, unallocated `#ddd5c7`, unknown
+    `#ede8de`), con tinta cálida oscura para textos y bordes. Los tonos de volumen se asignan por
+    tramos de tamaño ocupado (`bytes`, que fija además el área del tile): el mayor usa el tono más
+    oscuro y hay como máximo 3 niveles; si solo hay 1 o 2 tamaños distintos se usan 1 o 2 tonos, y
+    los volúmenes de igual tamaño comparten tramo. En modo oscuro el treemap resuelve
+    una rampa grafito (`DiskTreemapPalette.dark`: papel `#161b22`, partición `#20262f`, contenedor
+    `#29313b`, volumen `#333c48`, used `#3a4451`, free `#1a2027`) y tinta clara `#ece7de`, con
+    bordes atenuados y la misma rampa de volúmenes invertida para que el mayor siga siendo el más
+    oscuro. Con un volumen seleccionado, ese pasa al azul de la
     app (`#4f93cc`) y los demás conservan los grises. El treemap elige los bordes/textos por la
     luminancia relativa del relleno (`contentColor`/`bandColor`): tinta cálida oscura sobre los
     tonos claros. El rectángulo seleccionado usa un trazo de tinta de 2 pt; hover y ancestros

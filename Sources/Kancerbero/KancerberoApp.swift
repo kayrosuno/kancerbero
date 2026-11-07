@@ -11,6 +11,10 @@ struct KancerberoApp: App {
     @AppStorage(KBPreferences.dockIconStyleKey)
     private var dockIconStyle = KBPreferences.dockIconStyleDefault
 
+    init() {
+        KBAppearance.applyStored()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()
