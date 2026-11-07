@@ -138,21 +138,13 @@ struct DiskVolumeDetailView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .center, spacing: 10) {
-                    diskTitleLabel
-                    capacityChip
-                    componentSummary
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .center, spacing: 10) {
-                        diskTitleLabel
-                        capacityChip
-                    }
-                    componentSummary
-                }
+        HStack(alignment: .center, spacing: 8) {
+            // The title yields (truncates) before the chips; the chips are
+            // fixed-size, so they can never wrap onto a second line.
+            HStack(alignment: .center, spacing: 6) {
+                diskTitleLabel
+                capacityChip
+                componentSummary
             }
             .layoutPriority(1)
 
@@ -208,25 +200,27 @@ struct DiskVolumeDetailView: View {
         Text(displayName(scopeDisk))
             .font(.system(size: 19, weight: .semibold, design: .rounded))
             .lineLimit(1)
-            .minimumScaleFactor(0.7)
+            .minimumScaleFactor(0.55)
             .textSelection(.enabled)
     }
 
     private var capacityChip: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 3) {
             Image(systemName: "internaldrive")
-                .font(.system(size: 11.5, weight: .semibold))
+                .font(.system(size: 10.5, weight: .semibold))
                 .foregroundStyle(capacityTint)
             Text("Capacity")
-                .font(.system(size: 10.5, weight: .medium))
+                .font(.system(size: 9.5, weight: .medium))
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
             Text(diskCapacityText)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(.primary)
+                .lineLimit(1)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
         .background {
             Capsule().fill(capacityTint.opacity(0.16))
         }
@@ -248,27 +242,31 @@ struct DiskVolumeDetailView: View {
 
     private var componentSummary: some View {
         let counts = componentCounts
-        return HStack(spacing: 6) {
+        return HStack(spacing: 3) {
             if counts.isEmpty {
                 Text("No nested items")
-                    .font(.system(size: 10.5))
+                    .font(.system(size: 9))
                     .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .fixedSize()
             } else {
                 ForEach(counts) { count in
-                    HStack(spacing: 4) {
+                    HStack(spacing: 3) {
                         Image(systemName: count.icon)
-                            .font(.system(size: 11.5, weight: .semibold))
+                            .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(count.tint)
                         Text(count.label.capitalized)
-                            .font(.system(size: 10.5, weight: .medium))
+                            .font(.system(size: 8.5, weight: .medium))
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
                         Text("\(count.value)")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 10.5, weight: .semibold))
                             .monospacedDigit()
                             .foregroundStyle(.primary)
+                            .lineLimit(1)
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2.5)
                     .background {
                         Capsule().fill(count.tint.opacity(0.14))
                     }
@@ -276,11 +274,13 @@ struct DiskVolumeDetailView: View {
                         Capsule().strokeBorder(count.tint.opacity(0.32),
                                                lineWidth: 0.75)
                     }
+                    .fixedSize()
                     .help("\(count.value) \(count.label)")
                 }
             }
         }
-        .frame(height: 26, alignment: .leading)
+        .frame(height: 22, alignment: .leading)
+        .fixedSize(horizontal: true, vertical: false)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(componentAccessibilityLabel)
     }
