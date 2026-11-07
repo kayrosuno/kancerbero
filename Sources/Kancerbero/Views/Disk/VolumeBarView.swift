@@ -9,6 +9,79 @@ struct VolumeBarSlice: Identifiable {
     let isHighlighted: Bool
 }
 
+/// Shared geometry between the bar and the hero stats, so the Used label and
+/// its leader line can target the selected segment.
+enum VolumeBarLayout {
+    static let contentInset: CGFloat = 2
+    static let gap: CGFloat = 2
+
+    static func minimumSliceHeight(isMaximized: Bool) -> CGFloat {
+        isMaximized ? 13 : 12
+    }
+
+    static func heights(for slices: [VolumeBarSlice], height: CGFloat,
+                        isMaximized: Bool) -> [CGFloat] {
+        guard !slices.isEmpty else { return [] }
+        let contentHeight = max(0, height - 2 * contentInset)
+        let available = max(
+            0, contentHeight - gap * CGFloat(max(0, slices.count - 1)))
+        let count = CGFloat(slices.count)
+        let requestedMinimum = minimumSliceHeight(isMaximized: isMaximized)
+            * count
+        let scale = requestedMinimum > available
+            ? available / requestedMinimum : 1
+        let minimum = minimumSliceHeight(isMaximized: isMaximized) * scale
+        let remainder = max(0, available - minimum * count)
+        let total = slices.reduce(0.0) {
+            $0 + max(0, $1.fraction)
+        }
+        return slices.map { slice in
+            let extra = total > 0
+                ? remainder * CGFloat(max(0, slice.fraction) / total)
+                : remainder / count
+            return minimum + extra
+        }
+    }
+
+    static func sliceIndex(at y: CGFloat, for slices: [VolumeBarSlice],
+                           height: CGFloat,
+                           isMaximized: Bool) -> Int? {
+        let heights = heights(for: slices, height: height,
+                              isMaximized: isMaximized)
+        guard !heights.isEmpty else { return nil }
+        var top = contentInset
+        for (index, sliceHeight) in heights.enumerated() {
+            let bottom = top + sliceHeight
+            if y >= top, y <= bottom { return index }
+            top = bottom + gap
+        }
+        return nil
+    }
+
+    static func selectedCenterY(for slices: [VolumeBarSlice],
+                                height: CGFloat,
+                                isMaximized: Bool) -> CGFloat? {
+        let heights = heights(for: slices, height: height,
+                              isMaximized: isMaximized)
+        guard !heights.isEmpty else { return nil }
+        var top = contentInset
+        var firstTop: CGFloat?
+        var lastBottom: CGFloat?
+        for (index, slice) in slices.enumerated() {
+            let bottom = top + heights[index]
+            if slice.isHighlighted {
+                if firstTop == nil { firstTop = top }
+                lastBottom = bottom
+            }
+            top = bottom + gap
+        }
+        guard let first = firstTop, let last = lastBottom else {
+            return nil
+        }
+        return (first + last) / 2
+    }
+}
+
 /// The vertical, 4/5-height volume bar of the Volumes hero. A dark glass rail
 /// holds the volume segments; the selected run gets a vivid gradient and a
 /// neon outline.
@@ -18,11 +91,9 @@ struct VolumeBarView: View {
     let height: CGFloat
     let tint: Color
     let isMaximized: Bool
+    var onTapSlice: ((VolumeBarSlice) -> Void)? = nil
 
-    private var minimumSliceHeight: CGFloat { isMaximized ? 13 : 12 }
-    private var sliceGap: CGFloat { 2 }
     private var trackCorner: CGFloat { isMaximized ? 14 : 12 }
-    private var contentInset: CGFloat { 2 }
 
     private var selectedCount: Int {
         slices.filter { $0.isHighlighted }.count
@@ -40,6 +111,15 @@ struct VolumeBarView: View {
             selectedCount > 0
                 ? "\(slices.count) blocks, \(selectedCount) selected"
                 : "\(slices.count) blocks")
+        .highPriorityGesture(
+            SpatialTapGesture().onEnded { value in
+                guard let index = VolumeBarLayout.sliceIndex(
+                    at: value.location.y, for: slices,
+                    height: height, isMaximized: isMaximized) else {
+                    return
+                }
+                onTapSlice?(slices[index])
+            })
     }
 
     private struct SliceFrame {
@@ -55,6 +135,7 @@ struct VolumeBarView: View {
         let track = CGRect(origin: .zero, size: size)
         let trackPath = Path(roundedRect: track,
                              cornerRadius: trackCorner)
+        let contentInset = VolumeBarLayout.contentInset
         let contentRect = track.insetBy(dx: contentInset,
                                         dy: contentInset)
         let contentPath = Path(
@@ -67,9 +148,9 @@ struct VolumeBarView: View {
         var content = context
         content.clip(to: contentPath)
 
-        let gapTotal = sliceGap * CGFloat(max(0, slices.count - 1))
-        let available = max(0, contentRect.height - gapTotal)
-        let heights = sliceHeights(available: available)
+        let heights = VolumeBarLayout.heights(
+            for: slices, height: size.height,
+            isMaximized: isMaximized)
 
         var frames: [SliceFrame] = []
         var top = contentRect.minY
@@ -87,9 +168,9 @@ struct VolumeBarView: View {
                               rect: CGRect(x: contentRect.minX,
                                            y: bottom,
                                            width: contentRect.width,
-                                           height: sliceGap))
+                                           height: VolumeBarLayout.gap))
             }
-            top = bottom + sliceGap
+            top = bottom + VolumeBarLayout.gap
         }
 
         drawSelection(context: &context, frames: frames,
@@ -99,27 +180,6 @@ struct VolumeBarView: View {
     }
 
     // MARK: - Slice layout
-
-    /// Every slice keeps a visible minimum; the remaining height is shared
-    /// proportionally, so larger blocks grow when there is room.
-    private func sliceHeights(available: CGFloat) -> [CGFloat] {
-        guard !slices.isEmpty else { return [] }
-        let count = CGFloat(slices.count)
-        let requestedMinimum = minimumSliceHeight * count
-        let scale = requestedMinimum > available
-            ? available / requestedMinimum : 1
-        let minimum = minimumSliceHeight * scale
-        let remainder = max(0, available - minimum * count)
-        let total = slices.reduce(0.0) {
-            $0 + max(0, $1.fraction)
-        }
-        return slices.map { slice in
-            let extra = total > 0
-                ? remainder * CGFloat(max(0, slice.fraction) / total)
-                : remainder / count
-            return minimum + extra
-        }
-    }
 
     // MARK: - Track and slices
 
@@ -191,10 +251,16 @@ struct VolumeBarView: View {
 
     private func drawFreeSlice(context: inout GraphicsContext,
                                rect: CGRect, selected: Bool) {
-        let topColor = Color(.sRGB, red: 0.62, green: 0.74,
-                             blue: 0.86, opacity: selected ? 0.55 : 0.24)
-        let bottomColor = Color(.sRGB, red: 0.34, green: 0.45,
-                                blue: 0.58, opacity: selected ? 0.38 : 0.14)
+        let topColor = selected
+            ? Color(.sRGB, red: 0.49, green: 0.89, blue: 1.0,
+                    opacity: 0.92)
+            : Color(.sRGB, red: 0.62, green: 0.74, blue: 0.86,
+                    opacity: 0.24)
+        let bottomColor = selected
+            ? Color(.sRGB, red: 0.16, green: 0.45, blue: 0.98,
+                    opacity: 0.82)
+            : Color(.sRGB, red: 0.34, green: 0.45, blue: 0.58,
+                    opacity: 0.14)
         context.fill(
             Path(rect),
             with: .linearGradient(
@@ -211,7 +277,8 @@ struct VolumeBarView: View {
             line.move(to: CGPoint(x: x, y: rect.maxY))
             line.addLine(to: CGPoint(x: x + rect.height, y: rect.minY))
             hatch.stroke(line,
-                         with: .color(.white.opacity(0.13)),
+                         with: .color(.white.opacity(selected
+                             ? 0.22 : 0.13)),
                          lineWidth: 1)
             x += step
         }
@@ -254,7 +321,8 @@ struct VolumeBarView: View {
                          blue: 1.0, opacity: 1)
         let inset: CGFloat = 1.2
         let smallRadius: CGFloat = 4
-        let capRadius = max(0, trackCorner - contentInset - inset)
+        let capRadius = max(0, trackCorner
+            - VolumeBarLayout.contentInset - inset)
 
         for run in runs {
             let top = run.top - inset

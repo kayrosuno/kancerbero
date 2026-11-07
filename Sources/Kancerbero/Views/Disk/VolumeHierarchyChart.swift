@@ -22,6 +22,11 @@ struct VolumeHierarchyChart: View {
     var usageFraction: Double? = nil
     var usageCaption: String? = nil
     var notes: [String] = []
+    /// Height of the detail-card viewport. The chart and the bar are capped
+    /// to it so the bar stays fully visible when the window shrinks.
+    var availableHeight: CGFloat? = nil
+    @Binding var selectedFreeContainerID: String?
+    @Binding var detailSelectionHidden: Bool
 
     @Environment(\.byteUnitSystem) private var byteUnitSystem
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -32,18 +37,29 @@ struct VolumeHierarchyChart: View {
         let nodes = makeNodes(for: scope)
         let highlightID = highlightID(in: nodes)
 
+        // The treemap keeps its original adaptive height. Only the bar is
+        // capped to the window so it stays fully visible when resizing.
         let treemapHeight = adaptiveTreemapHeight(for: nodes)
-        let trackHeight = (treemapHeight * 0.8).rounded()
+        let desiredBarHeight = (treemapHeight * 0.8).rounded()
+        let maxBarHeight = availableHeight.map { max(180, $0 - 145) }
+            ?? desiredBarHeight
+        let trackHeight = min(desiredBarHeight, maxBarHeight)
         HStack(alignment: .top, spacing: chartColumnSpacing) {
             heroInfo(trackHeight: trackHeight)
             treemap(nodes: nodes, scope: scope,
-                    highlightID: highlightID)
+                    highlightID: detailSelectionHidden ? nil : highlightID)
                 .frame(height: treemapHeight)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 6)
         .animation(reduceMotion ? nil : .snappy(duration: 0.25),
                    value: item.deviceIdentifier)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.25),
+                   value: selectedFreeContainerID)
+        .onChange(of: item.deviceIdentifier) { _, _ in
+            selectedFreeContainerID = nil
+            detailSelectionHidden = false
+        }
     }
 
     // MARK: - Hero
@@ -58,7 +74,7 @@ struct VolumeHierarchyChart: View {
 
     private func heroInfo(trackHeight: CGFloat) -> some View {
         HStack(alignment: .top, spacing: heroSpacing) {
-            statsColumn
+            statsColumn(trackHeight: trackHeight)
             VerticalUsageBar(
                 slices: barSlices,
                 fraction: usageFraction,
@@ -67,18 +83,112 @@ struct VolumeHierarchyChart: View {
                 caption: usageCaption,
                 height: trackHeight,
                 width: barWidth,
-                isMaximized: isMaximized)
+                isMaximized: isMaximized,
+                onSliceTap: handleBarTap)
         }
         .fixedSize(horizontal: true, vertical: false)
+        .overlayPreferenceValue(UsedLeaderAnchorKey.self) { anchors in
+            GeometryReader { proxy in
+                Canvas { context, _ in
+                    guard let anchor = anchors["used"] else { return }
+                    let rect = proxy[anchor]
+                    let start = CGPoint(x: rect.maxX + 4, y: rect.midY)
+                    let endX = statsWidth + heroSpacing + 1
+                    guard endX > start.x else { return }
+                    let color = Color(.sRGB, red: 0.30, green: 0.66,
+                                      blue: 0.92, opacity: 0.85)
+                    var path = Path()
+                    path.move(to: start)
+                    path.addLine(to: CGPoint(x: endX, y: start.y))
+                    context.stroke(
+                        path, with: .color(color),
+                        style: StrokeStyle(lineWidth: 1,
+                                           lineCap: .round))
+                    let dot = CGRect(x: endX - 1.6, y: start.y - 1.6,
+                                     width: 3.2, height: 3.2)
+                    context.fill(Path(ellipseIn: dot),
+                                 with: .color(color))
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
     }
 
-    /// Capacity, Free and Used stacked above the shared-space notes. There
-    /// are no callout lines or anchors connecting the column to the chart.
-    private var statsColumn: some View {
-        VStack(alignment: .leading, spacing: columnSpacing) {
-            ForEach(stats) { stat in
-                statRow(stat)
+    /// A hidden detail selection comes back when the bar is clicked; with a
+    /// visible selection, clicking a highlighted segment hides it.
+    private func handleBarTap(_ slice: VolumeBarSlice) {
+        if detailSelectionHidden {
+            detailSelectionHidden = false
+            return
+        }
+        guard slice.isHighlighted else { return }
+        if selectedFreeContainerID != nil {
+            selectedFreeContainerID = nil
+        } else {
+            detailSelectionHidden = true
+        }
+    }
+
+    /// Distance from the hero top to the top of the bar: the kind label and
+    /// percentage sit above the capsule inside the bar column.
+    private var barTopOffset: CGFloat {
+        labelLineHeight(7.5) + 5
+            + labelLineHeight(isMaximized ? 14 : 12) + 5
+    }
+
+    private var statRowHeight: CGFloat {
+        labelLineHeight(9.5) + 1 + labelLineHeight(statValueSize)
+    }
+
+    /// Offset of the value line inside a stat row, used to align Used with
+    /// the selected bar portion.
+    private var usedValueMidOffset: CGFloat {
+        labelLineHeight(9.5) + 1 + labelLineHeight(statValueSize) / 2
+    }
+
+    /// Top offset of the Used row so its value sits at the selected bar
+    /// portion. It never overlaps Capacity and Free.
+    private func usedRowTop(trackHeight: CGFloat) -> CGFloat {
+        let minimumTop = statRowHeight * 2 + columnSpacing * 2
+        // A free-space selection is highlighted in the bar but has no Used
+        // leader: the Used value keeps its normal position.
+        guard !detailSelectionHidden,
+              selectedFreeContainerID == nil,
+              let center = VolumeBarLayout.selectedCenterY(
+                  for: barSlices, height: trackHeight,
+                  isMaximized: isMaximized) else {
+            return minimumTop
+        }
+        let target = barTopOffset + center - usedValueMidOffset
+        return max(minimumTop, target)
+    }
+
+    /// Capacity and Free stay at the top; Used travels to the selected bar
+    /// portion and gets a horizontal leader line.
+    private func statsColumn(trackHeight: CGFloat) -> some View {
+        let capacity = stats.first { $0.id == "capacity" }
+        let free = stats.first { $0.id == "free" }
+        let used = stats.first { $0.id == "used" }
+        let usedTop = usedRowTop(trackHeight: trackHeight)
+        let freeBottom = statRowHeight * 2 + columnSpacing
+        let spacer = max(0, usedTop - freeBottom)
+        return VStack(alignment: .leading, spacing: 0) {
+            if let capacity {
+                statRow(capacity)
             }
+            Color.clear.frame(height: columnSpacing)
+            if let free {
+                statRow(free)
+            }
+            Color.clear.frame(height: spacer)
+            if let used {
+                statRow(used,
+                        anchorID: !detailSelectionHidden
+                            && selectedFreeContainerID == nil
+                            ? "used" : nil)
+            }
+            Color.clear.frame(height: columnSpacing)
             ForEach(notes, id: \.self) { note in
                 Text(note)
                     .font(.system(size: isMaximized ? 11 : 10))
@@ -91,7 +201,8 @@ struct VolumeHierarchyChart: View {
         .frame(width: statsWidth, alignment: .leading)
     }
 
-    private func statRow(_ stat: VolumeHierarchyStat) -> some View {
+    private func statRow(_ stat: VolumeHierarchyStat,
+                         anchorID: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(stat.title)
                 .font(.system(size: 9.5, weight: .semibold))
@@ -107,6 +218,10 @@ struct VolumeHierarchyChart: View {
                 .foregroundStyle(.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
+                .anchorPreference(key: UsedLeaderAnchorKey.self,
+                                  value: .bounds) { anchor in
+                    anchorID.map { [$0: anchor] } ?? [:]
+                }
         }
     }
 
@@ -133,9 +248,17 @@ struct VolumeHierarchyChart: View {
         return blocks.map { block in
             let fraction = total > 0
                 ? Double(block.bytes) / total : 0
-            let highlighted = block.isFree
-                ? selectedIDs.contains(block.containerID)
-                : selectedIDs.contains(block.ownerID)
+            let highlighted: Bool
+            if detailSelectionHidden {
+                highlighted = false
+            } else if let selectedFreeContainerID {
+                highlighted = block.isFree
+                    && block.containerID == selectedFreeContainerID
+            } else {
+                highlighted = block.isFree
+                    ? selectedIDs.contains(block.containerID)
+                    : selectedIDs.contains(block.ownerID)
+            }
             return VolumeBarSlice(
                 id: block.id,
                 fraction: fraction,
@@ -361,8 +484,9 @@ struct VolumeHierarchyChart: View {
                 Canvas { context, _ in
                     drawTreemap(layout, scope: scope,
                                 highlightID: highlightID,
-                                diskSelected: item.deviceIdentifier
-                                    == scope.deviceIdentifier,
+                                diskSelected: !detailSelectionHidden
+                                    && item.deviceIdentifier
+                                        == scope.deviceIdentifier,
                                 context: &context)
                 }
 
@@ -406,15 +530,39 @@ struct VolumeHierarchyChart: View {
                     }
                 }
             }
-            .gesture(
+            .highPriorityGesture(
                 SpatialTapGesture().onEnded { value in
                     guard let hit = treemapItem(at: value.location, in: layout)
                     else {
-                        onSelectItem?(scope.deviceIdentifier)
+                        selectedFreeContainerID = nil
+                        if detailSelectionHidden
+                            || item.deviceIdentifier
+                                != scope.deviceIdentifier {
+                            detailSelectionHidden = false
+                            if item.deviceIdentifier
+                                != scope.deviceIdentifier {
+                                onSelectItem?(scope.deviceIdentifier)
+                            }
+                        } else {
+                            detailSelectionHidden = true
+                        }
                         return
                     }
+                    if hit.node.role == .free, let ownerID = hit.ownerID {
+                        detailSelectionHidden = false
+                        selectedFreeContainerID =
+                            selectedFreeContainerID == ownerID
+                                ? nil : ownerID
+                        return
+                    }
+                    selectedFreeContainerID = nil
                     guard hit.node.role.isSelectable,
                           let itemID = hit.node.itemID else { return }
+                    if itemID == item.deviceIdentifier {
+                        detailSelectionHidden.toggle()
+                        return
+                    }
+                    detailSelectionHidden = false
                     onSelectItem?(itemID)
                 }
             )
@@ -426,6 +574,8 @@ struct VolumeHierarchyChart: View {
                     + "Selected \(kindLine(for: item)) "
                     + "\(item.deviceIdentifier): \(headerUsageSummary)")
             .accessibilityAction(named: Text("Show disk details")) {
+                selectedFreeContainerID = nil
+                detailSelectionHidden = false
                 onSelectItem?(scope.deviceIdentifier)
             }
         }
@@ -804,8 +954,11 @@ struct VolumeHierarchyChart: View {
 
         for item in layout.items {
             let content = DiskPalette.contentColor(on: item.node.color)
-            let selected = item.node.itemID != nil
-                && item.node.itemID == highlightID
+            let freeSelected = selectedFreeContainerID != nil
+                && item.node.role == .free
+                && item.ownerID == selectedFreeContainerID
+            let selected = (item.node.itemID != nil
+                && item.node.itemID == highlightID) || freeSelected
             let ancestor = !selected
                 && containsSelection(item.node, highlightID: highlightID)
             let hovered = hoveredNodeID == item.node.id && !selected
@@ -1715,6 +1868,7 @@ private struct VerticalUsageBar: View {
     let height: CGFloat
     let width: CGFloat
     let isMaximized: Bool
+    var onSliceTap: ((VolumeBarSlice) -> Void)? = nil
 
     private var clamped: Double {
         guard let fraction, fraction.isFinite else { return 0 }
@@ -1752,7 +1906,8 @@ private struct VerticalUsageBar: View {
                 width: width,
                 height: height,
                 tint: tint,
-                isMaximized: isMaximized)
+                isMaximized: isMaximized,
+                onTapSlice: onSliceTap)
 
             Text(caption ?? "")
                 .font(.system(size: 8))
@@ -1766,5 +1921,15 @@ private struct VerticalUsageBar: View {
         .accessibilityLabel(kindLabel.map { "\($0) blocks" }
                             ?? "Disk blocks")
         .accessibilityValue(fraction == nil ? "Unknown" : percentText)
+    }
+}
+
+/// Collects the Used value frame so the hero can draw its horizontal leader.
+private struct UsedLeaderAnchorKey: PreferenceKey {
+    static let defaultValue: [String: Anchor<CGRect>] = [:]
+
+    static func reduce(value: inout [String: Anchor<CGRect>],
+                       nextValue: () -> [String: Anchor<CGRect>]) {
+        value.merge(nextValue(), uniquingKeysWith: { $1 })
     }
 }

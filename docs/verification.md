@@ -436,13 +436,21 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   tabla; `kb-vol-2col.png` puede abrir con la fila seleccionada fuera del área visible, sin
   centrarla.
 - Treemap y barra: la tarjeta muestra Capacity/Free/Used a la izquierda, una barra vertical en
-  medio (4/5 de la altura del treemap) y el treemap a la derecha. La barra es un carril oscuro de
-  esquinas redondeadas con una sección por volumen APFS del disco y una por el espacio libre de
-  cada contenedor; no dibuja particiones ni contenedores. Los volúmenes usan un degradado azul y
-  el libre una trama diagonal; cada sección recibe una altura mínima visible y el resto se reparte
-  proporcionalmente. El grupo seleccionado pasa a un degradado cian-azul con un contorno luminoso
-  (un volumen, todas las secciones de un contenedor con su libre, o todo el disco/partición); el
-  resto queda en azul grisáceo oscuro. No hay líneas de unión con el treemap. El
+  medio (4/5 de la altura del treemap, acotada al alto de la ventana para que quepa al
+  redimensionar) y el treemap a la derecha. La barra es un carril oscuro de esquinas redondeadas
+  con una sección por volumen APFS del disco y una por el espacio libre de cada contenedor; no
+  dibuja particiones ni contenedores. Los volúmenes usan un degradado azul y el libre una trama
+  diagonal; cada sección recibe una altura mínima visible y el resto se reparte proporcionalmente.
+  El grupo seleccionado pasa a un degradado cian-azul con un contorno luminoso (un volumen, todas
+  las secciones de un contenedor con su libre, o todo el disco/partición); el resto queda en azul
+  grisáceo oscuro. Used se coloca a la altura de la sección seleccionada con una línea horizontal
+  hasta la barra; Capacity y Free quedan arriba. Al seleccionar un bloque free en el treemap, su
+  sección se destaca en la barra (y en el treemap) y Used vuelve a su posición superior. Pulsar de
+  nuevo el elemento seleccionado en el treemap, o su tramo resaltado en la barra, quita el
+  resaltado del detalle sin cambiar la selección de las tablas; un clic fuera del treemap y de la
+  barra también lo quita. El panel sigue mostrando todo el contenido sin ningún tile o tramo
+  resaltado; volver a pulsar restaura el resaltado y la x lo cierra. No hay conectores
+  barra-treemap. El
   gráfico es un rectángulo anidado (particiones → contenedores APFS → volúmenes, con “Other” para
   el espacio no asignado, residual y libre) que adapta su altura al contenido (420/460…860 pt)
   para evitar scroll innecesario, con texto de tile mayor. Particiones y contenedores usan la
@@ -452,7 +460,8 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   material claro con lavado ámbar/teal, borde y sombra suaves. El disco aparece como contenedor
   raíz dentro del treemap, con su banda de cabecera (`disk0`, capacidad, usado y libre) y las
   particiones anidadas; la cabecera de la tarjeta muestra el nombre del disco con los chips de
-  capacidad y de componentes con nombre y número (una o dos líneas según el ancho). **No hay
+  capacidad y de componentes con nombre y número, en una sola línea (el título se trunca
+  antes). **No hay
   bloque-resumen sobre el gráfico ni leyenda debajo**; el rectángulo ocupa ese espacio. La
   cabecera no cambia al seleccionar un volumen o contenedor; la metadata describe el elemento
   seleccionado. Cada contenedor y volumen muestra su uso/% (inline si la fila es compacta). El
@@ -472,9 +481,10 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   se comprueba que `disk0s3` muestra `disk2` y sus volúmenes `Recovery`/`Update` con
   `Not mounted`. En un disco con pocos volúmenes (p. ej. `kb-follow-disk4.png`) el treemap baja a
   ~420/460 pt; el máximo sigue siendo 860.
-- Barra: no hay id rotado, pop ni líneas de conexión; el tipo y el porcentaje van encima y la
-  leyenda “of container”/“of capacity” debajo. Capacity/Free/Used quedan a la izquierda, con la
-  nota de espacio compartido debajo y sin líneas de llamada. Al seleccionar un contenedor/volumen
+- Barra: no hay id rotado, pop ni conectores barra-treemap; el tipo y el porcentaje van encima y
+  la leyenda “of container”/“of capacity” debajo. Capacity y Free quedan arriba, Used a la altura
+  de la sección seleccionada con su línea horizontal, y la nota de espacio compartido debajo. Al
+  seleccionar un contenedor/volumen
   APFS aparece la fila “Shared with” con el contenedor y los volúmenes (nombre+id); no se muestra
   para discos, particiones ni snapshots. Las barras de las tablas siguen en azul.
 - Maximizar/restaurar en tablas y detalle: la tarjeta ocupa el área de Volumes y se oculta la otra
