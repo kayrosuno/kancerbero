@@ -408,8 +408,8 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   mini barra (volúmenes: parte del usado del contenedor; resto: usado/capacidad); Free muestra `—`
   en volúmenes (libre compartido); Mount trunca con tooltip. Un contenedor sin volumen montado
   muestra `—` en Used/Free. La cabecera de la tarjeta muestra el nombre del disco con los chips de
-  capacidad y de particiones/contenedores/volúmenes con nombre y número (pasan a una segunda línea
-  si no caben). No hay flecha
+  capacidad y de particiones/contenedores/volúmenes con nombre y número, en una sola línea (el
+  título se trunca antes). No hay flecha
   de subir nivel.
 - Columnas: en `kb-vol-cols.png` (árbol maximizado) se ven las ocho cabeceras y los separadores
   verticales; en `kb-vol-cols-narrow.png` se comprueba que la tabla estrecha conserva la cabecera
@@ -435,60 +435,48 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   sigue arriba (sección disk0) mientras el detalle muestra disk4: la selección no desplaza la
   tabla; `kb-vol-2col.png` puede abrir con la fila seleccionada fuera del área visible, sin
   centrarla.
-- Treemap: tarjeta hero con Capacity/Free/Used a la izquierda del gauge vertical. El gauge es una
-  composición segmentada con una sección por hijo (disco → particiones, container → volúmenes,
-  volumen → volúmenes de su container), con los mismos colores que el treemap y sin leyenda; el
-  volumen seleccionado va en azul en la barra y en su tile y su tramo conserva el degradado. Cada
-  sección con id dibuja su id rotado dentro de la barra y, al pasar el ratón, un pop muestra el id
-  (o el nombre si no tiene id). Cuando hay varias secciones, cada una se conecta con una línea fina
-  al borde izquierdo del treemap a la altura de su tile. Capacity queda arriba y Free/Used se
-  colocan en el centro de su sección (libre y usada; para discos/containers Used en el centro de la
-  barra), cada uno con su línea horizontal; la nota de Shares queda debajo del más bajo. La barra
-  mide lo mismo que el treemap (420–860 pt). El gráfico es un
-  rectángulo
-  anidado (particiones → contenedores APFS → volúmenes, con “Other” para el espacio no asignado,
-  residual y libre) que adapta su altura al contenido (420/460…860 pt) para
-  evitar scroll innecesario, con texto de
-  tile mayor. Usa la
-  paleta hueso
-  `#e8e2d7 #d9d1c3 #c9bfae` (particiones hueso claro, contenedores hueso medio, volúmenes hueso
-  profundo; free `#f7f3ea`, residual `#d2c9ba`). Con un volumen seleccionado, ese pasa al azul del
-  gauge `#4f93cc` y los demás volúmenes usan tres grises neutros alternos (`#c9cbd0` `#b9bcc2`
-  `#a9adb4`), como desactivados pero distinguibles. Bordes y texto en tinta cálida oscura. La
-  tarjeta es un panel material claro con lavado ámbar/teal, borde y sombra suaves; el gauge usa el
-  azul de la app para el borde y la sección seleccionada. El disco aparece como contenedor raíz dentro del treemap, con su banda de cabecera
-  (`disk0`, capacidad, usado y libre) y las particiones anidadas; la cabecera de la tarjeta muestra
-  el nombre del disco con los chips de capacidad y
-  de componentes con nombre y número (una o dos líneas según el ancho).
-  **No hay bloque-resumen sobre el gráfico ni leyenda
-  debajo**; el rectángulo ocupa ese espacio. La cabecera no cambia al seleccionar un volumen o
-  contenedor; la línea sobre el gráfico y el gauge/metadata describen el disco y el seleccionado
-  respectivamente. Cada contenedor y volumen muestra su uso/% (inline si la fila es compacta).
-  El texto de los tiles tiene un mínimo de 11.5 pt (12.5 maximizado): si no cabe se trunca con
+- Treemap y barra: la tarjeta muestra Capacity/Free/Used a la izquierda, una barra vertical en
+  medio (4/5 de la altura del treemap) y el treemap a la derecha. La barra es un carril oscuro de
+  esquinas redondeadas con una sección por volumen APFS del disco y una por el espacio libre de
+  cada contenedor; no dibuja particiones ni contenedores. Los volúmenes usan un degradado azul y
+  el libre una trama diagonal; cada sección recibe una altura mínima visible y el resto se reparte
+  proporcionalmente. El grupo seleccionado pasa a un degradado cian-azul con un contorno luminoso
+  (un volumen, todas las secciones de un contenedor con su libre, o todo el disco/partición); el
+  resto queda en azul grisáceo oscuro. No hay líneas de unión con el treemap. El
+  gráfico es un rectángulo anidado (particiones → contenedores APFS → volúmenes, con “Other” para
+  el espacio no asignado, residual y libre) que adapta su altura al contenido (420/460…860 pt)
+  para evitar scroll innecesario, con texto de tile mayor. Particiones y contenedores usan la
+  paleta hueso (`#e8e2d7`, `#d9d1c3`); los volúmenes usan por defecto los tres azules grisáceos
+  (`#c9cbd0` `#b9bcc2` `#a9adb4`) y el volumen seleccionado pasa al azul `#4f93cc`. Free
+  `#f7f3ea`, residual `#d2c9ba`. Bordes y texto en tinta cálida oscura. La tarjeta es un panel
+  material claro con lavado ámbar/teal, borde y sombra suaves. El disco aparece como contenedor
+  raíz dentro del treemap, con su banda de cabecera (`disk0`, capacidad, usado y libre) y las
+  particiones anidadas; la cabecera de la tarjeta muestra el nombre del disco con los chips de
+  capacidad y de componentes con nombre y número (una o dos líneas según el ancho). **No hay
+  bloque-resumen sobre el gráfico ni leyenda debajo**; el rectángulo ocupa ese espacio. La
+  cabecera no cambia al seleccionar un volumen o contenedor; la metadata describe el elemento
+  seleccionado. Cada contenedor y volumen muestra su uso/% (inline si la fila es compacta). El
+  texto de los tiles tiene un mínimo de 11.5 pt (12.5 maximizado): si no cabe se trunca con
   elipsis, nunca se reduce. El rectángulo seleccionado usa un trazo de tinta de 2 pt, distinto del
   hover/ancestros. No hay pop/tooltip sobre el treemap; el mount point de cada volumen se dibuja en
   la misma línea que el nombre (izquierda) y el tamaño/uso (derecha), comenzando en una columna
-  central común y alineado a la izquierda; las hojas que no cruzan la columna no lo muestran. Las particiones y contenedores etiquetan su banda superior. Hover
-  resalta rectángulo. No hay flecha de subir nivel: la navegación es por las tablas y los
-  rectángulos. Las actions (Reveal, Copy ID, Analyze) van en una línea por encima de la metadata.
+  central común y alineado a la izquierda; las hojas que no cruzan la columna no lo muestran. Las
+  particiones y contenedores etiquetan su banda superior. Hover resalta el rectángulo. No hay
+  flecha de subir nivel: la navegación es por las tablas y los rectángulos. Las actions (Reveal,
+  Copy ID, Analyze) van en una línea por encima de la metadata. En `kb-2d-disk.png`,
+  `kb-bar-container.png` y `kb-bar-volume.png` se comprueba que el contenido de la barra no
+  cambia al cambiar de selección, solo el contorno.
 - Disco raíz, línea de mount y altura: en `kb-mountline-1440.png` se ve `disk0` como contenedor
   raíz con banda de cabecera y sin fondo/recuadro exterior; el mount de cada volumen aparece en su
   línea de nombre/tamaño, empezando en la columna central común. En `kb-mountline-details.png`
   se comprueba que `disk0s3` muestra `disk2` y sus volúmenes `Recovery`/`Update` con
   `Not mounted`. En un disco con pocos volúmenes (p. ej. `kb-follow-disk4.png`) el treemap baja a
   ~420/460 pt; el máximo sigue siendo 860.
-- Las barras de las tablas usan los acentos de la app; sobre el gauge se rotula DISK/PARTITION/
-  CONTAINER/VOLUME, y el caption dice “of container”/“of capacity”. Capacity, Free y Used van a la
-  izquierda de la barra. El gauge es una composición segmentada por hijo (disco → particiones,
-  container → volúmenes, volumen → volúmenes de su container), con los mismos colores que el
-  treemap y sin leyenda; el volumen seleccionado va en azul en la barra y en su tile. La barra mide
-  lo mismo que el treemap (420–860 pt). Free y Used se colocan en el centro de su sección (o de la
-  barra en discos/containers) con una línea horizontal; la nota queda debajo del más bajo. Cada
-  sección con id dibuja su id rotado y un pop al pasar; además, cada sección se conecta con una
-  línea fina al borde izquierdo del treemap a la altura de su tile. Al seleccionar un
-  contenedor/volumen APFS
-  aparece la nota de espacio compartido y la fila “Shared with” con el contenedor y los volúmenes
-  (nombre+id); no se muestra para discos, particiones ni snapshots.
+- Barra: no hay id rotado, pop ni líneas de conexión; el tipo y el porcentaje van encima y la
+  leyenda “of container”/“of capacity” debajo. Capacity/Free/Used quedan a la izquierda, con la
+  nota de espacio compartido debajo y sin líneas de llamada. Al seleccionar un contenedor/volumen
+  APFS aparece la fila “Shared with” con el contenedor y los volúmenes (nombre+id); no se muestra
+  para discos, particiones ni snapshots. Las barras de las tablas siguen en azul.
 - Maximizar/restaurar en tablas y detalle: la tarjeta ocupa el área de Volumes y se oculta la otra
   columna; la cabecera, las pestañas y el selector de unidades siguen visibles.
   `--volumes-maximized details` sin selección cae al layout normal.
@@ -977,22 +965,18 @@ $K --screenshot /tmp/kb-hero-min.png --section disk --disk-tab volumes \
 ```
 
 - La cabecera de la tarjeta muestra el nombre del disco con los chips de capacidad y de
-  particiones/contenedores/volúmenes con nombre y número (pasan a una segunda línea si no caben);
+  particiones/contenedores/volúmenes con nombre y número, en una sola línea (el título se trunca
+  antes);
   el título no cambia al seleccionar un volumen o contenedor. El disco aparece como contenedor
   raíz dentro del treemap, con su banda de cabecera (`disk0`, capacidad, usado y libre) y las
   particiones dentro; no queda ningún bloque de
   resumen de conteos ni cabecera de selección encima del gráfico. Las actions van en una línea por
   encima de la metadata. Cada nivel usa su tramo de la paleta hueso y los bordes/texto se eligen
   por luminancia (tinta cálida sobre claros).
-- El gauge vertical tiene Capacity, Free y Used a su izquierda. El gauge es una composición
-  segmentada con una sección por hijo (disco → particiones, container → volúmenes, volumen →
-  volúmenes de su container), con los colores del treemap y sin leyenda; el volumen seleccionado
-  va en azul en la barra y en el treemap y su tramo conserva el degradado. Muestra el tipo, el
-  porcentaje y “of container”/“of capacity”; la barra mide lo mismo que el treemap (420–860 pt).
-  Cada sección con id dibuja su id rotado y un pop al pasar; Free y Used se colocan en el centro de
-  su sección (o de la barra) con una línea horizontal y la nota queda debajo del más bajo. Cada
-  sección se conecta con una línea fina al borde izquierdo del treemap a la altura de su tile. El
-  gauge y la metadata describen el elemento seleccionado.
+- Barra y selección: el contenido (todos los volúmenes y libres del disco) no cambia al navegar;
+  un volumen seleccionado dibuja el contorno azul de su sección; un contenedor, el de todas sus
+  secciones y su espacio libre; un disco o partición, el de todo su subárbol. La metadata describe
+  el elemento seleccionado.
 - El treemap anida filas de particiones, columnas de contenedores y filas de volúmenes; cada
   rectángulo tiene un mínimo visible por rol/eje y el resto se reparte proporcional a la fracción,
   de modo que todas las particiones y volúmenes aparecen (incluidos los desmontados, con
@@ -1008,16 +992,16 @@ $K --screenshot /tmp/kb-hero-min.png --section disk --disk-tab volumes \
   `disk3 · Free space`). Cada partición, contenedor y volumen muestra su usado y porcentaje
   inline a la derecha de la cabecera/fila (o `Usage unknown`/`Not mounted`). Los colores son fijos
   por nivel sobre la tarjeta material:
-  particiones hueso claro `#e8e2d7`, contenedores hueso medio `#d9d1c3`, volúmenes hueso profundo
-  `#c9bfae`; free `#f7f3ea`, residual `#d2c9ba`, unallocated `#ddd5c7`, unknown `#ede8de`; cada
-  tile lleva un brillo blanco sutil.
+  particiones hueso claro `#e8e2d7`, contenedores hueso medio `#d9d1c3`, volúmenes por defecto
+  las tres azules grisáceas `#c9cbd0` `#b9bcc2` `#a9adb4` (el seleccionado `#4f93cc`); free
+  `#f7f3ea`, residual `#d2c9ba`, unallocated `#ddd5c7`, unknown `#ede8de`; cada tile lleva un
+  brillo blanco sutil.
   No hay callouts exteriores ni leyenda debajo del treemap. Hover resalta el rectángulo; pulsar
   el fondo del treemap selecciona el disco del alcance. Los bordes son líneas finas (0.6–1.0 pt;
   maximizado algo más); el rectángulo seleccionado usa un trazo de 2 pt en tinta, que se reduce en
   tiles pequeños.
 - El treemap adapta su altura al contenido (420/460…860 pt), con texto de tile
-  mayor; el gauge es una composición segmentada de los hijos, la barra mide lo mismo que el
-  treemap, Capacity queda arriba y Free/Used en su sección; no hay leyenda debajo. Cada partición
+  mayor; la barra mide 4/5 de esa altura y no tiene leyenda debajo. Cada partición
   reserva una altura recursiva según sus volúmenes
   (tope 520/600 pt) para que su contenido se vea; un disco con pocos volúmenes no ocupa 860 de más.
   A 1340×700 la tarjeta puede hacer scroll vertical si el contenido lo necesita.
