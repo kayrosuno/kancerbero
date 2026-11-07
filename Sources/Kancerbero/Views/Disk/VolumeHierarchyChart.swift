@@ -32,11 +32,12 @@ struct VolumeHierarchyChart: View {
         let nodes = makeNodes(for: scope)
         let highlightID = highlightID(in: nodes)
 
-        HStack(alignment: .center, spacing: chartColumnSpacing) {
-            heroInfo
+        let treemapHeight = adaptiveTreemapHeight(for: nodes)
+        HStack(alignment: .top, spacing: chartColumnSpacing) {
+            heroInfo(trackHeight: treemapHeight)
             treemap(nodes: nodes, scope: scope,
                     highlightID: highlightID)
-                .frame(height: adaptiveTreemapHeight(for: nodes))
+                .frame(height: treemapHeight)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 6)
@@ -46,54 +47,305 @@ struct VolumeHierarchyChart: View {
 
     // MARK: - Hero
 
-    private var chartColumnSpacing: CGFloat { isMaximized ? 18 : 12 }
+    private var chartColumnSpacing: CGFloat { isMaximized ? 10 : 6 }
 
-    private var heroInfo: some View {
-        HStack(alignment: .center, spacing: isMaximized ? 12 : 6) {
+    private var statsWidth: CGFloat { isMaximized ? 150 : 130 }
+    private var heroSpacing: CGFloat { isMaximized ? 12 : 6 }
+    private var barWidth: CGFloat { isMaximized ? 54 : 46 }
+    private var trackWidth: CGFloat { isMaximized ? 24 : 20 }
+
+    /// Fixed width of the gauge column (stats + spacing + bar).
+    private var heroWidth: CGFloat {
+        statsWidth + heroSpacing + barWidth
+    }
+
+    /// Horizontal distance from the chart leading edge to the treemap.
+    private var connectorSpan: CGFloat {
+        heroWidth + chartColumnSpacing
+    }
+
+    /// Right edge of the gauge track in chart coordinates.
+    private var barTrackRight: CGFloat {
+        statsWidth + heroSpacing + (barWidth + trackWidth) / 2
+    }
+
+    private func heroInfo(trackHeight: CGFloat) -> some View {
+        HStack(alignment: .top, spacing: heroSpacing) {
+            statsColumn(trackHeight: trackHeight)
             VerticalUsageBar(
+                sections: barSections,
                 fraction: usageFraction,
                 tint: DiskPalette.tint(for: item.kind),
                 kindLabel: gaugeKindLabel(for: item.kind),
                 caption: usageCaption,
-                height: isMaximized ? 300 : 210,
-                width: isMaximized ? 54 : 46,
+                height: trackHeight,
+                width: barWidth,
                 isMaximized: isMaximized)
-            statsColumn
         }
         .fixedSize(horizontal: true, vertical: false)
-    }
-
-    private var statsColumn: some View {
-        VStack(alignment: .leading, spacing: isMaximized ? 14 : 11) {
-            ForEach(stats) { stat in
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(stat.title)
-                        .font(.system(size: 9.5, weight: .semibold))
-                        .textCase(.uppercase)
-                        .tracking(0.5)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Text(stat.value)
-                        .font(.system(
-                            size: isMaximized ? 24 : 20,
-                            weight: .semibold,
-                            design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
+        .overlayPreferenceValue(VolumeLeaderAnchorKey.self) { anchors in
+            GeometryReader { proxy in
+                Canvas { context, _ in
+                    drawVolumeLeaders(anchors: anchors, proxy: proxy,
+                                      context: &context)
                 }
             }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+
+    private var columnSpacing: CGFloat { isMaximized ? 14 : 11 }
+
+    private var statValueSize: CGFloat { isMaximized ? 24 : 20 }
+
+    private var statRowHeight: CGFloat {
+        labelLineHeight(9.5) + 1 + labelLineHeight(statValueSize)
+    }
+
+    /// Distance from the hero top to the top of the track: kind label,
+    /// spacing, percentage and spacing.
+    private var gaugeTrackTop: CGFloat {
+        labelLineHeight(7.5) + 5
+            + labelLineHeight(isMaximized ? 14 : 12) + 5
+    }
+
+    private struct BarSectionLayout {
+        let section: VolumeBarSection
+        let top: CGFloat
+        let height: CGFloat
+    }
+
+    /// Chart-space frames of the gauge sections for a given track height.
+    /// The track starts below the kind/percentage header.
+    private func barSectionLayout(trackHeight: CGFloat)
+        -> [BarSectionLayout] {
+        guard !barSections.isEmpty else { return [] }
+        let gap = volumeBarSectionGap
+        let available = max(0, trackHeight
+            - gap * CGFloat(max(0, barSections.count - 1)))
+        var top = gaugeTrackTop
+        return barSections.map { section in
+            let height = available * section.fraction
+            let layout = BarSectionLayout(section: section, top: top,
+                                          height: height)
+            top += height + gap
+            return layout
+        }
+    }
+
+    /// One stacked section per child, in the same order and colours as the
+    /// treemap level for the selected item. The selected volume is blue.
+    private var barSections: [VolumeBarSection] {
+        let sections: [VolumeBarSection] = makeNodes(for: item)
+            .compactMap { node -> VolumeBarSection? in
+                guard node.fraction.isFinite, node.fraction > 0 else {
+                    return nil
+                }
+                let isSelected = item.kind == .apfsVolume
+                    && node.itemID == item.deviceIdentifier
+                return VolumeBarSection(
+                    id: node.id, itemID: node.itemID,
+                    title: node.label, fraction: node.fraction,
+                    color: node.color, isSelected: isSelected,
+                    isFree: node.role == .free)
+            }
+        guard sections.isEmpty else { return sections }
+
+        // No hierarchy (e.g. a volume with no APFS context): fall back to
+        // used/free so the gauge is never empty.
+        let used = min(max(usageFraction ?? 0, 0), 1)
+        guard used > 0 else {
+            return [VolumeBarSection(id: "free", itemID: nil,
+                                     title: "Free", fraction: 1,
+                                     color: DiskPalette.free,
+                                     isSelected: false, isFree: true)]
+        }
+        return [
+            VolumeBarSection(id: "used", itemID: item.deviceIdentifier,
+                             title: "Used", fraction: used,
+                             color: DiskPalette.tint(for: item.kind),
+                             isSelected: true, isFree: false),
+            VolumeBarSection(id: "free", itemID: nil, title: "Free",
+                             fraction: 1 - used,
+                             color: DiskPalette.free,
+                             isSelected: false, isFree: true)
+        ]
+    }
+
+    private func freeLabelCenterY(trackHeight: CGFloat) -> CGFloat? {
+        guard let free = barSectionLayout(trackHeight: trackHeight)
+            .first(where: { $0.section.isFree }) else { return nil }
+        return free.top + free.height / 2
+    }
+
+    /// Middle of the selected section for a volume, or of the whole bar.
+    private func usedLabelCenterY(trackHeight: CGFloat) -> CGFloat {
+        if item.kind == .apfsVolume,
+           let selected = barSectionLayout(trackHeight: trackHeight)
+               .first(where: {
+                   $0.section.itemID == item.deviceIdentifier
+               }) {
+            return selected.top + selected.height / 2
+        }
+        return gaugeTrackTop + trackHeight / 2
+    }
+
+    private struct StatPlacement: Identifiable {
+        let stat: VolumeHierarchyStat
+        let top: CGFloat
+        var id: String { stat.id }
+    }
+
+    /// Capacity stays on top; Free and Used travel to the middle of their
+    /// section, so their position follows the composition.
+    private func statPlacements(trackHeight: CGFloat) -> [StatPlacement] {
+        let rowHeight = statRowHeight
+        var placements: [StatPlacement] = []
+        var previousBottom: CGFloat = 0
+        if let capacity = stats.first(where: { $0.id == "capacity" }) {
+            placements.append(StatPlacement(stat: capacity, top: 0))
+            previousBottom = rowHeight
+        }
+        var annotations: [(VolumeHierarchyStat, CGFloat)] = []
+        if let free = stats.first(where: { $0.id == "free" }) {
+            let center = freeLabelCenterY(trackHeight: trackHeight)
+                ?? (previousBottom + columnSpacing + rowHeight / 2)
+            annotations.append((free, center))
+        }
+        if let used = stats.first(where: { $0.id == "used" }) {
+            annotations.append((used,
+                                usedLabelCenterY(trackHeight: trackHeight)))
+        }
+        annotations.sort { $0.1 < $1.1 }
+        for (stat, center) in annotations {
+            let top = max(previousBottom + columnSpacing,
+                          center - rowHeight / 2)
+            placements.append(StatPlacement(stat: stat, top: top))
+            previousBottom = top + rowHeight
+        }
+        return placements
+    }
+
+    private func statsColumn(trackHeight: CGFloat) -> some View {
+        let placements = statPlacements(trackHeight: trackHeight)
+        return VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(placements.enumerated()),
+                    id: \.element.id) { index, placement in
+                let previousBottom = index == 0
+                    ? 0 : placements[index - 1].top + statRowHeight
+                Color.clear.frame(
+                    height: max(0, placement.top - previousBottom))
+                statRow(placement.stat)
+            }
+            Color.clear.frame(height: columnSpacing)
             ForEach(notes, id: \.self) { note in
                 Text(note)
-                    .font(.system(size: 8.5))
+                    .font(.system(size: isMaximized ? 11 : 10))
                     .foregroundStyle(.secondary)
+                    .lineSpacing(1)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .frame(width: isMaximized ? 150 : 130, alignment: .leading)
+        .frame(width: statsWidth, alignment: .leading)
+    }
+
+    private func statRow(_ stat: VolumeHierarchyStat) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(stat.title)
+                .font(.system(size: 9.5, weight: .semibold))
+                .textCase(.uppercase)
+                .tracking(0.5)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(stat.value)
+                .font(.system(
+                    size: statValueSize,
+                    weight: .semibold,
+                    design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+        }
+        .anchorPreference(key: VolumeLeaderAnchorKey.self,
+                          value: .bounds) { [stat.id: $0] }
+    }
+
+    /// Thin horizontal callouts from the Free/Used values to the bar. Both
+    /// move with their section of the composition.
+    private func drawVolumeLeaders(anchors: [String: Anchor<CGRect>],
+                                   proxy: GeometryProxy,
+                                   context: inout GraphicsContext) {
+        guard let trackAnchor = anchors["track"] else { return }
+        let track = proxy[trackAnchor]
+        guard track.height > 2 else { return }
+        let tint = DiskPalette.tint(for: item.kind)
+        let inset: CGFloat = 3
+
+        if barSections.contains(where: { $0.isFree }),
+           let freeAnchor = anchors["free"] {
+            let free = proxy[freeAnchor]
+            drawLeader(context: &context, tint: tint,
+                       from: CGPoint(x: free.maxX + inset,
+                                     y: free.midY),
+                       to: CGPoint(x: track.minX, y: free.midY))
+        }
+        if let usedAnchor = anchors["used"] {
+            let used = proxy[usedAnchor]
+            drawLeader(context: &context, tint: tint,
+                       from: CGPoint(x: used.maxX + inset,
+                                     y: used.midY),
+                       to: CGPoint(x: track.minX, y: used.midY))
+        }
+    }
+
+    private func drawLeader(context: inout GraphicsContext, tint: Color,
+                            from start: CGPoint, to end: CGPoint) {
+        var path = Path()
+        path.move(to: start)
+        path.addLine(to: end)
+        context.stroke(path, with: .color(tint.opacity(0.55)),
+                       style: StrokeStyle(lineWidth: 0.8,
+                                          lineCap: .round))
+    }
+
+    /// Connects each slice of the segmented gauge with its tile in the
+    /// treemap, so the shared colours do not need a legend.
+    /// Connects each slice of the segmented gauge with the treemap level it
+    /// mirrors. Both share colours, so no legend is needed.
+    private func drawBarToTreemapConnectors(
+        layout: TreemapLayout,
+        trackHeight: CGFloat,
+        context: inout GraphicsContext
+    ) {
+        let sectionLayout = barSectionLayout(trackHeight: trackHeight)
+        guard sectionLayout.count > 1 else { return }
+        let tiles = Dictionary(
+            layout.items.map { ($0.node.id, $0.rect) },
+            uniquingKeysWith: { $1 })
+        let tint = DiskPalette.tint(for: item.kind)
+        let endX = connectorSpan + rootInset - 1
+        for entry in sectionLayout {
+            if let tile = tiles[entry.section.id] {
+                let start = CGPoint(
+                    x: barTrackRight,
+                    y: entry.top + entry.height / 2)
+                let end = CGPoint(x: endX, y: tile.midY)
+                var path = Path()
+                path.move(to: start)
+                path.addLine(to: end)
+                context.stroke(
+                    path,
+                    with: .color(tint.opacity(entry.section.isSelected
+                        ? 0.80 : 0.50)),
+                    style: StrokeStyle(
+                        lineWidth: entry.section.isSelected ? 1.0 : 0.8,
+                        lineCap: .round))
+            }
+        }
     }
 
     private func countsText(for scope: KBDiskItem) -> String {
@@ -203,6 +455,19 @@ struct VolumeHierarchyChart: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
+            }
+            .overlay(alignment: .leading) {
+                Canvas { context, _ in
+                    drawBarToTreemapConnectors(
+                        layout: layout,
+                        trackHeight: proxy.size.height,
+                        context: &context)
+                }
+                .frame(width: connectorSpan + proxy.size.width,
+                       height: proxy.size.height)
+                .offset(x: -connectorSpan)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
             }
             .contentShape(Rectangle())
             .onContinuousHover { phase in
@@ -1259,6 +1524,9 @@ struct VolumeHierarchyChart: View {
 
         var nodes: [HierarchyNode] = []
         var represented = Set<String>()
+        let selectedVolumeID = item.kind == .apfsVolume
+            ? item.deviceIdentifier : nil
+        var volumeIndex = 0
 
         for segment in context.segments where segment.fraction > 0 {
             let id = "\(container.deviceIdentifier):\(segment.id)"
@@ -1274,7 +1542,15 @@ struct VolumeHierarchyChart: View {
             let color: Color
             switch role {
             case .volume:
-                color = DiskPalette.fill(level: 2)
+                if let selectedVolumeID,
+                   segment.itemID == selectedVolumeID {
+                    color = DiskPalette.tint(for: .apfsVolume)
+                } else if selectedVolumeID != nil {
+                    color = DiskPalette.mutedVolume(volumeIndex)
+                } else {
+                    color = DiskPalette.fill(level: 2)
+                }
+                volumeIndex += 1
             case .free:
                 color = DiskPalette.free
             case .residual:
@@ -1330,6 +1606,17 @@ struct VolumeHierarchyChart: View {
             .filter { $0.kind == .apfsVolume }
             .filter { !represented.contains($0.deviceIdentifier) }
         for volume in missing {
+            let isSelected = selectedVolumeID != nil
+                && volume.deviceIdentifier == selectedVolumeID
+            let color: Color
+            if isSelected {
+                color = DiskPalette.tint(for: .apfsVolume)
+            } else if selectedVolumeID != nil {
+                color = DiskPalette.mutedVolume(volumeIndex)
+            } else {
+                color = DiskPalette.fill(level: 2)
+            }
+            volumeIndex += 1
             nodes.append(HierarchyNode(
                 id: "missing:\(container.deviceIdentifier):\(volume.deviceIdentifier)",
                 itemID: volume.deviceIdentifier,
@@ -1343,7 +1630,7 @@ struct VolumeHierarchyChart: View {
                 usedBytes: volume.usedBytes,
                 freeBytes: nil,
                 fraction: 0,
-                color: DiskPalette.fill(level: 2),
+                color: color,
                 children: []))
         }
         return nodes
@@ -1508,6 +1795,7 @@ struct VolumeHierarchyChart: View {
 }
 
 private struct VerticalUsageBar: View {
+    let sections: [VolumeBarSection]
     let fraction: Double?
     let tint: Color
     let kindLabel: String?
@@ -1516,7 +1804,7 @@ private struct VerticalUsageBar: View {
     let width: CGFloat
     let isMaximized: Bool
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var hoveredSectionID: String?
 
     private var clamped: Double {
         guard let fraction, fraction.isFinite else { return 0 }
@@ -1526,6 +1814,10 @@ private struct VerticalUsageBar: View {
     private var percentText: String {
         fraction == nil ? "—" : KBFormat.percent(clamped)
     }
+
+    /// Two lines are always reserved below the bar so a longer caption never
+    /// shifts or resizes the bar above it.
+    private var captionHeight: CGFloat { 20 }
 
     var body: some View {
         VStack(spacing: 5) {
@@ -1546,75 +1838,145 @@ private struct VerticalUsageBar: View {
                 .foregroundStyle(fraction == nil ? .secondary : .primary)
 
             GeometryReader { proxy in
-                let trackHeight = proxy.size.height
-                let fillHeight = max(0, trackHeight * clamped)
-                ZStack(alignment: .bottom) {
-                    Capsule()
-                        .fill(.quaternary.opacity(0.30))
-
-                    if clamped > 0 {
-                        Capsule()
-                            .fill(LinearGradient(
-                                gradient: Gradient(stops: [
-                                    .init(color: tint, location: 0),
-                                    .init(color: tint.opacity(0.75),
-                                          location: 0.55),
-                                    .init(color: tint.opacity(0.35),
-                                          location: 1)
-                                ]),
-                                startPoint: .bottom,
-                                endPoint: .top))
-                            .frame(height: fillHeight)
-                            .shadow(color: tint.opacity(0.20),
-                                    radius: 5, y: -1)
-                    }
-
-                    VStack(spacing: 0) {
-                        ForEach(0..<3, id: \.self) { _ in
-                            Spacer(minLength: 0)
-                            Rectangle()
-                                .fill(.primary.opacity(0.20))
-                                .frame(height: 0.75)
-                        }
-                        Spacer(minLength: 0)
-                    }
+                Canvas { context, size in
+                    drawSections(in: size, context: &context)
                 }
                 .clipShape(Capsule())
                 .overlay {
                     Capsule()
-                        .strokeBorder(tint.opacity(0.45),
-                                      lineWidth: 1.0)
+                        .strokeBorder(tint.opacity(0.70),
+                                      lineWidth: 1.25)
                 }
-                .overlay(alignment: .bottom) {
-                    if clamped > 0 {
-                        Circle()
-                            .fill(.white)
-                            .frame(width: 7, height: 7)
-                            .overlay {
-                                Circle()
-                                    .strokeBorder(tint, lineWidth: 1.5)
-                            }
-                            .shadow(color: tint.opacity(0.30),
-                                    radius: 4)
-                            .offset(y: -max(0, fillHeight - 3.5))
-                    }
-                }
-                .animation(reduceMotion ? nil : .snappy(duration: 0.4),
-                           value: clamped)
             }
             .frame(width: isMaximized ? 24 : 20, height: height)
+            .anchorPreference(key: VolumeLeaderAnchorKey.self,
+                              value: .bounds) { ["track": $0] }
+            .onContinuousHover { phase in
+                switch phase {
+                case .active(let point):
+                    hoveredSectionID = section(at: point.y)?.id
+                case .ended:
+                    hoveredSectionID = nil
+                }
+            }
+            .help(hoveredTooltip ?? "")
 
             Text(caption ?? "")
                 .font(.system(size: 8))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
-                .frame(width: width)
+                .frame(width: width, height: captionHeight, alignment: .top)
         }
         .frame(width: width)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(kindLabel.map { "\($0) capacity used" }
                             ?? "Capacity used")
         .accessibilityValue(fraction == nil ? "Unknown" : percentText)
+    }
+
+    /// Stacked sections, top to bottom, mirroring the treemap level of the
+    /// selected item. A small gap keeps same-colour siblings readable, and
+    /// the selected slice keeps the old blue gradient.
+    private func drawSections(in size: CGSize,
+                              context: inout GraphicsContext) {
+        guard size.height > 1, !sections.isEmpty else { return }
+        let gap = volumeBarSectionGap
+        let totalGap = gap * CGFloat(max(0, sections.count - 1))
+        let available = max(0, size.height - totalGap)
+        var y: CGFloat = 0
+        for section in sections {
+            let sectionHeight = available * section.fraction
+            guard sectionHeight > 0 else { continue }
+            let rect = CGRect(x: 0, y: y, width: size.width,
+                              height: sectionHeight)
+            if section.isSelected {
+                context.fill(Path(rect), with: .color(section.color))
+                context.fill(
+                    Path(rect),
+                    with: .linearGradient(
+                        Gradient(stops: [
+                            .init(color: .white.opacity(0), location: 0),
+                            .init(color: .white.opacity(0), location: 0.45),
+                            .init(color: .white.opacity(0.5), location: 1)
+                        ]),
+                        startPoint: CGPoint(x: rect.midX,
+                                            y: rect.maxY),
+                        endPoint: CGPoint(x: rect.midX, y: rect.minY)))
+            } else {
+                context.fill(Path(rect), with: .color(section.color))
+            }
+            if let label = section.itemID, !label.isEmpty {
+                drawSectionLabel(label, in: rect, color: section.color,
+                                 context: &context)
+            }
+            y += sectionHeight + gap
+        }
+    }
+
+    /// Rotated device id inside the slice, when there is room for it.
+    private func drawSectionLabel(_ text: String, in rect: CGRect,
+                                  color: Color,
+                                  context: inout GraphicsContext) {
+        let fontSize: CGFloat = isMaximized ? 8.5 : 7.5
+        let resolved = context.resolve(
+            Text(text)
+                .font(.system(size: fontSize, weight: .semibold,
+                              design: .monospaced))
+                .foregroundColor(DiskPalette.contentColor(on: color)))
+        let measured = resolved.measure(
+            in: CGSize(width: 240, height: 24))
+        guard measured.width <= rect.height - 6,
+              measured.height <= rect.width - 2 else { return }
+        var labelContext = context
+        labelContext.translateBy(x: rect.midX, y: rect.midY)
+        labelContext.rotate(by: .degrees(-90))
+        labelContext.draw(resolved, at: .zero, anchor: .center)
+    }
+
+    private func section(at y: CGFloat) -> VolumeBarSection? {
+        guard !sections.isEmpty, height > 0 else { return nil }
+        let gap = volumeBarSectionGap
+        let available = max(0, height
+            - gap * CGFloat(max(0, sections.count - 1)))
+        var top: CGFloat = 0
+        for section in sections {
+            let sectionHeight = available * section.fraction
+            if y >= top, y <= top + sectionHeight { return section }
+            top += sectionHeight + gap
+        }
+        return nil
+    }
+
+    private var hoveredTooltip: String? {
+        guard let hoveredSectionID,
+              let section = sections.first(where: {
+                  $0.id == hoveredSectionID
+              }) else { return nil }
+        return section.itemID ?? section.title
+    }
+}
+
+/// One slice of the segmented gauge.
+private struct VolumeBarSection: Identifiable {
+    let id: String
+    let itemID: String?
+    let title: String
+    let fraction: Double
+    let color: Color
+    let isSelected: Bool
+    let isFree: Bool
+}
+
+private let volumeBarSectionGap: CGFloat = 1.5
+
+/// Collects the gauge track and the annotation frames so the
+/// callout lines can be drawn across both columns.
+private struct VolumeLeaderAnchorKey: PreferenceKey {
+    static let defaultValue: [String: Anchor<CGRect>] = [:]
+
+    static func reduce(value: inout [String: Anchor<CGRect>],
+                       nextValue: () -> [String: Anchor<CGRect>]) {
+        value.merge(nextValue(), uniquingKeysWith: { $1 })
     }
 }

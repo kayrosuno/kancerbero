@@ -35,6 +35,23 @@ enum DiskPalette {
     static let unallocated = Color(.sRGB, red: 0.867, green: 0.835,
                                    blue: 0.780, opacity: 1)
 
+    /// Neutral greys for the volumes that are not selected: present but
+    /// visually "off". Three shades keep adjacent tiles distinguishable.
+    static let mutedVolume1 = Color(.sRGB, red: 0.788, green: 0.796,
+                                    blue: 0.816, opacity: 1)
+    static let mutedVolume2 = Color(.sRGB, red: 0.725, green: 0.737,
+                                    blue: 0.761, opacity: 1)
+    static let mutedVolume3 = Color(.sRGB, red: 0.663, green: 0.678,
+                                    blue: 0.706, opacity: 1)
+
+    static func mutedVolume(_ index: Int) -> Color {
+        switch index % 3 {
+        case 0: return mutedVolume1
+        case 1: return mutedVolume2
+        default: return mutedVolume3
+        }
+    }
+
     static func fill(level: Int) -> Color {
         switch level {
         case 0: return partitionFill

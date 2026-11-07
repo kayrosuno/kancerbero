@@ -139,17 +139,6 @@ struct DiskVolumeDetailView: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(KBTheme.gradient(diskTint))
-                    .frame(width: 44, height: 44)
-                    .shadow(color: .black.opacity(0.08),
-                            radius: 4, y: 2)
-                Image(systemName: "internaldrive")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
-
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .center, spacing: 10) {
                     diskTitleLabel
@@ -364,14 +353,14 @@ struct DiskVolumeDetailView: View {
                 title: "Capacity",
                 value: KBFormat.bytes(item.sizeBytes, units: byteUnitSystem)),
             VolumeHierarchyStat(
-                id: "used",
-                title: "Used",
-                value: usedText),
-            VolumeHierarchyStat(
                 id: "free",
                 title: item.kind == .apfsVolume || item.kind == .snapshot
                     ? "Free (container)" : "Free",
-                value: freeText)
+                value: freeText),
+            VolumeHierarchyStat(
+                id: "used",
+                title: "Used",
+                value: usedText)
         ]
     }
 
