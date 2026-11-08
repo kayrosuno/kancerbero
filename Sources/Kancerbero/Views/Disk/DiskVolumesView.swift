@@ -293,6 +293,9 @@ struct DiskVolumesView: View {
             content
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            DiskItemContextMenu(item: diskItem, onAnalyze: onAnalyze)
+        }
         .overlay(alignment: .leading) {
             if !diskItem.children.isEmpty
                 && ui.disk.volumesFocus != .disks {
@@ -553,6 +556,9 @@ struct DiskVolumesView: View {
             content
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            DiskItemContextMenu(item: item, onAnalyze: onAnalyze)
+        }
         .overlay(alignment: .leading) {
             if !item.children.isEmpty && !focused {
                 Button {

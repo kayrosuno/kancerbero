@@ -19,6 +19,7 @@ struct VolumeHierarchyChart: View {
     let inventory: KBDiskInventorySnapshot
     var isMaximized = false
     var onSelectItem: ((String) -> Void)? = nil
+    var onAnalyze: ((String) -> Void)? = nil
     var stats: [VolumeHierarchyStat] = []
     var usageFraction: Double? = nil
     var usageCaption: String? = nil
@@ -32,6 +33,7 @@ struct VolumeHierarchyChart: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @State private var hoveredNodeID: String?
+    @State private var contextItemID: String?
 
     private var palette: DiskTreemapPalette {
         DiskPalette.treemap(for: colorScheme)
@@ -42,13 +44,16 @@ struct VolumeHierarchyChart: View {
         let nodes = makeNodes(for: scope)
         let highlightID = highlightID(in: nodes)
 
-        // The treemap keeps its original adaptive height. Only the bar is
-        // capped to the window so it stays fully visible when resizing.
-        let treemapHeight = adaptiveTreemapHeight(for: nodes)
-        let desiredBarHeight = (treemapHeight * 0.8).rounded()
-        let maxBarHeight = availableHeight.map { max(180, $0 - 145) }
-            ?? desiredBarHeight
-        let trackHeight = min(desiredBarHeight, maxBarHeight)
+        // The bar and the treemap share the same height. When the detail card
+        // provides the space left under its header, both fill it so the
+        // treemap tiles grow with the window. The caption under the bar is
+        // reserved inside that height (20 pt caption + 5 pt spacing, see
+        // VerticalUsageBar).
+        let captionReserve: CGFloat = 25
+        let treemapHeight = availableHeight.map {
+            max(treemapMinimumHeight, $0 - captionReserve)
+        } ?? adaptiveTreemapHeight(for: nodes)
+        let trackHeight = treemapHeight
         HStack(alignment: .top, spacing: chartColumnSpacing) {
             heroInfo(trackHeight: trackHeight)
             treemap(nodes: nodes, scope: scope,
@@ -64,6 +69,7 @@ struct VolumeHierarchyChart: View {
         .onChange(of: item.deviceIdentifier) { _, _ in
             selectedFreeContainerID = nil
             detailSelectionHidden = false
+            contextItemID = nil
         }
     }
 
@@ -89,7 +95,14 @@ struct VolumeHierarchyChart: View {
                 height: trackHeight,
                 width: barWidth,
                 isMaximized: isMaximized,
-                onSliceTap: handleBarTap)
+                onSliceTap: handleBarTap,
+                fallbackItemID: item.deviceIdentifier,
+                itemResolver: { id in
+                    inventory.allItems.first {
+                        $0.deviceIdentifier == id
+                    }
+                },
+                onAnalyze: onAnalyze)
         }
         .fixedSize(horizontal: true, vertical: false)
         .overlayPreferenceValue(UsedLeaderAnchorKey.self) { anchors in
@@ -118,6 +131,13 @@ struct VolumeHierarchyChart: View {
             .allowsHitTesting(false)
             .accessibilityHidden(true)
         }
+    }
+
+    /// Item behind the treemap tile under the cursor; the selected item is
+    /// used when the pointer is over the background.
+    private var contextItem: KBDiskItem? {
+        let id = contextItemID ?? item.deviceIdentifier
+        return inventory.allItems.first { $0.deviceIdentifier == id }
     }
 
     /// Clicking a bar segment selects the disk item behind it. Free-space
@@ -560,17 +580,26 @@ struct VolumeHierarchyChart: View {
 
             }
             .contentShape(Rectangle())
+            .contextMenu {
+                if let target = contextItem {
+                    DiskItemContextMenu(item: target,
+                                        onAnalyze: onAnalyze)
+                }
+            }
             .onContinuousHover { phase in
                 switch phase {
                 case .active(let location):
-                    let hovered = treemapItem(at: location, in: layout)?.node.id
-                    if hovered != hoveredNodeID {
+                    let hovered = treemapItem(at: location, in: layout)
+                    contextItemID = hovered?.ownerID
+                    if hovered?.node.id != hoveredNodeID {
                         withAnimation(reduceMotion ? nil
                                        : .easeOut(duration: 0.12)) {
-                            hoveredNodeID = hovered
+                            hoveredNodeID = hovered?.node.id
                         }
                     }
                 case .ended:
+                    // Keep the last tile for the context menu; only the
+                    // hover outline goes away.
                     withAnimation(reduceMotion ? nil
                                    : .easeOut(duration: 0.12)) {
                         hoveredNodeID = nil
@@ -692,7 +721,7 @@ struct VolumeHierarchyChart: View {
         var items: [TreemapItem] = []
         layoutTreemap(nodes, in: bounds, depth: 0, axis: .rows,
                       path: "", parentFraction: 1,
-                      ownerID: scopeID, items: &items)
+                      ownerID: scopeID, parentRole: nil, items: &items)
         return TreemapLayout(bounds: bounds, items: items,
                              diskRect: diskRect,
                              diskHeaderHeight: diskHeaderHeight)
@@ -701,6 +730,7 @@ struct VolumeHierarchyChart: View {
     private func layoutTreemap(_ nodes: [HierarchyNode], in rect: CGRect,
                                depth: Int, axis: TreemapAxis, path: String,
                                parentFraction: Double, ownerID: String?,
+                               parentRole: SliceRole?,
                                items: inout [TreemapItem]) {
         guard rect.width > 0.5, rect.height > 0.5 else { return }
         guard !nodes.isEmpty else { return }
@@ -718,7 +748,8 @@ struct VolumeHierarchyChart: View {
         guard available > 0.5 else { return }
 
         let extents = allocateExtents(entries, available: available,
-                                      axis: axis, depth: depth)
+                                      axis: axis, depth: depth,
+                                      parentRole: parentRole)
         var offset: CGFloat = 0
 
         for (node, extent) in zip(entries, extents) {
@@ -764,11 +795,25 @@ struct VolumeHierarchyChart: View {
                 continue
             }
 
+            // If the remaining area cannot fit the labels of the children,
+            // keep this tile as a labeled leaf instead of drawing unlabeled
+            // slivers.
+            let innerAxis = childAxis(for: node)
+            let neededHeight = minimumChildHeight(
+                of: node.children, axis: innerAxis, depth: depth + 1)
+            let neededWidth = minimumChildWidth(
+                of: node.children, axis: innerAxis, depth: depth + 1)
+            if inner.height < neededHeight || inner.width < neededWidth {
+                items[index].headerHeight = 0
+                continue
+            }
+
             let before = items.count
             layoutTreemap(node.children, in: inner, depth: depth + 1,
                           axis: childAxis(for: node),
                           path: childPath, parentFraction: global,
-                          ownerID: resolvedOwner, items: &items)
+                          ownerID: resolvedOwner, parentRole: node.role,
+                          items: &items)
             let hasChildren = items.count > before
             items[index].hasDrawableChildren = hasChildren
             if !hasChildren {
@@ -778,11 +823,14 @@ struct VolumeHierarchyChart: View {
     }
 
     /// Guarantees a visible floor for every sibling, then spreads the rest
-    /// proportionally to the real fraction.
+    /// proportionally to the real fraction. When a container holds volumes
+    /// with very different sizes, the proportional share takes precedence
+    /// over the per-tile floor so the largest volume can grow.
     private func allocateExtents(_ entries: [HierarchyNode],
                                  available: CGFloat,
                                  axis: TreemapAxis,
-                                 depth: Int) -> [CGFloat] {
+                                 depth: Int,
+                                 parentRole: SliceRole?) -> [CGFloat] {
         let count = entries.count
         guard count > 0, available.isFinite, available > 0 else {
             return Array(repeating: 0, count: count)
@@ -800,9 +848,20 @@ struct VolumeHierarchyChart: View {
             $0.fraction.isFinite ? max(0, $0.fraction) : 0
         }
         let weightTotal = weights.reduce(0, +)
+        let positiveWeights = weights.filter { $0 > 0 }
+        let spread = positiveWeights.isEmpty
+            ? 1
+            : (positiveWeights.max() ?? 1)
+                / max(positiveWeights.min() ?? 1, .leastNonzeroMagnitude)
 
         var extents: [CGFloat]
-        if weightTotal > 0, weightTotal.isFinite {
+        let fits = requestedTotal <= available
+        if spread >= 6,
+           parentRole == .container || !fits {
+            extents = proportionalExtents(entries, available: available,
+                                          weights: weights, axis: axis,
+                                          depth: depth)
+        } else if weightTotal > 0, weightTotal.isFinite {
             extents = zip(mins, weights).map { minimum, weight in
                 minimum + remainder * CGFloat(weight / weightTotal)
             }
@@ -816,6 +875,212 @@ struct VolumeHierarchyChart: View {
             extents[index] = max(0, extents[index] + drift)
         }
         return extents
+    }
+
+    /// Allocates the available length in proportion to the real fraction,
+    /// keeping a floor that still fits one line of tile text. Used for
+    /// container children when the size spread is wide, so a large volume
+    /// does not collapse to the same extent as the small ones and every
+    /// tile keeps its name visible.
+    private func proportionalExtents(_ entries: [HierarchyNode],
+                                     available: CGFloat,
+                                     weights: [Double],
+                                     axis: TreemapAxis,
+                                     depth: Int) -> [CGFloat] {
+        let count = entries.count
+        guard count > 0 else { return [] }
+
+        let visibility = entries.map {
+            visibilityFloor(for: $0, axis: axis)
+        }
+        let labels = entries.map {
+            floorExtent(for: $0, axis: axis, depth: depth)
+        }
+        let floors = allocateFloors(visibility: visibility, labels: labels,
+                                    weights: weights, available: available)
+        let weightTotal = weights.reduce(0, +)
+        let targets: [CGFloat]
+        if weightTotal > 0, weightTotal.isFinite {
+            targets = weights.map {
+                available * CGFloat($0 / weightTotal)
+            }
+        } else {
+            targets = Array(repeating: available / CGFloat(count),
+                            count: count)
+        }
+
+        var extents = zip(targets, floors).map { max($0, $1) }
+        let total = extents.reduce(0, +)
+        if total > available {
+            let above = zip(extents, floors).map { max(0, $0 - $1) }
+            let aboveTotal = above.reduce(0, +)
+            let excess = total - available
+            if aboveTotal > 0 {
+                // Never shrink a tile below its floor: take at most the
+                // amount that sits above it.
+                let scale = min(1, excess / aboveTotal)
+                extents = zip(extents, above).map { $0 - $1 * scale }
+            } else {
+                let scale = available / max(total, .leastNonzeroMagnitude)
+                extents = floors.map { $0 * scale }
+            }
+        }
+        return extents
+    }
+
+    /// Assigns each tile the largest floor it can get: every tile first
+    /// receives its selectable visibility floor, then the remaining space
+    /// is handed out (proportionally to size) up to the label floor. This
+    /// keeps the text legible instead of leaving tiles too short to draw it.
+    private func allocateFloors(visibility: [CGFloat],
+                                labels: [CGFloat],
+                                weights: [Double],
+                                available: CGFloat) -> [CGFloat] {
+        let labelTotal = labels.reduce(0, +)
+        if labelTotal <= available { return labels }
+
+        let visibilityTotal = visibility.reduce(0, +)
+        guard visibilityTotal < available else {
+            let scale = available / max(visibilityTotal,
+                                        .leastNonzeroMagnitude)
+            return visibility.map { $0 * scale }
+        }
+
+        var floors = visibility
+        var budget = available - visibilityTotal
+        var capacity = zip(labels, visibility).map { max(0, $0 - $1) }
+        let weightTotal = weights.reduce(0, +)
+
+        // Redistribute leftovers left by capped tiles until the budget is
+        // spent or no tile can grow further.
+        while budget > 0.001 {
+            let open = capacity.indices.filter { capacity[$0] > 0.001 }
+            guard !open.isEmpty else { break }
+            let openWeight = open.reduce(0) { $0 + max(0, weights[$1]) }
+            var spent: CGFloat = 0
+            for index in open {
+                let share = openWeight > 0 && weights[index] > 0
+                    ? budget * CGFloat(max(0, weights[index]) / openWeight)
+                    : budget / CGFloat(open.count)
+                let grant = min(share, capacity[index])
+                floors[index] += grant
+                capacity[index] -= grant
+                spent += grant
+            }
+            guard spent > 0.001 else { break }
+            budget -= spent
+        }
+        return floors
+    }
+
+    /// Smallest extent that stays visible and selectable, even when there
+    /// is no room for the label.
+    private func visibilityFloor(for node: HierarchyNode,
+                                 axis: TreemapAxis) -> CGFloat {
+        switch node.role {
+        case .volume, .free, .residual, .unknown, .unallocated, .used:
+            return axis == .rows ? 10 : 24
+        default:
+            return axis == .rows ? 20 : 40
+        }
+    }
+
+    /// Smallest extent that fits the tile's own label: the header band for
+    /// partitions and containers, one text line for leaves.
+    private func floorExtent(for node: HierarchyNode,
+                             axis: TreemapAxis,
+                             depth: Int) -> CGFloat {
+        switch axis {
+        case .rows:
+            switch node.role {
+            case .partition, .container:
+                let base: CGFloat = isMaximized ? 20 : 18
+                return base + nestedInset(depth: depth) * 2 + 2
+            default:
+                return tileLabelFloor(axis: .rows, depth: depth)
+            }
+        case .columns:
+            switch node.role {
+            case .partition, .container:
+                return isMaximized ? 70 : 60
+            default:
+                return tileLabelFloor(axis: .columns, depth: depth)
+            }
+        }
+    }
+
+    /// Smallest extent that fits one line of tile text. Mirrors the guard
+    /// used by `drawTreemapLabel`.
+    private func tileLabelFloor(axis: TreemapAxis, depth: Int) -> CGFloat {
+        switch axis {
+        case .rows:
+            return minimumTileNameHeight
+        case .columns:
+            return 36
+        }
+    }
+
+    private var minimumTileNameHeight: CGFloat {
+        ceil(1.5 + labelLineHeight(minimumTileTextSize) + 1)
+    }
+
+    /// Vertical space a subtree needs so all of its labels fit. Rows stack
+    /// their children; columns take the tallest child.
+    private func minimumChildHeight(of nodes: [HierarchyNode],
+                                    axis: TreemapAxis,
+                                    depth: Int) -> CGFloat {
+        let heights = nodes
+            .filter { $0.fraction.isFinite }
+            .map { labelContentHeight(for: $0, depth: depth) }
+        guard !heights.isEmpty else { return 0 }
+        if axis == .rows {
+            let gap = siblingGap(depth: depth)
+            return heights.reduce(0, +)
+                + gap * CGFloat(max(0, heights.count - 1))
+        }
+        return heights.max() ?? 0
+    }
+
+    /// Horizontal space a subtree needs for its tiles and labels.
+    private func minimumChildWidth(of nodes: [HierarchyNode],
+                                   axis: TreemapAxis,
+                                   depth: Int) -> CGFloat {
+        let widths = nodes
+            .filter { $0.fraction.isFinite }
+            .map { floorExtent(for: $0, axis: .columns, depth: depth) }
+        guard !widths.isEmpty else { return 0 }
+        if axis == .columns {
+            let gap = siblingGap(depth: depth)
+            return widths.reduce(0, +)
+                + gap * CGFloat(max(0, widths.count - 1))
+        }
+        return widths.max() ?? 0
+    }
+
+    /// Recursive height of a tile plus its descendants when every label is
+    /// given its floor. Partitions and containers add their header band and
+    /// insets; children add their own requirement.
+    private func labelContentHeight(for node: HierarchyNode,
+                                    depth: Int) -> CGFloat {
+        let children = node.children.filter { $0.fraction.isFinite }
+        guard !children.isEmpty else {
+            return floorExtent(for: node, axis: .rows, depth: depth)
+        }
+        let inset = nestedInset(depth: depth)
+        let header: CGFloat = isMaximized ? 20 : 18
+        let innerAxis = childAxis(for: node)
+        let childFloors = children.map {
+            labelContentHeight(for: $0, depth: depth + 1)
+        }
+        let childContent: CGFloat
+        if innerAxis == .rows {
+            let gap = siblingGap(depth: depth + 1)
+            childContent = childFloors.reduce(0, +)
+                + gap * CGFloat(max(0, children.count - 1))
+        } else {
+            childContent = childFloors.max() ?? 0
+        }
+        return header + inset * 2 + childContent
     }
 
     private func minimumExtent(for node: HierarchyNode,
@@ -1153,9 +1418,8 @@ struct VolumeHierarchyChart: View {
         let nameTop: CGFloat = compact ? 1.5 : 2
         let nameLine = labelLineHeight(nameSize)
         let nameBottom = item.rect.minY + nameTop + nameLine
-        let nameMinHeight = nameTop + nameLine + 1
         guard item.rect.width >= 34,
-              item.rect.height >= nameMinHeight else { return }
+              item.rect.height >= minimumTileNameHeight else { return }
 
         let valueSize = labelValueSize(for: item.depth)
         let dataTop = nameBottom + 2
@@ -1985,6 +2249,9 @@ private struct VerticalUsageBar: View {
     let width: CGFloat
     let isMaximized: Bool
     var onSliceTap: ((VolumeBarSlice) -> Void)? = nil
+    var fallbackItemID: String? = nil
+    var itemResolver: ((String) -> KBDiskItem?)? = nil
+    var onAnalyze: ((String) -> Void)? = nil
 
     private var clamped: Double {
         guard let fraction, fraction.isFinite else { return 0 }
@@ -2007,7 +2274,10 @@ private struct VerticalUsageBar: View {
                 height: height,
                 tint: tint,
                 isMaximized: isMaximized,
-                onTapSlice: onSliceTap)
+                onTapSlice: onSliceTap,
+                fallbackItemID: fallbackItemID,
+                itemResolver: itemResolver,
+                onAnalyze: onAnalyze)
 
             Text(caption ?? "")
                 .font(.system(size: 8))

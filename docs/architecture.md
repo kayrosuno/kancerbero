@@ -396,12 +396,17 @@
     además su usado y porcentaje alineado a la derecha en la cabecera. Cada partición reserva
     altura suficiente para los volúmenes que contiene (altura recursiva con tope 520/600 pt), de
     modo que las particiones pequeñas muestran su contenido y no hay leyenda debajo del treemap.
-    La altura del treemap es adaptativa al contenido (420/460…860 pt): se calcula con los ejes,
-    mínimos, insets y gaps reales, así que un disco con pocos volúmenes usa menos alto y no fuerza
-    scroll de más. El texto de los tiles nunca baja de 11.5 pt (12.5 maximizado) y se trunca antes
-    que reducirse.
-    La barra mide 4/5 de la altura del treemap, se acota con `availableHeight` al alto de la
-    ventana para que quepa al redimensionar y no dibuja líneas de unión con el treemap. Es un
+    La altura del treemap y de la barra se ajusta al alto disponible de la tarjeta: se mide el
+    bloque de cabecera y el gráfico ocupa el resto, dejando 25 pt para el caption de la barra. La
+    barra comparte exactamente la altura del treemap (ya no mide 4/5) y ambos terminan a la misma
+    línea; con ventanas bajas se mantiene una altura mínima y la tarjeta hace scroll. El cálculo
+    adaptativo (420/460…860 pt) queda como fallback cuando no se proporciona `availableHeight`.
+    Cuando los volúmenes de un contenedor tienen un reparto de tamaños muy dispar (ratio ≥ 6×), la
+    asignación pasa a ser proporcional con un suelo pequeño (10 pt) en vez de repartir mínimos
+    iguales: el volumen mayor crece y la proporción se lee de un vistazo; el resto de casos
+    conserva el mínimo visible por tile más el reparto proporcional del sobrante. El texto de los
+    tiles nunca baja de 11.5 pt (12.5 maximizado) y se trunca antes que reducirse.
+    La barra no dibuja líneas de unión con el treemap. Es un
     carril oscuro de esquinas redondeadas que recorre las hojas del disco del alcance: una sección
     por volumen APFS y una por el espacio libre de cada contenedor; las particiones y los
     contenedores no se dibujan. Los volúmenes usan un degradado azul y el espacio libre una trama
@@ -444,8 +449,15 @@
     El mount point de cada volumen se dibuja en la misma línea que el nombre (izquierda) y el
     tamaño/uso (derecha), comenzando en una columna central común (`layout.bounds.midX`) y alineado
     a la izquierda; las hojas que no cruzan esa columna no lo muestran. No hay pop/tooltip sobre el
-    treemap. La metadata describe el elemento seleccionado. Las actions (Reveal, Copy ID, Analyze)
-    van en una línea por encima de la metadata. Pulsar un rectángulo selecciona el ítem; pulsar el
+    treemap. El detalle termina en el treemap: no hay fila de acciones ni metadata en la tarjeta.
+    El menú contextual (cabeceras de disco, filas, tarjeta, tramos de la barra y tiles del treemap)
+    ofrece Reveal, Copy ID, Analyze y “Get Info”. Las acciones actúan sobre el elemento pulsado
+    (en barra/treemap, el que está bajo el cursor; free/residual → contenedor propietario; el fondo
+    usa el seleccionado); Reveal/Analyze se deshabilitan si no está montado y Copy ID siempre está
+    activo. “Get Info” abre una ventana por
+    `deviceIdentifier` con toda la metadata (Kind, IDs, UUIDs, modelo, etc.); la ventana resuelve
+    el elemento desde el inventario vivo y muestra un aviso si ya no existe. Pulsar un rectángulo
+    selecciona el ítem; pulsar el
     fondo del treemap selecciona el disco del alcance. En las tablas, la barra de un volumen
     representa su parte del usado del contenedor (el resto usa usado/capacidad). Para contenedores
     y volúmenes APFS se añade una fila “Shared with” con el contenedor y los volúmenes implicados.

@@ -459,8 +459,9 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   tabla; `kb-vol-2col.png` puede abrir con la fila seleccionada fuera del área visible, sin
   centrarla.
 - Treemap y barra: la tarjeta muestra Capacity/Free/Used a la izquierda, una barra vertical en
-  medio (4/5 de la altura del treemap, acotada al alto de la ventana para que quepa al
-  redimensionar) y el treemap a la derecha. La barra es un carril oscuro de esquinas redondeadas
+  medio y el treemap a la derecha; ambos ocupan el alto disponible de la tarjeta y terminan a la
+  misma línea (la barra deja 25 pt para su caption). La barra es un carril oscuro de esquinas
+  redondeadas
   con una sección por volumen APFS del disco y una por el espacio libre de cada contenedor; no
   dibuja particiones ni contenedores. Los volúmenes usan un degradado azul y el libre una trama
   diagonal; cada sección recibe una altura mínima visible y el resto se reparte proporcionalmente.
@@ -479,8 +480,8 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   resaltado; volver a pulsar restaura el resaltado y la x lo cierra. No hay conectores
   barra-treemap. El
   gráfico es un rectángulo anidado (particiones → contenedores APFS → volúmenes, con “Other” para
-  el espacio no asignado, residual y libre) que adapta su altura al contenido (420/460…860 pt)
-  para evitar scroll innecesario, con texto de tile mayor. Si el disco no tiene tabla de
+  el espacio no asignado, residual y libre) que llena el alto disponible de la tarjeta (el
+  adaptativo 420/460…860 pt queda como fallback), con texto de tile mayor. Si el disco no tiene tabla de
   particiones, el contenedor APFS cuelga directamente del disco y sus volúmenes se dibujan igual,
   apilados en filas (p. ej. `disk11 → disk12 → disk12s1`). Particiones y contenedores usan la
   paleta hueso (`#e8e2d7`, `#d9d1c3`); los volúmenes usan por defecto los tres azules grisáceos
@@ -492,16 +493,21 @@ $K --screenshot /tmp/kb-disk-io.png --section disk \
   capacidad y de componentes con nombre y número, en una sola línea (el título se trunca
   antes). **No hay
   bloque-resumen sobre el gráfico ni leyenda debajo**; el rectángulo ocupa ese espacio. La
-  cabecera no cambia al seleccionar un volumen o contenedor; la metadata describe el elemento
-  seleccionado. Cada contenedor y volumen muestra su uso/% (inline si la fila es compacta). El
+  cabecera no cambia al seleccionar un volumen o contenedor. Cada contenedor y volumen muestra su
+  uso/% (inline si la fila es compacta). El
   texto de los tiles tiene un mínimo de 11.5 pt (12.5 maximizado): si no cabe se trunca con
   elipsis, nunca se reduce. El rectángulo seleccionado usa un trazo de tinta de 2 pt, distinto del
   hover/ancestros. No hay pop/tooltip sobre el treemap; el mount point de cada volumen se dibuja en
   la misma línea que el nombre (izquierda) y el tamaño/uso (derecha), comenzando en una columna
   central común y alineado a la izquierda; las hojas que no cruzan la columna no lo muestran. Las
   particiones y contenedores etiquetan su banda superior. Hover resalta el rectángulo. No hay
-  flecha de subir nivel: la navegación es por las tablas y los rectángulos. Las actions (Reveal,
-  Copy ID, Analyze) van en una línea por encima de la metadata. En `kb-2d-disk.png`,
+  flecha de subir nivel: la navegación es por las tablas y los rectángulos. El detalle termina en
+  el treemap; no hay fila de acciones ni metadata. El clic derecho en una cabecera, fila, la
+  tarjeta de detalle, un tramo de la barra o un tile del treemap abre Reveal, Copy ID, Analyze y
+  “Get Info” para el elemento bajo el cursor (el fondo usa el seleccionado): Reveal/Analyze se
+  deshabilitan sin mount point, Copy ID siempre está activo y “Get Info” abre una ventana
+  independiente por elemento; si desaparece del inventario, la ventana muestra “Item unavailable”.
+  En `kb-2d-disk.png`,
   `kb-bar-container.png` y `kb-bar-volume.png` se comprueba que el contenido de la barra no
   cambia al cambiar de selección, solo el contorno.
 - Disco raíz, línea de mount y altura: en `kb-mountline-1440.png` se ve `disk0` como contenedor
@@ -1009,17 +1015,21 @@ $K --screenshot /tmp/kb-hero-min.png --section disk --disk-tab volumes \
   el título no cambia al seleccionar un volumen o contenedor. El disco aparece como contenedor
   raíz dentro del treemap, con su banda de cabecera (`disk0`, capacidad, usado y libre) y las
   particiones dentro; no queda ningún bloque de
-  resumen de conteos ni cabecera de selección encima del gráfico. Las actions van en una línea por
-  encima de la metadata. Cada nivel usa su tramo de la paleta hueso y los bordes/texto se eligen
+  resumen de conteos ni cabecera de selección encima del gráfico. El detalle termina en el
+  treemap; Reveal, Copy ID, Analyze y “Get Info” viven en el menú contextual de cabeceras, filas,
+  detalle, barra y treemap. Cada nivel usa su tramo de la paleta hueso y los bordes/texto se eligen
   por luminancia (tinta cálida sobre claros).
 - Barra y selección: el contenido (todos los volúmenes y libres del disco) no cambia al navegar;
   un volumen seleccionado dibuja el contorno azul de su sección; un contenedor, el de todas sus
-  secciones y su espacio libre; un disco o partición, el de todo su subárbol. La metadata describe
-  el elemento seleccionado.
+  secciones y su espacio libre; un disco o partición, el de todo su subárbol. “Get Info” abre una
+  ventana por elemento con su metadata y resuelve el ítem desde el inventario vivo.
 - El treemap anida filas de particiones, columnas de contenedores y filas de volúmenes; cada
   rectángulo tiene un mínimo visible por rol/eje y el resto se reparte proporcional a la fracción,
   de modo que todas las particiones y volúmenes aparecen (incluidos los desmontados, con
-  `Not mounted` y un tile compacto de 20/22 pt). Las áreas son aproximadas. Partición/contenedor
+  `Not mounted` y un tile compacto de 20/22 pt). Cuando los volúmenes de un contenedor tienen
+  tamaños muy dispares (≥ 6×), el suelo baja a 10 pt y el volumen mayor crece para que la
+  proporción se lea; algún tile pequeño puede quedarse sin etiqueta. Las áreas son aproximadas.
+  Partición/contenedor
   con hijos reservan una banda
   superior para su etiqueta y dejan un inset visible (12/9/7 pt normal, 14/11/8 maximizado)
   alrededor de los hijos; los volúmenes se etiquetan dentro, muestran su mount point en la línea
@@ -1039,11 +1049,14 @@ $K --screenshot /tmp/kb-hero-min.png --section disk --disk-tab volumes \
   el fondo del treemap selecciona el disco del alcance. Los bordes son líneas finas (0.6–1.0 pt;
   maximizado algo más); el rectángulo seleccionado usa un trazo de 2 pt en tinta, que se reduce en
   tiles pequeños.
-- El treemap adapta su altura al contenido (420/460…860 pt), con texto de tile
-  mayor; la barra mide 4/5 de esa altura y no tiene leyenda debajo. Cada partición
+- El treemap y la barra ocupan el alto disponible de la tarjeta; la barra comparte la altura del
+  treemap y deja 25 pt para su caption. El cálculo adaptativo (420/460…860 pt) es solo el fallback.
+  Cuando los volúmenes de un contenedor tienen tamaños muy dispares (ratio ≥ 6×), el tile mayor
+  crece y los pequeños se compactan a un suelo de 10 pt para que la proporción se lea; en el resto
+  de casos cada tile conserva su mínimo visible. Cada partición
   reserva una altura recursiva según sus volúmenes
-  (tope 520/600 pt) para que su contenido se vea; un disco con pocos volúmenes no ocupa 860 de más.
-  A 1340×700 la tarjeta puede hacer scroll vertical si el contenido lo necesita.
+  (tope 520/600 pt) para que su contenido se vea. A 1340×700 la tarjeta puede hacer scroll vertical
+  si el contenido lo necesita.
 
 - El número de contenedores del disco debe coincidir con `diskutil list` (incluye los
   contenedores ISC y Recovery que `diskutil apfs list` no muestra); `diskutil apfs list` sirve

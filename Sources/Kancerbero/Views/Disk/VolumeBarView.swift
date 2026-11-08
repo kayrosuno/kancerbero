@@ -1,4 +1,5 @@
 import SwiftUI
+import KancerberoCore
 
 /// One segment of the vertical volume bar. Its fraction mirrors the weight of
 /// the corresponding deepest block of the disk being viewed.
@@ -97,6 +98,16 @@ struct VolumeBarView: View {
     let tint: Color
     let isMaximized: Bool
     var onTapSlice: ((VolumeBarSlice) -> Void)? = nil
+    var fallbackItemID: String? = nil
+    var itemResolver: ((String) -> KBDiskItem?)? = nil
+    var onAnalyze: ((String) -> Void)? = nil
+
+    @State private var hoveredSliceID: String?
+
+    private var hoveredSlice: VolumeBarSlice? {
+        guard let hoveredSliceID else { return nil }
+        return slices.first { $0.id == hoveredSliceID }
+    }
 
     private var trackCorner: CGFloat { isMaximized ? 14 : 12 }
 
@@ -125,6 +136,31 @@ struct VolumeBarView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Volume bar")
         .accessibilityValue(accessibilityValueText)
+        .onContinuousHover { phase in
+            switch phase {
+            case .active(let location):
+                if let index = VolumeBarLayout.sliceIndex(
+                    at: location.y, for: slices,
+                    height: height, isMaximized: isMaximized) {
+                    hoveredSliceID = slices[index].id
+                } else {
+                    hoveredSliceID = nil
+                }
+            case .ended:
+                // Keep the last slice: the context menu opens after the
+                // pointer leaves the Canvas.
+                break
+            }
+        }
+        .contextMenu {
+            let itemID = hoveredSlice?.ownerID ?? fallbackItemID
+            if let itemID, let item = itemResolver?(itemID) {
+                DiskItemContextMenu(item: item, onAnalyze: onAnalyze)
+            }
+        }
+        .onDisappear {
+            hoveredSliceID = nil
+        }
         .highPriorityGesture(
             SpatialTapGesture().onEnded { value in
                 guard let index = VolumeBarLayout.sliceIndex(
