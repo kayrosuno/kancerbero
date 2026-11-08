@@ -125,6 +125,15 @@ struct KancerberoApp: App {
         .defaultSize(width: 820, height: 580)
         .windowResizability(.contentMinSize)
 
+        WindowGroup("Disk Info", id: DiskItemInfoWindow.id,
+                    for: String.self) { $itemID in
+            DiskItemInfoWindowView(itemID: itemID)
+                .environment(disk)
+        }
+        .defaultSize(width: 560, height: 680)
+        .windowResizability(.contentMinSize)
+        .restorationBehavior(.disabled)
+
         Settings {
             SettingsView()
         }

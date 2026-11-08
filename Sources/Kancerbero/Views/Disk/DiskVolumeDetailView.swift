@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 import KancerberoCore
 
@@ -14,6 +13,7 @@ struct DiskVolumeDetailView: View {
     @Environment(\.byteUnitSystem) private var byteUnitSystem
     @State private var freeSelectionContainerID: String?
     @State private var hidesDetailSelection = false
+    @State private var headerBlockHeight: CGFloat = 39
 
     private var usage: KBDiskSpaceUsage { item.spaceUsage }
 
@@ -78,58 +78,49 @@ struct DiskVolumeDetailView: View {
     }
 
     private func content(viewportHeight: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            header
-            softRule
+        let chartHeight = max(
+            0,
+            viewportHeight - 28 - headerBlockHeight - 14 - 6)
+        return VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 14) {
+                header
+                softRule
+            }
+            .background {
+                GeometryReader { proxy in
+                    Color.clear.preference(
+                        key: DetailHeaderBlockHeightKey.self,
+                        value: proxy.size.height)
+                }
+            }
             if let inventory {
                 VolumeHierarchyChart(
                     item: item,
                     inventory: inventory,
                     isMaximized: isMaximized,
                     onSelectItem: onSelectItem,
+                    onAnalyze: onAnalyze,
                     stats: heroStats,
                     usageFraction: item.volumeUsedFraction,
                     usageCaption: usageCaption,
-                    availableHeight: viewportHeight,
+                    availableHeight: chartHeight,
                     selectedFreeContainerID: $freeSelectionContainerID,
                     detailSelectionHidden: $hidesDetailSelection)
             }
-            softRule
-            actions
-                .padding(10)
-                .background {
-                    RoundedRectangle(cornerRadius: 12,
-                                     style: .continuous)
-                        .fill(Color.primary.opacity(0.035))
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12,
-                                     style: .continuous)
-                        .strokeBorder(.quaternary.opacity(0.35),
-                                      lineWidth: 0.5)
-                }
-            softRule
-            metadata
-                .padding(10)
-                .background {
-                    RoundedRectangle(cornerRadius: 12,
-                                     style: .continuous)
-                        .fill(Color.primary.opacity(0.035))
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12,
-                                     style: .continuous)
-                        .strokeBorder(.quaternary.opacity(0.35),
-                                      lineWidth: 0.5)
-                }
         }
         .padding(14)
+        .onPreferenceChange(DetailHeaderBlockHeightKey.self) {
+            headerBlockHeight = $0
+        }
         .contentShape(Rectangle())
         .onTapGesture {
             // Clicking outside the treemap and the bar removes the detail's
             // selection highlight; the panel and its data stay visible.
             hidesDetailSelection = true
             freeSelectionContainerID = nil
+        }
+        .contextMenu {
+            DiskItemContextMenu(item: item, onAnalyze: onAnalyze)
         }
     }
 
@@ -447,148 +438,15 @@ struct DiskVolumeDetailView: View {
             .sorted { ($0.usedBytes ?? 0) > ($1.usedBytes ?? 0) }
     }
 
-    /// "Shared with" list for containers and volumes; snapshots are omitted.
-    private var sharedWithEntries: [String]? {
-        guard let inventory else { return nil }
-        switch item.kind {
-        case .apfsContainer:
-            let volumes = containerVolumes
-            guard !volumes.isEmpty else { return nil }
-            return volumes.map { "\(displayName($0)) (\($0.deviceIdentifier))" }
-        case .apfsVolume:
-            guard let container = inventory.apfsContainer(enclosing: item) else {
-                return nil
-            }
-            var entries = ["\(container.deviceIdentifier) · \(displayName(container))"]
-            entries.append(contentsOf: siblingVolumes(of: container).map {
-                "\(displayName($0)) (\($0.deviceIdentifier))"
-            })
-            return entries
-        default:
-            return nil
-        }
-    }
-
-    private var sharedWithText: String? {
-        guard let entries = sharedWithEntries else { return nil }
-        let visible = entries.prefix(6)
-        var text = visible.joined(separator: ", ")
-        if entries.count > visible.count {
-            text += " and \(entries.count - visible.count) more"
-        }
-        return text
-    }
-
-    private var sharedWithHelp: String? {
-        sharedWithEntries?.joined(separator: ", ")
-    }
-
     private func displayName(_ item: KBDiskItem) -> String {
         item.name.isEmpty ? item.deviceIdentifier : item.name
     }
+}
 
-    private var metadata: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            row("Kind", item.kind.displayName)
-            row("Identifier", item.deviceIdentifier)
-            row("Filesystem", item.fileSystem ?? "—")
-            if let content = item.content {
-                row("Content", content)
-            }
-            row("Mount point", item.mountPoint ?? "Not mounted",
-                path: item.mountPoint != nil)
-            row("Used", usedText)
-            row(item.kind == .apfsVolume || item.kind == .apfsContainer
-                ? "Free (container)" : "Free",
-                freeText)
-            row(item.kind == .apfsVolume || item.kind == .apfsContainer
-                ? "Available (container)" : "Available",
-                item.availableBytes.map { KBFormat.bytes($0, units: byteUnitSystem) } ?? "—")
-            if let sharedWithText {
-                row("Shared with", sharedWithText,
-                    lineLimit: 4, help: sharedWithHelp)
-            }
-            row("Volume UUID", item.volumeUUID ?? "—")
-            row("Media UUID", item.mediaUUID ?? "—")
-            if let group = item.volumeGroupUUID {
-                row("APFS group", group)
-            }
-            if !item.roles.isEmpty {
-                row("APFS roles", item.roles.joined(separator: ", "))
-            }
-            row("Model", item.deviceModel ?? "—")
-            row("Protocol", item.deviceProtocol ?? "—")
-            row("Bus", item.busName ?? "—")
-            row("Internal", yesNo(item.isInternal))
-            row("Removable", yesNo(item.isRemovable))
-            row("Writable", yesNo(item.isWritable))
-            row("Encrypted", yesNo(item.isEncrypted))
-            row("SMART", "Unavailable via public APIs")
-        }
-    }
+private struct DetailHeaderBlockHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
 
-    private func row(_ title: String, _ value: String,
-                     path: Bool = false, lineLimit: Int? = nil,
-                     help: String? = nil) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text(title)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 88, alignment: .leading)
-            Text(value)
-                .font(.system(size: 11,
-                              design: path ? .monospaced : .default))
-                .foregroundStyle(.primary)
-                .textSelection(.enabled)
-                .lineLimit(lineLimit ?? (path ? 2 : 3))
-                .truncationMode(.middle)
-                .help(help ?? value)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var actions: some View {
-        HStack(spacing: 8) {
-            Button {
-                if let mount = item.mountPoint {
-                    NSWorkspace.shared.activateFileViewerSelecting([
-                        URL(fileURLWithPath: mount)
-                    ])
-                }
-            } label: {
-                Label("Reveal", systemImage: "folder")
-            }
-            .buttonStyle(.bordered)
-            .disabled(item.mountPoint == nil)
-
-            Button {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(item.deviceIdentifier,
-                                               forType: .string)
-            } label: {
-                Label("Copy ID", systemImage: "doc.on.doc")
-            }
-            .buttonStyle(.bordered)
-
-            Button {
-                if let mount = item.mountPoint {
-                    onAnalyze(mount)
-                }
-            } label: {
-                Label("Analyze", systemImage: "chart.pie")
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(diskTint)
-            .disabled(item.mountPoint == nil)
-
-            Spacer(minLength: 0)
-        }
-        .controlSize(.small)
-        .font(.system(size: 11, weight: .medium))
-    }
-
-    private func yesNo(_ value: Bool?) -> String {
-        guard let value else { return "—" }
-        return value ? "Yes" : "No"
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
