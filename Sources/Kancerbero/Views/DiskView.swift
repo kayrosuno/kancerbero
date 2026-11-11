@@ -40,7 +40,7 @@ struct DiskView: View {
             CollapsibleSectionHeader(
                 section: .disk,
                 title: "Disk",
-                subtitle: "Volumes, analysis and disk I/O"
+                subtitle: "Volumes, filesystems, analysis and disk I/O"
             )
 
             HStack(spacing: 12) {
@@ -61,6 +61,18 @@ struct DiskView: View {
                 }
             }
 
+            if let progress = disk.operationProgress {
+                HStack { ProgressView().controlSize(.small); Text(progress).font(.caption) }
+            }
+            if let error = disk.operationError {
+                HStack(alignment: .top) {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(.orange).textSelection(.enabled)
+                    Spacer()
+                    Button("Dismiss") { disk.operationError = nil }
+                }
+            }
+
             Group {
                 switch tab {
                 case .volumes:
@@ -70,6 +82,8 @@ struct DiskView: View {
                         }
                         Task { await disk.startScan(path: path) }
                     }
+                case .filesystems:
+                    FilesystemView()
                 case .analyzer:
                     DiskAnalyzerView()
                 case .io:
@@ -86,6 +100,7 @@ struct DiskView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .task {
             await disk.refreshInventory()
+            await disk.refreshFilesystems()
             if disk.consumeAutoScan() {
                 await disk.startScan()
             }
@@ -97,6 +112,9 @@ struct DiskView: View {
         case .volumes:
             let count = disk.inventory?.mountedVolumes.count ?? 0
             return "\(count) mounted volumes"
+        case .filesystems:
+            let systemCount = disk.filesystemSnapshot?.filesystems.count ?? 0
+            return "\(systemCount) filesystems"
         case .analyzer:
             if disk.isScanning {
                 if let live = disk.liveSnapshot {

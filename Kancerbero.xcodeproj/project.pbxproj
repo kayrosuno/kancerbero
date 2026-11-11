@@ -107,10 +107,10 @@
 
 /* Begin PBXFileReference section */
 		A9C68BDB3091523B00171609 /* architecture.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = architecture.md; sourceTree = "<group>"; };
-		A9C68BE03091523B00171609 /* daemons-and-libraries.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "daemons-and-libraries.md"; sourceTree = "<group>"; };
 		A9C68BDC3091523B00171609 /* private-apis.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "private-apis.md"; sourceTree = "<group>"; };
 		A9C68BDD3091523B00171609 /* security.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = security.md; sourceTree = "<group>"; };
 		A9C68BDE3091523B00171609 /* verification.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = verification.md; sourceTree = "<group>"; };
+		A9C68BE03091523B00171609 /* daemons-and-libraries.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "daemons-and-libraries.md"; sourceTree = "<group>"; };
 		ABCDEF000000000000000020 /* libKancerberoC.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libKancerberoC.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		ABCDEF000000000000000021 /* libKancerberoCore.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libKancerberoCore.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		ABCDEF000000000000000022 /* KancerberoDaemon */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = KancerberoDaemon; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -306,14 +306,6 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
-		ABCDEF0000000000000000C3 /* Daemon */ = {
-			isa = PBXGroup;
-			children = (
-				ABCDEF0000000000000000C2 /* KancerberoDaemon.entitlements */,
-			);
-			path = Daemon;
-			sourceTree = "<group>";
-		};
 		ABCDEF000000000000000009 /* App */ = {
 			isa = PBXGroup;
 			children = (
@@ -352,6 +344,14 @@
 				ABCDEF0000000000000000C1 /* KancerberoFilter-Development.entitlements */,
 			);
 			path = Filter;
+			sourceTree = "<group>";
+		};
+		ABCDEF0000000000000000C3 /* Daemon */ = {
+			isa = PBXGroup;
+			children = (
+				ABCDEF0000000000000000C2 /* KancerberoDaemon.entitlements */,
+			);
+			path = Daemon;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */

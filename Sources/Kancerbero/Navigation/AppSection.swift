@@ -154,6 +154,7 @@ enum NetworkingTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
 enum DiskTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
     case io
     case volumes
+    case filesystems
     case analyzer
 
     var id: String { rawValue }
@@ -161,6 +162,7 @@ enum DiskTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
     var title: String {
         switch self {
         case .volumes: return "Volumes"
+        case .filesystems: return "Filesystems"
         case .analyzer: return "Analyzer"
         case .io: return "I/O"
         }
@@ -169,6 +171,7 @@ enum DiskTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
     var systemImage: String {
         switch self {
         case .volumes: return "internaldrive"
+        case .filesystems: return "hdd.rigid"
         case .analyzer: return "chart.pie"
         case .io: return "arrow.left.arrow.right"
         }
@@ -177,6 +180,7 @@ enum DiskTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
     var tint: Color {
         switch self {
         case .volumes: return Color(red: 0.94, green: 0.56, blue: 0.18)
+        case .filesystems: return Color(red: 0.25, green: 0.62, blue: 0.95)
         case .analyzer: return Color(red: 0.90, green: 0.42, blue: 0.25)
         case .io: return Color(red: 0.25, green: 0.62, blue: 0.95)
         }
@@ -192,8 +196,9 @@ enum DiskTab: String, CaseIterable, Identifiable, Hashable, PillTabItem {
         if let tab = DiskTab(rawValue: value) { return tab }
         switch value {
         case "0": return .volumes
-        case "1": return .analyzer
-        case "2": return .io
+        case "1": return .filesystems
+        case "2": return .analyzer
+        case "3": return .io
         default: return nil
         }
     }

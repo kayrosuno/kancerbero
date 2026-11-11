@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import Darwin
 import Observation
 import KancerberoCore
 
@@ -17,6 +18,113 @@ final class DiskModel {
     var inventoryError: String?
     var isLoadingInventory = false
     var selectedItemID: String?
+
+    var filesystemSnapshot: KBFilesystemSnapshot?
+    var filesystemError: String?
+    var isLoadingFilesystems = false
+
+    var operationProgress: String?
+    var operationError: String?
+    private var ejectDisks: [String: String] = [:]
+    private let operationService = DiskOperationService()
+
+    private static var homeFilesystemPath: String? {
+        let path = FileManager.default.homeDirectoryForCurrentUser.resolvingSymlinksInPath().path
+        var info = statfs()
+        guard statfs(path, &info) == 0 else { return nil }
+        // statfs crosses APFS firmlinks; resolvingSymlinks alone does not.
+        return withUnsafePointer(to: &info.f_mntonname) {
+            $0.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) }
+        }
+    }
+
+    private var operationPolicy: KBDiskOperationPolicy? {
+        guard let inventory, inventory.error == nil,
+              let filesystemSnapshot, filesystemSnapshot.error == nil,
+              filesystemSnapshot.filesystems.contains(where: { $0.mountPoint == "/" }),
+              let homePath = Self.homeFilesystemPath else { return nil }
+        return KBDiskOperationPolicy(inventory: inventory,
+            filesystems: filesystemSnapshot.filesystems,
+            homePath: homePath,
+            ejectDisks: ejectDisks)
+    }
+
+    func canPerform(_ action: KBDiskAction, on target: KBDiskOperationTarget) -> Bool {
+        operationProgress == nil && operationPolicy?.steps(for: action, target: target) != nil
+    }
+
+    func perform(_ action: KBDiskAction, on target: KBDiskOperationTarget, name: String) async {
+        guard operationProgress == nil else { return }
+        let originalInventory = inventory
+        operationProgress = "\(action.rawValue) · \(name)…"
+        operationError = nil
+        defer { operationProgress = nil }
+        // Collect independent fresh snapshots even if a UI refresh is already
+        // in flight. Never authorize an operation from cached menu state.
+        let collector = inventoryCollector
+        let fresh = await Task.detached(priority: .utility) {
+            let inventory = collector.snapshot()
+            return (inventory, FilesystemCollector.snapshot(), DiskOperationService.ejectDisks(in: inventory))
+        }.value
+        inventory = fresh.0; filesystemSnapshot = fresh.1; ejectDisks = fresh.2
+        do {
+            guard let originalInventory,
+                  let steps = operationPolicy?.steps(for: action, target: target),
+                  Self.sameDevices(steps, before: originalInventory, after: fresh.0) else {
+                throw KBDiskOperationError(message: "The target changed, is protected, or no longer supports this action.")
+            }
+            // A Filesystems row disappears after unmount. Preserve the local
+            // inventory identity so eject can continue after that refresh.
+            let executionTarget: KBDiskOperationTarget
+            if case .filesystem(let row) = target,
+               let local = fresh.0.allItems.first(where: { $0.mountPoint == row.mountPoint }),
+               row.filesystem == "/dev/" + local.id {
+                executionTarget = .disk(local.id, identity: .init(local))
+            } else {
+                executionTarget = target
+            }
+            // Each step is checked against current inventory/protections. Eject
+            // is still conditional on successful completion of every unmount.
+            for (index, step) in steps.enumerated() {
+                let latest = await Task.detached(priority: .utility) {
+                    let inventory = collector.snapshot()
+                    return (inventory, FilesystemCollector.snapshot(), DiskOperationService.ejectDisks(in: inventory))
+                }.value
+                inventory = latest.0; filesystemSnapshot = latest.1; ejectDisks = latest.2
+                let validationAction = action == .eject ? .eject : step.action
+                guard let valid = operationPolicy?.steps(for: validationAction, target: executionTarget),
+                      valid.contains(step),
+                      Self.sameDevices(Array(steps[index...]), before: fresh.0, after: latest.0) else {
+                    throw KBDiskOperationError(message: "The device state or its protections changed during the operation.")
+                }
+                operationProgress = "\(step.action.rawValue) · \(name) (\(step.device))…"
+                try await operationService.execute(step)
+            }
+        } catch {
+            operationError = "\(action.rawValue) · \(name): \(error.localizedDescription)"
+            if action == .mount {
+                operationError! += " If the volume is locked, unlock it in Disk Utility and try again."
+            }
+        }
+        // Wait out a UI refresh so the final refresh cannot be skipped.
+        while isLoadingInventory || isLoadingFilesystems {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        await refreshInventory(force: true)
+        await refreshFilesystems()
+    }
+
+    private static func sameDevices(_ steps: [KBDiskOperationStep],
+                                    before: KBDiskInventorySnapshot,
+                                    after: KBDiskInventorySnapshot) -> Bool {
+        steps.filter { !$0.network }.allSatisfy { step in
+            guard let old = before.allItems.first(where: { $0.id == step.device }),
+                  let new = after.allItems.first(where: { $0.id == step.device }) else { return false }
+            return old.kind == new.kind && old.volumeUUID == new.volumeUUID
+                && old.mediaUUID == new.mediaUUID && old.parentID == new.parentID
+                && old.sizeBytes == new.sizeBytes
+        }
+    }
 
     var scanRootPath: String
     var scanOptions = KBDiskScanOptions()
@@ -53,6 +161,9 @@ final class DiskModel {
                 guard let self else { return }
                 Task { @MainActor in
                     await self.refreshInventory(force: true)
+                    if self.filesystemSnapshot != nil {
+                        await self.refreshFilesystems()
+                    }
                 }
             })
         }
@@ -101,6 +212,7 @@ final class DiskModel {
             return
         }
 
+        let isInitialInventory = inventory == nil
         isLoadingInventory = true
         inventoryError = nil
         let collector = inventoryCollector
@@ -108,6 +220,7 @@ final class DiskModel {
             collector.snapshot()
         }.value
 
+        ejectDisks = DiskOperationService.ejectDisks(in: snapshot)
         inventory = snapshot
         inventoryError = snapshot.error
         isLoadingInventory = false
@@ -116,7 +229,21 @@ final class DiskModel {
            snapshot.allItems.contains(where: { $0.deviceIdentifier == selectedItemID }) {
             return
         }
-        selectedItemID = snapshot.mountedVolumes.first?.deviceIdentifier
+        selectedItemID = isInitialInventory ? snapshot.mountedVolumes.first?.deviceIdentifier : nil
+    }
+
+    func refreshFilesystems() async {
+        guard !isLoadingFilesystems else { return }
+        isLoadingFilesystems = true
+        let snapshot = await Task.detached(priority: .utility) {
+            FilesystemCollector.snapshot()
+        }.value
+        // Retain the last successful rows if enumerating the mount table fails.
+        if snapshot.error == nil {
+            filesystemSnapshot = snapshot
+        }
+        filesystemError = snapshot.error
+        isLoadingFilesystems = false
     }
 
     func select(_ identifier: String?) {

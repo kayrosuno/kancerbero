@@ -84,7 +84,17 @@ El detalle de binarios, permisos, instalación y librerías está en
   `GB`). El selector de **Interval** ajusta la cadencia real de Networking y CPU; con el daemon
   conectado reenvía la suscripción y en local despierta el bucle de polling. Al cambiarlo, los
   historiales se reinician para que el eje temporal del gráfico coincida con la nueva cadencia.
-- **Disk** — tres subpestañas:
+- **Disk** — cuatro subpestañas:
+  - **Filesystems** — tarjeta con todos los sistemas de ficheros montados, al estilo de
+    `df`: Filesystem, Type, Size, Used, Available, Capacity, iused, ifree, %iused y Mounted on.
+    Tabla ordenable con filtro por dispositivo/tipo/mount, botón Refresh y actualización cada
+    5 segundos mientras está visible. Usa `getfsstat`/`statfs` y
+    `getattrlist(ATTR_VOL_SPACEUSED)` para el uso individual de APFS; Capacity es
+    `ceil(Used / (Used + Available) × 100)`, como `df`. Respeta Decimal/Binary.
+    Los montajes de red y autofs usan estadísticas del kernel, marcadas con un reloj,
+    para no bloquear con servidores inaccesibles. Los errores locales conservan las cifras
+    disponibles y muestran un aviso. Las capacidades APFS no se suman entre filas.
+    Diagnóstico: `KancerberoProbe disk filesystems` (bytes exactos).
   - **Volumes** — jerarquía nativa de discos físicos, particiones, contenedores APFS y volúmenes
     (IOKit + DiskArbitration + `getmntinfo`/`getattrlist`), con capacidad, usado, libre, punto de
     montaje, UUID, roles APFS, modelo/protocolo y cifrado. No ejecuta procesos externos. La

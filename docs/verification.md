@@ -11,6 +11,31 @@
 ./build/Build/Products/Debug/KancerberoProbe nstat --seconds 5
 ```
 
+## Filesystems
+
+```bash
+./build/Build/Products/Debug/KancerberoProbe disk filesystems
+/bin/df -k -Y
+
+# Pruebas independientes de porcentaje/APFS, inodos y límites numéricos:
+xcrun swiftc Sources/KancerberoCore/Models/KBFilesystem.swift \
+  Tests/KancerberoTests/FilesystemModelTests.swift \
+  -o "$TMPDIR/kancerbero-filesystem-tests"
+"$TMPDIR/kancerbero-filesystem-tests"
+```
+
+Comparar montajes, tipo y Size/Used/Available (el probe muestra bytes; `df -k`, bloques
+de 1024 bytes). Capacity y %iused deben coincidir; permitir pequeños cambios de espacio/inodos
+entre lecturas. APFS usa `ATTR_VOL_SPACEUSED`, no `Size − Available`, y Capacity usa
+`ceil(Used / (Used + Available) × 100)`. Los montajes remotos/autofs se marcan como cached:
+no se contacta al servidor para refrescarlos. Los fallos de permisos locales conservan las
+cifras del kernel y muestran la advertencia correspondiente.
+
+Abrir `--section disk --disk-tab filesystems` y comprobar ordenación, filtro, Refresh,
+actualización a los 5 segundos, tooltips con rutas/cifras completas y Decimal/Binary.
+Tras montar/desmontar un volumen, su fila debe aparecer/desaparecer. Los tamaños APFS
+compartidos no se totalizan. Capturar también a 1340×700 para revisar el scroll y truncado.
+
 ## Tráfico por proceso
 
 ```bash
@@ -99,7 +124,7 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--screenshot-size <ancho>x<alto>] \
   [--section networking|disk|daemons|cpu|memory|energy] \
   [--tab interfaces|connections|processes] \
-  [--disk-tab volumes|analyzer|io] \
+   [--disk-tab volumes|filesystems|analyzer|io] \
   [--disk-path=<carpeta>] [--disk-scan] [--disk-item <diskXsY>] \
   [--disk-io-search <texto>] [--disk-io-selected <pid>] \
   [--disk-io-graph data|operations] \
@@ -1477,3 +1502,58 @@ done
 - La fila FDA no debe confundirse con `Privileged data / Full access`, que describe el acceso root
   del daemon. Sin FDA, el banner global puede seguir diciendo «Full access» y el contenedor de otra
   app debe seguir fallando con el aviso de permisos.
+
+### Disk Mount / Unmount / Eject
+
+Standalone policy and simulated executor regression suite:
+
+```sh
+swiftc -module-cache-path /tmp/kancerbero-swift-cache \
+  Sources/KancerberoCore/Models/KBDiskModels.swift \
+  Sources/KancerberoCore/Models/KBDiskSpaceUsage.swift \
+  Sources/KancerberoCore/Models/KBFilesystem.swift \
+  Sources/KancerberoCore/Collectors/DiskOperationPolicy.swift \
+  Tests/KancerberoTests/DiskOperationTests.swift \
+  -o /tmp/kancerbero-disk-operation-tests
+/tmp/kancerbero-disk-operation-tests
+```
+
+Covers mounted/unmounted volumes, partial APFS containers, excluded auxiliary
+roles, root and boot group protection (including a sealed root absent from the
+inventory), home filesystem protection, snapshots, partitions without a
+filesystem, ambiguous/unresolved eject targets, SMB/NFS, unsupported virtual
+filesystems, changed/disappeared targets, and stopping before eject when
+unmount fails. The app also compares device UUIDs, type, parent and size against
+fresh inventories before executing each step.
+
+Disposable image integration suite (never use a production device):
+
+```sh
+swiftc -module-cache-path /tmp/kancerbero-swift-cache \
+  Sources/KancerberoCore/Models/KBDiskModels.swift \
+  Sources/KancerberoCore/Models/KBDiskSpaceUsage.swift \
+  Sources/KancerberoCore/Models/KBFilesystem.swift \
+  Sources/KancerberoCore/Collectors/DiskOperationPolicy.swift \
+  Sources/KancerberoCore/Collectors/DiskOperationService.swift \
+  Tests/KancerberoTests/DiskOperationIntegrationTests.swift \
+  -o /tmp/kancerbero-disk-operation-integration
+hdiutil create -size 32m -fs HFS+ -volname KancerberoOperationTest /tmp/kancerbero-operation-test.dmg
+hdiutil attach -nomount /tmp/kancerbero-operation-test.dmg
+# Use the volume and whole-disk BSD IDs printed by attach, e.g.:
+/tmp/kancerbero-disk-operation-integration disk8s1 disk8
+```
+
+On 2026-11-09, the application built successfully and a disposable HFS+ image
+passed real Disk Arbitration mount, volume unmount, whole-disk unmount and eject.
+A disposable APFS image also passed, including resolution from the synthetic
+APFS volume to its physical image device. The simulated suite passed. Real external hardware, locked encryption,
+SMB/NFS servers, busy resources, permission denial and physical disconnects
+remain manual checks; they were not exercised against user devices.
+
+UI checks: open menus on a different row from the selection; verify Filesystems
+multi-row menus disable every operation; verify only one operation runs at a
+time, progress/error text identifies the action and target, both inventories
+refresh, vanished selections clear, and filtering/sorting survive refresh.
+
+Automated UI inspection could not complete: the native app controller timed out
+opening the Debug application. The menu interaction checks above remain manual.
