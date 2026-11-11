@@ -403,6 +403,17 @@ private func printDaemons(domain: KBDaemonDomain) {
     }
 }
 
+private func printFilesystems() {
+    let snapshot = FilesystemCollector.snapshot()
+    if let error = snapshot.error { fail(error) }
+    write("Filesystem\tType\tSize(bytes)\tUsed(bytes)\tAvailable(bytes)\tCapacity\tiused\tifree\t%iused\tMounted on\tStatus\n")
+    for row in snapshot.filesystems {
+        let inodePercent = row.inodePercent < 0 ? "—" : "\(Int(row.inodePercent))%"
+        let status = row.warning ?? (row.isCached ? "cached" : "live")
+        write("\(row.filesystem)\t\(row.type)\t\(row.sizeBytes)\t\(row.usedBytes)\t\(row.availableBytes)\t\(Int(row.capacityPercent))%\t\(row.usedInodes)\t\(row.freeInodes)\t\(inodePercent)\t\(row.mountPoint)\t\(status)\n")
+    }
+}
+
 private func printDiskVolumes() {
     let snapshot = DiskInventoryCollector().snapshot()
     write("disk inventory source=\(snapshot.source) roots=\(snapshot.items.count) error=\(snapshot.error ?? "-")\n")
@@ -687,6 +698,8 @@ case "disk":
     switch subcommand {
     case "volumes":
         printDiskVolumes()
+    case "filesystems":
+        printFilesystems()
     case "info":
         guard remainder.count >= 2 else {
             fail("usage: disk info <deviceIdentifier>")
@@ -704,7 +717,7 @@ case "disk":
                       top: integerOption("--top", default: 20),
                       includeHidden: remainder.contains("--hidden"))
     default:
-        fail("usage: disk <volumes|info <device>|apfs [device]|usage [device]|scan <path>>")
+        fail("usage: disk <volumes|filesystems|info <device>|apfs [device]|usage [device]|scan <path>>")
     }
 case "daemon-action":
     guard remainder.count >= 3,

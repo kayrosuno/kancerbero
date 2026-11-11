@@ -81,6 +81,26 @@ typedef struct {
 int kb_disk_media_list(kb_disk_media **out, size_t *count);
 void kb_disk_media_list_free(kb_disk_media *items);
 
+/* Mounted filesystems, independent of the physical disk hierarchy. */
+typedef struct {
+    char     filesystem[1024];
+    char     file_system[32];
+    char     mount_point[1024];
+    uint64_t size_bytes;
+    uint64_t used_bytes;
+    uint64_t available_bytes;
+    uint64_t inode_count;
+    uint64_t free_inodes;
+    int32_t  stats_error;         /* errno; cached statfs is retained on failure */
+    int32_t  used_space_error;    /* errno; block accounting is the fallback */
+    uint8_t  is_cached;           /* remote/autofs: never synchronously probe */
+    uint8_t  is_read_only;
+} kb_filesystem;
+
+/* Returns 0 on success, or errno. Caller owns the returned array. */
+int kb_filesystem_list(kb_filesystem **out, size_t *count);
+void kb_filesystem_list_free(kb_filesystem *items);
+
 #ifdef __cplusplus
 }
 #endif

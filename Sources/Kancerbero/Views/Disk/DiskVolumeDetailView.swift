@@ -102,7 +102,6 @@ struct DiskVolumeDetailView: View {
                     onAnalyze: onAnalyze,
                     stats: heroStats,
                     usageFraction: item.volumeUsedFraction,
-                    usageCaption: usageCaption,
                     availableHeight: chartHeight,
                     selectedFreeContainerID: $freeSelectionContainerID,
                     detailSelectionHidden: $hidesDetailSelection)
@@ -380,12 +379,6 @@ struct DiskVolumeDetailView: View {
                 title: "Used",
                 value: usedText)
         ]
-    }
-
-    private var usageCaption: String {
-        guard item.volumeUsedFraction != nil else { return "usage unknown" }
-        return item.kind == .apfsVolume || item.kind == .snapshot
-            ? "of container" : "of capacity"
     }
 
     /// Capacity context shown as the subtitle of the Capacity stat: who the

@@ -22,7 +22,6 @@ struct VolumeHierarchyChart: View {
     var onAnalyze: ((String) -> Void)? = nil
     var stats: [VolumeHierarchyStat] = []
     var usageFraction: Double? = nil
-    var usageCaption: String? = nil
     /// Height of the detail-card viewport. The chart and the bar are capped
     /// to it so the bar stays fully visible when the window shrinks.
     var availableHeight: CGFloat? = nil
@@ -44,16 +43,11 @@ struct VolumeHierarchyChart: View {
         let nodes = makeNodes(for: scope)
         let highlightID = highlightID(in: nodes)
 
-        // The bar and the treemap share the same height. When the detail card
-        // provides the space left under its header, both fill it so the
-        // treemap tiles grow with the window. The caption under the bar is
-        // reserved inside that height (20 pt caption + 5 pt spacing, see
-        // VerticalUsageBar).
-        let captionReserve: CGFloat = 25
+        // Match the bar to the visible treemap, excluding its bottom inset.
         let treemapHeight = availableHeight.map {
-            max(treemapMinimumHeight, $0 - captionReserve)
+            max(treemapMinimumHeight, $0)
         } ?? adaptiveTreemapHeight(for: nodes)
-        let trackHeight = treemapHeight
+        let trackHeight = max(0, treemapHeight - treemapTopInset - rootInset)
         HStack(alignment: .top, spacing: chartColumnSpacing) {
             heroInfo(trackHeight: trackHeight)
             treemap(nodes: nodes, scope: scope,
@@ -79,7 +73,7 @@ struct VolumeHierarchyChart: View {
 
     private var statsWidth: CGFloat { isMaximized ? 150 : 130 }
     private var heroSpacing: CGFloat { isMaximized ? 12 : 6 }
-    private var barWidth: CGFloat { isMaximized ? 72 : 64 }
+    private var barWidth: CGFloat { isMaximized ? 66 : 58 }
     private var columnSpacing: CGFloat { isMaximized ? 14 : 11 }
     private var statValueSize: CGFloat { isMaximized ? 24 : 20 }
 
@@ -91,7 +85,6 @@ struct VolumeHierarchyChart: View {
                 fraction: usageFraction,
                 tint: DiskPalette.tint(for: item.kind),
                 kindLabel: gaugeKindLabel(for: item.kind),
-                caption: usageCaption,
                 height: trackHeight,
                 width: barWidth,
                 isMaximized: isMaximized,
@@ -2244,7 +2237,6 @@ private struct VerticalUsageBar: View {
     let fraction: Double?
     let tint: Color
     let kindLabel: String?
-    let caption: String?
     let height: CGFloat
     let width: CGFloat
     let isMaximized: Bool
@@ -2262,13 +2254,8 @@ private struct VerticalUsageBar: View {
         fraction == nil ? "—" : KBFormat.percent(clamped)
     }
 
-    /// Two lines are reserved below the bar so a longer caption never
-    /// shifts or resizes the bar above it.
-    private var captionHeight: CGFloat { 20 }
-
     var body: some View {
-        VStack(spacing: 5) {
-            VolumeBarView(
+        VolumeBarView(
                 slices: slices,
                 width: width,
                 height: height,
@@ -2278,14 +2265,6 @@ private struct VerticalUsageBar: View {
                 fallbackItemID: fallbackItemID,
                 itemResolver: itemResolver,
                 onAnalyze: onAnalyze)
-
-            Text(caption ?? "")
-                .font(.system(size: 8))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .frame(width: width, height: captionHeight, alignment: .top)
-        }
         .frame(width: width)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(kindLabel.map { "\($0) blocks" }

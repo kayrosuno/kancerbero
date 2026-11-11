@@ -88,7 +88,7 @@ enum VolumeBarLayout {
     }
 }
 
-/// The vertical, 4/5-height volume bar of the Volumes hero. A dark glass rail
+/// The vertical volume bar of the Volumes hero. A dark glass rail
 /// holds the volume segments; the selected run gets a vivid gradient and a
 /// neon outline.
 struct VolumeBarView: View {
@@ -312,7 +312,7 @@ struct VolumeBarView: View {
         let font = Font.system(size: isMaximized ? 8.5 : 8,
                                weight: .semibold, design: .monospaced)
         var resolved = context.resolve(Text(label).font(font))
-        resolved.shading = .color(.white.opacity(0.92))
+        resolved.shading = .color(Color(white: 0.75))
         var labelContext = context
         labelContext.addFilter(.shadow(color: .black.opacity(0.55),
                                        radius: 1, x: 0, y: 0.5))
