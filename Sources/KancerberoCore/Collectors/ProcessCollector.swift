@@ -3,6 +3,7 @@ import Foundation
 public enum KBCollectionError: Error, LocalizedError, Sendable {
     case unavailable(String)
     case syscall(String, Int32)
+    case schemaMismatch(expected: Int, actual: Int)
 
     public var errorDescription: String? {
         switch self {
@@ -10,6 +11,8 @@ public enum KBCollectionError: Error, LocalizedError, Sendable {
             return message
         case .syscall(let name, let code):
             return "\(name) failed (errno \(code))"
+        case .schemaMismatch(let expected, let actual):
+            return "daemon schema \(actual) is incompatible with \(expected)"
         }
     }
 }
@@ -78,6 +81,7 @@ public enum ProcessCollector {
 
     public static func info(from raw: kb_process) -> KBProcessInfo {
         let hasTaskInfo = raw.has_task_info != 0
+        let hasRusage = raw.has_rusage != 0
         let runningThreads = Int(raw.running_threads)
         let usage: KBProcessUsage? = hasTaskInfo
             ? KBProcessUsage(
@@ -93,7 +97,15 @@ public enum ProcessCollector {
                 packageIdleWakeups: raw.pkg_idle_wkups,
                 diskBytesRead: raw.diskio_bytes_read,
                 diskBytesWritten: raw.diskio_bytes_written,
-                logicalWrites: raw.logical_writes)
+                logicalWrites: raw.logical_writes,
+                pageIns: raw.page_ins,
+                physFootprintBytes: hasRusage ? raw.phys_footprint : nil,
+                machSystemCalls: raw.mach_syscalls,
+                unixSystemCalls: raw.unix_syscalls,
+                machMessagesSent: raw.messages_sent,
+                machMessagesReceived: raw.messages_received,
+                contextSwitches: raw.context_switches,
+                faults: raw.faults)
             : nil
         let state: KBProcessState?
         if hasTaskInfo {
@@ -118,7 +130,8 @@ public enum ProcessCollector {
             path: KBInterop.string(raw.path),
             state: state,
             nice: raw.nice,
-            usage: usage
+            usage: usage,
+            processGroupID: raw.pgid > 0 ? raw.pgid : nil
         )
     }
 }

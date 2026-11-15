@@ -8,7 +8,7 @@ struct MemoryProcessTable: View {
 
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
-    @State private var inspected: KBProcessInfo?
+    @Environment(\.openWindow) private var openWindow
 
     private var selection: Binding<KBProcessKey?> {
         Binding(
@@ -50,7 +50,7 @@ struct MemoryProcessTable: View {
                     .frame(width: 220)
 
                 Button("Inspect Selected") {
-                    inspected = selectedRow?.process
+                    inspect(selectedRow?.process)
                 }
                 .disabled(selectedRow == nil)
 
@@ -79,27 +79,23 @@ struct MemoryProcessTable: View {
 
             Table(displayRows, selection: selection, sortOrder: sortOrder) {
                 commandColumn
+                pidColumn
+                userColumn
                 residentColumn
                 memoryColumn
                 threadsColumn
-                pidColumn
-                userColumn
             }
             .contextMenu(forSelectionType: KBProcessKey.self) { keys in
                 if let key = keys.first, let row = rows.first(where: { $0.id == key }) {
                     Button("Inspect \(row.commandText)") {
-                        inspected = row.process
+                        inspect(row.process)
                     }
                 }
             } primaryAction: { keys in
                 if let key = keys.first, let row = rows.first(where: { $0.id == key }) {
-                    inspected = row.process
+                    inspect(row.process)
                 }
             }
-        }
-        .sheet(item: $inspected) { process in
-            ProcessInspectorView(process: process)
-                .environment(model)
         }
         .onChange(of: rows.map(\.id), initial: true) { _, ids in
             if let pid = ui.memory.pendingSelectionPID {
@@ -175,6 +171,11 @@ struct MemoryProcessTable: View {
     private var selectedRow: CPUProcessRow? {
         guard let selection = ui.memory.selectedProcess else { return nil }
         return rows.first { $0.id == selection }
+    }
+
+    private func inspect(_ process: KBProcessInfo?) {
+        guard let process else { return }
+        openWindow(id: ProcessInspectorWindow.id, value: process.id)
     }
 
     private func memoryColor(_ value: Double?) -> Color {

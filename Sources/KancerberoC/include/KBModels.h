@@ -38,6 +38,17 @@ typedef struct {
     uint64_t diskio_bytes_read;
     uint64_t diskio_bytes_written;
     uint64_t logical_writes;
+    /* Added at the end so every caller still zero-fills a POD struct. */
+    int32_t pgid;              /* kinfo_proc.kp_eproc.e_pgid */
+    uint64_t page_ins;         /* cumulative page-ins, ri_pageins or pti_pageins */
+    uint64_t phys_footprint;   /* rusage_info_v6.ri_phys_footprint */
+    uint64_t mach_syscalls;    /* pti_syscalls_mach */
+    uint64_t unix_syscalls;    /* pti_syscalls_unix */
+    uint64_t messages_sent;    /* pti_messages_sent */
+    uint64_t messages_received; /* pti_messages_received */
+    uint64_t context_switches; /* pti_csw */
+    uint64_t faults;           /* pti_faults */
+    uint8_t has_rusage;        /* 0 when proc_pid_rusage is not readable */
 } kb_process;
 
 typedef struct {
@@ -90,6 +101,12 @@ typedef struct {
     uint64_t alloc_memory;         /* Alloc system memory */
     char name[128];                /* machdep.cpu.brand_string */
 } kb_gpu_stats;
+
+/* Cumulative GPU time per process, from IOAccelerator user client AppUsage. */
+typedef struct {
+    int32_t pid;
+    uint64_t gpu_time_ns;          /* summed accumulatedGPUTime */
+} kb_gpu_process;
 
 typedef struct {
     int32_t valid;

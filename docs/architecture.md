@@ -164,13 +164,26 @@
   barritas; en ventanas estrechas o Macs con más cores cae a la rejilla de filas con medidores
   rectangulares. Uptime; tarjeta
   de memoria/swap con segmentos Active/Wired/Compressed/Cached/Free y `CapacityBar`; tabla de
-  procesos `CPUProcessTable` (PID, USER, PRI/NI, VIRT, RES, S/THR, CPU%, MEM%, TIME+, Command)
-  ordenable, con búsqueda, selección persistida e inspector. `CPUProcessRow` añade claves de
+  procesos `CPUProcessTable` (Command, PID, USER, PRI/NI, VIRT, RES, S/THR, CPU%, MEM%, TIME+,
+  %GPU, GPU Time) ordenable, con búsqueda, selección persistida e inspector. `%GPU` y
+  `GPU Time` se leen del IORegistry (`IOAccelerator > AppUsage > accumulatedGPUTime`) por PID,
+  sin privilegios; `ProcessCPUTracker` calcula el delta sobre la ventana. `CPUProcessRow` añade claves de
   orden no opcionales para que los procesos sin task info queden al final. SwiftUI limita el
   `TableColumnBuilder` a 10 columnas, así que PRI/NI y S/THR se muestran combinadas.
 - `ProcessCollector`/`kb_process_list`: enumera con `sysctl(KERN_PROC_ALL)` (incluye PID 0 y
   procesos sin task info), enriquece con `PROC_PIDTASKALLINFO` y `rusage_info_v6` y nunca descarta
-  un proceso por falta de permisos. `AppModel` fusiona `ProcessCollector.metadataSnapshot()`
+  un proceso por falta de permisos. Además del task info copia `pgid` (de `kinfo_proc`, disponible
+  incluso en la ruta metadata), `pti_pageins`, `ri_phys_footprint` y los contadores de eventos
+  `pti_syscalls_mach`, `pti_syscalls_unix`, `pti_messages_sent/received`, `pti_csw` y `pti_faults`,
+  que alimentan el inspector.
+  El inspector es una ventana independiente por proceso (`WindowGroup(for: KBProcessKey.self)`,
+  una por PID + start time) con las pestañas **Statistics** —tres grupos visuales (Process, Memory
+  y System) con CPU, memoria (Real, Virtual, Private, Shared y Memory Footprint), llamadas
+  Mach/Unix, mensajes Mach, cambios de contexto, fallos y page ins— y **Open Files and Ports**.
+  Private/Shared se leen con `kb_task_vm_info_read` (`task_for_pid` + `TASK_VM_INFO`,
+  `internal`/`external`): mismo uid desde la app y otros usuarios vía daemon root; los procesos
+  protegidos por SIP muestran `—`. `AppModel` fusiona
+  `ProcessCollector.metadataSnapshot()`
   cuando el daemon reporta menos procesos que macOS y expone `daemonProcessesIncomplete`; System
   status muestra el aviso y la tabla marca “N restricted”. Con el daemon root actualizado los
   contadores e hilos están completos; sin root quedan restringidos.
@@ -273,6 +286,14 @@
   la ventana reincorpora flujos aún presentes en `lastActivityNanoseconds` y bajarla los descarta
   en el siguiente refresco; la caption/hint del tile se actualizan en vivo vía `@AppStorage`.
   Sparklines, hover, paneles de detalle, filtros/foco y LiveDot no se tocan.
+- Updates: `UpdaterModel` envuelve `SPUStandardUpdaterController` de **Sparkle 2.10.1** (SPM,
+  solo target Kancerbero). `KancerberoApp` lo inyecta en la UI y añade “Check for Updates…” tras
+  About; `SettingsView` muestra la sección Updates. `Info.plist` declara `SUFeedURL` (GitHub
+  Pages), `SUPublicEDKey`, `SURequireSignedFeed` y `SUVerifyUpdateBeforeExtraction`. En Debug el
+  updater no arranca salvo con `KANCERBERO_UPDATE_FEED`; `--screenshot` nunca lo arranca. Tras
+  reemplazar el bundle, Sparkle relanza la app: `AppModel` reinicia el daemon si
+  `daemonVersion`/`daemonBuild` del handshake no coinciden, y `FilterModel` reenvía la activación
+  de la extensión si el `CFBundleVersion` staged es viejo. Runbook: `docs/updates.md`.
 - Disk → Volumes mantiene `expanded`, `volumesFocus`, `volumeColumnWidths` y
   `volumesSplitFraction` en `UIState`. La
   expansión inicial se hace una sola vez (`didExpandVolumesOnce`); los refrescos de inventario solo
@@ -336,6 +357,9 @@
      `tcpsi_state`) o `pri_in` para UDP.
    - `PROC_PIDFDVNODEPATHINFO` para rutas y tamaño de ficheros.
    - `proc_pidfdinfo` exige mismo uid salvo root: el daemon root es necesario para otros usuarios.
+   - La pestaña **Open Files and Ports** fusiona por `fd` los descriptores de `PROC_PIDLISTFDS` con
+     la información de socket (`protocolLabel`, endpoints y estado). `Ports` en Statistics es el
+     número de sockets abiertos, el equivalente público más cercano al contador de AM.
 
 ## Daemons
 

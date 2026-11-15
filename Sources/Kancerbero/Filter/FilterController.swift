@@ -254,12 +254,17 @@ final class FilterController: NSObject {
         filterLog.notice("system extension requires user approval")
     }
 
+    /// True when macOS staged a newer extension but will only run it after a
+    /// reboot.
+    private(set) var requiresReboot = false
+
     fileprivate func handleFinished(_ result: OSSystemExtensionRequest.Result) {
         requests.removeAll()
         activationPending = false
         isActivating = false
         switch result {
         case .completed:
+            requiresReboot = false
             if enableAfterActivation {
                 enableAfterActivation = false
                 Task { await enable() }
@@ -268,6 +273,7 @@ final class FilterController: NSObject {
             }
         case .willCompleteAfterReboot:
             enableAfterActivation = false
+            requiresReboot = true
             state = .requiresApproval
             lastError = "The filter extension will be active after the next reboot."
         @unknown default:

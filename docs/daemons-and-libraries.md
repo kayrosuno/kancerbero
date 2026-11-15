@@ -89,8 +89,10 @@ extension usa un Mach service distinto y es independiente del daemon.
 | Deployment target | macOS 15.6 |
 | Firma | Debug ad-hoc; Release Developer ID + hardened runtime + timestamp, sin entitlements, identificador `-i uno.kayros.kancerbero` |
 
-`main.swift` exige el argumento `--daemon`. Sin él imprime la versión, la versión del core y el
-`euid`, y sale con código 0; es la forma de comprobar qué binario se va a ejecutar.
+`main.swift` exige el argumento `--daemon`. Sin él imprime la versión, el build, la versión del
+core y el `euid`, y sale con código 0; es la forma de comprobar qué binario se va a ejecutar. La
+versión y el build son constantes compiladas (macros de `Config/Version.xcconfig`), de modo que un
+proceso viejo sigue reportando lo que se compiló, no lo que hay ahora en el bundle.
 
 ### Dónde se instala y se ejecuta
 
@@ -164,6 +166,11 @@ El plist de `SMAppService` contiene:
    Al invalidarse la conexión se cancela la tarea de suscripción y se suelta el cliente.
 4. `KeepAlive.SuccessfulExit = false` y `ThrottleInterval = 5` relanzan el helper si falla.
 5. Desregistrar el servicio o desinstalar la app lo detiene; la app vuelve al modo local.
+6. Tras una actualización de Sparkle, la app compara `daemonVersion`/`daemonBuild` del handshake
+   con los suyos. Si el daemon viejo sigue respondiendo, envía el `daemonAction .stop` existente:
+   launchd mata el job y lo relanza desde el binario nuevo del bundle. Si el stop falla, cae a
+   `repairDaemonService()` (unregister/register). Es el único camino que no depende de callbacks
+   de Sparkle, que no cubren todos los escenarios de instalación.
 
 ### Funciones y uso
 
@@ -171,7 +178,7 @@ El plist de `SMAppService` contiene:
 
 | Mensaje | Contenido | Efecto |
 |---|---|---|
-| `handshake` | `KBHelloRequest` (`appVersion`, `schemaVersion`) | Responde `KBHelloResponse` con versión del daemon, del core y capacidades |
+| `handshake` | `KBHelloRequest` (`appVersion`, `appBuild`, `schemaVersion`) | Responde `KBHelloResponse` con versión/build del daemon, del core y capacidades |
 | `subscribe` | `KBSubscription` (`interval`, `topics`) | Arranca el push periódico de snapshots; intervalo efectivo limitado a 0.5–10 s |
 | `request` | `KBRequestMessage` | Petición puntual; ver tipos abajo |
 | `unsubscribe` | — | Cancela la tarea de push |
@@ -339,6 +346,11 @@ sandboxeada debe empezar por uno de sus App Groups; no se usa para compartir est
 4. Reglas y decisiones recordadas se persisten en `rules.plist` dentro del container sandbox de
    la extensión (`Application Support/KancerberoFilter/rules.plist`), así que siguen aplicándose
    tras un reinicio sin la app. Los flujos y el historial viven solo en memoria.
+5. Tras una actualización de la app, `CFBundleVersion` del filtro sube en cada release y
+   `FilterModel.start()` reenvía la activation request si el filtro está habilitado; sysextd
+   responde `.replace` y staged la copia nueva. Si macOS responde `willCompleteAfterReboot`, la
+   UI avisa de que el filtro se activará tras reiniciar. El ACK del filtro lleva el build (no la
+   versión de marketing) para que la app detecte una extensión staged obsoleta.
 
 ### Funciones y uso
 

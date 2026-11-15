@@ -21,9 +21,25 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>SUFeedURL</key>
+	<string>https://kayrosuno.github.io/kancerbero/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>xfQbkGYIvoax6VF89Rwz+sQ5tPmW8labaux5hoHJvlc=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
+	<key>SUAllowsAutomaticUpdates</key>
+	<true/>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
+	<key>SURequireSignedFeed</key>
+	<true/>
 	<key>KBFilterMachService</key>
 	<string>group.uno.kayros.kancerbero.filter</string>
 	<key>LSApplicationCategoryType</key>

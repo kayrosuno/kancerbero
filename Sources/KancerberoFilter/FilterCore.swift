@@ -223,7 +223,7 @@ final class FilterCore: NSObject, @unchecked Sendable, KancerberoFilterXPC {
             switch envelope.kind {
             case .hello:
                 return FilterCodec.envelope(.helloAck,
-                                            value: FilterAck(ok: true, message: FilterVersion.current))
+                                            value: FilterAck(ok: true, message: FilterVersion.build))
             case .setRules:
                 let snapshot = try FilterCodec.decodePayload(FilterRuleSnapshot.self, from: envelope)
                 rules = snapshot.rules
@@ -241,10 +241,11 @@ final class FilterCore: NSObject, @unchecked Sendable, KancerberoFilterXPC {
                     dropAllPausedLocked(reason: "block all")
                 }
                 flushLocked(resolved: dropped)
-                // The message lets the app detect a stale extension build: pre
-                // 0.2.0 replies with no message at all.
+                // The message lets the app detect a stale extension build. Old
+                // extensions report their marketing version (or nothing), so a
+                // build-number mismatch means the staged copy is outdated.
                 return FilterCodec.envelope(.setRulesAck,
-                                            value: FilterAck(ok: true, message: FilterVersion.current))
+                                            value: FilterAck(ok: true, message: FilterVersion.build))
             case .decide:
                 let message = try FilterCodec.decodePayload(FilterDecisionMessage.self, from: envelope)
                 applyDecisionLocked(message)

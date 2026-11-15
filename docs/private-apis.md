@@ -12,6 +12,7 @@ Mach-O universal arm64e, sha256 `70593b6e60f57767255a1bca5d9c5da09abb9f410a2cb04
 | Totales de interfaz | `sysctl {CTL_NET, PF_ROUTE, 0, 0, NET_RT_IFLIST2, 0}`; `RTM_IFINFO2`; `if_indextoname` | `-[SMStatisticsManager processSystemSysmonTable:]` 0x100012398; MIB en 0x10005ab18 |
 | (kancerbero) contadores de interfaz | `net.link.generic.system.ifcount` + `IFMIB_IFDATA`/`IFDATA_GENERAL` (`ifmibdata.if_data64`) | En macOS 27, `NET_RT_IFLIST2` devuelve `ifi_ibytes` truncado a 32 bits; IFMIB coincide con `netstat` |
 | Lista de procesos | `libsysmon` privado | imports `_sysmon_*` |
+| `% GPU` / GPU Time por proceso | IORegistry `IOAccelerator` → user clients → `IOUserClientCreator` + `AppUsage[].accumulatedGPUTime` (ns); `% GPU` = delta / ventana | Cadena `accumulatedGPUTime` en el binario; `_gpuUsedSeconds`, `_gpuUsedSecondsDelta`, `_gpuPercentUtilization`, `_pidsActivelyUsingGPU`, `_gpuTotalUsedSeconds`, `_totalNanoSeconds`; títulos `% GPU` y `GPU Time` |
 | Open Files and Ports | `/usr/sbin/lsof -Fn <pid>` local o vía helper XPC root | `-[SMProcessInspector _listOpenFiles]` 0x10002d63c; `listOpenFilesWithProcessID:taskID:result:` 0x100001428 |
 | Privilegios | Entitlements privados + helper `_RoleAccount=root` + AuthorizationServices | `codesign -d --entitlements`; Info.plist del helper |
 
@@ -114,7 +115,51 @@ inspeccionaron `_CPUMeterCommonDraw`, `_CPUMeter_updateValues`, `_Platform_setCP
   sin daemon root solo enumera el uid actual; con el daemon root obtiene task info de todos.
 - `PROC_PIDTASKALLINFO`, `PROC_PIDTBSDINFO`, `host_processor_info`, `host_statistics64`,
   `sysctlbyname` y `getloadavg` son APIs públicas del SDK; no se usan símbolos privados de
-  `libsysmon` ni `task_for_pid`.
+  `libsysmon`.
+- Private/Shared Memory del inspector usan `task_for_pid` + `task_info(TASK_VM_INFO)` (Mach
+  público) para leer `internal`/`external`. `task_for_pid` funciona sin entitlements para procesos
+  del mismo uid (verificado en macOS 27) y el daemon root cubre otros usuarios; los procesos
+  protegidos por SIP pueden denegarlo y se muestra `—`.
+
+## GPU por proceso (pestaña CPU)
+
+Activity Monitor publica `% GPU` y `GPU Time` por proceso desde el IORegistry;
+`rusage_info_v6` no tiene tiempo de GPU. La ruta es:
+
+1. `IOServiceGetMatchingServices("IOAccelerator")` devuelve el acelerador
+   (`AGXAcceleratorG13X` en Apple Silicon; `IntelAccelerator`/AMD en Intel). Sus hijos son user
+   clients (`AGXDeviceUserClient`, `IOAccelContext…`) que **no** están registrados como
+   servicios: hay que recorrer el subárbol con
+   `IORegistryEntryCreateIterator(..., kIOServicePlane, kIORegistryIterateRecursively, ...)`.
+2. Cada user client expone:
+   - `IOUserClientCreator` = `"pid 619, WindowServer"`, el PID dueño del client.
+   - `AppUsage` = CFArray de CFDictionary con `API = "Metal"`, `lastSubmittedTime` y
+     `accumulatedGPUTime` en **nanosegundos**, acumulado por client.
+3. Un proceso puede tener varios user clients y varios elementos en `AppUsage` (WindowServer,
+   por ejemplo, tiene dos clients y seis entradas). kancerbero suma todos los valores del mismo
+   PID y deduplica por `IORegistryEntryGetRegistryEntryID` por si el mismo client se alcanza
+   desde dos raíces.
+4. `% GPU` = `Δ accumulatedGPUTime / Δ ventana × 100`, limitado a 100% (Activity Monitor
+   muestra 100% cuando la GPU está ocupada toda la ventana). `GPU Time` es el acumulado del
+   client, con el mismo formato htop que `TIME+`.
+5. Todo se lee sin privilegios: no hace falta el daemon root ni `powermetrics`
+   (`powermetrics --show-process-gpu` también da tiempos por proceso, pero exige root y lanza un
+   proceso). Si el hardware/OS no publica `AppUsage` (Intel antiguos, VMs), la función C devuelve
+   `-1` y las columnas muestran `—`.
+
+Evidencia en el binario de Activity Monitor: cadena `accumulatedGPUTime`, símbolos
+`_gpuUsedSeconds`, `_gpuUsedSecondsDelta`, `_gpuPercentUtilization`, `_pidsActivelyUsingGPU`,
+`_gpuTotalUsedSeconds` y `_totalNanoSeconds`, y los títulos localizados `% GPU` / `GPU Time`.
+Verificado con `ioreg -r -d 2 -c IOAccelerator -l -w 0` y con una consulta Swift/IOKit
+equivalente en macOS 27 (68 user clients, 67 PIDs distintos).
+
+Limitaciones verificadas:
+
+- El acumulado pertenece al client: si el proceso libera su último client de GPU, su `GPU Time`
+  puede bajar a 0. Es fiel a la fuente y a Activity Monitor.
+- Solo se contabiliza trabajo que pasa por user clients de `IOAccelerator` (Metal); otras vías
+  no aparecen, igual que en Activity Monitor.
+- Con varias GPUs se suman los tiempos y el porcentaje se limita a 100%.
 
 ## Temperaturas CPU (IOHID)
 

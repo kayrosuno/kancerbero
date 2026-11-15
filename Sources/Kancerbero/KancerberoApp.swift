@@ -1,4 +1,5 @@
 import SwiftUI
+import KancerberoCore
 
 @main
 struct KancerberoApp: App {
@@ -8,6 +9,7 @@ struct KancerberoApp: App {
     @State private var ui = UIState()
     @State private var filter = FilterModel()
     @State private var dockIcon = DockIconController()
+    @State private var updater = UpdaterModel()
     @AppStorage(KBPreferences.dockIconStyleKey)
     private var dockIconStyle = KBPreferences.dockIconStyleDefault
 
@@ -23,6 +25,7 @@ struct KancerberoApp: App {
                 .environment(applications)
                 .environment(ui)
                 .environment(filter)
+                .environment(updater)
                 .task {
                     if CommandLine.arguments.contains("--register-service") {
                         await model.registerDaemonService()
@@ -42,6 +45,13 @@ struct KancerberoApp: App {
         .windowResizability(.contentMinSize)
         .commands {
             SidebarCommands()
+
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") {
+                    updater.checkForUpdates()
+                }
+                .disabled(!updater.isEnabled || !updater.canCheckForUpdates)
+            }
 
             CommandMenu("Sections") {
                 ForEach(AppSection.allCases) { section in
@@ -134,8 +144,20 @@ struct KancerberoApp: App {
         .windowResizability(.contentMinSize)
         .restorationBehavior(.disabled)
 
+        WindowGroup("Process Inspector", id: ProcessInspectorWindow.id,
+                    for: KBProcessKey.self) { $key in
+            ProcessInspectorWindowView(key: key)
+                .environment(model)
+        }
+        .defaultSize(width: 1040, height: 660)
+        .windowResizability(.contentMinSize)
+        .restorationBehavior(.disabled)
+
         Settings {
             SettingsView()
+                .environment(model)
+                .environment(filter)
+                .environment(updater)
         }
     }
 }

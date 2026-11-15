@@ -54,6 +54,19 @@ final class FilterModel {
         blockAllNewConnections && filterHealth == .running && !extensionIsCurrent
     }
 
+    /// True when the staged extension is older than the app's bundled one.
+    var extensionNeedsUpdate: Bool {
+        !extensionIsCurrent && filterHealth == .running
+    }
+
+    /// True when macOS accepted the new extension but will only run it after a
+    /// reboot.
+    var extensionRequiresReboot: Bool { controller.requiresReboot }
+
+    func updateExtension() {
+        controller.ensureInstalled()
+    }
+
     var watchedCount: Int { rules.count }
 
     func start() {
@@ -329,8 +342,9 @@ final class FilterModel {
               let envelope = try? FilterCodec.decodeEnvelope(reply),
               let ack = try? FilterCodec.decodePayload(FilterAck.self, from: envelope),
               ack.ok else { return }
-        // Pre-0.2.0 extensions acknowledge without a message.
-        extensionIsCurrent = ack.message == FilterVersion.current
+        // Old extensions acknowledge with their marketing version (or nothing);
+        // the build number is what identifies the staged extension.
+        extensionIsCurrent = ack.message == FilterVersion.build
     }
 
     // MARK: - Applying extension state

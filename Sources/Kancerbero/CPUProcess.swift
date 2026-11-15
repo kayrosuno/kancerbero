@@ -11,9 +11,13 @@ struct CPUProcessRow: Identifiable, Hashable {
 
     var cpuPercent: Double? { process.usage?.cpuPercent }
     var memoryPercent: Double? { process.usage?.memoryPercent }
+    var gpuPercent: Double? { process.usage?.gpuPercent }
+    var gpuTimeNanoseconds: UInt64? { process.usage?.gpuTimeNanoseconds }
 
     var cpuSortValue: Double { cpuPercent ?? -1 }
     var memorySortValue: Double { memoryPercent ?? -1 }
+    var gpuSortValue: Double { gpuPercent ?? -1 }
+    var gpuTimeSortValue: UInt64 { gpuTimeNanoseconds ?? 0 }
     var residentSortValue: UInt64 { process.usage?.residentBytes ?? 0 }
     var virtualSortValue: UInt64 { process.usage?.virtualBytes ?? 0 }
     var prioritySortValue: Int32 { process.usage?.priority ?? Int32.max }
@@ -70,6 +74,16 @@ struct CPUProcessRow: Identifiable, Hashable {
     var memoryText: String {
         guard let memoryPercent else { return "—" }
         return String(format: "%.1f%%", memoryPercent)
+    }
+
+    var gpuText: String {
+        guard let gpuPercent else { return "—" }
+        return String(format: "%.1f%%", gpuPercent)
+    }
+
+    var gpuTimeText: String {
+        guard let gpuTimeNanoseconds else { return "—" }
+        return KBFormat.cpuDuration(gpuTimeNanoseconds)
     }
 
     var energyText: String {

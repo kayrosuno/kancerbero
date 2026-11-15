@@ -20,3 +20,5 @@ GCC_WARN_UNUSED_FUNCTION = YES
 // Optional local signing overrides (Developer ID identities and provisioning
 // profile names). The file is git-ignored; see Signing.local.xcconfig.example.
 #include? "Signing.local.xcconfig"
+
+#include "Version.xcconfig"

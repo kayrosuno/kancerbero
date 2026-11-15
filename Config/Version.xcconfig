@@ -1,0 +1,7 @@
+// Single source of truth for the app, daemon and filter versions.
+// Bump with scripts/set-version.sh; do not edit by hand.
+// MARKETING_VERSION must be semver; CURRENT_PROJECT_VERSION must be a strictly
+// increasing integer (Sparkle compares it and sysextd uses it to stage a new
+// system extension).
+KANCERBERO_MARKETING_VERSION = 0.1.1
+KANCERBERO_BUILD_VERSION = 2026111601

@@ -10,6 +10,8 @@ extern "C" {
 #endif
 
 const char *kb_version(void);
+/* Compile-time build number (CFBundleVersion equivalent). */
+const char *kb_build_version(void);
 
 /* NetworkStatistics.framework (private), loaded with dlopen. */
 int kb_nstat_open(void);
@@ -57,6 +59,12 @@ int kb_host_stats_read(kb_host_stats *out);
 int kb_memory_pressure_read(int32_t *percent, int32_t *level);
 /* GPU utilisation and memory from IOAccelerator PerformanceStatistics. */
 int kb_gpu_stats_read(kb_gpu_stats *out);
+/* Per-process cumulative GPU time from IOAccelerator AppUsage.
+   Returns 0 on success (count may be 0), -1 when IOAccelerator or the
+   per-process AppUsage property is unavailable. Caller frees items with
+   kb_gpu_process_list_free. */
+int kb_gpu_process_list(kb_gpu_process **out, size_t *count);
+void kb_gpu_process_list_free(kb_gpu_process *items);
 /* Battery charge, time remaining and power source. */
 int kb_power_stats_read(kb_power_stats *out);
 /* CPU package and per-core temperatures through the private IOHID event
@@ -81,6 +89,22 @@ int kb_process_energy_read(int32_t pid, uint64_t *energy_nj,
 /* Per-process disk counters from rusage_info_v6. */
 int kb_process_io_read(int32_t pid, uint64_t *bytes_read,
                        uint64_t *bytes_written, uint64_t *logical_writes);
+/* Per-process cumulative task counters from PROC_PIDTASKALLINFO. */
+int kb_process_counters_read(int32_t pid,
+                             uint64_t *mach_syscalls,
+                             uint64_t *unix_syscalls,
+                             uint64_t *messages_sent,
+                             uint64_t *messages_received,
+                             uint64_t *context_switches,
+                             uint64_t *faults,
+                             uint64_t *page_ins);
+/* Private/shared resident memory from task_info(TASK_VM_INFO). Needs a task
+   port: same-uid processes work unprivileged; other users need the root
+   daemon, and SIP-protected processes may still deny it. */
+int kb_task_vm_info_read(int32_t pid,
+                         uint64_t *private_bytes,
+                         uint64_t *shared_bytes,
+                         uint64_t *phys_footprint);
 /* PIDs holding an active PreventUserIdleSystemSleep/PreventSystemSleep
    assertion. Caller frees `pids` with free(). */
 int kb_prevent_sleep_pids(int32_t **pids, size_t *count);

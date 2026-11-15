@@ -113,6 +113,52 @@ EXT="$APP/Contents/Library/SystemExtensions/uno.kayros.kancerbero.filter.systeme
 DAEMON="$APP/Contents/Library/LaunchDaemons/KancerberoDaemon"
 PRODUCT_DAEMON="$ROOT/build/Build/Products/Release/KancerberoDaemon"
 
+VERSION="$(awk -F' *= *' '$1 == "KANCERBERO_MARKETING_VERSION" { print $2 }' Config/Version.xcconfig)"
+BUILD="$(awk -F' *= *' '$1 == "KANCERBERO_BUILD_VERSION" { print $2 }' Config/Version.xcconfig)"
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+    echo "Config/Version.xcconfig has an invalid marketing version" >&2
+    exit 1
+}
+[[ "$BUILD" =~ ^[0-9]+$ ]] || {
+    echo "Config/Version.xcconfig has an invalid build number" >&2
+    exit 1
+}
+if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+    echo "tag v$VERSION already exists" >&2
+    exit 1
+fi
+
+app_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
+app_build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")"
+filter_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$EXT/Contents/Info.plist")"
+filter_build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$EXT/Contents/Info.plist")"
+if [[ "$app_version" != "$VERSION" || "$app_build" != "$BUILD" ]]; then
+    echo "app version is $app_version ($app_build), expected $VERSION ($BUILD)" >&2
+    exit 1
+fi
+if [[ "$filter_version" != "$VERSION" || "$filter_build" != "$BUILD" ]]; then
+    echo "filter version is $filter_version ($filter_build), expected $VERSION ($BUILD)" >&2
+    exit 1
+fi
+# The daemon prints its compile-time version when it is not launched with
+# --daemon. Both strings must come from Config/Version.xcconfig.
+daemon_version="$("$PRODUCT_DAEMON" 2>&1 | head -1 || true)"
+if [[ "$daemon_version" != *"$VERSION"* || "$daemon_version" != *"$BUILD"* ]]; then
+    echo "daemon reports '${daemon_version:-<no output>}', expected $VERSION (build $BUILD)" >&2
+    exit 1
+fi
+
+pubkey="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$APP/Contents/Info.plist" 2>/dev/null || true)"
+if [[ ${#pubkey} -ne 44 || "$pubkey" == *"REPLACE"* ]]; then
+    echo "SUPublicEDKey is missing or not a 44-character EdDSA key" >&2
+    exit 1
+fi
+feed="$(/usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$APP/Contents/Info.plist" 2>/dev/null || true)"
+if [[ "$feed" != https://* ]]; then
+    echo "SUFeedURL must be an HTTPS URL (got '${feed:-<unset>}')" >&2
+    exit 1
+fi
+
 codesign --verify --deep --strict --verbose=2 "$APP"
 
 signature_info() { codesign -dvvv "$1" 2>&1 || true; }

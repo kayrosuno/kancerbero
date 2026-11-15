@@ -164,6 +164,9 @@ public struct ProcessCPUTracker {
         var wakeups: UInt64
         var diskRead: UInt64
         var diskWrite: UInt64
+        /// Nil when the GPU source was unavailable this tick; keeping the
+        /// baseline empty avoids a bogus spike when it comes back.
+        var gpuTime: UInt64?
     }
 
     private var previous: [KBProcessKey: Counters] = [:]
@@ -174,7 +177,8 @@ public struct ProcessCPUTracker {
                                   elapsed: Double,
                                   totalMemoryBytes: UInt64,
                                   coreCount: Int,
-                                  cadence: Double? = nil) {
+                                  cadence: Double? = nil,
+                                  gpuTimes: [Int32: UInt64]? = nil) {
         // `CollectionActor` ya pasa `elapsed: 0` cuando la ventana no vale; se
         // repite el criterio para las llamadas directas (KancerberoProbe).
         let validInterval = RateTiming.isValidGap(elapsed, cadence: cadence)
@@ -190,9 +194,11 @@ public struct ProcessCPUTracker {
             let wakeups = (usage.interruptWakeups ?? 0) &+ (usage.packageIdleWakeups ?? 0)
             let diskRead = usage.diskBytesRead ?? 0
             let diskWrite = usage.diskBytesWritten ?? 0
+            let gpuTime = gpuTimes.map { $0[processes[index].pid] ?? 0 }
             baseline[key] = Counters(cpuTime: current, energy: energy,
                                      wakeups: wakeups,
-                                     diskRead: diskRead, diskWrite: diskWrite)
+                                     diskRead: diskRead, diskWrite: diskWrite,
+                                     gpuTime: gpuTime)
 
             if let prior = previous[key], validInterval {
                 if current >= prior.cpuTime {
@@ -219,6 +225,19 @@ public struct ProcessCPUTracker {
                 usage.wakeupsPerSecond = 0
                 usage.diskBytesReadPerSecond = 0
                 usage.diskBytesWrittenPerSecond = 0
+            }
+
+            if let gpuTime {
+                usage.gpuTimeNanoseconds = gpuTime
+                if validInterval, let priorGPU = previous[key]?.gpuTime {
+                    usage.gpuPercent = ProcessGPURate.percent(
+                        current: gpuTime, previous: priorGPU, elapsed: elapsed)
+                } else {
+                    usage.gpuPercent = 0
+                }
+            } else {
+                usage.gpuTimeNanoseconds = nil
+                usage.gpuPercent = nil
             }
 
             if totalMemoryBytes > 0 {
@@ -344,5 +363,86 @@ public enum ProcessIOReader {
             return nil
         }
         return (read, written, writes)
+    }
+}
+
+/// Per-process cumulative GPU time from IOAccelerator AppUsage. Readable
+/// without privileges. Returns `nil` when the source is unavailable and an
+/// empty dictionary when it exists but no process is using the GPU.
+public enum ProcessGPUUsageReader {
+    public static func current() -> [Int32: UInt64]? {
+        var pointer: UnsafeMutablePointer<kb_gpu_process>?
+        var count = 0
+        guard kb_gpu_process_list(&pointer, &count) == 0 else {
+            return nil
+        }
+        defer { if let pointer { kb_gpu_process_list_free(pointer) } }
+        guard let pointer, count > 0 else { return [:] }
+        var result: [Int32: UInt64] = [:]
+        result.reserveCapacity(count)
+        for index in 0..<count {
+            result[pointer[index].pid] = pointer[index].gpu_time_ns
+        }
+        return result
+    }
+}
+
+/// Per-process cumulative task counters from PROC_PIDTASKALLINFO. Used as a
+/// local fallback so the inspector still shows Mach/Unix counters when it is
+/// connected to a daemon built before those fields existed.
+public enum ProcessCountersReader {
+    public struct Counters: Sendable {
+        public var machSystemCalls: UInt64
+        public var unixSystemCalls: UInt64
+        public var machMessagesSent: UInt64
+        public var machMessagesReceived: UInt64
+        public var contextSwitches: UInt64
+        public var faults: UInt64
+        public var pageIns: UInt64
+    }
+
+    public static func current(pid: Int32) -> Counters? {
+        var mach: UInt64 = 0
+        var unix: UInt64 = 0
+        var sent: UInt64 = 0
+        var received: UInt64 = 0
+        var switches: UInt64 = 0
+        var faults: UInt64 = 0
+        var pageIns: UInt64 = 0
+        guard kb_process_counters_read(pid, &mach, &unix, &sent, &received,
+                                       &switches, &faults, &pageIns) == 0 else {
+            return nil
+        }
+        return Counters(machSystemCalls: mach,
+                        unixSystemCalls: unix,
+                        machMessagesSent: sent,
+                        machMessagesReceived: received,
+                        contextSwitches: switches,
+                        faults: faults,
+                        pageIns: pageIns)
+    }
+}
+
+/// Per-process private/shared resident memory from task_info(TASK_VM_INFO).
+/// Same-uid processes work unprivileged; other users need the root daemon, and
+/// SIP-protected processes may still deny the task port.
+public enum ProcessVMInfoReader {
+    public struct VMInfo: Sendable {
+        public var privateBytes: UInt64
+        public var sharedBytes: UInt64
+        public var footprintBytes: UInt64
+    }
+
+    public static func current(pid: Int32) -> VMInfo? {
+        var privateBytes: UInt64 = 0
+        var sharedBytes: UInt64 = 0
+        var footprint: UInt64 = 0
+        guard kb_task_vm_info_read(pid, &privateBytes, &sharedBytes,
+                                   &footprint) == 0 else {
+            return nil
+        }
+        return VMInfo(privateBytes: privateBytes,
+                      sharedBytes: sharedBytes,
+                      footprintBytes: footprint)
     }
 }

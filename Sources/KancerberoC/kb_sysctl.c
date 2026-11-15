@@ -221,6 +221,250 @@ int kb_gpu_stats_read(kb_gpu_stats *out)
     return out->valid ? 0 : -1;
 }
 
+/*
+ * Per-process GPU time lives on the IOAccelerator user clients (for example
+ * AGXDeviceUserClient): IOUserClientCreator holds "pid N, name" and AppUsage
+ * is an array of dictionaries with a cumulative accumulatedGPUTime in
+ * nanoseconds. These entries are not registered services, so a direct
+ * IOServiceMatching does not find them; the accelerator subtree must be
+ * walked with IORegistryEntryCreateIterator. Readable without privileges.
+ */
+typedef struct {
+    kb_gpu_process *items;
+    size_t count;
+    size_t capacity;
+} kb_gpu_accumulator;
+
+static uint64_t kb_gpu_saturating_add(uint64_t a, uint64_t b)
+{
+    return a > UINT64_MAX - b ? UINT64_MAX : a + b;
+}
+
+static int32_t kb_gpu_pid_from_creator(CFTypeRef value)
+{
+    if (!value || CFGetTypeID(value) != CFStringGetTypeID()) {
+        return 0;
+    }
+    CFStringRef string = (CFStringRef)value;
+    CFIndex length = CFStringGetLength(string);
+    if (length < 5) {
+        return 0;
+    }
+    if (CFStringGetCharacterAtIndex(string, 0) != 'p'
+        || CFStringGetCharacterAtIndex(string, 1) != 'i'
+        || CFStringGetCharacterAtIndex(string, 2) != 'd'
+        || CFStringGetCharacterAtIndex(string, 3) != ' ') {
+        return 0;
+    }
+    int64_t pid = 0;
+    int digits = 0;
+    for (CFIndex index = 4; index < length; index++) {
+        UniChar character = CFStringGetCharacterAtIndex(string, index);
+        if (character < '0' || character > '9') {
+            break;
+        }
+        if (pid > (INT32_MAX - (character - '0')) / 10) {
+            return 0;
+        }
+        pid = pid * 10 + (character - '0');
+        digits++;
+    }
+    if (digits == 0 || pid <= 0 || pid > INT32_MAX) {
+        return 0;
+    }
+    return (int32_t)pid;
+}
+
+static uint64_t kb_gpu_app_usage_sum(CFTypeRef usage)
+{
+    if (!usage) {
+        return 0;
+    }
+    uint64_t total = 0;
+    CFTypeID type = CFGetTypeID(usage);
+    if (type == CFArrayGetTypeID()) {
+        CFArrayRef entries = (CFArrayRef)usage;
+        CFIndex count = CFArrayGetCount(entries);
+        for (CFIndex index = 0; index < count; index++) {
+            CFTypeRef item = CFArrayGetValueAtIndex(entries, index);
+            if (item && CFGetTypeID(item) == CFDictionaryGetTypeID()) {
+                total = kb_gpu_saturating_add(
+                    total, kb_cf_u64((CFDictionaryRef)item,
+                                     CFSTR("accumulatedGPUTime")));
+            }
+        }
+    } else if (type == CFDictionaryGetTypeID()) {
+        total = kb_cf_u64((CFDictionaryRef)usage, CFSTR("accumulatedGPUTime"));
+    }
+    return total;
+}
+
+static int kb_gpu_accumulator_add(kb_gpu_accumulator *accumulator, int32_t pid,
+                                  uint64_t nanoseconds)
+{
+    if (nanoseconds == 0) {
+        return 0;
+    }
+    for (size_t index = 0; index < accumulator->count; index++) {
+        if (accumulator->items[index].pid == pid) {
+            accumulator->items[index].gpu_time_ns = kb_gpu_saturating_add(
+                accumulator->items[index].gpu_time_ns, nanoseconds);
+            return 0;
+        }
+    }
+    if (accumulator->count == accumulator->capacity) {
+        size_t capacity = accumulator->capacity == 0
+            ? 32 : accumulator->capacity * 2;
+        if (capacity < accumulator->capacity
+            || capacity > SIZE_MAX / sizeof(kb_gpu_process)) {
+            return -1;
+        }
+        kb_gpu_process *items = realloc(
+            accumulator->items, capacity * sizeof(kb_gpu_process));
+        if (!items) {
+            return -1;
+        }
+        accumulator->items = items;
+        accumulator->capacity = capacity;
+    }
+    accumulator->items[accumulator->count].pid = pid;
+    accumulator->items[accumulator->count].gpu_time_ns = nanoseconds;
+    accumulator->count++;
+    return 0;
+}
+
+/* Returns 1 when the registry entry was already visited, 0 when it is new
+   (and records it), -1 on allocation failure. */
+static int kb_gpu_registry_id_seen(uint64_t **ids, size_t *count,
+                                   size_t *capacity, uint64_t value)
+{
+    for (size_t index = 0; index < *count; index++) {
+        if ((*ids)[index] == value) {
+            return 1;
+        }
+    }
+    if (*count == *capacity) {
+        size_t next = *capacity == 0 ? 32 : *capacity * 2;
+        if (next < *capacity || next > SIZE_MAX / sizeof(uint64_t)) {
+            return -1;
+        }
+        uint64_t *grown = realloc(*ids, next * sizeof(uint64_t));
+        if (!grown) {
+            return -1;
+        }
+        *ids = grown;
+        *capacity = next;
+    }
+    (*ids)[*count] = value;
+    (*count)++;
+    return 0;
+}
+
+int kb_gpu_process_list(kb_gpu_process **out, size_t *count)
+{
+    if (!out || !count) {
+        return -1;
+    }
+    *out = NULL;
+    *count = 0;
+
+    CFMutableDictionaryRef matching = IOServiceMatching("IOAccelerator");
+    if (!matching) {
+        return -1;
+    }
+    io_iterator_t accelerators = 0;
+    if (IOServiceGetMatchingServices(kIOMainPortDefault, matching,
+                                     &accelerators) != KERN_SUCCESS) {
+        return -1;
+    }
+
+    kb_gpu_accumulator accumulator = {0};
+    uint64_t *seen_ids = NULL;
+    size_t seen_count = 0;
+    size_t seen_capacity = 0;
+    int saw_accelerator = 0;
+    int saw_user_client = 0;
+    int saw_app_usage = 0;
+    int failed = 0;
+
+    io_service_t accelerator = 0;
+    while ((accelerator = IOIteratorNext(accelerators)) != 0) {
+        saw_accelerator = 1;
+        io_iterator_t children = 0;
+        if (IORegistryEntryCreateIterator(accelerator, kIOServicePlane,
+                                          kIORegistryIterateRecursively,
+                                          &children) != KERN_SUCCESS) {
+            failed = 1;
+            IOObjectRelease(accelerator);
+            break;
+        }
+        io_registry_entry_t child = 0;
+        while ((child = IOIteratorNext(children)) != 0) {
+            uint64_t entry_id = 0;
+            if (IORegistryEntryGetRegistryEntryID(child, &entry_id) == KERN_SUCCESS) {
+                int seen = kb_gpu_registry_id_seen(&seen_ids, &seen_count,
+                                                   &seen_capacity, entry_id);
+                if (seen < 0) {
+                    failed = 1;
+                    IOObjectRelease(child);
+                    break;
+                }
+                if (seen) {
+                    IOObjectRelease(child);
+                    continue;
+                }
+            }
+
+            CFTypeRef creator = IORegistryEntryCreateCFProperty(
+                child, CFSTR("IOUserClientCreator"), kCFAllocatorDefault, 0);
+            CFTypeRef usage = IORegistryEntryCreateCFProperty(
+                child, CFSTR("AppUsage"), kCFAllocatorDefault, 0);
+            int32_t pid = kb_gpu_pid_from_creator(creator);
+            if (pid > 0) {
+                saw_user_client = 1;
+            }
+            if (usage) {
+                saw_app_usage = 1;
+            }
+            if (pid > 0 && usage
+                && kb_gpu_accumulator_add(&accumulator, pid,
+                                          kb_gpu_app_usage_sum(usage)) != 0) {
+                failed = 1;
+            }
+            if (creator) {
+                CFRelease(creator);
+            }
+            if (usage) {
+                CFRelease(usage);
+            }
+            IOObjectRelease(child);
+            if (failed) {
+                break;
+            }
+        }
+        IOObjectRelease(children);
+        IOObjectRelease(accelerator);
+        if (failed) {
+            break;
+        }
+    }
+    IOObjectRelease(accelerators);
+    free(seen_ids);
+
+    if (failed || !saw_accelerator || (saw_user_client && !saw_app_usage)) {
+        free(accumulator.items);
+        return -1;
+    }
+    *out = accumulator.items;
+    *count = accumulator.count;
+    return 0;
+}
+
+void kb_gpu_process_list_free(kb_gpu_process *items)
+{
+    free(items);
+}
+
 static int kb_cf_int(CFDictionaryRef dictionary, CFStringRef key, int fallback)
 {
     CFTypeRef value = CFDictionaryGetValue(dictionary, key);

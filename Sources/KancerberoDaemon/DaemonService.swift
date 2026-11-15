@@ -70,7 +70,7 @@ final class DaemonService: NSObject, KancerberoDaemonXPC, @unchecked Sendable {
         let request = (try? KBWireCodec.decode(KBHelloRequest.self, from: message))
             ?? KBHelloRequest()
         let response = KBHelloResponse(capabilities: KBCapabilitiesProbe.current())
-        logger.notice("handshake app=\(request.appVersion, privacy: .public) schema=\(request.schemaVersion)")
+        logger.notice("handshake app=\(request.appVersion, privacy: .public) build=\(request.appBuild ?? "?", privacy: .public) schema=\(request.schemaVersion)")
         guard let data = try? KBWireCodec.encode(response) else {
             reply(Data())
             return
@@ -310,6 +310,7 @@ final class DaemonService: NSObject, KancerberoDaemonXPC, @unchecked Sendable {
         if let found = try? ProcessCollector.snapshot().first(where: { $0.pid == pid }) {
             process = found
         }
+        let vm = ProcessVMInfoReader.current(pid: pid)
         do {
             let sockets = try SocketCollector.snapshot(pid: pid)
             let files = try OpenFileCollector.snapshot(pid: pid)
@@ -317,10 +318,15 @@ final class DaemonService: NSObject, KancerberoDaemonXPC, @unchecked Sendable {
                 KBOpenFileSample(fd: $0.fd, type: $0.typeName, path: $0.path,
                                  size: Int64(clamping: $0.size))
             }
-            return KBProcessDetail(process: process, sockets: sockets, openFiles: openFiles)
+            return KBProcessDetail(process: process, sockets: sockets,
+                                   openFiles: openFiles,
+                                   privateMemoryBytes: vm?.privateBytes,
+                                   sharedMemoryBytes: vm?.sharedBytes)
         } catch {
             return KBProcessDetail(process: process, restricted: true,
-                                   source: "libproc", processGone: true)
+                                   source: "libproc", processGone: true,
+                                   privateMemoryBytes: vm?.privateBytes,
+                                   sharedMemoryBytes: vm?.sharedBytes)
         }
     }
 }
