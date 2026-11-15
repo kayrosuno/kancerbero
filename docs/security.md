@@ -185,3 +185,29 @@ Pendiente para producción:
 - No se consulta el daemon: FDA está ligada a la identidad de firma `uno.kayros.kancerbero`, que
   comparten app y helper, y TCC también se aplica a root. `hasFullDataAccess` (acceso root del
   daemon) y FDA son conceptos distintos; la UI los presenta por separado.
+
+## Actualizaciones (Sparkle 2)
+
+- **Firma EdDSA.** La clave privada vive en el Keychain (cuenta `kancerbero-ed25519`); la pública
+  está en `SUPublicEDKey` (`Resources/App/Info.plist`). `generate_appcast` firma cada ZIP y
+  `sign_update` firma el appcast. La app tiene `SUVerifyUpdateBeforeExtraction` y
+  `SURequireSignedFeed`: rechaza un archivo o un feed sin firma válida antes de extraer nada.
+- **HTTPS.** El feed está en GitHub Pages (`https://kayrosuno.github.io/kancerbero/appcast.xml`) y
+  los binarios en GitHub Releases. No hay excepciones ATS en Release y la app no está
+  sandboxeada, así que no necesita entitlements de red.
+- **Integridad y downgrade.** Sparkle compara `CFBundleVersion`, que es estrictamente creciente
+  (`Config/Version.xcconfig`). Un appcast comprometido no puede instalar un build menor ni un
+  archivo sin la firma de la clave privada.
+- **Clave privada.** Nunca se commitea. Debe tener copia de seguridad cifrada: si se pierde, las
+  instalaciones existentes no podrán validar actualizaciones futuras y la recuperación exige una
+  versión con clave nueva instalada manualmente. No hay rotación silenciosa.
+- **Token de GitHub.** `publish-release.sh` usa un PAT con `Contents: Read and write`, guardado en
+  el Keychain; no se commitea ni se pasa por argumentos.
+- **Post-actualización.** El daemon viejo se detecta por `daemonVersion`/`daemonBuild` en el
+  handshake y se reinicia con el `daemonAction .stop` ya autorizado por `DaemonClientPolicy`
+  (Developer ID, team `AK37TK8X2Y`); si falla, se re-registra el servicio. La system extension se
+  reemplaza con `CFBundleVersion` nuevo y una activation request `.replace`.
+- **TCC.** El reemplazo es in-place, con el mismo bundle id, ruta y team; FDA debe conservarse. No
+  cambiar bundle id, team ni el identifier del daemon en un release.
+- **No se usa un `sha256` del feed como seguridad** (el error del updater de Otty): la garantía es
+  la firma EdDSA verificada por Sparkle, más la notarización y la firma de código del bundle.

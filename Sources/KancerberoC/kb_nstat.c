@@ -1028,8 +1028,3 @@ void kb_nstat_close(void)
        every flow then arrived once per manager, which is what produced the
        duplicated rows in the Connections table. */
 }
-
-const char *kb_version(void)
-{
-    return "0.1.0";
-}

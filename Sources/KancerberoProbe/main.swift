@@ -46,13 +46,50 @@ private func printProcesses(limit: Int) {
         write("processes: \(items.count) (showing \(min(limit, items.count)))\n")
         for item in items.sorted(by: { $0.pid < $1.pid }).prefix(limit) {
             let path = item.path.isEmpty ? "-" : item.path
-            write(String(format: "%7d %7d uid=%-5u %-24@ %@\n",
-                         item.pid, item.ppid, item.uid,
+            let pgid = item.processGroupID.map { String($0) } ?? "-"
+            write(String(format: "%7d %7d pgid=%-6@ uid=%-5u %-24@ %@\n",
+                         item.pid, item.ppid, pgid as NSString, item.uid,
                          item.name as NSString, path as NSString))
         }
     } catch {
         fail(error.localizedDescription)
     }
+}
+
+private func printCounters(pid: Int32) {
+    do {
+        let items = try ProcessCollector.snapshot()
+        guard let item = items.first(where: { $0.pid == pid }) else {
+            fail("process \(pid) not found")
+        }
+        let usage = item.usage
+        func count(_ value: UInt64?) -> String {
+            value.map(String.init) ?? "—"
+        }
+        write("pid=\(item.pid) name=\(item.name)\n")
+        write("pgid=\(item.processGroupID.map(String.init) ?? "—")\n")
+        write("mach_syscalls=\(count(usage?.machSystemCalls))\n")
+        write("unix_syscalls=\(count(usage?.unixSystemCalls))\n")
+        write("mach_messages_sent=\(count(usage?.machMessagesSent))\n")
+        write("mach_messages_received=\(count(usage?.machMessagesReceived))\n")
+        write("context_switches=\(count(usage?.contextSwitches))\n")
+        write("faults=\(count(usage?.faults))\n")
+        write("page_ins=\(count(usage?.pageIns))\n")
+        write("phys_footprint=\(usage?.physFootprintBytes.map { formatBytes($0) } ?? "—")\n")
+    } catch {
+        fail(error.localizedDescription)
+    }
+}
+
+private func printVMInfo(pid: Int32) {
+    guard let vm = ProcessVMInfoReader.current(pid: pid) else {
+        fail("task_vm_info unavailable for pid \(pid)")
+    }
+    write("pid=\(pid)\n")
+    write("private=\(formatBytes(vm.privateBytes))\n")
+    write("shared=\(formatBytes(vm.sharedBytes))\n")
+    write("resident=\(formatBytes(vm.privateBytes + vm.sharedBytes))\n")
+    write("footprint=\(formatBytes(vm.footprintBytes))\n")
 }
 
 private func formatPercent(_ value: Double?) -> String {
@@ -72,7 +109,8 @@ private func printCPU(interval: Double) {
     var sampler = HostMetricsSampler()
     var energyTracker = ProcessCPUTracker()
     var before = (try? ProcessCollector.snapshot()) ?? []
-    energyTracker.annotate(&before, elapsed: 0, totalMemoryBytes: 0, coreCount: 1)
+    energyTracker.annotate(&before, elapsed: 0, totalMemoryBytes: 0, coreCount: 1,
+                           gpuTimes: ProcessGPUUsageReader.current())
     _ = sampler.sample(processes: before)
     Thread.sleep(forTimeInterval: max(0.1, interval))
     var after = (try? ProcessCollector.snapshot()) ?? []
@@ -82,7 +120,8 @@ private func printCPU(interval: Double) {
     energyTracker.annotate(&after,
                            elapsed: max(0.1, interval),
                            totalMemoryBytes: metrics.memory.totalBytes,
-                           coreCount: metrics.cpu.coreCount)
+                           coreCount: metrics.cpu.coreCount,
+                           gpuTimes: ProcessGPUUsageReader.current())
 
     write("cpu cores=\(metrics.cpu.coreCount) load=\(String(format: "%.2f", metrics.cpu.load1))/\(String(format: "%.2f", metrics.cpu.load5))/\(String(format: "%.2f", metrics.cpu.load15))\n")
     for core in metrics.cpu.cores {
@@ -236,7 +275,8 @@ private func printProcessesCPU(limit: Int, interval: Double) {
     let firstHost = sampler.sample(processes: processes)
     tracker.annotate(&processes, elapsed: 0,
                      totalMemoryBytes: firstHost?.memory.totalBytes ?? 0,
-                     coreCount: firstHost?.cpu.coreCount ?? 1)
+                     coreCount: firstHost?.cpu.coreCount ?? 1,
+                     gpuTimes: ProcessGPUUsageReader.current())
 
     Thread.sleep(forTimeInterval: max(0.1, interval))
     let elapsed = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000_000
@@ -244,13 +284,15 @@ private func printProcessesCPU(limit: Int, interval: Double) {
     let host = sampler.sample(processes: processes)
     tracker.annotate(&processes, elapsed: elapsed,
                      totalMemoryBytes: host?.memory.totalBytes ?? 0,
-                     coreCount: host?.cpu.coreCount ?? 1)
+                     coreCount: host?.cpu.coreCount ?? 1,
+                     gpuTimes: ProcessGPUUsageReader.current())
 
-    write(String(format: "%7@ %-16@ %-2@ %5@ %5@ %5@ %8@ %7@ %10@ %10@ %-10@ %@\n",
+    write(String(format: "%7@ %-16@ %-2@ %5@ %5@ %5@ %8@ %7@ %10@ %10@ %-10@ %8@ %-10@ %@\n",
                  "PID" as NSString, "USER" as NSString, "S" as NSString,
                  "PRI" as NSString, "NI" as NSString, "THR" as NSString,
                  "CPU%" as NSString, "MEM%" as NSString,
                  "RSS" as NSString, "VSZ" as NSString, "TIME+" as NSString,
+                 "GPU%" as NSString, "GPU TIME" as NSString,
                  "COMMAND" as NSString))
     let sorted = processes.sorted {
         ($0.usage?.cpuPercent ?? -1) > ($1.usage?.cpuPercent ?? -1)
@@ -266,13 +308,20 @@ private func printProcessesCPU(limit: Int, interval: Double) {
         let resident = usage.map { formatBytes($0.residentBytes) } ?? "—"
         let virtual = usage.map { formatBytes($0.virtualBytes) } ?? "—"
         let time = usage.map { formatDuration($0.cpuTimeNanoseconds) } ?? "—"
+        let gpuPercent = formatPercent(usage?.gpuPercent)
+        let gpuTime = usage?.gpuTimeNanoseconds.map(formatDuration) ?? "—"
         let user = UserCollector.name(for: item.uid) ?? "\(item.uid)"
-        write(String(format: "%7d %-16@ %-2@ %5@ %5@ %5@ %8@ %7@ %10@ %10@ %-10@ %@\n",
+        let pgid = item.processGroupID.map { String($0) } ?? "—"
+        let pageIns = usage?.pageIns.map { String($0) } ?? "—"
+        let footprint = usage?.physFootprintBytes.map { formatBytes($0) } ?? "—"
+        let command = "\(item.name) pgid=\(pgid) pins=\(pageIns) fp=\(footprint)"
+        write(String(format: "%7d %-16@ %-2@ %5@ %5@ %5@ %8@ %7@ %10@ %10@ %-10@ %8@ %-10@ %@\n",
                      item.pid, user as NSString, state as NSString,
                      priority as NSString, nice as NSString, threads as NSString,
                      cpuPercent as NSString, memoryPercent as NSString,
                      resident as NSString, virtual as NSString, time as NSString,
-                     item.name as NSString))
+                     gpuPercent as NSString, gpuTime as NSString,
+                     command as NSString))
     }
 }
 
@@ -650,6 +699,16 @@ case "procs":
     } else {
         printProcesses(limit: integerOption("--limit", default: 20))
     }
+case "counters":
+    guard let pid = Int32(remainder.first ?? "") else {
+        fail("usage: KancerberoProbe counters <pid>")
+    }
+    printCounters(pid: pid)
+case "vminfo":
+    guard let pid = Int32(remainder.first ?? "") else {
+        fail("usage: KancerberoProbe vminfo <pid>")
+    }
+    printVMInfo(pid: pid)
 case "cpu":
     printCPU(interval: doubleOption("--interval", default: 1))
 case "thermal":

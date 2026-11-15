@@ -31,23 +31,31 @@ public struct KBWireEnvelope: Codable, Sendable {
 
 public struct KBHelloRequest: Codable, Sendable {
     public var appVersion: String
+    public var appBuild: String?
     public var schemaVersion: Int
 
-    public init(appVersion: String = KBVersion.current, schemaVersion: Int = KBVersion.schema) {
+    public init(appVersion: String = KBVersion.current, appBuild: String? = KBVersion.build,
+                schemaVersion: Int = KBVersion.schema) {
         self.appVersion = appVersion
+        self.appBuild = appBuild
         self.schemaVersion = schemaVersion
     }
 }
 
 public struct KBHelloResponse: Codable, Sendable {
     public var daemonVersion: String
+    /// Nil when talking to a daemon built before build numbers were added.
+    public var daemonBuild: String?
     public var coreVersion: String
     public var schemaVersion: Int
     public var capabilities: KBCapabilities
 
-    public init(daemonVersion: String = KBVersion.current, coreVersion: String = KBVersion.coreVersion,
+    public init(daemonVersion: String = KBVersion.current,
+                daemonBuild: String? = KBVersion.build,
+                coreVersion: String = KBVersion.coreVersion,
                 schemaVersion: Int = KBVersion.schema, capabilities: KBCapabilities) {
         self.daemonVersion = daemonVersion
+        self.daemonBuild = daemonBuild
         self.coreVersion = coreVersion
         self.schemaVersion = schemaVersion
         self.capabilities = capabilities

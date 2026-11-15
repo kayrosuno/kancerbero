@@ -56,6 +56,9 @@ public actor CollectionActor {
     public func refresh(timeoutMilliseconds: Int32 = 250,
                         cadence: Double? = nil) -> KBCollectionSnapshot {
         let start = KBInterop.monotonicNanoseconds()
+        // Read the GPU counter alongside the timestamp that defines the
+        // sample window, so its delta and `processElapsed` share an origin.
+        let gpuTimes = ProcessGPUUsageReader.current()
         var errorMessage: String?
 
         var statisticsPrivcheck: Int32 = -1
@@ -120,7 +123,8 @@ public actor CollectionActor {
                                        elapsed: validProcessInterval ? processElapsed : 0,
                                        totalMemoryBytes: host.memory.totalBytes,
                                        coreCount: host.cpu.coreCount,
-                                       cadence: cadence)
+                                       cadence: cadence,
+                                       gpuTimes: gpuTimes)
         }
         if let sleeping = PowerAssertionsReader.current() {
             for index in processes.indices {

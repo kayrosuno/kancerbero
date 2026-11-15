@@ -664,6 +664,33 @@ $K --screenshot /tmp/kb-cpu-selected.png --section cpu \
   Con el daemon root aparecen todos. Los procesos sin task info muestran `—`, nunca 0.
 - CPU% puede superar 100% en multithread; `TIME+` es tiempo acumulado. Ordenar por cada columna,
   filtrar y cambiar de sección: búsqueda, selección y orden se conservan.
+- `%GPU` y `GPU Time` por proceso: `GPU Time` es la suma de `accumulatedGPUTime` de todos los
+  user clients de `IOAccelerator` del PID y debe coincidir con
+  `ioreg -r -d 2 -c IOAccelerator -l -w 0` (segundos truncados); `%GPU` es el delta sobre la
+  ventana, limitado a 100%. Comprobación:
+
+  ```bash
+  P=./build/Build/Products/Debug/KancerberoProbe
+  $P procs --cpu --limit 20 --interval 2
+  ioreg -r -d 2 -c IOAccelerator -l -w 0 | grep -E "IOUserClientCreator|accumulatedGPUTime"
+  sudo powermetrics --samplers gpu_power --show-process-gpu -n 1 -i 1000
+  K=./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
+  $K --screenshot /tmp/kb-cpu-gpu.png --section cpu --screenshot-delay 6
+  ```
+
+  Para forzar carga, compilar un pequeño bucle Metal y filtrar la tabla con
+  `--cpu-search kb-gpuload`; la fila debe mostrar `%GPU` > 0 y `GPU Time` creciente. Sin fuente
+  `AppUsage` (Intel antiguos, VMs), ambas columnas muestran `—`, nunca ceros. Pausar y reanudar
+  no debe producir picos: el primer tick válido vuelve a 0%.
+
+  Test aislado del cálculo de porcentaje:
+
+  ```bash
+  xcrun swiftc Sources/KancerberoCore/Support/ProcessGPURate.swift \
+    Tests/KancerberoTests/ProcessGPURateTests.swift \
+    -o "$TMPDIR/kancerbero-gpu-rate-tests"
+  "$TMPDIR/kancerbero-gpu-rate-tests"
+  ```
 - El recuento de procesos debe coincidir con `ps -ax | wc -l` y `top -l 1 -n 0` (±5) e incluir
   kernel_task (PID 0). Como usuario, `threads` es menor que `top` y la UI muestra
   “partial”/“N restricted”; con el daemon root actualizado coinciden procesos e hilos. Si el
@@ -1557,3 +1584,57 @@ refresh, vanished selections clear, and filtering/sorting survive refresh.
 
 Automated UI inspection could not complete: the native app controller timed out
 opening the Debug application. The menu interaction checks above remain manual.
+
+## Actualizaciones (Sparkle 2)
+
+Requiere una app Developer ID notarizada en `/Applications` y la build Sparkle. La 0.1.0
+original (sin Sparkle) no puede autoactualizarse; instalar a mano la primera build con Sparkle
+y publicar una versión posterior para probar el salto.
+
+### Feed y firma
+
+```bash
+SPARKLE_BIN=build/SourcePackages/artifacts/sparkle/Sparkle/bin
+curl -fsSL https://kayrosuno.github.io/kancerbero/appcast.xml -o /tmp/appcast.xml
+xmllint --noout /tmp/appcast.xml
+grep -E "sparkle:(version|shortVersionString|minimumSystemVersion)|enclosure" /tmp/appcast.xml
+"$SPARKLE_BIN/sign_update" --verify /tmp/appcast.xml
+curl -fsSIL "$(grep -o 'https://github.com/[^"]*\.zip' /tmp/appcast.xml | head -1)" | grep -q 200
+```
+
+### Casos
+
+| Caso | Procedimiento | Resultado esperado |
+|---|---|---|
+| Sin actualización | Feed con el mismo build | “You're up to date.” |
+| Actualización feliz | Feed con build mayor | Sparkle descarga, verifica EdDSA, instala y relanza |
+| Firma inválida | Modificar el ZIP o regenerar sin firmar | Rechazo; sigue la versión anterior |
+| Appcast manipulado | Editar el XML sin re-firmar | `SURequireSignedFeed` lo rechaza |
+| Downgrade | Feed con build menor | No se ofrece |
+| Offline | Desconectar red y pulsar Check | Error controlado |
+| App fuera de /Applications | Copiar a ~/Applications | Aviso; no se permite instalar |
+| Daemon viejo | Instalar versión anterior y actualizar | El PID del daemon cambia; hello reporta la versión/build nuevos |
+| Stop del daemon falla | Daemon sin `daemonAction` | Fallback a `repairDaemonService`; aviso, sin bucle |
+| Schema incompatible | Cambiar `KBVersion.schema` en una build de prueba | El handshake falla y se reinicia el daemon |
+| Filtro reemplazado | Actualizar con el filtro activo | `systemextensionsctl list` muestra el build nuevo; el filtro sigue |
+| Filtro requiere reinicio | Forzar `.willCompleteAfterReboot` | Ajustes → Updates: “completes after a restart” |
+| FDA | Conceder FDA antes de actualizar | Sigue concedida y una lectura protegida funciona |
+
+### Comandos de comprobación
+
+```bash
+defaults read /Applications/Kancerbero.app/Contents/Info CFBundleShortVersionString
+defaults read /Applications/Kancerbero.app/Contents/Info CFBundleVersion
+launchctl print system/uno.kayros.kancerbero.daemon.v2 | grep -E 'pid|state'
+systemextensionsctl list | grep uno.kayros.kancerbero.filter
+codesign --verify --deep --strict --verbose=2 /Applications/Kancerbero.app
+xcrun stapler validate /Applications/Kancerbero.app
+spctl -a -vvv -t exec /Applications/Kancerbero.app
+```
+
+### Feed local (solo Debug)
+
+La build Debug no arranca el updater salvo que se pase `KANCERBERO_UPDATE_FEED`. Verificado con
+el appcast firmado servido por `python3 -m http.server 8000 --bind 127.0.0.1 --directory
+build/updates`: la app hace `GET /appcast.xml` y lo acepta (ATS permite loopback). Para la prueba
+real de instalación es preferible un prerelease HTTPS.

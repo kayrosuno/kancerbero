@@ -38,6 +38,10 @@ final class AppModel {
     }
     var usingDaemon = false
     var daemonVersion: String?
+    var daemonBuild: String?
+    /// True while the app is replacing an older running daemon after an update.
+    var daemonNeedsUpdate = false
+    var daemonUpdateMessage: String?
     /// The connected daemon advertises `trashItems`. Older daemons decode the
     /// capability as nil, which reads as false here.
     var daemonSupportsTrash = false
@@ -111,6 +115,9 @@ final class AppModel {
     private var previousProcessIO: [KBProcessKey: (read: UInt64, written: UInt64)] = [:]
     /// Baselines for the local energy fallback used with old daemons.
     private var previousProcessEnergy: [KBProcessKey: (energy: UInt64, wakeups: UInt64)] = [:]
+    /// Baselines for the local GPU fallback used with old daemons.
+    private var previousProcessGPU: [KBProcessKey: UInt64] = [:]
+    private var daemonUpdateRestartInFlight = false
     var serviceStatus: SMAppService.Status = .notRegistered
     var serviceError: String?
     var serviceActionInFlight = false
@@ -579,6 +586,7 @@ final class AppModel {
               daemonHelperPresent,
               daemonPlistPresent,
               !daemonConnecting,
+              !daemonUpdateRestartInFlight,
               !usingDaemon else { return }
         refreshServiceStatus()
 
@@ -775,6 +783,7 @@ final class AppModel {
             }
         }
         return await Task.detached {
+            let vm = ProcessVMInfoReader.current(pid: pid)
             do {
                 let sockets = try SocketCollector.snapshot(pid: pid)
                 let files = try OpenFileCollector.snapshot(pid: pid)
@@ -782,10 +791,15 @@ final class AppModel {
                     KBOpenFileSample(fd: $0.fd, type: $0.typeName, path: $0.path,
                                      size: Int64(clamping: $0.size))
                 }
-                return KBProcessDetail(process: process, sockets: sockets, openFiles: openFiles)
+                return KBProcessDetail(process: process, sockets: sockets,
+                                       openFiles: openFiles,
+                                       privateMemoryBytes: vm?.privateBytes,
+                                       sharedMemoryBytes: vm?.sharedBytes)
             } catch {
                 return KBProcessDetail(process: process, restricted: true,
-                                       source: "libproc", processGone: true)
+                                       source: "libproc", processGone: true,
+                                       privateMemoryBytes: vm?.privateBytes,
+                                       sharedMemoryBytes: vm?.sharedBytes)
             }
         }.value
     }
@@ -814,6 +828,7 @@ final class AppModel {
                     guard let self, self.daemonGeneration == generation else { return }
                     self.usingDaemon = false
                     self.daemonVersion = nil
+                    self.daemonBuild = nil
                     self.daemonIsRoot = false
                     self.daemonSupportsTrash = false
                     self.daemonConnectionError = "Daemon connection closed."
@@ -842,6 +857,13 @@ final class AppModel {
                 }
                 self.daemonSource = source
                 self.daemonVersion = hello.daemonVersion
+                self.daemonBuild = hello.daemonBuild
+                if hello.daemonVersion != KBVersion.current
+                    || (hello.daemonBuild != nil && hello.daemonBuild != KBVersion.build) {
+                    // Run outside daemonConnectTask: the restart resets and
+                    // cancels that task while it is still on this stack.
+                    Task { await self.checkDaemonBuild(hello) }
+                }
                 self.daemonIsRoot = hello.capabilities.root
                 self.daemonSupportsTrash = hello.capabilities.trash ?? false
                 self.usingDaemon = true
@@ -857,6 +879,12 @@ final class AppModel {
                 self.daemonConnecting = false
                 self.daemonConnectionError = message
                 self.logger.error("daemon connection failed: \(message, privacy: .public)")
+                if let collectionError = error as? KBCollectionError,
+                   case .schemaMismatch = collectionError {
+                    // The old daemon cannot even handshake; replace it with the
+                    // binary embedded in the freshly installed app.
+                    Task { await self.restartDaemonForUpdate() }
+                }
             }
         }
     }
@@ -892,6 +920,79 @@ final class AppModel {
         }
     }
 
+    /// Called after a successful handshake when the running daemon reports a
+    /// version or build different from the app that just replaced the bundle.
+    private func checkDaemonBuild(_ hello: KBHelloResponse) async {
+        guard !daemonUpdateRestartInFlight, serviceStatus == .enabled else { return }
+        let versionMismatch = hello.daemonVersion != KBVersion.current
+        let buildMismatch = hello.daemonBuild != nil && hello.daemonBuild != KBVersion.build
+        guard versionMismatch || buildMismatch else {
+            daemonNeedsUpdate = false
+            daemonUpdateMessage = nil
+            return
+        }
+        logger.notice("stale daemon \(hello.daemonVersion, privacy: .public)/\(hello.daemonBuild ?? "?", privacy: .public); restarting")
+        await restartDaemonForUpdate()
+    }
+
+    /// Stops the old daemon through the existing `daemonAction` self-stop. The
+    /// launchd job relaunches from the newly installed bundle because the plist
+    /// keeps `KeepAlive.SuccessfulExit = false`. If that fails (a daemon too old
+    /// to control services), re-register the service as a fallback.
+    private func restartDaemonForUpdate() async {
+        guard serviceStatus == .enabled, !daemonUpdateRestartInFlight else { return }
+        daemonUpdateRestartInFlight = true
+        defer { daemonUpdateRestartInFlight = false }
+        daemonNeedsUpdate = true
+        daemonUpdateMessage = "Updating the background service…"
+
+        for _ in 0..<2 {
+            let previous = daemonSource
+            resetDaemonConnection()
+            if let previous {
+                await Self.stopDaemon(previous)
+            }
+
+            let deadline = Date().addingTimeInterval(15)
+            while Date() < deadline {
+                if !usingDaemon && !daemonConnecting {
+                    connectDaemon()
+                }
+                if usingDaemon, daemonVersion == KBVersion.current,
+                   (daemonBuild == nil || daemonBuild == KBVersion.build) {
+                    UserDefaults.standard.set(daemonFingerprint,
+                                              forKey: Self.daemonFingerprintKey)
+                    daemonNeedsUpdate = false
+                    daemonUpdateMessage = "Background service updated."
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+        }
+
+        logger.notice("daemon self-stop did not replace the service; repairing registration")
+        await repairDaemonService()
+
+        let deadline = Date().addingTimeInterval(30)
+        while Date() < deadline {
+            if !usingDaemon && !daemonConnecting {
+                connectDaemon()
+            }
+            if usingDaemon, daemonVersion == KBVersion.current,
+               (daemonBuild == nil || daemonBuild == KBVersion.build) {
+                daemonNeedsUpdate = false
+                daemonUpdateMessage = "Background service updated."
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+
+        daemonNeedsUpdate = false
+        daemonUpdateMessage = "The background service could not be updated. Restart your Mac."
+        serviceError = daemonUpdateMessage
+        logger.error("daemon still stale after update restart attempts")
+    }
+
     private func resetDaemonConnection() {
         daemonGeneration += 1
         daemonConnectTask?.cancel()
@@ -901,6 +1002,7 @@ final class AppModel {
         usingDaemon = false
         daemonIsRoot = false
         daemonVersion = nil
+        daemonBuild = nil
         daemonSupportsTrash = false
         daemonConnectionError = nil
         daemonConnecting = false
@@ -938,6 +1040,7 @@ final class AppModel {
             previousInterfaceCounters = [:]
             previousProcessEnergy = [:]
             previousProcessIO = [:]
+            previousProcessGPU = [:]
             lastActivityNanoseconds = [:]
             activeSourceIDs = []
             lastSampleSource = source
@@ -1092,12 +1195,39 @@ final class AppModel {
             }
             previousProcessIO = ioBaseline
         }
+        // A daemon built before the GPU fields existed leaves them nil. The
+        // registry is readable without privileges, so fill them locally.
+        if usingDaemon, patchedProcesses.contains(where: {
+            $0.usage != nil && $0.usage?.gpuTimeNanoseconds == nil
+        }) {
+            var gpuBaseline: [KBProcessKey: UInt64] = [:]
+            if let gpuTimes = ProcessGPUUsageReader.current() {
+                for index in patchedProcesses.indices {
+                    guard var usage = patchedProcesses[index].usage else { continue }
+                    let key = patchedProcesses[index].id
+                    let current = gpuTimes[patchedProcesses[index].pid] ?? 0
+                    if usage.gpuTimeNanoseconds == nil {
+                        usage.gpuTimeNanoseconds = current
+                        if validInterval, let prior = previousProcessGPU[key] {
+                            usage.gpuPercent = ProcessGPURate.percent(
+                                current: current, previous: prior, elapsed: elapsed)
+                        } else {
+                            usage.gpuPercent = 0
+                        }
+                        gpuBaseline[key] = current
+                    }
+                    patchedProcesses[index].usage = usage
+                }
+            }
+            previousProcessGPU = validInterval ? gpuBaseline : [:]
+        }
         if !validInterval {
             // Baselines only advance inside a valid window; clear them after a
             // pause or source switch so the next real tick cannot divide a
             // multi-second delta by one cadence.
             previousProcessEnergy = [:]
             previousProcessIO = [:]
+            previousProcessGPU = [:]
         }
         if patchedProcesses.contains(where: {
             $0.usage != nil && $0.usage?.preventingSleep == nil
@@ -1124,6 +1254,21 @@ final class AppModel {
             if !missing.isEmpty {
                 patchedProcesses.append(contentsOf: missing)
                 patchedProcesses.sort { $0.pid < $1.pid }
+            }
+            // Older daemons predate processGroupID; kinfo_proc still exposes it
+            // locally for every process, including other users' rows.
+            var pgids: [Int32: Int32] = [:]
+            for process in metadata {
+                if let pgid = process.processGroupID {
+                    pgids[process.pid] = pgid
+                }
+            }
+            if !pgids.isEmpty {
+                for index in patchedProcesses.indices
+                where patchedProcesses[index].processGroupID == nil {
+                    patchedProcesses[index].processGroupID =
+                        pgids[patchedProcesses[index].pid]
+                }
             }
         } else {
             daemonProcessesIncomplete = false

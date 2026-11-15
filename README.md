@@ -1,7 +1,8 @@
 # kancerbero
 
 Monitor de red para macOS inspirado en Activity Monitor. Muestra tráfico por proceso,
-conexiones por proceso, contadores por interfaz y un inspector con sockets y ficheros abiertos.
+conexiones por proceso, contadores por interfaz y una ventana de inspección por proceso con
+estadísticas, memoria, ficheros abiertos y puertos, al estilo de Activity Monitor.
 
 El diseño se basa en ingeniería inversa de `Activity Monitor.app` con REA (ver
 `docs/private-apis.md`), no en suposiciones: Activity Monitor obtiene el tráfico por proceso de
@@ -77,7 +78,7 @@ El detalle de binarios, permisos, instalación y librerías está en
   `AF_* · SOCK_* · IPPROTO_*`. Sin escaneo se usan las etiquetas agregadas y el detalle de
   `RAW4`/`RAW6`/`OTHER` como antes.
   (p. ej. daemon antiguo o sockets restringidos). El inspector de proceso muestra la misma etiqueta
-  en su columna Proto. Los filtros de cada subpestaña son independientes. Ambas
+  en su columna Type. Los filtros de cada subpestaña son independientes. Ambas
   tablas se pueden ordenar por cualquier columna. Sin root solo se leen sockets del propio
   usuario; el daemon root cubre el resto. Las **velocidades** se muestran en bits con unidades
   humanas (`bps`, `Kbps`, `Mbps`, `Gbps`); los **totales acumulados** siguen en Bytes (`KB`, `MB`,
@@ -195,8 +196,8 @@ El detalle de binarios, permisos, instalación y librerías está en
     (todo, solo ficheros, solo carpetas o rutas denegadas); no se lee contenido de ficheros.
   - **I/O** — actividad de disco con gráfico espejado lectura/escritura (histórico de 120 muestras),
     selector **Data / Operations**, tasas y totales de Reads in, Writes out, Data read y Data
-    written, y tabla de procesos por actividad de disco (Read/s, Write/s, Bytes Read, Bytes
-    Written, Writes, State, PID, USER). Los contadores del sistema salen de `IOBlockStorageDriver`
+    written, y tabla de procesos por actividad de disco (Command, PID, USER, Read/s, Write/s,
+    Bytes Read, Bytes Written, Writes, State). Los contadores del sistema salen de `IOBlockStorageDriver`
     (`Bytes/Operations`); los de proceso de `rusage_info_v6`.
 - **Daemons** — inventario de servicios launchd con chips multiselección por tipo (agentes /
   daemons), ámbito (sistema / global / usuario / runtime), origen (Apple / custom / desconocido)
@@ -214,20 +215,23 @@ El detalle de binarios, permisos, instalación y librerías está en
   histórico reciente de cada core, color por carga, grupos Performance/Efficiency, uso y
   temperatura por core, y temperatura de paquete vía IOHID (como btop); uptime; memoria y swap
   con desglose Active/Wired/Compressed/Cached/Free; y tabla de procesos ordenable con búsqueda
-  (PID, USER, PRI/NI, VIRT, RES, S/THR, CPU%, MEM%, TIME+ y Command). CPU% no se normaliza
-  (puede superar 100% en multihilo). El listado usa `KERN_PROC_ALL` e incluye todos los procesos
+  (Command, PID, USER, PRI/NI, VIRT, RES, S/THR, CPU%, MEM%, TIME+, %GPU y GPU Time). CPU% no
+  se normaliza (puede superar 100% en multihilo). `%GPU` y `GPU Time` salen de
+  `IOAccelerator > AppUsage` (`accumulatedGPUTime`) por proceso, legible sin root: `%GPU` es el
+  delta sobre la ventana (limitado a 100%) y `GPU Time` usa el formato de `TIME+`. El listado usa
+  `KERN_PROC_ALL` e incluye todos los procesos
   (kernel_task incluido), sin descartar los que no exponen task info. Sin daemon root los
   contadores de otros usuarios quedan restringidos; si el daemon es antiguo la app fusiona las
   identidades locales y avisa en System status (los hilos aparecen como “partial”).
 - **Memory** — panel dedicado tipo Activity Monitor: presión de memoria (Low/Medium/High) con
   histórico y explicación, composición App/Wired/Compressed/Cached/Free, detalle de Physical
   Memory, Memory Used, App Memory, Wired, Compressed, Cached Files y Swap, y tabla de procesos
-  ordenada por memoria residente (Command, Memory, MEM%, Threads, PID, USER) con búsqueda,
+  ordenada por memoria residente (Command, PID, USER, Memory, MEM%, Threads) con búsqueda,
   selección e inspector.
 - **Energy** — panel tipo Activity Monitor: estado de batería (carga, tiempo restante, cargando,
   conector) con el gráfico de 12 h de carga, bandas verdes del tiempo en AC y «Time on AC/Battery»,
   consumo por proceso en vatios y wake-ups inactivos con histórico, procesos que impiden dormir, y
-  tabla ordenada por energía (Command, Energy, Impact, Wake-ups, CPU%, PID, USER, Preventing Sleep).
+  tabla ordenada por energía (Command, PID, USER, Energy, Impact, Wake-ups, CPU%, Preventing Sleep).
 
 **Dock icon** — el menú `Dock Icon` (y Ajustes → Dock) cambia el icono del Dock por gráficos en
 vivo, igual que Activity Monitor: aplicación, uso e histórico de CPU, uso de red, actividad de
@@ -441,13 +445,25 @@ portapapeles, nunca se ejecutan con sudo desde la app.
 Requisitos de distribución:
 
 ```bash
-./scripts/build-release.sh      # Developer ID + hardened runtime, embebe el daemon
 # Crear el perfil de notarización una sola vez:
 xcrun notarytool store-credentials kancerbero-notary \
   --apple-id "<Apple ID>" --team-id AK37TK8X2Y --password "<app-specific password>"
-./scripts/notarize.sh           # notarytool + stapler + spctl
-./scripts/install-app.sh        # copia a /Applications/Kancerbero.app
+
+# Release completo, sin publicar (version bump + build + notarización + ZIP + appcast):
+./scripts/release.sh 0.1.2 2026111701
+
+# Publicar en GitHub Releases + Pages (requiere GITHUB_TOKEN). Se puede ejecutar
+# directamente, o después del paso anterior: reutiliza el bump ya commiteado.
+export GITHUB_TOKEN=...
+./scripts/release.sh 0.1.2 2026111701 --publish
+
+./scripts/install-app.sh        # instalación manual para probar
 ```
+
+La app se actualiza con **Sparkle 2** (feed EdDSA en GitHub Pages, ZIP en GitHub Releases). La
+primera versión con Sparkle se instala a mano; a partir de ahí las actualizaciones son
+automáticas. Detalle, gestión de la clave y diagnóstico en
+[`docs/updates.md`](docs/updates.md).
 
 Un daemon registrado con `SMAppService` exige app firmada con Developer ID y **notarizada**.
 La build Debug ad-hoc puede mostrar la UI y el estado, pero no se espera que `register()` funcione.
@@ -521,6 +537,9 @@ Compara con `netstat -ibI`, `lsof -nP -i`, `nettop` y Activity Monitor. Detalle 
 ## Limitaciones conocidas
 
 - APIs privadas (`NetworkStatistics.framework`): no apto para App Store.
+- Actualizaciones: Sparkle 2 requiere app Developer ID notarizada en `/Applications`; el feed y
+  los binarios son públicos. Las instalaciones anteriores a la primera versión con Sparkle no se
+  autoactualizan (bootstrap manual).
 - Sin firma Developer ID, el daemon se instala en modo desarrollo (ad-hoc + launchd manual).
 - El filtro de red es una system extension: macOS solo la activa desde una app Developer ID
   **notarizada** (o con developer mode, que exige SIP desactivado). Con un build Apple
@@ -531,4 +550,8 @@ Compara con `netstat -ibI`, `lsof -nP -i`, `nettop` y Activity Monitor. Detalle 
   `PID`/`UUID`.
 - La atribución por proceso usa `epid` cuando existe (como Activity Monitor); los flujos sin
   proceso se agrupan como desconocidos.
-- El inspector usa `libproc`; para procesos de otros uid requiere el daemon root.
+- El inspector usa `libproc`; para procesos de otros uid requiere el daemon root. Es una ventana
+  independiente por proceso con Statistics organizada en tres grupos visuales: Process (CPU, hilos,
+  grupo, padre, usuario y ruta), Memory (footprint, real, virtual, private, shared y puertos) y
+  System (llamadas Mach y Unix, mensajes Mach in/out, cambios de contexto, fallos y page ins),
+  además de Open Files and Ports (descriptores y sockets fusionados por fd).

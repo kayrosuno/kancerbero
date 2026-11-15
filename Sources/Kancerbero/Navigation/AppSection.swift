@@ -16,7 +16,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .networking: return "Networking"
         case .disk: return "Disk"
         case .daemons: return "Daemons"
-        case .cpu: return "CPU"
+        case .cpu: return "CPU & GPU"
         case .memory: return "Memory"
         case .energy: return "Energy"
         case .applications: return "Applications"

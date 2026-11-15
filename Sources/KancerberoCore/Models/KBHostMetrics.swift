@@ -46,6 +46,10 @@ public struct KBProcessUsage: Codable, Sendable, Hashable {
     public var cpuPercent: Double?
     /// Resident bytes over physical memory, 0...100.
     public var memoryPercent: Double?
+    /// Cumulative GPU time from IOAccelerator AppUsage; nil when unavailable.
+    public var gpuTimeNanoseconds: UInt64?
+    /// GPU busy time over the sample interval, 0...100.
+    public var gpuPercent: Double?
     /// Cumulative energy counters from rusage_info_v6.
     public var energyNanojoules: UInt64?
     public var interruptWakeups: UInt64?
@@ -62,6 +66,16 @@ public struct KBProcessUsage: Codable, Sendable, Hashable {
     /// Disk rates computed between samples by `ProcessCPUTracker`.
     public var diskBytesReadPerSecond: Double?
     public var diskBytesWrittenPerSecond: Double?
+    /// Cumulative page-ins and physical footprint (rusage_info_v6).
+    public var pageIns: UInt64?
+    public var physFootprintBytes: UInt64?
+    /// Cumulative task counters from PROC_PIDTASKALLINFO.
+    public var machSystemCalls: UInt64?
+    public var unixSystemCalls: UInt64?
+    public var machMessagesSent: UInt64?
+    public var machMessagesReceived: UInt64?
+    public var contextSwitches: UInt64?
+    public var faults: UInt64?
 
     public init(cpuTimeNanoseconds: UInt64 = 0, residentBytes: UInt64 = 0,
                 virtualBytes: UInt64 = 0, threads: Int = 0,
@@ -77,7 +91,17 @@ public struct KBProcessUsage: Codable, Sendable, Hashable {
                 diskBytesWritten: UInt64? = nil,
                 logicalWrites: UInt64? = nil,
                 diskBytesReadPerSecond: Double? = nil,
-                diskBytesWrittenPerSecond: Double? = nil) {
+                diskBytesWrittenPerSecond: Double? = nil,
+                pageIns: UInt64? = nil,
+                physFootprintBytes: UInt64? = nil,
+                machSystemCalls: UInt64? = nil,
+                unixSystemCalls: UInt64? = nil,
+                machMessagesSent: UInt64? = nil,
+                machMessagesReceived: UInt64? = nil,
+                contextSwitches: UInt64? = nil,
+                faults: UInt64? = nil,
+                gpuTimeNanoseconds: UInt64? = nil,
+                gpuPercent: Double? = nil) {
         self.cpuTimeNanoseconds = cpuTimeNanoseconds
         self.residentBytes = residentBytes
         self.virtualBytes = virtualBytes
@@ -86,6 +110,8 @@ public struct KBProcessUsage: Codable, Sendable, Hashable {
         self.priority = priority
         self.cpuPercent = cpuPercent
         self.memoryPercent = memoryPercent
+        self.gpuTimeNanoseconds = gpuTimeNanoseconds
+        self.gpuPercent = gpuPercent
         self.energyNanojoules = energyNanojoules
         self.interruptWakeups = interruptWakeups
         self.packageIdleWakeups = packageIdleWakeups
@@ -97,6 +123,14 @@ public struct KBProcessUsage: Codable, Sendable, Hashable {
         self.logicalWrites = logicalWrites
         self.diskBytesReadPerSecond = diskBytesReadPerSecond
         self.diskBytesWrittenPerSecond = diskBytesWrittenPerSecond
+        self.pageIns = pageIns
+        self.physFootprintBytes = physFootprintBytes
+        self.machSystemCalls = machSystemCalls
+        self.unixSystemCalls = unixSystemCalls
+        self.machMessagesSent = machMessagesSent
+        self.machMessagesReceived = machMessagesReceived
+        self.contextSwitches = contextSwitches
+        self.faults = faults
     }
 }
 

@@ -12,6 +12,9 @@ struct SettingsView: View {
     @AppStorage(KBPreferences.activeWindowKey)
     private var activeWindowSeconds = KBPreferences.activeWindowDefault
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(AppModel.self) private var model
+    @Environment(FilterModel.self) private var filter
+    @Environment(UpdaterModel.self) private var updater
 
     /// Keeps the picker and the stored value on one of the supported windows.
     private var activeWindowSelection: Binding<Int> {
@@ -94,6 +97,93 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             } header: {
                 Text("Dock")
+            }
+
+            Section {
+                Toggle("Automatically check for updates", isOn: Binding(
+                    get: { updater.automaticallyChecksForUpdates },
+                    set: { updater.setAutomaticallyChecksForUpdates($0) }
+                ))
+                .toggleStyle(.switch)
+                .disabled(!updater.isEnabled)
+
+                Toggle("Automatically download updates", isOn: Binding(
+                    get: { updater.automaticallyDownloadsUpdates },
+                    set: { updater.setAutomaticallyDownloadsUpdates($0) }
+                ))
+                .toggleStyle(.switch)
+                .disabled(!updater.isEnabled
+                          || !updater.allowsAutomaticUpdates
+                          || !updater.automaticallyChecksForUpdates)
+
+                Picker("Check for updates", selection: Binding(
+                    get: { updater.updateCheckInterval },
+                    set: { updater.setUpdateCheckInterval($0) }
+                )) {
+                    Text("Hourly").tag(3600.0)
+                    Text("Daily").tag(86400.0)
+                    Text("Weekly").tag(604800.0)
+                }
+                .pickerStyle(.menu)
+                .disabled(!updater.isEnabled)
+
+                HStack {
+                    Button("Check Now") {
+                        updater.checkForUpdates()
+                    }
+                    .disabled(!updater.isEnabled || !updater.canCheckForUpdates)
+
+                    Spacer()
+
+                    Text(updater.statusText)
+                        .foregroundStyle(.secondary)
+                }
+
+                Text("Kancerbero \(model.appVersion) (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"))")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+
+                if !updater.isEnabled {
+                    Text("Updates are disabled in this build.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+
+                if !model.appIsInApplications {
+                    Label("Move Kancerbero to /Applications to install updates.",
+                          systemImage: "exclamationmark.triangle")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                }
+
+                if let message = model.daemonUpdateMessage {
+                    Label(message, systemImage: "gearshape.2")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if filter.extensionRequiresReboot {
+                    Label("The network filter update completes after a restart.",
+                          systemImage: "arrow.clockwise")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if filter.extensionNeedsUpdate {
+                    Label("The network filter will be updated automatically.",
+                          systemImage: "shield.lefthalf.filled")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let error = updater.lastError {
+                    Text(error)
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } header: {
+                Text("Updates")
             }
 
             if reduceMotion {

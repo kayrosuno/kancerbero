@@ -2,11 +2,13 @@ import Darwin
 import Foundation
 
 public enum KBVersion {
-    public static let current = "0.1.0"
+    /// Compile-time marketing version injected by Config/Version.xcconfig.
+    public static let current = String(cString: kb_version())
+    /// Compile-time build number, used by Sparkle and to detect a stale daemon.
+    public static let build = String(cString: kb_build_version())
     public static let schema = 1
-    public static var coreVersion: String {
-        String(cString: kb_version())
-    }
+    public static var coreVersion: String { current }
+    public static var coreBuild: String { build }
 }
 
 public struct KBProcessKey: Hashable, Codable, Sendable, Identifiable {
@@ -170,13 +172,15 @@ public struct KBProcessInfo: Codable, Sendable, Identifiable, Hashable {
     public var state: KBProcessState?
     public var nice: Int32?
     public var usage: KBProcessUsage?
+    /// Process group id. Optional so payloads from an older daemon decode as nil.
+    public var processGroupID: Int32?
 
     public var id: KBProcessKey { KBProcessKey(pid: pid, startTimeUS: startTimeUS) }
 
     public init(pid: Int32, ppid: Int32 = 0, uid: UInt32 = 0,
                 startTimeUS: UInt64 = 0, name: String = "", path: String = "",
                 state: KBProcessState? = nil, nice: Int32? = nil,
-                usage: KBProcessUsage? = nil) {
+                usage: KBProcessUsage? = nil, processGroupID: Int32? = nil) {
         self.pid = pid
         self.ppid = ppid
         self.uid = uid
@@ -186,6 +190,7 @@ public struct KBProcessInfo: Codable, Sendable, Identifiable, Hashable {
         self.state = state
         self.nice = nice
         self.usage = usage
+        self.processGroupID = processGroupID
     }
 }
 
@@ -381,11 +386,17 @@ public struct KBProcessDetail: Codable, Sendable {
     public var source: String
     public var generatedAt: Date
     public var processGone: Bool
+    /// Task VM breakdown from `task_info(TASK_VM_INFO)`; nil when the task port
+    /// is not available (old daemon, other user without root, SIP target).
+    public var privateMemoryBytes: UInt64?
+    public var sharedMemoryBytes: UInt64?
 
     public init(process: KBProcessInfo, sockets: [KBSocketInfo] = [],
                 openFiles: [KBOpenFileSample] = [], restricted: Bool = false,
                 source: String = "libproc", generatedAt: Date = Date(),
-                processGone: Bool = false) {
+                processGone: Bool = false,
+                privateMemoryBytes: UInt64? = nil,
+                sharedMemoryBytes: UInt64? = nil) {
         self.process = process
         self.sockets = sockets
         self.openFiles = openFiles
@@ -393,6 +404,8 @@ public struct KBProcessDetail: Codable, Sendable {
         self.source = source
         self.generatedAt = generatedAt
         self.processGone = processGone
+        self.privateMemoryBytes = privateMemoryBytes
+        self.sharedMemoryBytes = sharedMemoryBytes
     }
 }
 

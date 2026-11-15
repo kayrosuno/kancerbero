@@ -3,6 +3,9 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <libproc.h>
+#include <mach/mach.h>
+#include <mach/mach_traps.h>
+#include <mach/task_info.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,11 +16,17 @@
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 
+static uint64_t kb_nonnegative(int32_t value)
+{
+    return value > 0 ? (uint64_t)value : 0;
+}
+
 static void kb_fill_identity(kb_process *item, const struct kinfo_proc *entry)
 {
     pid_t pid = entry->kp_proc.p_pid;
     item->pid = (int32_t)pid;
     item->ppid = (int32_t)entry->kp_eproc.e_ppid;
+    item->pgid = (int32_t)entry->kp_eproc.e_pgid;
     item->uid = (uint32_t)entry->kp_eproc.e_ucred.cr_uid;
     item->start_time_us =
         (uint64_t)entry->kp_proc.p_starttime.tv_sec * 1000000ULL +
@@ -132,6 +141,19 @@ int kb_process_list(kb_process **out, size_t *count)
             item->threads = (uint32_t)all.ptinfo.pti_threadnum;
             item->running_threads = (uint32_t)all.ptinfo.pti_numrunning;
             item->priority = (int32_t)all.ptinfo.pti_priority;
+            item->page_ins = all.ptinfo.pti_pageins > 0
+                ? (uint64_t)all.ptinfo.pti_pageins
+                : 0;
+            item->mach_syscalls =
+                kb_nonnegative(all.ptinfo.pti_syscalls_mach);
+            item->unix_syscalls =
+                kb_nonnegative(all.ptinfo.pti_syscalls_unix);
+            item->messages_sent =
+                kb_nonnegative(all.ptinfo.pti_messages_sent);
+            item->messages_received =
+                kb_nonnegative(all.ptinfo.pti_messages_received);
+            item->context_switches = kb_nonnegative(all.ptinfo.pti_csw);
+            item->faults = kb_nonnegative(all.ptinfo.pti_faults);
             item->has_task_info = 1;
         }
 
@@ -146,6 +168,11 @@ int kb_process_list(kb_process **out, size_t *count)
             item->diskio_bytes_read = usage.ri_diskio_bytesread;
             item->diskio_bytes_written = usage.ri_diskio_byteswritten;
             item->logical_writes = usage.ri_logical_writes;
+            item->phys_footprint = usage.ri_phys_footprint;
+            if (usage.ri_pageins > 0) {
+                item->page_ins = usage.ri_pageins;
+            }
+            item->has_rusage = 1;
         }
     }
     return 0;
@@ -200,6 +227,95 @@ int kb_process_io_read(int32_t pid, uint64_t *bytes_read,
     }
     if (logical_writes) {
         *logical_writes = usage.ri_logical_writes;
+    }
+    return 0;
+}
+
+int kb_process_counters_read(int32_t pid,
+                             uint64_t *mach_syscalls,
+                             uint64_t *unix_syscalls,
+                             uint64_t *messages_sent,
+                             uint64_t *messages_received,
+                             uint64_t *context_switches,
+                             uint64_t *faults,
+                             uint64_t *page_ins)
+{
+    if (pid <= 0) {
+        return -1;
+    }
+    struct proc_taskallinfo all;
+    memset(&all, 0, sizeof(all));
+    int rc = proc_pidinfo((pid_t)pid, PROC_PIDTASKALLINFO, 0,
+                          &all, (int)sizeof(all));
+    if (rc != (int)sizeof(all) ||
+        (all.ptinfo.pti_threadnum == 0 &&
+         all.ptinfo.pti_total_user == 0 &&
+         all.ptinfo.pti_total_system == 0)) {
+        return -1;
+    }
+    if (mach_syscalls) {
+        *mach_syscalls = kb_nonnegative(all.ptinfo.pti_syscalls_mach);
+    }
+    if (unix_syscalls) {
+        *unix_syscalls = kb_nonnegative(all.ptinfo.pti_syscalls_unix);
+    }
+    if (messages_sent) {
+        *messages_sent = kb_nonnegative(all.ptinfo.pti_messages_sent);
+    }
+    if (messages_received) {
+        *messages_received = kb_nonnegative(all.ptinfo.pti_messages_received);
+    }
+    if (context_switches) {
+        *context_switches = kb_nonnegative(all.ptinfo.pti_csw);
+    }
+    if (faults) {
+        *faults = kb_nonnegative(all.ptinfo.pti_faults);
+    }
+    if (page_ins) {
+        *page_ins = all.ptinfo.pti_pageins > 0
+            ? (uint64_t)all.ptinfo.pti_pageins
+            : 0;
+    }
+    return 0;
+}
+
+int kb_task_vm_info_read(int32_t pid, uint64_t *private_bytes,
+                         uint64_t *shared_bytes, uint64_t *phys_footprint)
+{
+    if (pid <= 0) {
+        return -1;
+    }
+    mach_port_t task = MACH_PORT_NULL;
+    /*
+     * task_name_for_pid is the same-uid friendly path (no entitlements needed)
+     * and its name port still allows task_info(TASK_VM_INFO). Fall back to the
+     * stronger task_for_pid when the caller is root or entitled.
+     */
+    kern_return_t kr = task_name_for_pid(mach_task_self(), (pid_t)pid, &task);
+    if (kr != KERN_SUCCESS) {
+        kr = task_for_pid(mach_task_self(), (pid_t)pid, &task);
+    }
+    if (kr != KERN_SUCCESS) {
+        return -1;
+    }
+
+    task_vm_info_data_t info;
+    memset(&info, 0, sizeof(info));
+    mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+    kr = task_info(task, TASK_VM_INFO, (task_info_t)&info, &count);
+    mach_port_deallocate(mach_task_self(), task);
+    if (kr != KERN_SUCCESS) {
+        return -1;
+    }
+
+    if (private_bytes) {
+        *private_bytes = (uint64_t)info.internal;
+    }
+    if (shared_bytes) {
+        *shared_bytes = (uint64_t)info.external;
+    }
+    if (phys_footprint) {
+        *phys_footprint = (uint64_t)info.phys_footprint;
     }
     return 0;
 }

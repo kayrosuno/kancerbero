@@ -6,9 +6,18 @@ import Foundation
 
 public enum FilterVersion {
     public static let schema = 1
-    /// Bumped when the extension's behavior changes so the app can detect a
-    /// running extension that is older than the one it ships with.
-    public static let current = "0.2.0"
+    /// Marketing version of the bundle that is running this code. In the
+    /// extension this is the staged .systemextension, not the host app.
+    public static var marketing: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+    }
+    /// Build number of the running bundle. The app and the extension share the
+    /// build number, so comparing it detects a stale staged extension.
+    public static var build: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+    }
+    /// Human-readable version for status displays and the hello message.
+    public static var current: String { marketing }
 }
 
 public enum FilterPolicy: String, Codable, Sendable, CaseIterable, Identifiable {

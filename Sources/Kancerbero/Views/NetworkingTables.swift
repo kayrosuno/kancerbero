@@ -118,7 +118,7 @@ struct ConnectionsView: View {
     let context: String
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
-    @State private var inspected: KBProcessInfo?
+    @Environment(\.openWindow) private var openWindow
 
     private var selection: Binding<String?> {
         Binding(
@@ -185,7 +185,7 @@ struct ConnectionsView: View {
 
                 Button("Inspect Process") {
                     if let source = selectedSource {
-                        inspected = process(for: source)
+                        inspect(process(for: source))
                     }
                 }
                 .disabled(selectedSource == nil)
@@ -242,17 +242,15 @@ struct ConnectionsView: View {
             }
             .contextMenu(forSelectionType: String.self) { keys in
                 if let id = keys.first, let source = rows.first(where: { $0.id == id }) {
-                    Button("Inspect \(source.processName)") { inspected = process(for: source) }
+                    Button("Inspect \(source.processName)") {
+                        inspect(process(for: source))
+                    }
                 }
             } primaryAction: { keys in
                 if let id = keys.first, let source = rows.first(where: { $0.id == id }) {
-                    inspected = process(for: source)
+                    inspect(process(for: source))
                 }
             }
-        }
-        .sheet(item: $inspected) { process in
-            ProcessInspectorView(process: process)
-                .environment(model)
         }
         .onChange(of: rows.map(\.id), initial: true) { _, ids in
             guard let selected = ui.networking.selectedConnection,
@@ -286,6 +284,10 @@ struct ConnectionsView: View {
     private func process(for source: KBNStatSource) -> KBProcessInfo {
         model.processes.first { $0.pid == source.pid }
             ?? KBProcessInfo(pid: source.pid, name: source.processName)
+    }
+
+    private func inspect(_ process: KBProcessInfo) {
+        openWindow(id: ProcessInspectorWindow.id, value: process.id)
     }
 }
 
@@ -391,7 +393,7 @@ struct ProcessesView: View {
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
     @Environment(FilterModel.self) private var filterModel
-    @State private var inspected: KBProcessInfo?
+    @Environment(\.openWindow) private var openWindow
 
     private var selection: Binding<KBProcessKey?> {
         Binding(
@@ -494,7 +496,7 @@ struct ProcessesView: View {
                     .help("Filter by name, path, PID or user")
 
                 Button("Inspect Selected") {
-                    inspected = selectedRow?.process
+                    inspect(selectedRow?.process)
                 }
                 .disabled(selectedRow == nil)
 
@@ -514,7 +516,7 @@ struct ProcessesView: View {
                 if let key = keys.first,
                    let row = rows.first(where: { $0.id == key }) {
                     Button("Inspect \(displayName(row))") {
-                        inspected = row.process
+                        inspect(row.process)
                     }
                     Divider()
                     if filterModel.isWatched(row.process) {
@@ -538,13 +540,9 @@ struct ProcessesView: View {
             } primaryAction: { keys in
                 if let key = keys.first,
                    let row = rows.first(where: { $0.id == key }) {
-                    inspected = row.process
+                    inspect(row.process)
                 }
             }
-        }
-        .sheet(item: $inspected) { process in
-            ProcessInspectorView(process: process)
-                .environment(model)
         }
         .onChange(of: rows.map(\.id), initial: true) { _, ids in
             guard let selected = ui.networking.selectedProcess,
@@ -591,6 +589,11 @@ struct ProcessesView: View {
     private var selectedRow: ProcessInventoryRow? {
         guard let selection = ui.networking.selectedProcess else { return nil }
         return rows.first { $0.id == selection }
+    }
+
+    private func inspect(_ process: KBProcessInfo?) {
+        guard let process else { return }
+        openWindow(id: ProcessInspectorWindow.id, value: process.id)
     }
 
     private func displayName(_ row: ProcessInventoryRow) -> String {

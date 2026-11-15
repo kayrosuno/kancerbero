@@ -18,6 +18,7 @@
 		ABCDEF0000000000000000B5 /* libKancerberoFilterContract.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000025 /* libKancerberoFilterContract.a */; };
 		ABCDEF0000000000000000B6 /* libKancerberoFilterContract.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000025 /* libKancerberoFilterContract.a */; };
 		ABCDEF0000000000000000B7 /* uno.kayros.kancerbero.filter.systemextension in Embed Filter Extension */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000026 /* uno.kayros.kancerbero.filter.systemextension */; };
+		ABCDEF0000000000000000D0 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = ABCDEF0000000000000000D1 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -208,6 +209,7 @@
 				ABCDEF000000000000000085 /* libKancerberoCore.a in Frameworks */,
 				ABCDEF000000000000000082 /* libKancerberoC.a in Frameworks */,
 				ABCDEF0000000000000000B6 /* libKancerberoFilterContract.a in Frameworks */,
+				ABCDEF0000000000000000D0 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -425,6 +427,7 @@
 				ABCDEF000000000000000048 /* Resources */,
 				ABCDEF00000000000000004B /* Embed Daemon */,
 				ABCDEF0000000000000000B4 /* Embed Filter Extension */,
+				ABCDEF0000000000000000D3 /* Re-sign Sparkle helpers */,
 			);
 			buildRules = (
 			);
@@ -436,6 +439,9 @@
 			);
 			fileSystemSynchronizedGroups = (
 				ABCDEF000000000000000033 /* Kancerbero */,
+			);
+			packageProductDependencies = (
+				ABCDEF0000000000000000D1 /* Sparkle */,
 			);
 			name = Kancerbero;
 			productName = Kancerbero;
@@ -543,6 +549,9 @@
 			);
 			mainGroup = ABCDEF00000000000000000B;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				ABCDEF0000000000000000D2 /* Sparkle */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = ABCDEF000000000000000002 /* Products */;
 			projectDirPath = "";
@@ -568,6 +577,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		ABCDEF0000000000000000D3 /* Re-sign Sparkle helpers */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Re-sign Sparkle helpers";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nFRAMEWORK=\"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/Sparkle.framework\"\nIDENTITY=\"${EXPANDED_CODE_SIGN_IDENTITY:-}\"\nif [ ! -d \"$FRAMEWORK\" ] || [ -z \"$IDENTITY\" ] || [ \"$IDENTITY\" = \"-\" ]; then\n  exit 0\nfi\nfor item in \"$FRAMEWORK/Versions/B/Autoupdate\" \"$FRAMEWORK/Versions/B/Updater.app\" \"$FRAMEWORK/Versions/B/XPCServices/Downloader.xpc\" \"$FRAMEWORK/Versions/B/XPCServices/Installer.xpc\"; do\n  if [ -e \"$item\" ]; then\n    /usr/bin/codesign --force --options runtime --timestamp --sign \"$IDENTITY\" \"$item\"\n  fi\ndone\n/usr/bin/codesign --force --options runtime --timestamp --sign \"$IDENTITY\" \"$FRAMEWORK\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		ABCDEF000000000000000040 /* Sources */ = {
@@ -797,14 +828,12 @@
 				CODE_SIGN_ENTITLEMENTS = "Resources/App/Kancerbero-Development.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 261025;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = AK37TK8X2Y;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Kancerbero;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
-				MARKETING_VERSION = 0.1.0;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 			};
 			name = Debug;
@@ -815,14 +844,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Resources/App/Kancerbero.entitlements;
-				CURRENT_PROJECT_VERSION = 261025;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = AK37TK8X2Y;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Kancerbero;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
-				MARKETING_VERSION = 0.1.0;
 			};
 			name = Release;
 		};
@@ -991,6 +1018,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		ABCDEF0000000000000000D2 /* Sparkle */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.10.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		ABCDEF0000000000000000D1 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = ABCDEF0000000000000000D2 /* Sparkle */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = ABCDEF000000000000000001 /* Project object */;
 }

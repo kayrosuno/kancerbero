@@ -48,7 +48,8 @@ final class DaemonMetricsSource: NSObject, KancerberoClientXPC, @unchecked Senda
         }
         guard hello.schemaVersion == KBVersion.schema else {
             connection.invalidate()
-            throw KBCollectionError.unavailable("daemon schema \(hello.schemaVersion) is incompatible with \(KBVersion.schema)")
+            throw KBCollectionError.schemaMismatch(expected: KBVersion.schema,
+                                                    actual: hello.schemaVersion)
         }
 
         try sendSubscription(interval: interval, remote: remote)
