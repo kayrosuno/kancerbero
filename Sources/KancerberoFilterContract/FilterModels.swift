@@ -11,10 +11,20 @@ public enum FilterVersion {
     public static var marketing: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
     }
-    /// Build number of the running bundle. The app and the extension share the
-    /// build number, so comparing it detects a stale staged extension.
+    /// Build number of the running bundle. In the extension this is the staged
+    /// system extension; the app compares the ACK against `expectedBuild`.
     public static var build: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+    }
+    /// Build number of the filter extension embedded in this app bundle. Used
+    /// by the app to detect a stale staged extension without tying the filter
+    /// to the app's own (per-build) version.
+    public static var expectedBuild: String {
+        let url = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Library/SystemExtensions/uno.kayros.kancerbero.filter.systemextension",
+                                    isDirectory: true)
+        guard let bundle = Bundle(url: url) else { return "" }
+        return bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
     }
     /// Human-readable version for status displays and the hello message.
     public static var current: String { marketing }

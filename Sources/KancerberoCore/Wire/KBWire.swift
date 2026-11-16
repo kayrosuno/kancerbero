@@ -50,8 +50,8 @@ public struct KBHelloResponse: Codable, Sendable {
     public var schemaVersion: Int
     public var capabilities: KBCapabilities
 
-    public init(daemonVersion: String = KBVersion.current,
-                daemonBuild: String? = KBVersion.build,
+    public init(daemonVersion: String = KBVersion.daemonVersion,
+                daemonBuild: String? = KBVersion.daemonBuild,
                 coreVersion: String = KBVersion.coreVersion,
                 schemaVersion: Int = KBVersion.schema, capabilities: KBCapabilities) {
         self.daemonVersion = daemonVersion

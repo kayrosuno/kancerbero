@@ -89,10 +89,12 @@ extension usa un Mach service distinto y es independiente del daemon.
 | Deployment target | macOS 15.6 |
 | Firma | Debug ad-hoc; Release Developer ID + hardened runtime + timestamp, sin entitlements, identificador `-i uno.kayros.kancerbero` |
 
-`main.swift` exige el argumento `--daemon`. Sin él imprime la versión, el build, la versión del
-core y el `euid`, y sale con código 0; es la forma de comprobar qué binario se va a ejecutar. La
-versión y el build son constantes compiladas (macros de `Config/Version.xcconfig`), de modo que un
-proceso viejo sigue reportando lo que se compiló, no lo que hay ahora en el bundle.
+`main.swift` exige el argumento `--daemon`. Sin él imprime la versión/build de la app, la
+identidad propia del daemon (`daemonVersion`/`daemonBuild`), la versión del core y el `euid`, y
+sale con código 0; es la forma de comprobar qué binario se va a ejecutar. Son constantes
+compiladas: la app viene del xcconfig generado por build y el daemon de
+`Config/ComponentVersions.xcconfig`. Un proceso viejo sigue reportando lo que se compiló, no lo
+que hay ahora en el bundle.
 
 ### Dónde se instala y se ejecuta
 
@@ -346,11 +348,12 @@ sandboxeada debe empezar por uno de sus App Groups; no se usa para compartir est
 4. Reglas y decisiones recordadas se persisten en `rules.plist` dentro del container sandbox de
    la extensión (`Application Support/KancerberoFilter/rules.plist`), así que siguen aplicándose
    tras un reinicio sin la app. Los flujos y el historial viven solo en memoria.
-5. Tras una actualización de la app, `CFBundleVersion` del filtro sube en cada release y
-   `FilterModel.start()` reenvía la activation request si el filtro está habilitado; sysextd
+5. El `CFBundleVersion` del filtro solo sube cuando cambia su hash de fuentes/config; lo anota
+   `Config/ComponentVersions.xcconfig`. Tras una actualización, `FilterModel.start()` reenvía la
+   activation request si el filtro está habilitado y el build staged no coincide; sysextd
    responde `.replace` y staged la copia nueva. Si macOS responde `willCompleteAfterReboot`, la
-   UI avisa de que el filtro se activará tras reiniciar. El ACK del filtro lleva el build (no la
-   versión de marketing) para que la app detecte una extensión staged obsoleta.
+   UI avisa de que el filtro se activará tras reiniciar. El ACK del filtro lleva su propio build
+   y la app lo compara con `FilterVersion.expectedBuild` (el build del filtro embebido).
 
 ### Funciones y uso
 

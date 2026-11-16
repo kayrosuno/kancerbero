@@ -14,6 +14,14 @@
 #define KANCERBERO_BUILD_VERSION "0"
 #endif
 
+#ifndef KANCERBERO_DAEMON_VERSION
+#define KANCERBERO_DAEMON_VERSION "0.1.0"
+#endif
+
+#ifndef KANCERBERO_DAEMON_BUILD_VERSION
+#define KANCERBERO_DAEMON_BUILD_VERSION "0"
+#endif
+
 const char *kb_version(void)
 {
     return KANCERBERO_VERSION;
@@ -22,4 +30,14 @@ const char *kb_version(void)
 const char *kb_build_version(void)
 {
     return KANCERBERO_BUILD_VERSION;
+}
+
+const char *kb_daemon_version(void)
+{
+    return KANCERBERO_DAEMON_VERSION;
+}
+
+const char *kb_daemon_build_version(void)
+{
+    return KANCERBERO_DAEMON_BUILD_VERSION;
 }

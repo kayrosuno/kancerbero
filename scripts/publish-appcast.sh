@@ -2,9 +2,11 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "$ROOT/scripts/lib/version.sh"
+
 REMOTE="${GITHUB_REMOTE:-github}"
-VERSION="$(awk -F' *= *' '$1 == "KANCERBERO_MARKETING_VERSION" { print $2 }' \
-    "$ROOT/Config/Version.xcconfig")"
+APP="$(kancerbero_require_release_app "$ROOT")"
+kancerbero_read_app_version "$APP"
 SRC="$ROOT/build/updates/appcast.xml"
 WT="$ROOT/build/gh-pages"
 
@@ -37,7 +39,7 @@ fi
 cp "$SRC" "$WT/appcast.xml"
 touch "$WT/.nojekyll"
 git -C "$WT" add appcast.xml .nojekyll
-git -C "$WT" commit -m "appcast: v$VERSION"
+git -C "$WT" commit -m "appcast: $VERSION ($BUILD)"
 git -C "$WT" push "$REMOTE" gh-pages
 git -C "$ROOT" worktree remove --force "$WT"
 

@@ -78,35 +78,32 @@ export GITHUB_TOKEN="$(security find-generic-password -s kancerbero-github -w)"
 ## Publicar una versión
 
 ```bash
-./scripts/release.sh 0.1.2 2026111701
+./scripts/release.sh
 ```
 
 El script:
 
-1. Comprueba que el árbol está limpio.
-2. Escribe `Config/Version.xcconfig` con `scripts/set-version.sh` y hace commit + push del bump.
-3. `build-release.sh`: build Release limpio, valida versiones/firma/entitlements.
-4. `notarize.sh`: notarytool + stapler + spctl.
-5. `package-release.sh`: crea el ZIP **después** del stapling y lo verifica extrayéndolo.
-6. `generate-appcast.sh`: descarga el feed anterior, añade la versión nueva y firma el appcast.
+1. Comprueba que el árbol está limpio (incluido `Config/ComponentVersions.xcconfig`).
+2. `build-release.sh`: `clean` + `build` Release; genera la versión/build de la app y valida que
+   el filtro y el daemon coinciden con sus identidades anotadas.
+3. `notarize.sh`: notarytool + stapler + spctl.
+4. `package-release.sh`: crea `Kancerbero-<version>-<build>.zip` **después** del stapling.
+5. `generate-appcast.sh`: descarga el feed anterior, añade la versión nueva y firma el appcast.
 
 Para publicar:
 
 ```bash
 export GITHUB_TOKEN=...
-./scripts/release.sh 0.1.2 2026111701 --publish
+./scripts/release.sh --publish
 ```
 
-Se puede ejecutar directamente (hace todo) o después de un `release.sh` sin `--publish`: si el
-bump ya está commiteado, lo reutiliza. Eso crea el tag `v0.1.2`, la release, sube el ZIP,
-publica el appcast en `gh-pages` y verifica feed + asset.
+El tag es `v<build de la app>` y la release se llama `Kancerbero <version> (<build>)`. No hay
+commit de bump: la versión/build de la app se generan en el build y el tag apunta al HEAD ya
+commiteado.
 
 ### Orden manual equivalente
 
 ```bash
-./scripts/set-version.sh 0.1.2 2026111701
-git commit -am "Release 0.1.2" && git push github main
-
 ./scripts/build-release.sh
 ./scripts/notarize.sh
 ./scripts/package-release.sh
@@ -120,45 +117,73 @@ Nunca publicar el appcast antes que el asset: Sparkle daría 404 al descargar.
 
 ### Bootstrap
 
-La versión 0.1.0 no incluye Sparkle, así que no puede autoactualizarse. La primera build con
-Sparkle (0.1.1) se instala a mano; a partir de ahí las actualizaciones son automáticas. Para
-probar 0.1.1 → 0.1.2, instalar 0.1.1 primero.
+La primera versión con Sparkle se instala a mano; a partir de ahí las actualizaciones son
+automáticas.
 
 ## Versionado
 
-`Config/Version.xcconfig` es la fuente única:
+### App (cada compilación)
+
+`scripts/prepare-build-version.sh` (invocado por la pre-action del scheme y por los scripts)
+genera `build/Generated/Version.xcconfig`:
 
 ```xcconfig
-KANCERBERO_MARKETING_VERSION = 0.1.1
-KANCERBERO_BUILD_VERSION = 2026111601
+KANCERBERO_MARKETING_VERSION = 0.1.261116   # <prefijo>.<YYMMDD>
+KANCERBERO_BUILD_VERSION = 20261116084509   # YYYYMMDDHHMMSS UTC, creciente
 ```
 
-- `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` los heredan todos los targets.
-- Los `Info.plist` de app y filtro usan `$(MARKETING_VERSION)`/`$(CURRENT_PROJECT_VERSION)`.
-- `KBVersion.current`/`KBVersion.build` salen de `kb_version()`/`kb_build_version()`, inyectadas
-  por `GCC_PREPROCESSOR_DEFINITIONS`. Son constantes compiladas: un daemon viejo sigue
-  reportando su versión vieja aunque el bundle nuevo esté en disco.
-- `CURRENT_PROJECT_VERSION` debe ser estrictamente creciente. Sparkle lo usa para comparar
-  versiones y sysextd para reemplazar la extensión staged.
-- `FilterVersion.current` es la versión de marketing del bundle del filtro; `FilterVersion.build`
-  es el número de build que el filtro envía en sus ACK para detectar una extensión obsoleta. No
-  cambiar `FilterVersion.schema` salvo que cambie el protocolo.
+`Config/Version.xcconfig` guarda el prefijo (`0.1`, cambiable con `scripts/set-version.sh`) y los
+fallbacks, e incluye el fichero generado. `KBVersion.current`/`KBVersion.build` salen de
+`kb_version()`/`kb_build_version()`; el `Info.plist` de la app usa los mismos build settings. La
+build de la app es la clave de Sparkle y del appcast.
+
+### Daemon y filtro (solo al cambiar)
+
+`Config/ComponentVersions.xcconfig` (versionado) anota la identidad de cada componente:
+
+```xcconfig
+KANCERBERO_DAEMON_MARKETING_VERSION = 0.1.0
+KANCERBERO_DAEMON_BUILD_VERSION = 20261116084205
+KANCERBERO_DAEMON_SOURCE_HASH = ...
+KANCERBERO_FILTER_MARKETING_VERSION = 0.2.0
+KANCERBERO_FILTER_BUILD_VERSION = 20261116084205
+KANCERBERO_FILTER_SOURCE_HASH = ...
+```
+
+- El generador hashea las fuentes/config de cada componente (incluida su versión de marketing).
+  Si el hash cambia, fija el build del componente al timestamp del build y anota el nuevo hash.
+  Si no cambia, conserva build y hash.
+- El fichero está versionado: un cambio de componente lo deja modificado; hay que commitearlo
+  (el release lo exige).
+- El daemon recibe sus macros `KANCERBERO_DAEMON_*` y reporta `daemonVersion`/`daemonBuild` en el
+  handshake; el filtro usa `KANCERBERO_FILTER_MARKETING_VERSION`/`BUILD` en su `Info.plist`.
+- `KBVersion.daemonVersion`/`daemonBuild` y `FilterVersion.expectedBuild` (build del filtro
+  embebido en la app) son los valores esperados.
+- Cambiar `Config/ComponentVersions.xcconfig` a mano (p. ej. la versión de marketing) también
+  incrementa el build, porque está incluido en el hash.
+- `FilterVersion.schema` solo cambia si cambia el protocolo del filtro.
+
+### Comparaciones
+
+- Daemon: `hello.daemonBuild == KBVersion.daemonBuild`.
+- Filtro: el ACK del filtro (`FilterVersion.build`) contra `FilterVersion.expectedBuild`.
+- La versión de marketing de la app cambia cada día y **no** participa en estas comparaciones.
 
 ## Qué ocurre al actualizar
 
 Sparkle cierra la app, reemplaza `/Applications/Kancerbero.app` (con el daemon y la extensión
 embebidos), y la relanza.
 
-- **Daemon**: al conectar, la app compara `hello.daemonVersion`/`hello.daemonBuild` con
-  `KBVersion.current`/`KBVersion.build`. Si no coinciden, envía el `daemonAction .stop` existente
+- **Daemon**: al conectar, la app compara `hello.daemonBuild` con `KBVersion.daemonBuild`. Si no
+  coincide (o el daemon viejo no reporta build), envía el `daemonAction .stop` existente
   (launchctl mata el job); `KeepAlive.SuccessfulExit=false` hace que launchd lo relance desde el
-  bundle nuevo. Si el stop falla, cae a `repairDaemonService()` (unregister/register) y muestra el
-  estado en **System status**. No se añade ningún mensaje XPC nuevo.
-- **System extension**: el `CFBundleVersion` del filtro sube en cada release. Al arrancar,
-  `FilterModel.start()` llama `ensureInstalled()` si el filtro está habilitado; sysextd recibe una
-  activation request `.replace` y staged la versión nueva. Si macOS responde
+  bundle nuevo. Si el stop falla, cae a `repairDaemonService()` y muestra el estado en **System
+  status**. Una build de la app que no cambia el daemon no lo reinicia.
+- **System extension**: el `CFBundleVersion` del filtro solo cambia cuando cambia el componente.
+  Al arrancar, `FilterModel.start()` llama `ensureInstalled()` si el filtro está habilitado;
+  sysextd recibe una activation request `.replace` y staged la versión nueva. Si macOS responde
   `willCompleteAfterReboot`, Ajustes → Updates muestra “The network filter update completes after a
-  restart”.
+  restart”. Una build de la app que no cambia el filtro no lo reemplaza.
 - **FDA/TCC**: el reemplazo es in-place, con el mismo bundle id, ruta y team Developer ID
   (`AK37TK8X2Y`). La concesión de Full Disk Access se conserva; verificar tras la actualización.
 
@@ -203,6 +228,8 @@ spctl -a -vvv -t exec /Applications/Kancerbero.app
 - Clave privada EdDSA en el Keychain, nunca en el repo.
 - `SUVerifyUpdateBeforeExtraction` y `SURequireSignedFeed` activos: firma del ZIP y del feed.
 - HTTPS obligatorio (Pages y Releases). Sin excepciones ATS en Release.
-- `CFBundleVersion` estrictamente creciente: impide downgrades.
+- `CFBundleVersion` de la app estrictamente creciente (timestamp): impide downgrades. Los builds
+  de daemon y filtro son independientes y estables mientras su hash no cambie; se anotan en
+  `Config/ComponentVersions.xcconfig`.
 - La release se publica desde una máquina de confianza; el token de GitHub no se commitea.
 - Un feed comprometido no sirve sin la clave privada.

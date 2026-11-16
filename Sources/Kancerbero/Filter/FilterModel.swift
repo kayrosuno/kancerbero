@@ -342,9 +342,9 @@ final class FilterModel {
               let envelope = try? FilterCodec.decodeEnvelope(reply),
               let ack = try? FilterCodec.decodePayload(FilterAck.self, from: envelope),
               ack.ok else { return }
-        // Old extensions acknowledge with their marketing version (or nothing);
-        // the build number is what identifies the staged extension.
-        extensionIsCurrent = ack.message == FilterVersion.build
+        // Compare against the build of the filter embedded in this app, not the
+        // app's own build (which changes on every host build).
+        extensionIsCurrent = ack.message == FilterVersion.expectedBuild
     }
 
     // MARK: - Applying extension state

@@ -1408,14 +1408,16 @@ runtime y timestamp; que la app no lleva `get-task-allow`; que ambas firmas llev
      `setRules` no trae la versión esperada). Tras reinstalar/reactivar la extensión pasa a
      **Blocking** y `log stream --predicate 'subsystem == "uno.kayros.kancerbero.filter"'`
      muestra `setRules: … global block on`.
-   - **Actualizar la extensión**: los cambios en `Sources/KancerberoFilter` exigen un build
-     Release limpio (`./scripts/clean.sh --release`; `build-release.sh` ya hace `clean build`) y
-     subir `CFBundleVersion` en `Resources/Filter/Info.plist`, o instalar puede dejar la copia
-     antigua en `/Library/SystemExtensions` aunque la app se actualice. Si sysextd no la
-     reemplaza, `sudo systemextensionsctl uninstall AK37TK8X2Y uno.kayros.kancerbero.filter` y
-     volver a instalar/aprobar. Tras el reemplazo, `systemextensionsctl list` puede mostrar la
-     copia anterior como «terminated waiting to uninstall on reboot»: reiniciar para que la
-     nueva arranque y el proveedor pueda conectar por XPC.
+   - **Actualizar la extensión**: los cambios en `Sources/KancerberoFilter` (o en
+     `KancerberoFilterContract`/`Resources/Filter`) hacen que `prepare-build-version.sh` suba el
+     build del filtro en `Config/ComponentVersions.xcconfig`; el `CFBundleVersion` de
+     `Resources/Filter/Info.plist` se genera desde ahí, no se edita a mano. `build-release.sh`
+     hace `clean` + `build`. Si sysextd no reemplaza la copia antigua de
+     `/Library/SystemExtensions`, `sudo systemextensionsctl uninstall AK37TK8X2Y
+     uno.kayros.kancerbero.filter` y volver a instalar/aprobar. Tras el reemplazo,
+     `systemextensionsctl list` puede mostrar la copia anterior como «terminated waiting to
+     uninstall on reboot»: reiniciar para que la nueva arranque y el proveedor pueda conectar
+     por XPC.
 
 ### Desinstalación
 
@@ -1638,3 +1640,45 @@ La build Debug no arranca el updater salvo que se pase `KANCERBERO_UPDATE_FEED`.
 el appcast firmado servido por `python3 -m http.server 8000 --bind 127.0.0.1 --directory
 build/updates`: la app hace `GET /appcast.xml` y lo acepta (ATS permite loopback). Para la prueba
 real de instalación es preferible un prerelease HTTPS.
+
+## Versión y build automáticos
+
+La app genera su marketing/build en cada compilación; el daemon y el filtro tienen identidades
+propias y solo cambian cuando cambia su hash de fuentes/config.
+
+```bash
+# Generador
+./scripts/prepare-build-version.sh
+/usr/libexec/PlistBuddy -c 'Print :marketing' build/Generated/Version.plist
+/usr/libexec/PlistBuddy -c 'Print :build' build/Generated/Version.plist
+cat Config/ComponentVersions.xcconfig
+
+# Build desde cero (la pre-action debe recrear build/Generated sin wrapper)
+rm -rf build/Generated
+xcodebuild -project Kancerbero.xcodeproj -scheme Kancerbero \
+  -configuration Debug -derivedDataPath build build \
+  CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS=
+
+APP=build/Build/Products/Debug/Kancerbero.app
+EXT="$APP/Contents/Library/SystemExtensions/uno.kayros.kancerbero.filter.systemextension"
+/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$EXT/Contents/Info.plist"
+build/Build/Products/Debug/KancerberoDaemon | head -1
+```
+
+- **Sin cambios**: dos `./scripts/build.sh` seguidos. El `CFBundleVersion` de la app sube; los de
+  daemon y filtro no cambian; `Config/ComponentVersions.xcconfig` no se modifica. La app no debe
+  reiniciar el daemon ni re-staged el filtro.
+- **Solo app**: cambiar una vista de `Sources/Kancerbero`; el build de la app sube y los
+  componentes siguen iguales.
+- **Daemon**: cambiar `Sources/KancerberoDaemon` (o `KancerberoCore`/`KancerberoC`); el build del
+  daemon sube en `Config/ComponentVersions.xcconfig`, el filtro no cambia y la app reinicia el
+  daemon al conectar.
+- **Filtro**: cambiar `Sources/KancerberoFilter` (o `KancerberoFilterContract`/`Resources/Filter`);
+  el build del filtro sube, el daemon no cambia y la app envía una activation request `.replace`.
+- **Anotación**: un build que cambia un componente deja `Config/ComponentVersions.xcconfig`
+  modificado; hay que commitearlo. `build-release.sh` se niega a continuar si cambió durante el
+  build y `release.sh` exige el árbol limpio antes de empezar.
+- **Release**: `./scripts/release.sh` valida app/filtro/daemon, notariza y genera un appcast con
+  el build de la app; `sign_update --verify`; tag `v<build de la app>`.

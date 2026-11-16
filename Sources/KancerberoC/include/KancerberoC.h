@@ -12,6 +12,9 @@ extern "C" {
 const char *kb_version(void);
 /* Compile-time build number (CFBundleVersion equivalent). */
 const char *kb_build_version(void);
+/* Recorded daemon identity, independent from the host app's version. */
+const char *kb_daemon_version(void);
+const char *kb_daemon_build_version(void);
 
 /* NetworkStatistics.framework (private), loaded with dlopen. */
 int kb_nstat_open(void);
