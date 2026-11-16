@@ -219,7 +219,7 @@ build/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update --verify /tmp/app
 # Versión instalada y daemon
 defaults read /Applications/Kancerbero.app/Contents/Info CFBundleShortVersionString
 defaults read /Applications/Kancerbero.app/Contents/Info CFBundleVersion
-launchctl print system/uno.kayros.kancerbero.daemon.v2 | grep -E 'pid|state'
+launchctl print system/uno.kayros.kancerbero.daemon.service | grep -E 'pid|state'
 
 # Filtro staged
 systemextensionsctl list | grep uno.kayros.kancerbero.filter

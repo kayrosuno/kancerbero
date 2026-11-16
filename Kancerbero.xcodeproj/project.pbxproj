@@ -15,6 +15,7 @@
 		ABCDEF000000000000000086 /* libKancerberoCore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000021 /* libKancerberoCore.a */; };
 		ABCDEF000000000000000087 /* KancerberoDaemon in Embed Daemon */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000022 /* KancerberoDaemon */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		ABCDEF000000000000000088 /* uno.kayros.kancerbero.daemon.plist in Embed Daemon */ = {isa = PBXBuildFile; fileRef = ABCDEF00000000000000009C /* uno.kayros.kancerbero.daemon.plist */; };
+		ABCDEF0000000000000000C5 /* uno.kayros.kancerbero.daemon.service.plist in Embed Daemon */ = {isa = PBXBuildFile; fileRef = ABCDEF0000000000000000C4 /* uno.kayros.kancerbero.daemon.service.plist */; };
 		ABCDEF0000000000000000B5 /* libKancerberoFilterContract.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000025 /* libKancerberoFilterContract.a */; };
 		ABCDEF0000000000000000B6 /* libKancerberoFilterContract.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000025 /* libKancerberoFilterContract.a */; };
 		ABCDEF0000000000000000B7 /* uno.kayros.kancerbero.filter.systemextension in Embed Filter Extension */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000026 /* uno.kayros.kancerbero.filter.systemextension */; };
@@ -87,6 +88,7 @@
 			dstPath = Contents/Library/LaunchDaemons;
 			dstSubfolderSpec = 1;
 			files = (
+				ABCDEF0000000000000000C5 /* uno.kayros.kancerbero.daemon.service.plist in Embed Daemon */,
 				ABCDEF000000000000000088 /* uno.kayros.kancerbero.daemon.plist in Embed Daemon */,
 				ABCDEF000000000000000087 /* KancerberoDaemon in Embed Daemon */,
 			);
@@ -129,6 +131,7 @@
 		ABCDEF000000000000000097 /* KancerberoProbe.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = KancerberoProbe.xcconfig; sourceTree = "<group>"; };
 		ABCDEF000000000000000099 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		ABCDEF00000000000000009C /* uno.kayros.kancerbero.daemon.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = uno.kayros.kancerbero.daemon.plist; sourceTree = "<group>"; };
+		ABCDEF0000000000000000C4 /* uno.kayros.kancerbero.daemon.service.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = uno.kayros.kancerbero.daemon.service.plist; sourceTree = "<group>"; };
 		ABCDEF00000000000000009D /* KancerberoFilterContract.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = KancerberoFilterContract.xcconfig; sourceTree = "<group>"; };
 		ABCDEF00000000000000009E /* KancerberoFilter.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = KancerberoFilter.xcconfig; sourceTree = "<group>"; };
 		ABCDEF00000000000000009F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -320,6 +323,7 @@
 		ABCDEF00000000000000000A /* LaunchDaemons */ = {
 			isa = PBXGroup;
 			children = (
+				ABCDEF0000000000000000C4 /* uno.kayros.kancerbero.daemon.service.plist */,
 				ABCDEF00000000000000009C /* uno.kayros.kancerbero.daemon.plist */,
 			);
 			path = LaunchDaemons;

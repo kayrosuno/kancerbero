@@ -156,7 +156,11 @@ final class AppModel {
     private var sleepTask: Task<Void, Never>?
     private var batteryGraphFetchedAt = Date.distantPast
     private var batteryGraphFetchInFlight = false
-    private static let daemonServicePlist = "uno.kayros.kancerbero.daemon.plist"
+    private static let daemonServicePlist = "uno.kayros.kancerbero.daemon.service.plist"
+    /// Previous service identity. The plist is embedded only so an updated app
+    /// can unregister the old registration; it is never registered again.
+    /// Remove it, its Xcode entries and the cleanup code after one release.
+    private static let daemonLegacyPlist = "uno.kayros.kancerbero.daemon.plist"
 
     private var daemonService: SMAppService {
         .daemon(plistName: Self.daemonServicePlist)
@@ -191,7 +195,9 @@ final class AppModel {
     private var unresolvedHostNames: Set<String> = []
     private var resolvingHostNames: Set<String> = []
     private var registrationCheckTask: Task<Void, Never>?
+    private var legacyDaemonCleanupTask: Task<Void, Never>?
     private static let daemonFingerprintKey = "daemon.registrationFingerprint"
+    private static let legacyDaemonCleanupKey = "daemon.legacyV2CleanupDone"
     /// Set when the user explicitly disables the background service, so the
     /// automatic recovery on launch does not override that decision.
     private static let autoRegisterDisabledKey = "daemon.autoRegisterDisabled"
@@ -271,7 +277,7 @@ final class AppModel {
             return "\(size):\(inode):\(mtime)"
         }
         let plist = daemonBundleDirectory.appendingPathComponent(Self.daemonServicePlist)
-        return "\(stamp(daemonExecutableURL))|\(stamp(plist))"
+        return "\(Self.daemonServicePlist)|\(stamp(daemonExecutableURL))|\(stamp(plist))"
     }
 
     var daemonHelperPresent: Bool {
@@ -457,6 +463,49 @@ final class AppModel {
         daemonProcessRunning = match != nil
     }
 
+    /// The service identity changed from `...daemon.v2` to `...daemon.service`.
+    /// The previous plist is still embedded so this build can unregister the old
+    /// registration; otherwise the old job and its Login Items entry would
+    /// survive the update. Best effort: retry on the next launch on failure.
+    private func cleanupLegacyDaemonRegistrationIfNeeded() async {
+        guard !UserDefaults.standard.bool(forKey: Self.legacyDaemonCleanupKey) else { return }
+        if let legacyDaemonCleanupTask {
+            await legacyDaemonCleanupTask.value
+            return
+        }
+        let legacyPlist = Self.daemonLegacyPlist
+        let legacyURL = daemonBundleDirectory.appendingPathComponent(legacyPlist)
+        guard FileManager.default.fileExists(atPath: legacyURL.path) else {
+            UserDefaults.standard.set(true, forKey: Self.legacyDaemonCleanupKey)
+            return
+        }
+        let task = Task { [weak self] in
+            guard let self else { return }
+            let status = SMAppService.daemon(plistName: legacyPlist).status
+            do {
+                try await Task.detached(priority: .utility) {
+                    try SMAppService.daemon(plistName: legacyPlist).unregister()
+                }.value
+                UserDefaults.standard.set(true, forKey: Self.legacyDaemonCleanupKey)
+                UserDefaults.standard.removeObject(forKey: Self.daemonFingerprintKey)
+                logger.notice("legacy daemon unregistered (was \(String(describing: status), privacy: .public))")
+            } catch {
+                let nsError = error as NSError
+                // kSMErrorJobNotFound = 6: there was nothing left to remove.
+                if nsError.code == 6 {
+                    UserDefaults.standard.set(true, forKey: Self.legacyDaemonCleanupKey)
+                    UserDefaults.standard.removeObject(forKey: Self.daemonFingerprintKey)
+                    logger.notice("legacy daemon was already unregistered (was \(String(describing: status), privacy: .public))")
+                } else {
+                    logger.error("legacy daemon unregister failed: \(nsError.localizedDescription, privacy: .public)")
+                }
+            }
+        }
+        legacyDaemonCleanupTask = task
+        await task.value
+        legacyDaemonCleanupTask = nil
+    }
+
     func registerDaemonService() async {
         guard !serviceActionInFlight else { return }
         serviceActionInFlight = true
@@ -471,6 +520,7 @@ final class AppModel {
             serviceError = helperMissingMessage
             return
         }
+        await cleanupLegacyDaemonRegistrationIfNeeded()
         let plistName = Self.daemonServicePlist
         var alreadyRegistered = false
         do {
@@ -581,13 +631,17 @@ final class AppModel {
               daemonHelperPresent,
               daemonPlistPresent,
               !daemonConnecting,
-              !daemonUpdateRestartInFlight,
-              !usingDaemon else { return }
+              !daemonUpdateRestartInFlight else { return }
+
+        // The service identity changed in this version. Remove the previous
+        // `.v2` registration before registering the new one, even when the user
+        // disabled auto-registration.
+        await cleanupLegacyDaemonRegistrationIfNeeded()
+        guard !usingDaemon else { return }
         refreshServiceStatus()
 
-        // The service identity changed in this version (and a user may install
-        // over an older registration), so register it once on launch unless the
-        // user explicitly disabled it.
+        // Register the new service once on launch unless the user explicitly
+        // disabled it.
         if serviceStatus == .notRegistered,
            !UserDefaults.standard.bool(forKey: Self.autoRegisterDisabledKey) {
             logger.notice("background service not registered; registering")

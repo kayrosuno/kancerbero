@@ -4,7 +4,8 @@
 
 - La app no está sandboxeada y usa APIs privadas; no es apta para App Store.
 - El daemon se registra con `SMAppService` y corre como root; no hay modos legacy de instalación
-  ni helpers instalados con `sudo`.
+  ni helpers instalados con `sudo`. El plist legado `.v2` que se incrusta temporalmente es inerte:
+  no se registra y solo permite desregistrar el servicio anterior durante la migración.
 - El daemon solo expone lectura de inventario (procesos, sockets, ficheros, contadores y
   CPU/memoria). No lee contenido de ficheros, no ejecuta comandos y no escribe en disco.
 

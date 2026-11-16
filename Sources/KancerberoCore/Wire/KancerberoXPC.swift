@@ -12,5 +12,5 @@ import Foundation
 }
 
 public enum KancerberoXPCNames {
-    public static let machService = "uno.kayros.kancerbero.daemon.v2"
+    public static let machService = "uno.kayros.kancerbero.daemon.service"
 }

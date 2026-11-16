@@ -103,7 +103,7 @@ kancerbero usa la ruta IFMIB (`net.link.generic.system.ifcount` +
 ```bash
 K=./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
 "$K" --register-service
-launchctl print system/uno.kayros.kancerbero.daemon.v2
+launchctl print system/uno.kayros.kancerbero.daemon.service
 # la app debe mostrar "source: daemon" en la barra inferior
 "$K" --unregister-service
 ```
@@ -1218,14 +1218,15 @@ open /Applications/Kancerbero.app
   desregistra/registra el helper para que macOS pueda volver a pedir aprobación.
 - Aprobar en **Ajustes → General → Login Items & Extensions → Allow in the Background**. El
   ítem debe mostrar **Kancerbero con el icono de la app**.
-- `launchctl print system/uno.kayros.kancerbero.daemon.v2` y
+- `launchctl print system/uno.kayros.kancerbero.daemon.service` y
   `log show --predicate 'subsystem == "uno.kayros.kancerbero"' --last 5m --info`.
 - Comprobar la firma del daemon embebido antes y después de instalar:
   `codesign -dvvv .../KancerberoDaemon` debe mostrar `Identifier=uno.kayros.kancerbero` (el mismo
   que la app) y `codesign -d --entitlements - --xml` un diccionario vacío. Si launchd lo mata,
   el log del kernel muestra `AMFI: Launch Constraint Violation ... c[5]p[1]m[1]e[0]` y Login
   Items sigue diciendo “enabled”. Un registro BTM antiguo que no coincide no se arregla
-  re-registrando el mismo label: `sudo sfltool resetbtm` + reinicio, o usar la identidad `.v2`.
+  re-registrando el mismo label: `sudo sfltool resetbtm` + reinicio es el último recurso. La
+  identidad actual `...daemon.service` es nueva y no arrastra constraints del label histórico.
 - La app registra el servicio sola al arrancar si está en `/Applications` y el usuario no lo ha
   desactivado; un cambio de ejecutable/plist la re-registra una vez por ejecución. System status
   muestra el proceso real (`Daemon process`), su PID y el último error de conexión.
@@ -1233,6 +1234,18 @@ open /Applications/Kancerbero.app
   volver a modo local.
 - Sin notarización, Gatekeeper marca la app como “Unnotarized Developer ID” y el registro del
   daemon no es fiable; completar `notarytool store-credentials` + `scripts/notarize.sh`.
+
+### Migración `.v2` → `.service`
+
+1. Con la build anterior instalada y el servicio `.v2` aprobado:
+   `launchctl print system/uno.kayros.kancerbero.daemon.v2` debe mostrar el job.
+2. Instalar la build nueva notarizada, abrirla y aprobar el nuevo item en Login Items.
+3. Comprobar:
+   - `.v2` ya no existe; `launchctl print system/uno.kayros.kancerbero.daemon.service` está running;
+   - hay un solo proceso `KancerberoDaemon`;
+   - `defaults read uno.kayros.kancerbero daemon.legacyV2CleanupDone` vale `1`;
+   - la app muestra “Daemon connected” y XPC privilegiado funciona.
+4. Reabrir la app: el cleanup no se repite y `.v2` no reaparece.
 
 ### Verificación visual de la ventana
 
@@ -1611,6 +1624,7 @@ curl -fsSIL "$(grep -o 'https://github.com/[^"]*\.zip' /tmp/appcast.xml | head -
 | Offline | Desconectar red y pulsar Check | Error controlado |
 | App fuera de /Applications | Copiar a ~/Applications | Aviso; no se permite instalar |
 | Daemon viejo | Instalar versión anterior y actualizar | El PID del daemon cambia; hello reporta la versión/build nuevos |
+| Cambio de identidad del daemon | Actualizar desde una build con `.v2` aprobado | `.v2` desaparece; `.service` pide aprobación; tras aprobar, un solo daemon y XPC OK |
 | Stop del daemon falla | Daemon sin `daemonAction` | Fallback a `repairDaemonService`; aviso, sin bucle |
 | Schema incompatible | Cambiar `KBVersion.schema` en una build de prueba | El handshake falla y se reinicia el daemon |
 | Filtro reemplazado | Actualizar con el filtro activo | `systemextensionsctl list` muestra el build nuevo; el filtro sigue |
@@ -1622,7 +1636,7 @@ curl -fsSIL "$(grep -o 'https://github.com/[^"]*\.zip' /tmp/appcast.xml | head -
 ```bash
 defaults read /Applications/Kancerbero.app/Contents/Info CFBundleShortVersionString
 defaults read /Applications/Kancerbero.app/Contents/Info CFBundleVersion
-launchctl print system/uno.kayros.kancerbero.daemon.v2 | grep -E 'pid|state'
+launchctl print system/uno.kayros.kancerbero.daemon.service | grep -E 'pid|state'
 systemextensionsctl list | grep uno.kayros.kancerbero.filter
 codesign --verify --deep --strict --verbose=2 /Applications/Kancerbero.app
 xcrun stapler validate /Applications/Kancerbero.app
