@@ -462,6 +462,21 @@ xcrun notarytool store-credentials kancerbero-notary \
 ./scripts/install-app.sh        # instalación manual para probar
 ```
 
+DMG de distribución (manual, opcional):
+
+```bash
+# Requiere la app Release ya notarizada/stapled y el perfil kancerbero-notary.
+# Ejecutar desde una sesión gráfica y permitir a la terminal controlar Finder
+# la primera vez (Automatización).
+./scripts/package-dmg.sh
+# -> build/updates/dmg/Kancerbero-<version>.dmg
+```
+
+El DMG es un artefacto manual: `release.sh` no lo genera y `publish-release.sh` no lo sube; el
+appcast de Sparkle sigue apuntando al ZIP. El script firma el DMG con Developer ID, lo notariza,
+le grapa el ticket y verifica la imagen y la app embebida. Para probar el layout sin notarización:
+`KANCERBERO_DMG_DEV=1`; en entornos sin Finder: `KANCERBERO_DMG_SKIP_LAYOUT=1` (sin fondo).
+
 La app se actualiza con **Sparkle 2** (feed EdDSA en GitHub Pages, ZIP en GitHub Releases). La
 primera versión con Sparkle se instala a mano; a partir de ahí las actualizaciones son
 automáticas. La versión de la app es `0.2.<build>`, con el build en formato `YYMMDDHHMM` (10

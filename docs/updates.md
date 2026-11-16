@@ -174,6 +174,40 @@ Nunca publicar el appcast antes que el asset: Sparkle daría 404 al descargar.
 La primera versión con Sparkle se instala a mano (`gh release download v<build> --repo
 kayrosuno/kancerbero` o `curl`); a partir de ahí las actualizaciones son automáticas.
 
+## DMG de distribución (manual)
+
+El DMG no forma parte de Sparkle ni de `release.sh`. Se genera a partir de la app Release ya
+notarizada y stapled:
+
+```bash
+./scripts/build-release.sh
+./scripts/notarize.sh
+./scripts/package-dmg.sh
+```
+
+Salida: `build/updates/dmg/Kancerbero-<version>.dmg` (APFS dentro de UDZO). El script firma el DMG
+con Developer ID, lo notariza con `kancerbero-notary`, le grapa el ticket y verifica la imagen y la
+app embebida. Necesita una sesión gráfica y permiso de Automatización para controlar Finder; el
+fondo y las posiciones de los iconos se configuran con AppleScript.
+
+- El fondo está versionado en `Resources/DMG/background.png` (1320×896, 144 DPI) y se regenera con
+  `scripts/lib/dmg-background.swift`.
+- El DMG **no** se publica automáticamente. Para subirlo a mano:
+  `gh release upload v<build> build/updates/dmg/Kancerbero-<version>.dmg --repo kayrosuno/kancerbero`
+- No mover el DMG al nivel superior de `build/updates`: `generate_appcast` escanea ese directorio y
+  trata `.dmg` como archivo de actualización. El subdirectorio `dmg/` se ignora.
+- Modos de prueba: `KANCERBERO_DMG_DEV=1` (firma sin notarizar, salida `-dev.dmg`) y
+  `KANCERBERO_DMG_SKIP_LAYOUT=1` (sin Finder; el fondo no se muestra).
+- Verificación:
+
+```bash
+DMG=build/updates/dmg/Kancerbero-<version>.dmg
+codesign --verify --verbose=2 "$DMG"
+xcrun stapler validate "$DMG"
+spctl --assess --type open --context context:primary-signature -vvv "$DMG"
+hdiutil verify "$DMG"
+```
+
 ## Versionado
 
 ### App (cada compilación)
