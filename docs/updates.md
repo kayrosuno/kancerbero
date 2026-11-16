@@ -4,12 +4,52 @@ Kancerbero se actualiza con **Sparkle 2.10.1**. El appcast vive en GitHub Pages 
 notarizados en GitHub Releases:
 
 - Feed: <https://kayrosuno.github.io/kancerbero/appcast.xml>
-- Binarios: `https://github.com/kayrosuno/kancerbero/releases/download/v<version>/Kancerbero-<version>.zip`
+- Binarios: `https://github.com/kayrosuno/kancerbero/releases/download/v<build>/Kancerbero-<version>.zip`
+- Build: `YYMMDDHHMM` (10 dígitos, UTC); la versión es `<prefijo>.<build>`
 - Firma: EdDSA sobre cada ZIP y sobre el propio appcast (`SURequireSignedFeed`).
 
 Otty usa un updater propio con feed JSON y un `install-helper.sh`; su `sha256` está vacío. No se
 copia ese diseño: Sparkle firma criptográficamente cada archivo, verifica la firma antes de
 extraer, reemplaza el bundle con rollback y relanza la app.
+
+## Checklist de GitHub (una sola vez)
+
+1. **Repo público.** Pages y los assets deben ser accesibles sin autenticación. No hay CNAME: el
+   site es `https://kayrosuno.github.io/kancerbero/`.
+2. **Autenticación de publicación.** Recomendado `gh auth login` y comprobar con `gh auth status`.
+   Alternativa sin `gh`: PAT fine-grained con **Contents: Read and write** sobre
+   `kayrosuno/kancerbero`, guardado en el Keychain:
+   ```bash
+   security add-generic-password -U -a kancerbero-github -s kancerbero-github -w
+   export GITHUB_TOKEN="$(security find-generic-password -a kancerbero-github -s kancerbero-github -w)"
+   ```
+   El tag y `gh-pages` se empujan por SSH; la credencial (gh o PAT) solo se usa para la release.
+3. **Primer release en orden.** No usar `release.sh --publish` la primera vez: Pages aún no está
+   activo y `verify-release.sh` fallaría. Ejecutar:
+   ```bash
+   ./scripts/release.sh              # build + notarización + ZIP + appcast local
+   ./scripts/publish-release.sh     # tag v<build> + release + asset
+   ./scripts/publish-appcast.sh     # crea/actualiza gh-pages
+   # activar Pages (paso 4)
+   ./scripts/verify-release.sh
+   ```
+4. **Activar Pages.** Repo → **Settings → Pages → Deploy from a branch → `gh-pages` / (root) →
+   Save**. La rama debe existir antes de poder seleccionarla. Si `has_pages` ya era true pero el
+   feed da 404, comprobar que la fuente no sea `main` ni GitHub Actions.
+5. **Verificar.** `./scripts/verify-release.sh` espera 12×15 s; el primer despliegue de Pages
+   puede tardar más, así que reintentar no es un fallo. Comprobación manual:
+   ```bash
+   curl -fsSL -H 'Cache-Control: no-cache' \
+     https://kayrosuno.github.io/kancerbero/appcast.xml -o /tmp/appcast.xml
+   xmllint --noout /tmp/appcast.xml
+   gh release view v<build> --repo kayrosuno/kancerbero
+   ```
+6. **Bootstrap.** La primera build con Sparkle se instala a mano (`gh release download` o `curl`);
+   después se publica otra build y se prueba **Kancerbero → Check for Updates…**.
+
+Antes del primer release: árbol limpio, perfil `kancerbero-notary`, copia de la clave EdDSA y
+`build/updates/` sin artefactos obsoletos (`generate_appcast` reutiliza el appcast y escanea todos
+los ZIP del directorio).
 
 ## Puesta en marcha (una sola vez)
 
@@ -66,13 +106,19 @@ Comprobar:
 curl -fsSL https://kayrosuno.github.io/kancerbero/appcast.xml | head
 ```
 
-### Token de GitHub
+### GitHub CLI o token
 
-`publish-release.sh` usa la API de Releases (no hay `gh` instalado). Exportar un PAT con
-`Contents: Read and write`:
+`publish-release.sh` usa `gh` si está instalado y autenticado:
 
 ```bash
-export GITHUB_TOKEN="$(security find-generic-password -s kancerbero-github -w)"
+gh auth login        # una vez
+gh auth status
+```
+
+Si no hay `gh`, cae a la API de Releases y exige un PAT con `Contents: Read and write`:
+
+```bash
+export GITHUB_TOKEN="$(security find-generic-password -a kancerbero-github -s kancerbero-github -w)"
 ```
 
 ## Publicar una versión
@@ -83,19 +129,27 @@ export GITHUB_TOKEN="$(security find-generic-password -s kancerbero-github -w)"
 
 El script:
 
-1. Comprueba que el árbol está limpio (incluido `Config/ComponentVersions.xcconfig`).
+1. Comprueba que el árbol está limpio (incluido `Config/ComponentVersions.xcconfig`) y, con
+   `--publish`, que `gh`/el token y el upstream están listos antes de compilar.
 2. `build-release.sh`: `clean` + `build` Release; genera la versión/build de la app y valida que
    el filtro y el daemon coinciden con sus identidades anotadas.
 3. `notarize.sh`: notarytool + stapler + spctl.
-4. `package-release.sh`: crea `Kancerbero-<version>-<build>.zip` **después** del stapling.
+4. `package-release.sh`: crea `Kancerbero-<version>.zip` **después** del stapling. La versión ya
+   contiene el build, así que el nombre es único.
 5. `generate-appcast.sh`: descarga el feed anterior, añade la versión nueva y firma el appcast.
 
 Para publicar:
 
 ```bash
-export GITHUB_TOKEN=...
+gh auth login          # una vez
 ./scripts/release.sh --publish
 ```
+
+Con `gh` no hace falta `GITHUB_TOKEN`; si no está instalado, exportarlo como antes.
+`publish-release.sh` es idempotente: reutiliza la release existente y reemplaza el asset en un
+reintento. `generate-appcast.sh` rechaza publicar un build que no sea mayor que el item más nuevo
+del feed. `release.sh --publish` comprueba antes de compilar que la credencial y el upstream estén
+listos; si `github/main` está obsoleto, `git fetch github`.
 
 El tag es `v<build de la app>` y la release se llama `Kancerbero <version> (<build>)`. No hay
 commit de bump: la versión/build de la app se generan en el build y el tag apunta al HEAD ya
@@ -117,8 +171,8 @@ Nunca publicar el appcast antes que el asset: Sparkle daría 404 al descargar.
 
 ### Bootstrap
 
-La primera versión con Sparkle se instala a mano; a partir de ahí las actualizaciones son
-automáticas.
+La primera versión con Sparkle se instala a mano (`gh release download v<build> --repo
+kayrosuno/kancerbero` o `curl`); a partir de ahí las actualizaciones son automáticas.
 
 ## Versionado
 
@@ -128,15 +182,17 @@ automáticas.
 genera `build/Generated/Version.xcconfig`:
 
 ```xcconfig
-KANCERBERO_MARKETING_VERSION = 0.2.20261116095540   # <prefijo>.<build>
-KANCERBERO_BUILD_VERSION = 20261116095540           # YYYYMMDDHHMMSS UTC, creciente
+KANCERBERO_MARKETING_VERSION = 0.2.2611160955   # <prefijo>.<build>
+KANCERBERO_BUILD_VERSION = 2611160955           # YYMMDDHHMM UTC, creciente
 ```
 
 `Config/Version.xcconfig` guarda el prefijo (`0.2`, cambiable con `scripts/set-version.sh`) y los
 fallbacks, e incluye el fichero generado. `KBVersion.current`/`KBVersion.build` salen de
 `kb_version()`/`kb_build_version()`; el `Info.plist` de la app usa los mismos build settings. La
 build de la app es la clave de Sparkle y del appcast; **el último componente de la versión es
-exactamente el build**.
+exactamente el build**. El generador normaliza builds legados de 14 dígitos
+(`YYYYMMDDHHMMSS`) al esquema de 10 dígitos, tanto el estado generado como los tags `v<build>`,
+para que el floor monotónico no retroceda.
 
 ### Daemon y filtro (solo al cambiar)
 
@@ -144,13 +200,13 @@ exactamente el build**.
 
 ```xcconfig
 KANCERBERO_DAEMON_VERSION_PREFIX = 0.2
-KANCERBERO_DAEMON_BUILD_VERSION = 20261116095438
+KANCERBERO_DAEMON_BUILD_VERSION = 2611162249
 KANCERBERO_DAEMON_SOURCE_HASH = ...
 KANCERBERO_FILTER_VERSION_PREFIX = 0.2
-KANCERBERO_FILTER_BUILD_VERSION = 20261116095438
+KANCERBERO_FILTER_BUILD_VERSION = 2611160954
 KANCERBERO_FILTER_SOURCE_HASH = ...
-KANCERBERO_DAEMON_MARKETING_VERSION = 0.2.20261116095438
-KANCERBERO_FILTER_MARKETING_VERSION = 0.2.20261116095438
+KANCERBERO_DAEMON_MARKETING_VERSION = 0.2.2611162249
+KANCERBERO_FILTER_MARKETING_VERSION = 0.2.2611160954
 ```
 
 - El generador hashea **solo fuentes/config** de cada componente (sin marketing/build, para no
@@ -197,6 +253,11 @@ embebidos), y la relanza.
   (launchctl mata el job); `KeepAlive.SuccessfulExit=false` hace que launchd lo relance desde el
   bundle nuevo. Si el stop falla, cae a `repairDaemonService()` y muestra el estado en **System
   status**. Una build de la app que no cambia el daemon no lo reinicia.
+- **Identidad del servicio**: desde esta versión el daemon usa
+  `uno.kayros.kancerbero.daemon.service` (antes `.v2`). En la primera ejecución tras actualizar, la
+  app desregistra una vez el servicio antiguo con el plist legado incrustado; como la identidad
+  cambia, macOS pide aprobar de nuevo el background item en Login Items. El plist legado y su
+  código de limpieza se retiran tras un ciclo de release.
 - **System extension**: el `CFBundleVersion` del filtro solo cambia cuando cambia el componente.
   Al arrancar, `FilterModel.start()` llama `ensureInstalled()` si el filtro está habilitado;
   sysextd recibe una activation request `.replace` y staged la versión nueva. Si macOS responde
@@ -214,7 +275,12 @@ xmllint --noout /tmp/appcast.xml
 grep -E "sparkle:(version|shortVersionString)|enclosure" /tmp/appcast.xml
 
 # Firma del feed
-build/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update --verify /tmp/appcast.xml
+build/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update \
+  --account kancerbero-ed25519 --verify /tmp/appcast.xml
+
+# Release y asset
+gh release view v<build> --repo kayrosuno/kancerbero
+gh release download v<build> --repo kayrosuno/kancerbero
 
 # Versión instalada y daemon
 defaults read /Applications/Kancerbero.app/Contents/Info CFBundleShortVersionString
@@ -231,6 +297,9 @@ spctl -a -vvv -t exec /Applications/Kancerbero.app
 ```
 
 - **Feed 404**: Pages no está activado o el despliegue aún no terminó (puede tardar minutos).
+- **Feed con un build no creciente**: `generate-appcast.sh` aborta antes de publicar; comprobar el
+  reloj, los tags locales o el feed descargado.
+- **`gh` sin autenticar**: `gh auth status`; ejecutar `gh auth login` o exportar `GITHUB_TOKEN`.
 - **“Unable to check for updates”**: comprobar red, `SUFeedURL`, `SUPublicEDKey` y la firma del
   feed. Un appcast sin firma se rechaza con `SURequireSignedFeed`.
 - **El daemon sigue en la versión vieja**: System status → Repair / re-register.
@@ -245,8 +314,10 @@ spctl -a -vvv -t exec /Applications/Kancerbero.app
 - Clave privada EdDSA en el Keychain, nunca en el repo.
 - `SUVerifyUpdateBeforeExtraction` y `SURequireSignedFeed` activos: firma del ZIP y del feed.
 - HTTPS obligatorio (Pages y Releases). Sin excepciones ATS en Release.
-- `CFBundleVersion` de la app estrictamente creciente (timestamp): impide downgrades. Los builds
-  de daemon y filtro son independientes y estables mientras su hash no cambie; se anotan en
-  `Config/ComponentVersions.xcconfig`.
-- La release se publica desde una máquina de confianza; el token de GitHub no se commitea.
+- `CFBundleVersion` de la app estrictamente creciente (`YYMMDDHHMM`, 10 dígitos): impide
+  downgrades. Los builds de daemon y filtro son independientes y estables mientras su hash no
+  cambie; se anotan en `Config/ComponentVersions.xcconfig`.
+- La release se publica desde una máquina de confianza con `gh` autenticado o un PAT que no se
+  commitea. `build-release.sh` verifica que el `Label` y `MachServices` del plist coinciden con la
+  constante XPC, y `generate-appcast.sh` rechaza un feed con un build mayor o igual.
 - Un feed comprometido no sirve sin la clave privada.

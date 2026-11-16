@@ -455,8 +455,8 @@ xcrun notarytool store-credentials kancerbero-notary \
 # filtro solo cambian cuando cambia su código (Config/ComponentVersions.xcconfig).
 ./scripts/release.sh
 
-# Publicar en GitHub Releases + Pages (requiere GITHUB_TOKEN).
-export GITHUB_TOKEN=...
+# Publicar en GitHub Releases + Pages con gh autenticado (gh auth login).
+# Alternativa sin gh: exportar GITHUB_TOKEN con Contents: Read and write.
 ./scripts/release.sh --publish
 
 ./scripts/install-app.sh        # instalación manual para probar
@@ -464,10 +464,11 @@ export GITHUB_TOKEN=...
 
 La app se actualiza con **Sparkle 2** (feed EdDSA en GitHub Pages, ZIP en GitHub Releases). La
 primera versión con Sparkle se instala a mano; a partir de ahí las actualizaciones son
-automáticas. La versión de la app es `0.2.<build>` (el último número es el build); daemon y
-filtro tienen su propio `0.2.<build>` y solo cambian cuando cambia su componente. La ventana
-**System Status** muestra las versiones en ejecución y las que trae el ejecutable. Detalle,
-gestión de la clave y diagnóstico en [`docs/updates.md`](docs/updates.md).
+automáticas. La versión de la app es `0.2.<build>`, con el build en formato `YYMMDDHHMM` (10
+dígitos); el ZIP de release es `Kancerbero-<version>.zip`. Daemon y filtro tienen su propio
+`0.2.<build>` y solo cambian cuando cambia su componente. La ventana **System Status** muestra las
+versiones en ejecución y las que trae el ejecutable. Detalle, gestión de la clave y diagnóstico en
+[`docs/updates.md`](docs/updates.md).
 
 Un daemon registrado con `SMAppService` exige app firmada con Developer ID y **notarizada**.
 La build Debug ad-hoc puede mostrar la UI y el estado, pero no se espera que `register()` funcione.

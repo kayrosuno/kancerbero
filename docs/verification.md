@@ -1608,8 +1608,12 @@ SPARKLE_BIN=build/SourcePackages/artifacts/sparkle/Sparkle/bin
 curl -fsSL https://kayrosuno.github.io/kancerbero/appcast.xml -o /tmp/appcast.xml
 xmllint --noout /tmp/appcast.xml
 grep -E "sparkle:(version|shortVersionString|minimumSystemVersion)|enclosure" /tmp/appcast.xml
-"$SPARKLE_BIN/sign_update" --verify /tmp/appcast.xml
+"$SPARKLE_BIN/sign_update" --account kancerbero-ed25519 --verify /tmp/appcast.xml
 curl -fsSIL "$(grep -o 'https://github.com/[^"]*\.zip' /tmp/appcast.xml | head -1)" | grep -q 200
+
+# Release y bootstrap
+gh release view v<build> --repo kayrosuno/kancerbero
+gh release download v<build> --repo kayrosuno/kancerbero
 ```
 
 ### Casos
@@ -1679,7 +1683,7 @@ build/Build/Products/Debug/KancerberoDaemon | head -1
 
 - **Versión = build**: en app, filtro y daemon, el último componente de
   `CFBundleShortVersionString` debe ser exactamente `CFBundleVersion` (p. ej.
-  `0.2.20261116095540` / `20261116095540`).
+  `0.2.2611160955` / `2611160955`).
 - **Sin cambios**: dos `./scripts/build.sh` seguidos. El `CFBundleVersion` de la app sube; los de
   daemon y filtro no cambian; `Config/ComponentVersions.xcconfig` no se modifica. La app no debe
   reiniciar el daemon ni re-staged el filtro.
@@ -1708,4 +1712,7 @@ build/Build/Products/Debug/KancerberoDaemon | head -1
   para publicar `0.2.<build>`; el primer arranque reinicia el daemon y re-stagea el filtro. A
   partir de ahí solo cambian si cambia su hash.
 - **Release**: `./scripts/release.sh` valida app/filtro/daemon, notariza y genera un appcast con
-  el build de la app; `sign_update --verify`; tag `v<build de la app>`.
+  el build de la app; `sign_update --account kancerbero-ed25519 --verify`; tag `v<build de la app>`.
+  `build-release.sh` comprueba además que el `Label` y `MachServices` del plist coinciden con
+  `KancerberoXPCNames.machService`. `publish-release.sh` usa `gh` autenticado o, si no está
+  instalado, `GITHUB_TOKEN`.

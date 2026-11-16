@@ -90,8 +90,8 @@ independiente del daemon.
 identidad propia del daemon (`daemonVersion`/`daemonBuild`), la versión del core y el `euid`, y
 sale con código 0; es la forma de comprobar qué binario se va a ejecutar. Son constantes
 compiladas: la app viene del xcconfig generado por build y el daemon de
-`Config/ComponentVersions.xcconfig`; la versión del daemon es `prefijo.<build daemon>` y el
-filtro usa `prefijo.<build filtro>` en su `Info.plist`. Un proceso viejo sigue reportando lo que
+`Config/ComponentVersions.xcconfig`; la versión del daemon es `prefijo.<build daemon>` (build
+`YYMMDDHHMM` de 10 dígitos) y el filtro usa `prefijo.<build filtro>` en su `Info.plist`. Un proceso viejo sigue reportando lo que
 se compiló, no lo que hay ahora en el bundle; System Status lo muestra con la insignia de versión
 en la banda del título de la tarjeta frente a las versiones del panel lateral.
 

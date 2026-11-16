@@ -68,7 +68,9 @@ Pendiente para producción:
   con el **mismo identificador de code signing que la app** (`-i uno.kayros.kancerbero`) y **sin
   entitlements**: ServiceManagement deriva el launch constraint del job del requisito de la app,
   y un tool con identificador propio o un entitlement restringido sin profile embebido muere al
-  arrancar (`Launch Constraint Violation`).
+  arrancar (`Launch Constraint Violation`). Hereda el `DEVELOPMENT_TEAM` del proyecto para que
+  Xcode pueda firmarlo con Developer ID, pero no lleva App ID ni provisioning profile;
+  `build-release.sh` verifica el binario firmado.
 - Despliegue con `SMAppService.daemon(plistName:)`: el helper y el plist van dentro de
   `Kancerbero.app/Contents/Library/LaunchDaemons/`; la app los registra y el usuario aprueba en
   Ajustes → Login Items → Allow in the Background. El icono y el nombre se resuelven mediante
@@ -192,8 +194,8 @@ Pendiente para producción:
   los binarios en GitHub Releases. No hay excepciones ATS en Release y la app no está
   sandboxeada, así que no necesita entitlements de red.
 - **Integridad y downgrade.** Sparkle compara el `CFBundleVersion` de la **app**, un timestamp
-  estrictamente creciente generado en cada build; el último componente de
-  `CFBundleShortVersionString` es exactamente ese build. Los builds de daemon y filtro son
+  `YYMMDDHHMM` (10 dígitos) estrictamente creciente generado en cada build; el último componente
+  de `CFBundleShortVersionString` es exactamente ese build. Los builds de daemon y filtro son
   identidades separadas, anotadas en `Config/ComponentVersions.xcconfig` y estables mientras no
   cambie su componente; sus versiones también terminan en su build y no participan en la
   comparación de Sparkle. Un appcast comprometido no puede instalar un build menor ni un archivo
@@ -201,8 +203,12 @@ Pendiente para producción:
 - **Clave privada.** Nunca se commitea. Debe tener copia de seguridad cifrada: si se pierde, las
   instalaciones existentes no podrán validar actualizaciones futuras y la recuperación exige una
   versión con clave nueva instalada manualmente. No hay rotación silenciosa.
-- **Token de GitHub.** `publish-release.sh` usa un PAT con `Contents: Read and write`, guardado en
-  el Keychain; no se commitea ni se pasa por argumentos.
+- **Credenciales de publicación.** `publish-release.sh` usa `gh` autenticado (`gh auth login`) o,
+  como alternativa, un PAT con `Contents: Read and write` guardado en el Keychain. Ni el PAT ni el
+  token se commitean ni se pasan por argumentos.
+- **Publicación verificable.** `build-release.sh` comprueba que el `Label` y `MachServices` del
+  plist coinciden con la constante XPC; `generate-appcast.sh` rechaza un item que no sea más nuevo
+  que el feed; `publish-release.sh` es idempotente y el appcast se publica después del asset.
 - **Post-actualización.** El daemon viejo se detecta comparando `daemonBuild` con
   `KBVersion.daemonBuild` (no con el marketing de la app) y se reinicia con el
   `daemonAction .stop` ya autorizado por `DaemonClientPolicy` (Developer ID, team
@@ -211,6 +217,8 @@ Pendiente para producción:
   `FilterVersion.expectedBuild`. Un build de la app que no cambia esos componentes no los
   reinicia ni los reemplaza.
 - **TCC.** El reemplazo es in-place, con el mismo bundle id, ruta y team; FDA debe conservarse. No
-  cambiar bundle id, team ni el identifier del daemon en un release.
+  cambiar bundle id ni team en un release. La identidad del servicio es
+  `uno.kayros.kancerbero.daemon.service`; cambiarla otra vez exige desregistrar el label anterior
+  y pedir de nuevo la aprobación en Login Items.
 - **No se usa un `sha256` del feed como seguridad** (el error del updater de Otty): la garantía es
   la firma EdDSA verificada por Sparkle, más la notarización y la firma de código del bundle.
