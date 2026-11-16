@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TEAM="${DEVELOPMENT_TEAM:-AK37TK8X2Y}"
 
 cd "$ROOT"
+source "$ROOT/scripts/lib/version.sh"
 
 SIGNING="$ROOT/Config/Signing.local.xcconfig"
 if [[ ! -f "$SIGNING" ]]; then
@@ -101,50 +102,61 @@ done
 # Do not pass DEVELOPMENT_TEAM on the command line: command-line settings
 # override every target and would make Xcode derive an App ID (and therefore a
 # restricted application-identifier entitlement) for the daemon tool.
-# Clean build: the incremental build has been observed to reuse a stale
-# FilterCore.o for the system extension, leaving a binary that ignores new
-# wire fields. Release builds must always recompile the extension.
+# Clean and build are separate so the generated version xcconfig survives the
+# clean. The incremental build has also been observed to reuse a stale
+# FilterCore.o for the system extension, so Release always recompiles it.
 xcodebuild -project Kancerbero.xcodeproj -scheme Kancerbero \
-    -configuration Release -derivedDataPath build \
-    clean build
+    -configuration Release -derivedDataPath build clean
+
+./scripts/prepare-build-version.sh
+export KANCERBERO_VERSION_PREPARED=1
+
+xcodebuild -project Kancerbero.xcodeproj -scheme Kancerbero \
+    -configuration Release -derivedDataPath build build
 
 APP="$ROOT/build/Build/Products/Release/Kancerbero.app"
 EXT="$APP/Contents/Library/SystemExtensions/uno.kayros.kancerbero.filter.systemextension"
 DAEMON="$APP/Contents/Library/LaunchDaemons/KancerberoDaemon"
 PRODUCT_DAEMON="$ROOT/build/Build/Products/Release/KancerberoDaemon"
+COMPONENTS="$ROOT/Config/ComponentVersions.xcconfig"
 
-VERSION="$(awk -F' *= *' '$1 == "KANCERBERO_MARKETING_VERSION" { print $2 }' Config/Version.xcconfig)"
-BUILD="$(awk -F' *= *' '$1 == "KANCERBERO_BUILD_VERSION" { print $2 }' Config/Version.xcconfig)"
-[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
-    echo "Config/Version.xcconfig has an invalid marketing version" >&2
+# The built app is authoritative: the generated xcconfig may already belong to
+# a different build.
+kancerbero_read_app_version "$APP"
+
+FILTER_MARKETING="$(kancerbero_component_value "$COMPONENTS" KANCERBERO_FILTER_MARKETING_VERSION)"
+FILTER_BUILD="$(kancerbero_component_value "$COMPONENTS" KANCERBERO_FILTER_BUILD_VERSION)"
+DAEMON_MARKETING="$(kancerbero_component_value "$COMPONENTS" KANCERBERO_DAEMON_MARKETING_VERSION)"
+DAEMON_BUILD="$(kancerbero_component_value "$COMPONENTS" KANCERBERO_DAEMON_BUILD_VERSION)"
+
+kancerbero_require_filter_version "$APP" "$FILTER_MARKETING" "$FILTER_BUILD"
+
+if git rev-parse -q --verify "refs/tags/v$BUILD" >/dev/null; then
+    echo "tag v$BUILD already exists" >&2
     exit 1
-}
-[[ "$BUILD" =~ ^[0-9]+$ ]] || {
-    echo "Config/Version.xcconfig has an invalid build number" >&2
-    exit 1
-}
-if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
-    echo "tag v$VERSION already exists" >&2
+fi
+LAST_BUILD="$(git tag --list 'v[0-9]*' \
+    | sed -n 's/^v\([0-9]\{14\}\)$/\1/p' | LC_ALL=C sort -n | tail -1 || true)"
+if [[ -n "$LAST_BUILD" && "$BUILD" -le "$LAST_BUILD" ]]; then
+    echo "build $BUILD is not greater than the last release tag ($LAST_BUILD)" >&2
     exit 1
 fi
 
-app_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
-app_build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")"
-filter_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$EXT/Contents/Info.plist")"
-filter_build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$EXT/Contents/Info.plist")"
-if [[ "$app_version" != "$VERSION" || "$app_build" != "$BUILD" ]]; then
-    echo "app version is $app_version ($app_build), expected $VERSION ($BUILD)" >&2
+# The daemon prints its compile-time app and component identities when it is
+# not launched with --daemon.
+daemon_out="$("$PRODUCT_DAEMON" 2>&1 | head -1 || true)"
+if [[ "$daemon_out" != *"$VERSION"* || "$daemon_out" != *"$BUILD"* \
+    || "$daemon_out" != *"$DAEMON_MARKETING"* || "$daemon_out" != *"$DAEMON_BUILD"* ]]; then
+    echo "daemon reports '${daemon_out:-<no output>}'" >&2
+    echo "expected app $VERSION ($BUILD) and daemon $DAEMON_MARKETING ($DAEMON_BUILD)" >&2
     exit 1
 fi
-if [[ "$filter_version" != "$VERSION" || "$filter_build" != "$BUILD" ]]; then
-    echo "filter version is $filter_version ($filter_build), expected $VERSION ($BUILD)" >&2
-    exit 1
-fi
-# The daemon prints its compile-time version when it is not launched with
-# --daemon. Both strings must come from Config/Version.xcconfig.
-daemon_version="$("$PRODUCT_DAEMON" 2>&1 | head -1 || true)"
-if [[ "$daemon_version" != *"$VERSION"* || "$daemon_version" != *"$BUILD"* ]]; then
-    echo "daemon reports '${daemon_version:-<no output>}', expected $VERSION (build $BUILD)" >&2
+
+# A component change detected during the release build must be recorded and
+# committed before the artifact is published.
+if [[ -n "$(git status --porcelain -- Config/ComponentVersions.xcconfig)" ]]; then
+    echo "Config/ComponentVersions.xcconfig changed during the build." >&2
+    echo "commit the component version bump and run the release again." >&2
     exit 1
 fi
 
@@ -261,4 +273,4 @@ for bundle in "$APP" "$EXT"; do
     fi
 done
 
-echo "release app: $APP"
+echo "release app: $APP ($VERSION/$BUILD; daemon $DAEMON_MARKETING/$DAEMON_BUILD; filter $FILTER_MARKETING/$FILTER_BUILD)"

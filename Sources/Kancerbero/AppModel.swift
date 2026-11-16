@@ -858,8 +858,8 @@ final class AppModel {
                 self.daemonSource = source
                 self.daemonVersion = hello.daemonVersion
                 self.daemonBuild = hello.daemonBuild
-                if hello.daemonVersion != KBVersion.current
-                    || (hello.daemonBuild != nil && hello.daemonBuild != KBVersion.build) {
+                if hello.daemonBuild == nil
+                    || hello.daemonBuild != KBVersion.daemonBuild {
                     // Run outside daemonConnectTask: the restart resets and
                     // cancels that task while it is still on this stack.
                     Task { await self.checkDaemonBuild(hello) }
@@ -924,9 +924,12 @@ final class AppModel {
     /// version or build different from the app that just replaced the bundle.
     private func checkDaemonBuild(_ hello: KBHelloResponse) async {
         guard !daemonUpdateRestartInFlight, serviceStatus == .enabled else { return }
-        let versionMismatch = hello.daemonVersion != KBVersion.current
-        let buildMismatch = hello.daemonBuild != nil && hello.daemonBuild != KBVersion.build
-        guard versionMismatch || buildMismatch else {
+        // The daemon has its own recorded build. The host app's marketing
+        // version changes on every day/build and must not restart it.
+        let missingBuild = hello.daemonBuild == nil
+        let buildMismatch = hello.daemonBuild != nil
+            && hello.daemonBuild != KBVersion.daemonBuild
+        guard missingBuild || buildMismatch else {
             daemonNeedsUpdate = false
             daemonUpdateMessage = nil
             return
@@ -958,8 +961,7 @@ final class AppModel {
                 if !usingDaemon && !daemonConnecting {
                     connectDaemon()
                 }
-                if usingDaemon, daemonVersion == KBVersion.current,
-                   (daemonBuild == nil || daemonBuild == KBVersion.build) {
+                if usingDaemon, daemonBuild == KBVersion.daemonBuild {
                     UserDefaults.standard.set(daemonFingerprint,
                                               forKey: Self.daemonFingerprintKey)
                     daemonNeedsUpdate = false
@@ -978,8 +980,7 @@ final class AppModel {
             if !usingDaemon && !daemonConnecting {
                 connectDaemon()
             }
-            if usingDaemon, daemonVersion == KBVersion.current,
-               (daemonBuild == nil || daemonBuild == KBVersion.build) {
+            if usingDaemon, daemonBuild == KBVersion.daemonBuild {
                 daemonNeedsUpdate = false
                 daemonUpdateMessage = "Background service updated."
                 return

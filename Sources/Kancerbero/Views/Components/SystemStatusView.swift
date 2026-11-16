@@ -595,7 +595,8 @@ struct SystemStatusView: View {
         if connected {
             level = model.daemonIsRoot ? .ok : .warning
             value = "Connected"
-            detail = "Daemon \(model.daemonVersion ?? "unknown") · \(model.daemonIsRoot ? "root" : "non-root")."
+            let build = model.daemonBuild.map { " (\($0))" } ?? ""
+            detail = "Daemon \(model.daemonVersion ?? "unknown")\(build) · \(model.daemonIsRoot ? "root" : "non-root")."
         } else if connecting {
             level = .info
             value = "Connecting…"

@@ -2,17 +2,17 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP="$ROOT/build/Build/Products/Release/Kancerbero.app"
-VERSION="$(awk -F' *= *' '$1 == "KANCERBERO_MARKETING_VERSION" { print $2 }' \
-    "$ROOT/Config/Version.xcconfig")"
-OUT="$ROOT/build/updates"
-ZIP="$OUT/Kancerbero-$VERSION.zip"
+source "$ROOT/scripts/lib/version.sh"
 
-if [[ ! -d "$APP" ]]; then
-    echo "missing Release app: $APP" >&2
-    echo "run scripts/build-release.sh and scripts/notarize.sh first" >&2
-    exit 1
-fi
+APP="$(kancerbero_require_release_app "$ROOT")"
+kancerbero_read_app_version "$APP"
+COMPONENTS="$ROOT/Config/ComponentVersions.xcconfig"
+FILTER_MARKETING="$(kancerbero_component_value "$COMPONENTS" KANCERBERO_FILTER_MARKETING_VERSION)"
+FILTER_BUILD="$(kancerbero_component_value "$COMPONENTS" KANCERBERO_FILTER_BUILD_VERSION)"
+kancerbero_require_filter_version "$APP" "$FILTER_MARKETING" "$FILTER_BUILD"
+
+OUT="$ROOT/build/updates"
+ZIP="$OUT/Kancerbero-$VERSION-$BUILD.zip"
 
 mkdir -p "$OUT"
 rm -f "$ZIP"

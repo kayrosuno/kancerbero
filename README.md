@@ -449,13 +449,14 @@ Requisitos de distribución:
 xcrun notarytool store-credentials kancerbero-notary \
   --apple-id "<Apple ID>" --team-id AK37TK8X2Y --password "<app-specific password>"
 
-# Release completo, sin publicar (version bump + build + notarización + ZIP + appcast):
-./scripts/release.sh 0.1.2 2026111701
+# Release completo, sin publicar (build + notarización + ZIP + appcast).
+# La versión/build de la app se generan en cada compilación; el daemon y el
+# filtro solo cambian cuando cambia su código (Config/ComponentVersions.xcconfig).
+./scripts/release.sh
 
-# Publicar en GitHub Releases + Pages (requiere GITHUB_TOKEN). Se puede ejecutar
-# directamente, o después del paso anterior: reutiliza el bump ya commiteado.
+# Publicar en GitHub Releases + Pages (requiere GITHUB_TOKEN).
 export GITHUB_TOKEN=...
-./scripts/release.sh 0.1.2 2026111701 --publish
+./scripts/release.sh --publish
 
 ./scripts/install-app.sh        # instalación manual para probar
 ```

@@ -291,9 +291,12 @@
   About; `SettingsView` muestra la sección Updates. `Info.plist` declara `SUFeedURL` (GitHub
   Pages), `SUPublicEDKey`, `SURequireSignedFeed` y `SUVerifyUpdateBeforeExtraction`. En Debug el
   updater no arranca salvo con `KANCERBERO_UPDATE_FEED`; `--screenshot` nunca lo arranca. Tras
-  reemplazar el bundle, Sparkle relanza la app: `AppModel` reinicia el daemon si
-  `daemonVersion`/`daemonBuild` del handshake no coinciden, y `FilterModel` reenvía la activación
-  de la extensión si el `CFBundleVersion` staged es viejo. Runbook: `docs/updates.md`.
+  reemplazar el bundle, Sparkle relanza la app: `AppModel` reinicia el daemon si su
+  `daemonBuild` no coincide con `KBVersion.daemonBuild`, y `FilterModel` compara el ACK con
+  `FilterVersion.expectedBuild` (build del filtro embebido) para reenviar la activación si está
+  viejo. La versión/build de la app se genera en cada compilación (pre-action del scheme); las
+  identidades de daemon y filtro se anotan en `Config/ComponentVersions.xcconfig` y solo cambian
+  cuando cambia su componente. Runbook: `docs/updates.md`.
 - Disk → Volumes mantiene `expanded`, `volumesFocus`, `volumeColumnWidths` y
   `volumesSplitFraction` en `UIState`. La
   expansión inicial se hace una sola vez (`didExpandVolumesOnce`); los refrescos de inventario solo
@@ -646,13 +649,15 @@
   `"block all"`. Al activarlo, la extensión resuelve y deniega los flujos ya pausados para
   aprobación (con `resolved` para cerrar la hoja) y `applyDecisionLocked` fuerza deny mientras
   siga activo. Los flujos ya establecidos no se tocan.
-- La extensión responde a `setRules` con `FilterAck.message = FilterVersion.current`; la app
-  compara ese valor con el suyo y, si no coincide (una extensión anterior responde sin mensaje),
-  deja de afirmar que bloquea: muestra **Block outdated** y pide reinstalar o reactivar. Los
-  cambios del target `KancerberoFilter` requieren un **build Release limpio** (el incremental
-  reutilizó una vez un `FilterCore.o` obsoleto; `scripts/build-release.sh` hace `clean build`) y
-  subir `CFBundleVersion` en `Resources/Filter/Info.plist` para que sysextd reemplace la copia
-  staged que sigue corriendo desde `/Library/SystemExtensions`.
+- La extensión responde a `setRules` con `FilterAck.message = FilterVersion.build` (su propio
+  build); la app lo compara con `FilterVersion.expectedBuild`, leído del `Info.plist` del filtro
+  embebido, y si no coincide (una extensión anterior responde sin mensaje o con otro build) deja
+  de afirmar que bloquea: muestra **Block outdated** y pide reinstalar o reactivar. Los cambios
+  del target `KancerberoFilter` (o de `KancerberoFilterContract`/`Resources/Filter`) hacen que
+  `prepare-build-version.sh` suba el build en `Config/ComponentVersions.xcconfig`; el
+  `CFBundleVersion` de `Resources/Filter/Info.plist` se genera desde ahí y no se edita a mano.
+  `scripts/build-release.sh` hace `clean` + `build` y sysextd reemplaza la copia staged que sigue
+  corriendo desde `/Library/SystemExtensions`.
 - UI: pestaña **Filter** (flujos con RX/TX y estado), escudo por fila en **Processes** con el
   badge de la política activa al lado (Ask/Allow/Deny) cuando el proceso está vigilado, hoja de
   aprobación en `RootView` (`FilterApprovalSheet`: icono y nombre grandes, destino a 30 pt,

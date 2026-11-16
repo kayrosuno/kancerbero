@@ -2,9 +2,13 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="${1:?usage: release.sh <marketing> <build> [--publish]}"
-BUILD="${2:?usage: release.sh <marketing> <build> [--publish]}"
-PUBLISH="${3:-}"
+PUBLISH="${1:-}"
+
+if [[ -n "$PUBLISH" && "$PUBLISH" != "--publish" ]]; then
+    echo "release.sh no longer takes a version/build; they are generated automatically" >&2
+    echo "usage: release.sh [--publish]" >&2
+    exit 2
+fi
 
 cd "$ROOT"
 
@@ -13,25 +17,30 @@ if [[ -n "$(git status --porcelain)" ]]; then
     exit 1
 fi
 
-BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-current_version="$(awk -F' *= *' '$1 == "KANCERBERO_MARKETING_VERSION" { print $2 }' Config/Version.xcconfig)"
-current_build="$(awk -F' *= *' '$1 == "KANCERBERO_BUILD_VERSION" { print $2 }' Config/Version.xcconfig)"
-if [[ "$current_version" != "$VERSION" || "$current_build" != "$BUILD" ]]; then
-    ./scripts/set-version.sh "$VERSION" "$BUILD"
-    git add Config/Version.xcconfig
-    git commit -m "Release $VERSION ($BUILD)"
-    git push github "$BRANCH"
-else
-    echo "version already set to $VERSION ($BUILD); reusing the commit"
-fi
-
 ./scripts/build-release.sh
 ./scripts/notarize.sh
 ./scripts/package-release.sh
 ./scripts/generate-appcast.sh
 
+source "$ROOT/scripts/lib/version.sh"
+APP="$(kancerbero_require_release_app "$ROOT")"
+kancerbero_read_app_version "$APP"
+
+echo "release artifacts: Kancerbero $VERSION ($BUILD)"
+echo "  zip: build/updates/Kancerbero-$VERSION-$BUILD.zip"
+
 if [[ "$PUBLISH" == "--publish" ]]; then
     : "${GITHUB_TOKEN:?export GITHUB_TOKEN with contents:write}"
+
+    if upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)"; then
+        if ! git merge-base --is-ancestor HEAD "$upstream"; then
+            echo "HEAD is not pushed to $upstream; push before publishing" >&2
+            exit 1
+        fi
+    else
+        echo "warning: no upstream branch; the release tag will still be pushed" >&2
+    fi
+
     ./scripts/publish-release.sh
     ./scripts/publish-appcast.sh
     ./scripts/verify-release.sh

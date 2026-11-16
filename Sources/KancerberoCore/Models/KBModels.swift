@@ -6,6 +6,10 @@ public enum KBVersion {
     public static let current = String(cString: kb_version())
     /// Compile-time build number, used by Sparkle and to detect a stale daemon.
     public static let build = String(cString: kb_build_version())
+    /// Recorded daemon identity. It changes only when the daemon component
+    /// changes, not on every host app build.
+    public static let daemonVersion = String(cString: kb_daemon_version())
+    public static let daemonBuild = String(cString: kb_daemon_build_version())
     public static let schema = 1
     public static var coreVersion: String { current }
     public static var coreBuild: String { build }

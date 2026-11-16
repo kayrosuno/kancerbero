@@ -8,7 +8,7 @@ private let logger = Logger(subsystem: "uno.kayros.kancerbero", category: "daemo
 let isDaemon = CommandLine.arguments.contains("--daemon")
 
 guard isDaemon else {
-    print("kancerbero daemon \(KBVersion.current) (build \(KBVersion.build), core \(KBVersion.coreVersion), euid \(geteuid()))")
+    print("kancerbero daemon \(KBVersion.current) (build \(KBVersion.build), daemon \(KBVersion.daemonVersion)/\(KBVersion.daemonBuild), core \(KBVersion.coreVersion), euid \(geteuid()))")
     print("run with --daemon to start the XPC service")
     exit(0)
 }
