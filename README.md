@@ -426,10 +426,12 @@ desactivado) o desde la ventana **System status** / el menú **Daemon**. macOS l
 Kancerbero (vía `AssociatedBundleIdentifiers`); el usuario debe aprobarlo. La app usa
 `NSXPCConnection` privilegiado para el daemon de sistema.
 
-El servicio usa el identificador `uno.kayros.kancerbero.daemon.v2` (label, plist y Mach service).
-El sufijo evita registros de ServiceManagement obsoletos de versiones anteriores: una vez que
-macOS guarda un *launch constraint* que ya no coincide, volver a registrar el mismo label no lo
-refresca y launchd mata el job con `Launch Constraint Violation`.
+El servicio usa la identidad `uno.kayros.kancerbero.daemon.service` (label y Mach service) y el
+plist `uno.kayros.kancerbero.daemon.service.plist`. Es un identificador nuevo que evita los
+registros de ServiceManagement/BTM de versiones anteriores: macOS guarda un *launch constraint*
+por label y, si ya no coincide, volver a registrar el mismo label no lo refresca (`Launch
+Constraint Violation`). La actualización desregistra una vez el servicio anterior `.v2`; al cambiar
+la identidad, macOS pide aprobar de nuevo el background item en Login Items.
 
 El daemon se firma con el **mismo identificador de code signing que la app**
 (`-i uno.kayros.kancerbero`) y sin ningún entitlement. ServiceManagement construye el launch

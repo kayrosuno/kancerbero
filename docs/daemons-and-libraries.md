@@ -57,14 +57,16 @@ Kancerbero.app ──────> KancerberoFilterContract <────── 
 
 | Etiqueta o servicio | Artefacto | Dónde vive | Quién lo registra |
 |---|---|---|---|
-| `uno.kayros.kancerbero.daemon.v2` (Mach service) | `KancerberoDaemon` | proceso del daemon | `NSXPCListener` del daemon |
-| `uno.kayros.kancerbero.daemon.v2` (LaunchDaemon) | `KancerberoDaemon` + `uno.kayros.kancerbero.daemon.plist` | `Kancerbero.app/Contents/Library/LaunchDaemons/` | `SMAppService.daemon(plistName:)` |
+| `uno.kayros.kancerbero.daemon.service` (Mach service) | `KancerberoDaemon` | proceso del daemon | `NSXPCListener` del daemon |
+| `uno.kayros.kancerbero.daemon.service` (LaunchDaemon) | `KancerberoDaemon` + `uno.kayros.kancerbero.daemon.service.plist` | `Kancerbero.app/Contents/Library/LaunchDaemons/` | `SMAppService.daemon(plistName:)` |
 | `group.uno.kayros.kancerbero.filter` (Mach service) | `KancerberoFilter` | system extension | `NEMachServiceName` del Info.plist |
 
-El daemon de `SMAppService` usa la identidad `uno.kayros.kancerbero.daemon.v2`. El sufijo `.v2`
-existe para escapar de registros de ServiceManagement/BTM creados por versiones anteriores: macOS guarda un *launch constraint* por label y, si ya no coincide, volver
-a registrar el mismo label no lo refresca (`Launch Constraint Violation` al arrancar). La system
-extension usa un Mach service distinto y es independiente del daemon.
+El daemon de `SMAppService` usa la identidad `uno.kayros.kancerbero.daemon.service`, un label
+nuevo que no arrastra registros de ServiceManagement/BTM de versiones anteriores. macOS guarda un
+*launch constraint* por label y, si ya no coincide, volver a registrar el mismo label no lo
+refresca (`Launch Constraint Violation` al arrancar); por eso no se reutiliza el label histórico
+`uno.kayros.kancerbero.daemon`. La system extension usa un Mach service distinto y es
+independiente del daemon.
 
 ## KancerberoDaemon
 
@@ -76,7 +78,7 @@ extension usa un Mach service distinto y es independiente del daemon.
 | Tipo | `com.apple.product-type.tool` (ejecutable suelto) |
 | Producto | `KancerberoDaemon` |
 | Bundle ID | ninguno (tool sin Info.plist); identificador de firma `uno.kayros.kancerbero` |
-| Mach service | `uno.kayros.kancerbero.daemon.v2` |
+| Mach service | `uno.kayros.kancerbero.daemon.service` |
 | Fuentes | `Sources/KancerberoDaemon/main.swift`, `DaemonDelegate.swift`, `DaemonService.swift` |
 | Configuración | `Config/KancerberoDaemon.xcconfig` |
 | Módulos | `KancerberoCore` (y `KancerberoC` por debajo) |
@@ -99,7 +101,7 @@ Hay un único modo de distribución:
 
 | Modo | Binario | Plist y dominio | Permisos | Logs |
 |---|---|---|---|---|
-| `SMAppService` | `Kancerbero.app/Contents/Library/LaunchDaemons/KancerberoDaemon` | `uno.kayros.kancerbero.daemon.plist` embebido en la app; lo registra `SMAppService.daemon(plistName:)` | root | `os.Logger` (subsystem `uno.kayros.kancerbero`) |
+| `SMAppService` | `Kancerbero.app/Contents/Library/LaunchDaemons/KancerberoDaemon` | `uno.kayros.kancerbero.daemon.service.plist` embebido en la app; lo registra `SMAppService.daemon(plistName:)` | root | `os.Logger` (subsystem `uno.kayros.kancerbero`) |
 
 En el modo de distribución la app embebe el binario y el plist con la fase `Embed Daemon`
 (destino `Contents/Library/LaunchDaemons`), y macOS ejecuta el helper desde dentro del bundle.
@@ -115,14 +117,25 @@ El plist de `SMAppService` contiene:
 
 | Clave | Valor | Efecto |
 |---|---|---|
-| `Label` | `uno.kayros.kancerbero.daemon.v2` | Identidad launchd |
+| `Label` | `uno.kayros.kancerbero.daemon.service` | Identidad launchd |
 | `BundleProgram` | `Contents/Library/LaunchDaemons/KancerberoDaemon` | Binario dentro del bundle |
 | `ProgramArguments` | `KancerberoDaemon --daemon` | Arranque del modo XPC |
-| `MachServices` | `uno.kayros.kancerbero.daemon.v2` | Endpoint XPC |
+| `MachServices` | `uno.kayros.kancerbero.daemon.service` | Endpoint XPC |
 | `RunAtLoad` | `true` | Arranca al registrarse |
 | `KeepAlive.SuccessfulExit` | `false` | Relanza si termina con error |
 | `ThrottleInterval` | `5` | Espera mínima entre relanzamientos |
 | `ProcessType` | `Interactive` | Clase de scheduling |
+
+### Migración desde `.v2`
+
+La app embebe temporalmente `uno.kayros.kancerbero.daemon.plist` (label `...daemon.v2`) además del
+plist nuevo. Al arrancar, si el plist legado existe, desregistra una vez el servicio antiguo
+(`SMAppService.daemon(plistName:)`; `kSMErrorJobNotFound` cuenta como éxito) antes de registrar
+`...daemon.service`, y guarda `daemon.legacyV2CleanupDone` en `UserDefaults`. El cambio de label
+crea un background item nuevo, así que hay que aprobarlo otra vez en **Login Items**. El plist
+legado, sus entradas del proyecto y este código se eliminan tras un ciclo de release. El antiguo
+LaunchDaemon manual con label `uno.kayros.kancerbero.daemon` ya no se detecta; no colisiona con
+`.service`.
 
 ### Permisos y firma
 
@@ -134,10 +147,10 @@ El plist de `SMAppService` contiene:
   DiskArbitration) no los necesitan. La API privada `NetworkStatistics.framework` se carga con
   `dlopen` y funciona sin entitlement mientras `net.statistics_privcheck` valga 0.
 - El `.entitlements` del daemon está vacío a propósito. Un ejecutable suelto no puede reclamar
-  `com.apple.application-identifier` sin un provisioning profile embebido (TN3125); si Xcode lo
-  inyecta, añade `PRODUCT_BUNDLE_IDENTIFIER`/`DEVELOPMENT_TEAM` y el daemon se firma con ese
-  entitlement restringido. `scripts/build-release.sh` falla si el daemon lleva cualquier
-  entitlement.
+  `com.apple.application-identifier` sin un provisioning profile embebido (TN3125). El daemon
+  hereda el `DEVELOPMENT_TEAM` del proyecto para que Xcode pueda firmarlo con Developer ID, pero no
+  lleva App ID ni profile; si Xcode inyectara ese entitlement restringido,
+  `scripts/build-release.sh` falla al comprobar el binario firmado.
 - El daemon se firma con el **mismo identificador que la app** (`-i uno.kayros.kancerbero`,
   `Config/KancerberoDaemon.xcconfig`). ServiceManagement deriva el launch constraint del job del
   requisito de la app; un tool firmado con su nombre de target no lo satisface y launchd lo mata
@@ -157,7 +170,7 @@ El plist de `SMAppService` contiene:
 ### Ciclo de vida
 
 1. launchd arranca `KancerberoDaemon --daemon` según `RunAtLoad`.
-2. El proceso crea `NSXPCListener(machServiceName: "uno.kayros.kancerbero.daemon.v2")`, instala
+2. El proceso crea `NSXPCListener(machServiceName: "uno.kayros.kancerbero.daemon.service")`, instala
    `DaemonDelegate` y llama a `listener.resume()`; después entra en `RunLoop.main.run()`.
 3. Cada conexión aceptada crea un `DaemonService` que comparte el `CollectionActor` del proceso.
    Al invalidarse la conexión se cancela la tarea de suscripción y se suelta el cliente.
@@ -205,8 +218,8 @@ Uso desde la app:
 Comprobación manual:
 
 ```bash
-launchctl print system/uno.kayros.kancerbero.daemon.v2
-launchctl kickstart -k system/uno.kayros.kancerbero.daemon.v2
+launchctl print system/uno.kayros.kancerbero.daemon.service
+launchctl kickstart -k system/uno.kayros.kancerbero.daemon.service
 log show --last 5m --predicate 'subsystem == "uno.kayros.kancerbero"' --info --debug
 ```
 

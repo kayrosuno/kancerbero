@@ -6,7 +6,7 @@
 |---|---|---|
 | `KancerberoC` | static lib C | `dlopen` de NetworkStatistics, tabla de fuentes, parsers de libproc y sysctl |
 | `KancerberoCore` | static lib Swift | Modelos, wire codec, collectors, contabilidad, capacidades y diagnóstico |
-| `KancerberoDaemon` | tool | `NSXPCListener` en `uno.kayros.kancerbero.daemon.v2`, recolección y push |
+| `KancerberoDaemon` | tool | `NSXPCListener` en `uno.kayros.kancerbero.daemon.service`, recolección y push |
 | `Kancerbero` | app | SwiftUI, inspector, cliente XPC y modo local |
 | `KancerberoProbe` | tool | Diagnóstico y comparación con herramientas del sistema |
 | `KancerberoFilterContract` | static lib Swift | Contrato Codable y protocolos XPC compartidos por app y filtro |
@@ -595,7 +595,7 @@
 
 ## XPC
 
-- Mach service: `uno.kayros.kancerbero.daemon.v2` (label del job y plist: el mismo nombre).
+- Mach service: `uno.kayros.kancerbero.daemon.service` (label del job y plist: el mismo nombre).
 - Protocolo: `handshake`, `subscribe`, `request`, `unsubscribe`; callback `push`.
 - Envelopes `KBWireEnvelope` con `schemaVersion`, `kind`, `sequence` y payload
   `PropertyListEncoder` binario.

@@ -120,6 +120,60 @@ DAEMON="$APP/Contents/Library/LaunchDaemons/KancerberoDaemon"
 PRODUCT_DAEMON="$ROOT/build/Build/Products/Release/KancerberoDaemon"
 COMPONENTS="$ROOT/Config/ComponentVersions.xcconfig"
 
+# The launchd Label, the MachServices key and KancerberoXPCNames.machService
+# must stay in sync, or the app ships a daemon it cannot reach. The legacy
+# `.v2` plist is embedded only to unregister the previous service; remove this
+# block together with it after the migration release.
+DAEMON_PLIST_DIR="$APP/Contents/Library/LaunchDaemons"
+MAIN_DAEMON_PLIST="$DAEMON_PLIST_DIR/uno.kayros.kancerbero.daemon.service.plist"
+LEGACY_DAEMON_PLIST="$DAEMON_PLIST_DIR/uno.kayros.kancerbero.daemon.plist"
+
+require_daemon_plist() {
+    if [[ ! -f "$1" ]]; then
+        echo "missing embedded daemon plist: $1" >&2
+        exit 1
+    fi
+    plutil -lint "$1" >/dev/null
+}
+
+require_daemon_plist "$MAIN_DAEMON_PLIST"
+
+mach_matches="$(sed -n 's/^[[:space:]]*public static let machService = "\([^"]*\)".*/\1/p' \
+    "$ROOT/Sources/KancerberoCore/Wire/KancerberoXPC.swift")"
+if [[ "$(printf '%s\n' "$mach_matches" | grep -c . || true)" -ne 1 ]]; then
+    echo "expected exactly one KancerberoXPCNames.machService in KancerberoXPC.swift" >&2
+    exit 1
+fi
+plist_matches="$(sed -n 's/^[[:space:]]*private static let daemonServicePlist = "\([^"]*\)".*/\1/p' \
+    "$ROOT/Sources/Kancerbero/AppModel.swift")"
+if [[ "$(printf '%s\n' "$plist_matches" | grep -c . || true)" -ne 1 \
+    || "$plist_matches" != "$(basename "$MAIN_DAEMON_PLIST")" ]]; then
+    echo "AppModel.daemonServicePlist ('$plist_matches') does not name $MAIN_DAEMON_PLIST" >&2
+    exit 1
+fi
+
+main_label="$(/usr/libexec/PlistBuddy -c 'Print :Label' "$MAIN_DAEMON_PLIST")"
+main_machs="$(python3 - "$MAIN_DAEMON_PLIST" <<'PY'
+import json, plistlib, sys
+with open(sys.argv[1], "rb") as handle:
+    plist = plistlib.load(handle)
+print(json.dumps(plist.get("MachServices", {}), separators=(",", ":")))
+PY
+)"
+if [[ "$main_label" != "$mach_matches" || "$main_machs" != "{\"$mach_matches\":true}" ]]; then
+    echo "daemon Label/MachServices do not match KancerberoXPCNames.machService '$mach_matches'" >&2
+    exit 1
+fi
+
+if [[ -f "$LEGACY_DAEMON_PLIST" ]]; then
+    require_daemon_plist "$LEGACY_DAEMON_PLIST"
+    legacy_label="$(/usr/libexec/PlistBuddy -c 'Print :Label' "$LEGACY_DAEMON_PLIST")"
+    if [[ "$legacy_label" != "uno.kayros.kancerbero.daemon.v2" ]]; then
+        echo "legacy daemon plist no longer describes uno.kayros.kancerbero.daemon.v2" >&2
+        exit 1
+    fi
+fi
+
 # The built app is authoritative: the generated xcconfig may already belong to
 # a different build.
 kancerbero_read_app_version "$APP"
