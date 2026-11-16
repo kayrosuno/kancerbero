@@ -11,7 +11,19 @@ kancerbero_read_app_version "$APP"
 ZIP="$ROOT/build/updates/Kancerbero-$VERSION.zip"
 TAG="v$BUILD"
 
-: "${GITHUB_TOKEN:?export GITHUB_TOKEN with contents:write for $REPO}"
+USE_GH=0
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+    USE_GH=1
+elif [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    USE_GH=0
+elif command -v gh >/dev/null 2>&1; then
+    echo "gh is installed but not authenticated; run: gh auth login" >&2
+    echo "or export GITHUB_TOKEN with contents:write for $REPO" >&2
+    exit 1
+else
+    echo "export GITHUB_TOKEN with contents:write for $REPO" >&2
+    exit 1
+fi
 if [[ ! -f "$ZIP" ]]; then
     echo "missing $ZIP; run scripts/package-release.sh first" >&2
     exit 1
@@ -33,8 +45,25 @@ else
 fi
 git -C "$ROOT" push "$REMOTE" "$TAG"
 
-# GitHub rejects a second release for the same tag (422). Reuse the existing
-# release and asset so a retry after a partial publish is idempotent.
+if [[ "$USE_GH" == "1" ]]; then
+    # gh is idempotent: reuse the release and replace the asset on a retry.
+    if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+        gh release upload "$TAG" "$ZIP" --repo "$REPO" --clobber
+    else
+        gh release create "$TAG" "$ZIP" \
+            --repo "$REPO" \
+            --title "Kancerbero $VERSION ($BUILD)" \
+            --notes "Kancerbero $VERSION ($BUILD)"
+    fi
+    asset_url="https://github.com/$REPO/releases/download/$TAG/$(basename "$ZIP")"
+    curl -fsSIL "$asset_url" | grep -q "200"
+    echo "release asset: $asset_url"
+    exit 0
+fi
+
+# Fallback without gh: GitHub rejects a second release for the same tag (422).
+# Reuse the existing release and asset so a retry after a partial publish is
+# idempotent.
 release_json="$(curl -sS \
     -H "Authorization: Bearer $GITHUB_TOKEN" \
     -H "Accept: application/vnd.github+json" \

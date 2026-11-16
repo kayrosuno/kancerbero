@@ -295,7 +295,8 @@
   reemplazar el bundle, Sparkle relanza la app: `AppModel` reinicia el daemon si su
   `daemonBuild` no coincide con `KBVersion.daemonBuild`, y `FilterModel` compara el ACK con
   `FilterVersion.expectedBuild` (build del filtro embebido) para reenviar la activación si está
-  viejo. La versión/build de la app se genera en cada compilación (pre-action del scheme); las
+  viejo. La versión/build de la app se genera en cada compilación (pre-action del scheme) con
+  build `YYMMDDHHMM` de 10 dígitos; el ZIP de release es `Kancerbero-<version>.zip`. Las
   identidades de daemon y filtro se anotan en `Config/ComponentVersions.xcconfig` y solo cambian
   cuando cambia su componente. La versión de cada identidad es `<prefijo>.<build>`. En System
   Status, las tarjetas Application, Background Services y Network Filter muestran la versión en
