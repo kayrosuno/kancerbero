@@ -1647,6 +1647,32 @@ xcrun stapler validate /Applications/Kancerbero.app
 spctl -a -vvv -t exec /Applications/Kancerbero.app
 ```
 
+### DMG de distribución (manual)
+
+`scripts/package-dmg.sh` genera el DMG a partir de la app Release ya notarizada/stapled. No forma
+parte de `release.sh` ni de la publicación de Sparkle.
+
+```bash
+DMG=build/updates/dmg/Kancerbero-<version>.dmg
+codesign --verify --verbose=2 "$DMG"
+xcrun stapler validate "$DMG"
+spctl --assess --type open --context context:primary-signature -vvv "$DMG"
+hdiutil verify "$DMG"
+
+MP=$(mktemp -d)
+hdiutil attach -nobrowse -readonly -mountpoint "$MP" "$DMG"
+ls -la "$MP" "$MP/.background"
+codesign --verify --deep --strict --verbose=2 "$MP/Kancerbero.app"
+xcrun stapler validate "$MP/Kancerbero.app"
+hdiutil detach "$MP"
+rm -rf "$MP"
+```
+
+Abrir el DMG en Finder para comprobar visualmente el fondo, la flecha y la alineación de
+`Kancerbero.app` y `Applications`. El DMG debe quedar siempre en `build/updates/dmg/`; nunca en el
+nivel superior de `build/updates`, porque `generate_appcast` trata `.dmg` como archivo de
+actualización.
+
 ### Feed local (solo Debug)
 
 La build Debug no arranca el updater salvo que se pase `KANCERBERO_UPDATE_FEED`. Verificado con
