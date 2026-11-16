@@ -64,7 +64,7 @@ require_empty_setting() {
     value="${value#\"}"
     if [[ -n "$value" ]]; then
         echo "$target Release: $key is '$value', expected empty" >&2
-        echo "the daemon must not have an App ID or team; see docs/verification.md" >&2
+        echo "the daemon must not have an App ID or provisioning profile; see docs/verification.md" >&2
         exit 1
     fi
 }
@@ -87,7 +87,7 @@ require_setting Kancerbero CODE_SIGN_STYLE Manual
 require_setting KancerberoFilter CODE_SIGN_STYLE Manual
 require_setting Kancerbero DEVELOPMENT_TEAM "$TEAM"
 require_setting KancerberoFilter DEVELOPMENT_TEAM "$TEAM"
-require_empty_setting KancerberoDaemon DEVELOPMENT_TEAM
+require_empty_setting KancerberoDaemon PRODUCT_BUNDLE_IDENTIFIER
 
 for target in Kancerbero KancerberoFilter; do
     value="$(setting_value "$(target_settings "$target")" PROVISIONING_PROFILE_SPECIFIER)"
@@ -135,8 +135,7 @@ if git rev-parse -q --verify "refs/tags/v$BUILD" >/dev/null; then
     echo "tag v$BUILD already exists" >&2
     exit 1
 fi
-LAST_BUILD="$(git tag --list 'v[0-9]*' \
-    | sed -n 's/^v\([0-9]\{14\}\)$/\1/p' | LC_ALL=C sort -n | tail -1 || true)"
+LAST_BUILD="$(kancerbero_last_tag_build "$ROOT")"
 if [[ -n "$LAST_BUILD" && "$BUILD" -le "$LAST_BUILD" ]]; then
     echo "build $BUILD is not greater than the last release tag ($LAST_BUILD)" >&2
     exit 1
@@ -193,7 +192,7 @@ done
 # launchd job at spawn with "Launch Constraint Violation" while BTM/Login Items
 # still reports the item as enabled. It must be signed with no entitlements at
 # all: keep Resources/Daemon/KancerberoDaemon.entitlements empty and keep
-# PRODUCT_BUNDLE_IDENTIFIER/DEVELOPMENT_TEAM off the KancerberoDaemon target.
+# PRODUCT_BUNDLE_IDENTIFIER off the KancerberoDaemon target.
 for daemon in "$PRODUCT_DAEMON" "$DAEMON"; do
     if [[ ! -f "$daemon" ]]; then
         echo "missing daemon binary at $daemon" >&2
@@ -214,7 +213,7 @@ for daemon in "$PRODUCT_DAEMON" "$DAEMON"; do
         echo "$daemon has entitlements; the daemon must be signed with none:" >&2
         printf '%s\n' "$daemon_entitlements" >&2
         echo "keep Resources/Daemon/KancerberoDaemon.entitlements empty and remove" >&2
-        echo "PRODUCT_BUNDLE_IDENTIFIER/DEVELOPMENT_TEAM from the daemon target" >&2
+        echo "PRODUCT_BUNDLE_IDENTIFIER from the daemon target" >&2
         exit 1
     fi
     if [[ -f "$daemon/Contents/embedded.provisionprofile" ]]; then

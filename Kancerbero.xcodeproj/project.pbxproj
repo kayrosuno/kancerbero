@@ -128,7 +128,6 @@
 		ABCDEF000000000000000096 /* Kancerbero.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Kancerbero.xcconfig; sourceTree = "<group>"; };
 		ABCDEF000000000000000097 /* KancerberoProbe.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = KancerberoProbe.xcconfig; sourceTree = "<group>"; };
 		ABCDEF000000000000000099 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		ABCDEF00000000000000009A /* uno.kayros.kancerbero.daemon.legacy.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = uno.kayros.kancerbero.daemon.legacy.plist; sourceTree = "<group>"; };
 		ABCDEF00000000000000009C /* uno.kayros.kancerbero.daemon.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = uno.kayros.kancerbero.daemon.plist; sourceTree = "<group>"; };
 		ABCDEF00000000000000009D /* KancerberoFilterContract.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = KancerberoFilterContract.xcconfig; sourceTree = "<group>"; };
 		ABCDEF00000000000000009E /* KancerberoFilter.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = KancerberoFilter.xcconfig; sourceTree = "<group>"; };
@@ -321,7 +320,6 @@
 		ABCDEF00000000000000000A /* LaunchDaemons */ = {
 			isa = PBXGroup;
 			children = (
-				ABCDEF00000000000000009A /* uno.kayros.kancerbero.daemon.legacy.plist */,
 				ABCDEF00000000000000009C /* uno.kayros.kancerbero.daemon.plist */,
 			);
 			path = LaunchDaemons;
@@ -440,10 +438,10 @@
 			fileSystemSynchronizedGroups = (
 				ABCDEF000000000000000033 /* Kancerbero */,
 			);
+			name = Kancerbero;
 			packageProductDependencies = (
 				ABCDEF0000000000000000D1 /* Sparkle */,
 			);
-			name = Kancerbero;
 			productName = Kancerbero;
 			productReference = ABCDEF000000000000000023 /* Kancerbero.app */;
 			productType = "com.apple.product-type.application";
@@ -550,7 +548,7 @@
 			mainGroup = ABCDEF00000000000000000B;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				ABCDEF0000000000000000D2 /* Sparkle */,
+				ABCDEF0000000000000000D2 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = ABCDEF000000000000000002 /* Products */;
@@ -815,6 +813,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = ABCDEF000000000000000095 /* KancerberoDaemon.xcconfig */;
 			buildSettings = {
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				DEAD_CODE_STRIPPING = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
 			};
@@ -873,10 +872,11 @@
 			baseConfigurationReference = ABCDEF000000000000000097 /* KancerberoProbe.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = AK37TK8X2Y;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=macosx*]" = AK37TK8X2Y;
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
 				PRODUCT_BUNDLE_IDENTIFIER = uno.kayros.kancerberoprobe;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -927,6 +927,7 @@
 			baseConfigurationReference = ABCDEF00000000000000009E /* KancerberoFilter.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = AK37TK8X2Y;
+				"DEVELOPMENT_TEAM[sdk=macosx*]" = AK37TK8X2Y;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
@@ -939,6 +940,7 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "Kancerbero Filter Developer ID";
 			};
 			name = Release;
 		};
@@ -1020,7 +1022,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		ABCDEF0000000000000000D2 /* Sparkle */ = {
+		ABCDEF0000000000000000D2 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle";
 			requirement = {
@@ -1033,7 +1035,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		ABCDEF0000000000000000D1 /* Sparkle */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = ABCDEF0000000000000000D2 /* Sparkle */;
+			package = ABCDEF0000000000000000D2 /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */

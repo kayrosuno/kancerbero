@@ -135,23 +135,42 @@ struct DaemonsView: View {
 
     private var cards: some View {
         let base = baseEntries
+        // Type cards count with the type facet cleared so each number matches
+        // the rows shown after pressing it, with the other facets intact.
+        var typeBaseFilter = filter
+        typeBaseFilter.types = DaemonFilter.allTypes
+        let typeBaseEntries = entries.filter { typeBaseFilter.matches($0.service) }
+
+        let agents = typeBaseEntries.filter { $0.service.serviceType == .agent }.count
+        let daemons = typeBaseEntries.filter { $0.service.serviceType == .daemon }.count
         let running = base.filter { $0.service.state == .running }.count
         let stopped = base.filter { $0.service.state == .stopped }.count
         let disabled = base.filter { $0.service.state == .disabled }.count
-        let showingAll = !filter.hasFacets && !filter.hasSearch
+        let unloaded = base.filter { $0.service.state == .unloaded }.count
 
-        return LazyVGrid(columns: KBTheme.summaryColumns,
-                         spacing: KBTheme.summaryGridSpacing) {
+        return LazyVGrid(columns: cardColumns, spacing: 8) {
             SummaryCard(
-                title: "Services",
-                value: KBFormat.compactCount(base.count),
-                caption: "matching filters",
-                systemImage: "list.bullet.rectangle",
-                tint: Color(red: 0.16, green: 0.62, blue: 0.94),
-                action: { clearFilters() },
-                isSelected: showingAll,
-                filterHint: "Clear all filters"
+                title: "Agents",
+                value: KBFormat.compactCount(agents),
+                caption: "launch agents",
+                systemImage: DaemonServiceType.agent.systemImage,
+                tint: Color(red: 0.24, green: 0.62, blue: 0.72),
+                action: { toggleType(.agent) },
+                isSelected: ui.daemons.types.contains(.agent),
+                filterHint: "Toggle launch agents"
             )
+            .help("Launch agents: per-user GUI/user launchd jobs. Click to include or exclude them from the table.")
+            SummaryCard(
+                title: "Daemons",
+                value: KBFormat.compactCount(daemons),
+                caption: "launch daemons",
+                systemImage: DaemonServiceType.daemon.systemImage,
+                tint: Color(red: 0.36, green: 0.50, blue: 0.90),
+                action: { toggleType(.daemon) },
+                isSelected: ui.daemons.types.contains(.daemon),
+                filterHint: "Toggle launch daemons"
+            )
+            .help("Launch daemons: system launchd jobs. Click to include or exclude them from the table.")
             SummaryCard(
                 title: "Running",
                 value: KBFormat.compactCount(running),
@@ -162,6 +181,7 @@ struct DaemonsView: View {
                 isSelected: ui.daemons.states.contains(.running),
                 filterHint: "Toggle running services"
             )
+            .help("Services with a live process (PID). Click to toggle this state.")
             SummaryCard(
                 title: "Stopped",
                 value: KBFormat.compactCount(stopped),
@@ -172,6 +192,7 @@ struct DaemonsView: View {
                 isSelected: ui.daemons.states.contains(.stopped),
                 filterHint: "Toggle stopped services"
             )
+            .help("Services loaded by launchd but not running. Click to toggle this state.")
             SummaryCard(
                 title: "Disabled",
                 value: KBFormat.compactCount(disabled),
@@ -182,38 +203,78 @@ struct DaemonsView: View {
                 isSelected: ui.daemons.states.contains(.disabled),
                 filterHint: "Toggle disabled services"
             )
+            .help("Services disabled with launchd overrides (launchctl disable). Click to toggle this state.")
+            SummaryCard(
+                title: "Not loaded",
+                value: KBFormat.compactCount(unloaded),
+                caption: "plist present, not loaded",
+                systemImage: "circle.dashed",
+                tint: Color(red: 0.33, green: 0.57, blue: 0.94),
+                action: { toggleState(.unloaded) },
+                isSelected: ui.daemons.states.contains(.unloaded),
+                filterHint: "Toggle services not loaded by launchd"
+            )
+            .help("Services whose plist exists but launchd has not loaded. Click to toggle this state.")
         }
     }
 
+    /// Six cards in a single row at the window's minimum width.
+    private var cardColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(minimum: 120), spacing: 8), count: 6)
+    }
+
     private var controls: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                MultiSelectChipBar(
-                    selection: bind(\.types),
-                    label: "Type",
-                    options: [.agent, .daemon],
-                    title: { $0.title },
-                    systemImage: { $0.systemImage }
-                )
-                MultiSelectChipBar(
-                    selection: bind(\.scopes),
-                    label: "Scope",
-                    title: { $0.title }
-                )
-                MultiSelectChipBar(
-                    selection: bind(\.origins),
-                    label: "Origin",
-                    title: { $0.title }
-                )
-                MultiSelectChipBar(
-                    selection: bind(\.states),
-                    label: "State",
-                    title: { $0.displayName }
-                )
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                scopeGroup
+                originGroup
             }
-            .padding(.vertical, 2)
+            VStack(alignment: .leading, spacing: 6) {
+                scopeGroup
+                originGroup
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var scopeGroup: some View {
+        CheckboxFilterGroup("Scope",
+                            selection: bind(\.scopes),
+                            optionTitle: { $0.title },
+                            optionHelp: { scopeHelp($0) })
+            .help("Scope: where the service's plist is installed.")
+    }
+
+    private var originGroup: some View {
+        CheckboxFilterGroup("Origin",
+                            selection: bind(\.origins),
+                            optionTitle: { $0.title },
+                            optionHelp: { originHelp($0) })
+            .help("Origin: how the plist was shipped.")
+    }
+
+    private func scopeHelp(_ scope: DaemonScope) -> String {
+        switch scope {
+        case .system:
+            return "System: plist under /System/Library/LaunchDaemons or /System/Library/LaunchAgents (Apple)."
+        case .global:
+            return "Global: plist under /Library/LaunchDaemons or /Library/LaunchAgents, installed for all users."
+        case .user:
+            return "User: plist under ~/Library/LaunchAgents for the current user."
+        case .runtime:
+            return "Runtime: job registered by launchd at runtime; it has no plist file."
+        }
+    }
+
+    private func originHelp(_ origin: DaemonOrigin) -> String {
+        switch origin {
+        case .apple:
+            return "Apple: plist under /System/Library or a com.apple.* label."
+        case .custom:
+            return "Custom: plist installed by a third party or the user."
+        case .unknown:
+            return "Unknown: no plist (runtime job), so the origin cannot be determined."
+        }
     }
 
     private var tableCard: some View {
@@ -319,6 +380,13 @@ struct DaemonsView: View {
                 .frame(width: 240)
                 .help("Search label, program, arguments or plist")
 
+            Text("\(filteredEntries.count) of \(entries.count) services")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .contentTransition(.numericText())
+                .fixedSize()
+
             Spacer(minLength: 8)
 
             daemonModePill
@@ -333,16 +401,23 @@ struct DaemonsView: View {
                     .lineLimit(1)
                     .help(error)
             }
-            Text("\(filteredEntries.count) of \(entries.count) services")
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-                .contentTransition(.numericText())
         }
     }
 
     private var actionTitle: String {
         pendingAction?.rawValue.capitalized ?? "Action"
+    }
+
+    private func toggleType(_ type: DaemonServiceType) {
+        withAnimation(.snappy(duration: 0.2)) {
+            var types = ui.daemons.types
+            if types.contains(type) {
+                types.remove(type)
+            } else {
+                types.insert(type)
+            }
+            ui.daemons.types = types
+        }
     }
 
     private func toggleState(_ state: KBDaemonState) {
@@ -354,16 +429,6 @@ struct DaemonsView: View {
                 states.insert(state)
             }
             ui.daemons.states = states
-        }
-    }
-
-    private func clearFilters() {
-        withAnimation(.snappy(duration: 0.2)) {
-            ui.daemons.search = ""
-            ui.daemons.types = DaemonFilter.allTypes
-            ui.daemons.scopes = DaemonFilter.allScopes
-            ui.daemons.origins = DaemonFilter.allOrigins
-            ui.daemons.states = DaemonFilter.allStates
         }
     }
 

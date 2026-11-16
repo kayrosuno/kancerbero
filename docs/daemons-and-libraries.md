@@ -25,7 +25,7 @@ artefacto con plist propio.
 
 | Componente | Tipo | Producto | Se ejecuta como | Para qué se usa |
 |---|---|---|---|---|
-| `KancerberoDaemon` | tool + LaunchDaemon/Mach service | `KancerberoDaemon` | root con `SMAppService` o LaunchDaemon; usuario en el LaunchAgent legacy | Procesos, sockets, CPU/memoria e interfaces de todos los uid; inventario y acciones de servicios launchd del dominio `system` |
+| `KancerberoDaemon` | tool + LaunchDaemon/Mach service | `KancerberoDaemon` | root con `SMAppService` | Procesos, sockets, CPU/memoria e interfaces de todos los uid; inventario y acciones de servicios launchd del dominio `system` |
 | `KancerberoFilter` | system extension (`NEFilterDataProvider`) | `uno.kayros.kancerbero.filter.systemextension` | root, App Sandbox, sin UI ni sesión | Filtro de red: identifica el proceso de cada flujo, aplica reglas allow/deny y pausa conexiones para pedir aprobación |
 | `KancerberoProbe` | tool CLI (sin instalación) | `KancerberoProbe` | el usuario que lo lanza (root opcional) | Diagnóstico manual de NetworkStatistics, libproc, interfaces, launchd y disco |
 
@@ -59,15 +59,10 @@ Kancerbero.app ──────> KancerberoFilterContract <────── 
 |---|---|---|---|
 | `uno.kayros.kancerbero.daemon.v2` (Mach service) | `KancerberoDaemon` | proceso del daemon | `NSXPCListener` del daemon |
 | `uno.kayros.kancerbero.daemon.v2` (LaunchDaemon) | `KancerberoDaemon` + `uno.kayros.kancerbero.daemon.plist` | `Kancerbero.app/Contents/Library/LaunchDaemons/` | `SMAppService.daemon(plistName:)` |
-| `uno.kayros.kancerbero.daemon` (LaunchDaemon legacy) | plist legacy | `/Library/LaunchDaemons/uno.kayros.kancerbero.daemon.plist` + `/Library/PrivilegedHelperTools/uno.kayros.kancerbero.daemon` | `scripts/install-daemon.sh` |
-| `uno.kayros.kancerbero.agent` (LaunchAgent legacy) | `KancerberoDaemon` | `~/Library/LaunchAgents/uno.kayros.kancerbero.agent.plist` | `scripts/install-agent.sh` |
 | `group.uno.kayros.kancerbero.filter` (Mach service) | `KancerberoFilter` | system extension | `NEMachServiceName` del Info.plist |
 
-El daemon de `SMAppService` usa la identidad `uno.kayros.kancerbero.daemon.v2`; los modos legacy
-conservan el label y el Mach service antiguos (`uno.kayros.kancerbero.daemon`). La app sigue
-negándose a registrar el servicio moderno si detecta un registro legacy, y los dos no deben
-convivir. El sufijo `.v2` existe para escapar de registros de ServiceManagement/BTM creados por
-versiones anteriores: macOS guarda un *launch constraint* por label y, si ya no coincide, volver
+El daemon de `SMAppService` usa la identidad `uno.kayros.kancerbero.daemon.v2`. El sufijo `.v2`
+existe para escapar de registros de ServiceManagement/BTM creados por versiones anteriores: macOS guarda un *launch constraint* por label y, si ya no coincide, volver
 a registrar el mismo label no lo refresca (`Launch Constraint Violation` al arrancar). La system
 extension usa un Mach service distinto y es independiente del daemon.
 
@@ -93,18 +88,18 @@ extension usa un Mach service distinto y es independiente del daemon.
 identidad propia del daemon (`daemonVersion`/`daemonBuild`), la versión del core y el `euid`, y
 sale con código 0; es la forma de comprobar qué binario se va a ejecutar. Son constantes
 compiladas: la app viene del xcconfig generado por build y el daemon de
-`Config/ComponentVersions.xcconfig`. Un proceso viejo sigue reportando lo que se compiló, no lo
-que hay ahora en el bundle.
+`Config/ComponentVersions.xcconfig`; la versión del daemon es `prefijo.<build daemon>` y el
+filtro usa `prefijo.<build filtro>` en su `Info.plist`. Un proceso viejo sigue reportando lo que
+se compiló, no lo que hay ahora en el bundle; System Status lo muestra con la insignia de versión
+en la banda del título de la tarjeta frente a las versiones del panel lateral.
 
 ### Dónde se instala y se ejecuta
 
-Hay tres modos, y solo uno debe estar activo a la vez:
+Hay un único modo de distribución:
 
 | Modo | Binario | Plist y dominio | Permisos | Logs |
 |---|---|---|---|---|
-| `SMAppService` (distribución) | `Kancerbero.app/Contents/Library/LaunchDaemons/KancerberoDaemon` | `uno.kayros.kancerbero.daemon.plist` embebido en la app; lo registra `SMAppService.daemon(plistName:)` | root | `os.Logger` (subsystem `uno.kayros.kancerbero`) |
-| LaunchDaemon legacy | `/Library/PrivilegedHelperTools/uno.kayros.kancerbero.daemon` | `/Library/LaunchDaemons/uno.kayros.kancerbero.daemon.plist`, dominio `system` | root | `os.Logger` + `/Library/Logs/Kancerbero/daemon.{out,err}.log` |
-| LaunchAgent legacy | `build/Build/Products/<Config>/KancerberoDaemon` | `~/Library/LaunchAgents/uno.kayros.kancerbero.agent.plist`, dominio `gui/<uid>` | usuario | `os.Logger` + `~/Library/Logs/Kancerbero/agent.{out,err}.log` |
+| `SMAppService` | `Kancerbero.app/Contents/Library/LaunchDaemons/KancerberoDaemon` | `uno.kayros.kancerbero.daemon.plist` embebido en la app; lo registra `SMAppService.daemon(plistName:)` | root | `os.Logger` (subsystem `uno.kayros.kancerbero`) |
 
 En el modo de distribución la app embebe el binario y el plist con la fase `Embed Daemon`
 (destino `Contents/Library/LaunchDaemons`), y macOS ejecuta el helper desde dentro del bundle.
@@ -114,7 +109,7 @@ el icono de Kancerbero.
 
 La ventana **System status** expone el registro, la aprobación y **Repair / re-register**
 (desregistrar y volver a registrar para que macOS pida la aprobación de nuevo). No ejecuta
-`sudo` ni scripts: los comandos legacy se copian al portapapeles.
+`sudo` ni scripts.
 
 El plist de `SMAppService` contiene:
 
@@ -242,8 +237,6 @@ registrar desde la app (afecta a todos los ítems de Login Items del sistema).
   el dominio `system` es de solo lectura.
 - `restart` se implementa como `kill SIGTERM` + `kickstart`, no con `launchctl kickstart -k`,
   porque `-k` se queda esperando con servicios de larga duración en macOS 27.
-- `KB_LOG_LEVEL=debug` aparece en el plist legacy, pero ningún código actual lo lee; no cambia
-  el nivel de `os.Logger`.
 
 ### Instalación, desinstalación y diagnóstico
 
@@ -252,23 +245,11 @@ registrar desde la app (afecta a todos los ítems de Login Items del sistema).
 ./scripts/build-release.sh
 ./scripts/notarize.sh
 ./scripts/install-app.sh
-
-# Legacy de desarrollo (root); comparten label/Mach service con SMAppService
-sudo ./scripts/install-daemon.sh
-sudo ./scripts/uninstall-daemon.sh
-
-# Legacy de usuario (sin sudo)
-./scripts/install-agent.sh
-./scripts/uninstall-agent.sh
 ```
 
-Antes de registrar el daemon de `SMAppService`, elimina cualquier instalación legacy: la ventana
-System status la detecta y muestra los comandos, pero no los ejecuta. Los requisitos de firma y
-notarización están en `README.md` y `docs/verification.md`.
+Los requisitos de firma y notarización están en `README.md` y `docs/verification.md`.
 
-Categorías de log: `daemon.lifecycle`, `daemon.listener` y `daemon`. En modo legacy también
-escriben `daemon.out.log` y `daemon.err.log` (root en `/Library/Logs/Kancerbero/`, usuario en
-`~/Library/Logs/Kancerbero/`).
+Categorías de log: `daemon.lifecycle`, `daemon.listener` y `daemon`.
 
 Verificación completa en `docs/verification.md` (secciones «Servicio en background
 (SMAppService)» y «Daemon y XPC»).
@@ -664,8 +645,6 @@ de red (Network Extension)»).
 
 | Pareja | Convivencia |
 |---|---|
-| Daemon `SMAppService` + daemon legacy | **Incompatible**: comparten label y Mach service; hay que desinstalar el legacy antes de registrar |
-| Daemon `SMAppService` + LaunchAgent legacy | **Incompatible**: el agente publica el mismo Mach service con otro label |
 | Daemon + system extension | Compatible e independiente: Mach services distintos; el filtro funciona sin daemon |
 | `KancerberoProbe` + cualquier otro | Compatible: no se instala ni registra nada |
 | Varios filtros de red del mismo grade | Pueden convivir; otras herramientas (Little Snitch, LuLu) pueden alterar el orden |

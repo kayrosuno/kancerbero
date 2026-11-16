@@ -246,7 +246,7 @@ Daemon connected** en el footer del sidebar, el pill **Local / Daemon** de la ba
 icono de Kancerbero en la cabecera del sidebar abre la ventana **System status** con un checklist
 de la app, el helper, la colección, los
 privilegios, el acceso total al disco (FDA), el registro SMAppService, la aprobación en Login
-Items, la conexión XPC y los servicios legacy. Incluye explicaciones, los pasos para habilitar el acceso completo y acciones
+Items y la conexión XPC. Incluye explicaciones, los pasos para habilitar el acceso completo y acciones
 para activar, abrir Login Items, reintentar, reparar/re-registrar, refrescar o revelar la app. Si
 falta Acceso Total al Disco, la fila correspondiente abre una guía paso a paso y la pestaña
 Applications muestra un aviso para desbloquear los contenedores de otras apps.
@@ -439,8 +439,7 @@ satisface y muere al arrancar aunque Login Items lo muestre habilitado.
 La ventana **System status** muestra el estado real (proceso vivo, PID, último error de conexión)
 y permite **Repair / re-register**: desregistra y vuelve a registrar el helper para que macOS
 pueda pedir la aprobación de nuevo. La aprobación en Login Items no se puede automatizar; la
-ventana abre el ajuste correcto y muestra los pasos. Los comandos legacy se copian al
-portapapeles, nunca se ejecutan con sudo desde la app.
+ventana abre el ajuste correcto y muestra los pasos.
 
 Requisitos de distribución:
 
@@ -463,37 +462,13 @@ export GITHUB_TOKEN=...
 
 La app se actualiza con **Sparkle 2** (feed EdDSA en GitHub Pages, ZIP en GitHub Releases). La
 primera versión con Sparkle se instala a mano; a partir de ahí las actualizaciones son
-automáticas. Detalle, gestión de la clave y diagnóstico en
-[`docs/updates.md`](docs/updates.md).
+automáticas. La versión de la app es `0.2.<build>` (el último número es el build); daemon y
+filtro tienen su propio `0.2.<build>` y solo cambian cuando cambia su componente. La ventana
+**System Status** muestra las versiones en ejecución y las que trae el ejecutable. Detalle,
+gestión de la clave y diagnóstico en [`docs/updates.md`](docs/updates.md).
 
 Un daemon registrado con `SMAppService` exige app firmada con Developer ID y **notarizada**.
 La build Debug ad-hoc puede mostrar la UI y el estado, pero no se espera que `register()` funcione.
-
-La app se niega a registrar el servicio moderno mientras exista un registro legacy; elimínalo
-antes con los scripts siguientes.
-
-```bash
-./scripts/uninstall-agent.sh
-sudo ./scripts/uninstall-daemon.sh
-```
-
-### Modo legacy de desarrollo
-
-```bash
-./scripts/install-agent.sh     # LaunchAgent de usuario, sin sudo
-./scripts/uninstall-agent.sh
-```
-
-Sirve para probar el camino XPC completo en desarrollo. Solo ve procesos de tu usuario y no
-puede convivir con el daemon SMAppService.
-
-```bash
-sudo ./scripts/install-daemon.sh
-sudo ./scripts/uninstall-daemon.sh
-```
-
-Instala el binario en `/Library/PrivilegedHelperTools/` y el plist en
-`/Library/LaunchDaemons/`. Es el modo legacy de desarrollo, no el camino de distribución.
 
 ## Daemons
 

@@ -46,6 +46,12 @@ struct KancerberoApp: App {
         .commands {
             SidebarCommands()
 
+            CommandGroup(replacing: .appInfo) {
+                Button("About Kancerbero") {
+                    AboutPanel.present()
+                }
+            }
+
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") {
                     updater.checkForUpdates()
@@ -67,8 +73,7 @@ struct KancerberoApp: App {
                 Button("Enable Background Daemon") {
                     Task { await model.registerDaemonService() }
                 }
-                .disabled(model.legacyServiceDetected
-                          || model.serviceStatus == .enabled
+                .disabled(model.serviceStatus == .enabled
                           || model.serviceActionInFlight)
 
                 Button("Disable Background Daemon") {

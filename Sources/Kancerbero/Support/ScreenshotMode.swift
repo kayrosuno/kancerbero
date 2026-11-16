@@ -64,6 +64,10 @@ enum ScreenshotMode {
         // `--show-status` opens the System status window; capture that one
         // instead of the main window when both flags are present.
         let wantsStatus = arguments.contains("--show-status")
+        let wantsAbout = arguments.contains("--show-about")
+        if wantsAbout {
+            AboutPanel.present()
+        }
         var window: NSWindow?
         for _ in 0..<50 {
             try? await Task.sleep(for: .milliseconds(100))
@@ -71,6 +75,8 @@ enum ScreenshotMode {
                 $0.isVisible
                     && ($0.contentView?.bounds.width ?? 0) > 100
                     && (!wantsStatus || $0.title == "System status")
+                    // The standard About panel has no window title.
+                    && (!wantsAbout || $0.title.isEmpty)
             }
             if window != nil { break }
         }
@@ -88,6 +94,9 @@ enum ScreenshotMode {
         } else if wantsStatus {
             // Wide enough for the logo rail and the three status columns.
             window.setContentSize(NSSize(width: 1180, height: 820))
+        } else if wantsAbout {
+            // Keep the About panel's natural size; only center it.
+            window.center()
         } else {
             window.setContentSize(NSSize(width: 1440, height: 860))
             window.center()

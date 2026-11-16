@@ -3,9 +3,8 @@
 ## Modelo
 
 - La app no está sandboxeada y usa APIs privadas; no es apta para App Store.
-- El daemon de desarrollo corre como root vía LaunchDaemon cuando se instala con
-  `sudo scripts/install-daemon.sh`; el LaunchAgent de usuario corre sin privilegios y solo ve el
-  uid actual.
+- El daemon se registra con `SMAppService` y corre como root; no hay modos legacy de instalación
+  ni helpers instalados con `sudo`.
 - El daemon solo expone lectura de inventario (procesos, sockets, ficheros, contadores y
   CPU/memoria). No lee contenido de ficheros, no ejecuta comandos y no escribe en disco.
 
@@ -75,10 +74,6 @@ Pendiente para producción:
   `AssociatedBundleIdentifiers` y el registro de la app.
 - El daemon registrado exige app **notarizada**; una build ad-hoc puede mostrar el estado pero
   `register()` no es fiable. El cliente XPC usa `NSXPCConnection` con `.privileged`.
-- Antes de registrar hay que eliminar los plists legacy (`install-agent.sh`/`install-daemon.sh`):
-  la app se niega a registrar el servicio moderno mientras detecte un registro legacy. El
-  servicio SMAppService usa la identidad `uno.kayros.kancerbero.daemon.v2`; los legacy conservan
-  la antigua `uno.kayros.kancerbero.daemon`.
 
 ## Acciones sobre servicios launchd
 
@@ -196,10 +191,12 @@ Pendiente para producción:
   los binarios en GitHub Releases. No hay excepciones ATS en Release y la app no está
   sandboxeada, así que no necesita entitlements de red.
 - **Integridad y downgrade.** Sparkle compara el `CFBundleVersion` de la **app**, un timestamp
-  estrictamente creciente generado en cada build. Los builds de daemon y filtro son identidades
-  separadas, anotadas en `Config/ComponentVersions.xcconfig` y estables mientras no cambie su
-  componente; no participan en la comparación de Sparkle. Un appcast comprometido no puede
-  instalar un build menor ni un archivo sin la firma de la clave privada.
+  estrictamente creciente generado en cada build; el último componente de
+  `CFBundleShortVersionString` es exactamente ese build. Los builds de daemon y filtro son
+  identidades separadas, anotadas en `Config/ComponentVersions.xcconfig` y estables mientras no
+  cambie su componente; sus versiones también terminan en su build y no participan en la
+  comparación de Sparkle. Un appcast comprometido no puede instalar un build menor ni un archivo
+  sin la firma de la clave privada.
 - **Clave privada.** Nunca se commitea. Debe tener copia de seguridad cifrada: si se pierde, las
   instalaciones existentes no podrán validar actualizaciones futuras y la recuperación exige una
   versión con clave nueva instalada manualmente. No hay rotación silenciosa.

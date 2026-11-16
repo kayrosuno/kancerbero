@@ -27,18 +27,24 @@ APP="$(kancerbero_require_release_app "$ROOT")"
 kancerbero_read_app_version "$APP"
 
 echo "release artifacts: Kancerbero $VERSION ($BUILD)"
-echo "  zip: build/updates/Kancerbero-$VERSION-$BUILD.zip"
+echo "  zip: build/updates/Kancerbero-$VERSION.zip"
 
 if [[ "$PUBLISH" == "--publish" ]]; then
     : "${GITHUB_TOKEN:?export GITHUB_TOKEN with contents:write}"
 
     if upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)"; then
-        if ! git merge-base --is-ancestor HEAD "$upstream"; then
-            echo "HEAD is not pushed to $upstream; push before publishing" >&2
+        :
+    else
+        upstream="${GITHUB_REMOTE:-github}/main"
+        if ! git rev-parse -q --verify "refs/remotes/$upstream" >/dev/null; then
+            echo "no upstream configured and refs/remotes/$upstream does not exist;" >&2
+            echo "fetch the remote or set an upstream before publishing" >&2
             exit 1
         fi
-    else
-        echo "warning: no upstream branch; the release tag will still be pushed" >&2
+    fi
+    if ! git merge-base --is-ancestor HEAD "$upstream"; then
+        echo "HEAD is not pushed to $upstream; push before publishing" >&2
+        exit 1
     fi
 
     ./scripts/publish-release.sh

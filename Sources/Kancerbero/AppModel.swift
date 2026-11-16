@@ -121,8 +121,6 @@ final class AppModel {
     var serviceStatus: SMAppService.Status = .notRegistered
     var serviceError: String?
     var serviceActionInFlight = false
-    var legacyAgentDetected = false
-    var legacyDaemonDetected = false
     /// Whether a `KancerberoDaemon` process is visible in the process table.
     /// `SMAppService.Status.enabled` only means "registered and eligible to
     /// run"; a job whose signature is rejected never becomes a process.
@@ -136,10 +134,6 @@ final class AppModel {
     var daemonProcessesIncomplete = false
     var daemonReportedProcessCount = 0
     var daemonLocalProcessCount = 0
-
-    var legacyServiceDetected: Bool {
-        legacyAgentDetected || legacyDaemonDetected
-    }
 
     var daemonEntries: [DaemonListEntry] {
         DaemonDeduplicator.entries(system: systemDaemons, local: localDaemons)
@@ -219,6 +213,34 @@ final class AppModel {
             ?? KBVersion.current
     }
 
+    var appBuild: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+            ?? KBVersion.build
+    }
+
+    /// Identity of the daemon binary embedded in this app bundle (not the
+    /// daemon that may be running from an older build).
+    var bundledDaemonVersion: String { KBVersion.daemonVersion }
+    var bundledDaemonBuild: String { KBVersion.daemonBuild }
+
+    private var embeddedFilterBundle: Bundle? {
+        let url = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Library/SystemExtensions/uno.kayros.kancerbero.filter.systemextension",
+                                    isDirectory: true)
+        return Bundle(url: url)
+    }
+
+    /// Identity of the filter extension embedded in this app bundle.
+    var embeddedFilterVersion: String {
+        embeddedFilterBundle?.object(forInfoDictionaryKey: "CFBundleShortVersionString")
+            as? String ?? "unknown"
+    }
+
+    var embeddedFilterBuild: String {
+        embeddedFilterBundle?.object(forInfoDictionaryKey: "CFBundleVersion")
+            as? String ?? "unknown"
+    }
+
     var appBundlePath: String {
         Bundle.main.bundleURL.path
     }
@@ -264,19 +286,6 @@ final class AppModel {
 
     var hasFullDataAccess: Bool {
         (usingDaemon && daemonIsRoot) || isRoot
-    }
-
-    var legacyRemovalCommands: String {
-        var commands: [String] = []
-        if legacyAgentDetected { commands.append("./scripts/uninstall-agent.sh") }
-        if legacyDaemonDetected { commands.append("sudo ./scripts/uninstall-daemon.sh") }
-        return commands.joined(separator: "\n")
-    }
-
-    private var legacyServiceMessage: String {
-        let commands = legacyRemovalCommands
-        guard !commands.isEmpty else { return "" }
-        return "A legacy background service is installed. Remove it first:\n\(commands)"
     }
 
     private var helperMissingMessage: String {
@@ -390,11 +399,6 @@ final class AppModel {
 
     func refreshServiceStatus() {
         serviceStatus = daemonService.status
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        legacyAgentDetected = FileManager.default.fileExists(
-            atPath: "\(home)/Library/LaunchAgents/uno.kayros.kancerbero.agent.plist")
-        legacyDaemonDetected = FileManager.default.fileExists(
-            atPath: "/Library/LaunchDaemons/uno.kayros.kancerbero.daemon.plist")
         updateDaemonProcessState()
     }
 
@@ -463,10 +467,6 @@ final class AppModel {
 
     private func registerDaemonServiceInternal() async {
         serviceError = nil
-        if legacyServiceDetected {
-            serviceError = legacyServiceMessage
-            return
-        }
         guard daemonHelperPresent && daemonPlistPresent else {
             serviceError = helperMissingMessage
             return
@@ -545,10 +545,6 @@ final class AppModel {
         guard !serviceActionInFlight else { return }
         serviceActionInFlight = true
         defer { serviceActionInFlight = false }
-        if legacyServiceDetected {
-            serviceError = legacyServiceMessage
-            return
-        }
         guard daemonHelperPresent && daemonPlistPresent else {
             serviceError = helperMissingMessage
             return
@@ -582,7 +578,6 @@ final class AppModel {
         #if !DEBUG
         guard appIsInApplications,
               !serviceActionInFlight,
-              !legacyServiceDetected,
               daemonHelperPresent,
               daemonPlistPresent,
               !daemonConnecting,
@@ -621,7 +616,7 @@ final class AppModel {
         serviceError = nil
         refreshServiceStatus()
         guard !daemonConnecting, !usingDaemon else { return }
-        if serviceStatus != .enabled && !legacyServiceDetected {
+        if serviceStatus != .enabled {
             serviceError = "Enable and approve the background service first."
             return
         }
@@ -653,13 +648,6 @@ final class AppModel {
 
     func openApplicationsFolder() {
         NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications"))
-    }
-
-    func copyLegacyRemovalCommands() {
-        let commands = legacyRemovalCommands
-        guard !commands.isEmpty else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(commands, forType: .string)
     }
 
     func stop() {

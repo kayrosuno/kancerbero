@@ -19,6 +19,9 @@ final class FilterModel {
     /// False when the running extension reports a different build, e.g. the
     /// app was updated but the system extension was not replaced.
     private(set) var extensionIsCurrent = true
+    /// Build reported by the filter extension while answering `setRules`.
+    /// Nil when the extension is not connected.
+    private(set) var runningExtensionBuild: String?
     private(set) var history: [FlowRecord] = []
     private(set) var status: FilterStatus?
     private(set) var isConnected = false
@@ -96,6 +99,7 @@ final class FilterModel {
         client?.disconnect()
         client = nil
         isConnected = false
+        runningExtensionBuild = nil
     }
 
     // MARK: - Filter lifecycle
@@ -126,6 +130,7 @@ final class FilterModel {
         client?.disconnect()
         client = nil
         isConnected = false
+        runningExtensionBuild = nil
         flows.removeAll()
         pending.removeAll()
     }
@@ -137,6 +142,7 @@ final class FilterModel {
         client?.disconnect()
         client = nil
         isConnected = false
+        runningExtensionBuild = nil
         flows.removeAll()
         pending.removeAll()
     }
@@ -308,6 +314,7 @@ final class FilterModel {
         defer { connecting = false }
 
         client?.disconnect()
+        runningExtensionBuild = nil
         let client = FilterXPCClient()
         client.configure(
             onPush: { [weak self] push in
@@ -315,6 +322,9 @@ final class FilterModel {
             },
             onConnectionChange: { [weak self] connected in
                 self?.isConnected = connected
+                if !connected {
+                    self?.runningExtensionBuild = nil
+                }
             }
         )
         self.client = client
@@ -345,6 +355,7 @@ final class FilterModel {
         // Compare against the build of the filter embedded in this app, not the
         // app's own build (which changes on every host build).
         extensionIsCurrent = ack.message == FilterVersion.expectedBuild
+        runningExtensionBuild = ack.message
     }
 
     // MARK: - Applying extension state

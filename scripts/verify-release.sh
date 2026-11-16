@@ -7,7 +7,8 @@ source "$ROOT/scripts/lib/version.sh"
 APP="$(kancerbero_require_release_app "$ROOT")"
 kancerbero_read_app_version "$APP"
 
-FEED="https://kayrosuno.github.io/kancerbero/appcast.xml"
+REPO="${GITHUB_REPO:-kayrosuno/kancerbero}"
+FEED="${SPARKLE_FEED_URL:-https://${REPO%%/*}.github.io/${REPO##*/}/appcast.xml}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -47,9 +48,9 @@ if [[ -z "$enclosure" ]]; then
     exit 1
 fi
 case "$enclosure" in
-    *"-$BUILD.zip") ;;
+    *"$VERSION.zip") ;;
     *)
-        echo "enclosure does not contain -$BUILD.zip: $enclosure" >&2
+        echo "enclosure does not contain $VERSION.zip: $enclosure" >&2
         exit 1
         ;;
 esac

@@ -5,6 +5,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$ROOT/scripts/lib/version.sh"
 
 REMOTE="${GITHUB_REMOTE:-github}"
+REPO="${GITHUB_REPO:-kayrosuno/kancerbero}"
+FEED="${SPARKLE_FEED_URL:-https://${REPO%%/*}.github.io/${REPO##*/}/appcast.xml}"
 APP="$(kancerbero_require_release_app "$ROOT")"
 kancerbero_read_app_version "$APP"
 SRC="$ROOT/build/updates/appcast.xml"
@@ -43,4 +45,4 @@ git -C "$WT" commit -m "appcast: $VERSION ($BUILD)"
 git -C "$WT" push "$REMOTE" gh-pages
 git -C "$ROOT" worktree remove --force "$WT"
 
-echo "appcast published: https://kayrosuno.github.io/kancerbero/appcast.xml"
+echo "appcast published: $FEED"

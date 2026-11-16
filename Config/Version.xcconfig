@@ -1,9 +1,10 @@
 // App version prefix. The real marketing version and build are generated on
 // every build by scripts/prepare-build-version.sh:
-//   marketing = <prefix>.<YYMMDD>
-//   build     = YYYYMMDDHHMMSS (UTC, strictly increasing)
+//   marketing = <prefix>.<build>
+//   build     = YYMMDDHHMM (UTC, strictly increasing)
+// The last version component is exactly the build.
 // Change the prefix with scripts/set-version.sh (<major.minor>).
-KANCERBERO_VERSION_PREFIX = 0.1
+KANCERBERO_VERSION_PREFIX = 0.2
 
 // Fallbacks used only when the generated xcconfig does not exist (a target-only
 // build without the scheme pre-action, or a broken generator).
