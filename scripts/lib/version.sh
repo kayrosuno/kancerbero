@@ -1,6 +1,29 @@
 #!/bin/bash
 # Shared version helpers for the release scripts. Source this file.
 
+# Builds are YYMMDDHHMM (UTC). A previous build or release tag from the old
+# YYYYMMDDHHMMSS scheme is converted to the new form (drop century and
+# seconds) so the monotonic floor survives the format change.
+kancerbero_normalize_build() {
+    local build="${1:-}"
+    if [[ "$build" =~ ^[0-9]{14}$ ]]; then
+        printf '%s\n' "${build:2:10}"
+    else
+        printf '%s\n' "$build"
+    fi
+}
+
+# Highest build recorded in a release tag (v<build>), normalized to 10 digits.
+kancerbero_last_tag_build() {
+    local root="${1:?repository root}"
+    git -C "$root" tag --list 'v[0-9]*' 2>/dev/null \
+        | sed -n 's/^v\([0-9]\{10,14\}\)$/\1/p' \
+        | while IFS= read -r build; do
+              kancerbero_normalize_build "$build"
+          done \
+        | LC_ALL=C sort -n | tail -1 || true
+}
+
 kancerbero_release_app() {
     printf '%s\n' "${1:?repository root}/build/Build/Products/Release/Kancerbero.app"
 }
@@ -32,8 +55,8 @@ kancerbero_read_app_version() {
         echo "invalid CFBundleShortVersionString '$version' in $plist" >&2
         return 1
     fi
-    if [[ ! "$build" =~ ^[0-9]{14}$ ]]; then
-        echo "invalid CFBundleVersion '$build' in $plist (expected YYYYMMDDHHMMSS)" >&2
+    if [[ ! "$build" =~ ^[0-9]{10}$ ]]; then
+        echo "invalid CFBundleVersion '$build' in $plist (expected YYMMDDHHMM)" >&2
         return 1
     fi
     VERSION="$version"

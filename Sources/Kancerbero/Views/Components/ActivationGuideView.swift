@@ -256,7 +256,6 @@ struct ActivationGuideView: View {
             return filter.isBusy || filter.isConnecting
         case .backgroundService:
             return model.serviceActionInFlight
-                || model.legacyServiceDetected
                 || !model.daemonHelperPresent
                 || !model.daemonPlistPresent
         case .fullDiskAccess:

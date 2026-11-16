@@ -101,14 +101,11 @@ kancerbero usa la ruta IFMIB (`net.link.generic.system.ifcount` +
 ## Daemon y XPC
 
 ```bash
-./scripts/install-agent.sh
-launchctl print gui/$(id -u)/uno.kayros.kancerbero.agent
+K=./build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero
+"$K" --register-service
+launchctl print system/uno.kayros.kancerbero.daemon.v2
 # la app debe mostrar "source: daemon" en la barra inferior
-./scripts/uninstall-agent.sh
-
-sudo ./scripts/install-daemon.sh
-sudo launchctl print system/uno.kayros.kancerbero.daemon
-sudo ./scripts/uninstall-daemon.sh
+"$K" --unregister-service
 ```
 
 ## Captura visual de la UI sin TCC
@@ -146,12 +143,13 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
   [--networking-process-protocol tcp|udp|icmp|icmpv6|sctp|gre|esp|raw|other[,..]|all] \
   [--networking-process-socket stream|dgram|raw|seqpacket|other[,..]|all] \
   [--traffic-graph bits|packets] \
+  [--show-status] [--show-about] \
   [--sidebar-collapsed]
 ```
 
 Los flags **sin valor** (`--cards-collapsed`, `--cards-expanded`, `--sidebar-collapsed`,
-`--disk-scan`, `--show-status`, `--networking-resolve-names`) deben ir al final de la línea de
-argumentos; si quedan en medio,
+`--disk-scan`, `--show-status`, `--show-about`, `--networking-resolve-names`) deben ir al final de
+la línea de argumentos; si quedan en medio,
 macOS puede abrir la app sin ventana principal y la captura no se genera. `--cards-collapsed` /
 `--cards-expanded` fuerzan todas las tarjetas colapsadas/expandidas, `--cards-collapsed-sections`
 un estado mixto y `--screenshot-size 1340x700` fija el tamaño de la ventana.
@@ -210,7 +208,7 @@ build/Build/Products/Debug/Kancerbero.app/Contents/MacOS/Kancerbero \
 
 | Síntoma | Causa |
 |---|---|
-| No se genera el PNG y queda una ventana sin contenido (o ninguna ventana) | Un flag sin valor (`--cards-expanded`, `--cards-collapsed`, `--sidebar-collapsed`, `--disk-scan`, `--show-status`, `--networking-resolve-names`) quedó en medio de los argumentos; muévelo al final. |
+| No se genera el PNG y queda una ventana sin contenido (o ninguna ventana) | Un flag sin valor (`--cards-expanded`, `--cards-collapsed`, `--sidebar-collapsed`, `--disk-scan`, `--show-status`, `--show-about`, `--networking-resolve-names`) quedó en medio de los argumentos; muévelo al final. |
 | El PNG sale con ceros o «Last 0 samples» | `--screenshot-delay` insuficiente o daemon no disponible; súbelo. |
 | La captura no corresponde a la sección/pestaña pedida | Valor no válido en `--section`, `--tab` o `--disk-tab`; usa solo los de la lista superior. |
 | Ventana recortada o tarjetas apiladas | Usa `--screenshot-size 1340x700` (mínimo soportado) o superior. |
@@ -1235,9 +1233,6 @@ open /Applications/Kancerbero.app
   volver a modo local.
 - Sin notarización, Gatekeeper marca la app como “Unnotarized Developer ID” y el registro del
   daemon no es fiable; completar `notarytool store-credentials` + `scripts/notarize.sh`.
-- Antes de registrar, eliminar los plists legacy (`scripts/uninstall-agent.sh`,
-  `sudo scripts/uninstall-daemon.sh`). La ventana detecta el agente/daemon legacy, muestra los
-  comandos y los copia; no los ejecuta.
 
 ### Verificación visual de la ventana
 
@@ -1663,10 +1658,14 @@ APP=build/Build/Products/Debug/Kancerbero.app
 EXT="$APP/Contents/Library/SystemExtensions/uno.kayros.kancerbero.filter.systemextension"
 /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$EXT/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$EXT/Contents/Info.plist"
 build/Build/Products/Debug/KancerberoDaemon | head -1
 ```
 
+- **Versión = build**: en app, filtro y daemon, el último componente de
+  `CFBundleShortVersionString` debe ser exactamente `CFBundleVersion` (p. ej.
+  `0.2.20261116095540` / `20261116095540`).
 - **Sin cambios**: dos `./scripts/build.sh` seguidos. El `CFBundleVersion` de la app sube; los de
   daemon y filtro no cambian; `Config/ComponentVersions.xcconfig` no se modifica. La app no debe
   reiniciar el daemon ni re-staged el filtro.
@@ -1680,5 +1679,19 @@ build/Build/Products/Debug/KancerberoDaemon | head -1
 - **Anotación**: un build que cambia un componente deja `Config/ComponentVersions.xcconfig`
   modificado; hay que commitearlo. `build-release.sh` se niega a continuar si cambió durante el
   build y `release.sh` exige el árbol limpio antes de empezar.
+- **System Status**: abrir la ventana (`--show-status`) y comprobar:
+  - las tarjetas **Application**, **Background Services** y **Network Filter** muestran su
+    versión en la banda del título, en una sola línea y sin build;
+  - el **panel lateral** muestra **Versions in App Bundle** con Kancerbero, daemon y filtro,
+    también sin build;
+  - las acciones de servicio (Enable background service, Open Login Items, Repair, Retry y
+    Refresh) están en **Troubleshooting**, dentro del panel lateral;
+  - las versiones en ejecución y las embebidas coinciden; el build se comprueba con
+    `PlistBuddy`/scripts, no en la UI.
+- **About Kancerbero** (`--show-about`): muestra `Version 0.2.<build>` sin el build entre
+  paréntesis y el enlace https://kayros.uno en los créditos.
+- **Primer build del esquema 0.2**: daemon y filtro suben de build una vez (bump de migración)
+  para publicar `0.2.<build>`; el primer arranque reinicia el daemon y re-stagea el filtro. A
+  partir de ahí solo cambian si cambia su hash.
 - **Release**: `./scripts/release.sh` valida app/filtro/daemon, notariza y genera un appcast con
   el build de la app; `sign_update --verify`; tag `v<build de la app>`.

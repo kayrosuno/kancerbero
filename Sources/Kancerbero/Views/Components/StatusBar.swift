@@ -275,7 +275,6 @@ struct StatusBar: View {
     }
 
     private var statusTint: Color {
-        if model.legacyServiceDetected { return .orange }
         if model.usingDaemon {
             return model.daemonIsRoot ? .green : .orange
         }

@@ -1,4 +1,5 @@
 import AppKit
+import KancerberoFilterContract
 import ServiceManagement
 import SwiftUI
 
@@ -14,8 +15,8 @@ struct SystemStatusView: View {
     @Environment(AppModel.self) private var model
     @Environment(FilterModel.self) private var filter
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
 
-    @State private var copiedLegacyCommands = false
     @State private var showRepairConfirmation = false
     @State private var guide: ActivationGuide?
 
@@ -30,16 +31,30 @@ struct SystemStatusView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     contentHeader
                     overallBanner
-                    primaryActions
                     if let error = model.serviceError {
                         errorText(error)
                     }
                     checklist
-                    footerColumns
+                    if showsSetupSteps {
+                        setupSteps
+                    }
                 }
                 .padding(18)
             }
             .scrollIndicators(.visible)
+        }
+        .background {
+            // Designed backdrop instead of the default window background: it
+            // gives the elevated cards a stable surface to stand on.
+            LinearGradient(
+                colors: colorScheme == .dark
+                    ? [Color(red: 0.075, green: 0.08, blue: 0.095),
+                       Color(red: 0.025, green: 0.027, blue: 0.035)]
+                    : [Color(red: 0.97, green: 0.973, blue: 0.98),
+                       Color(red: 0.92, green: 0.925, blue: 0.94)],
+                startPoint: .top,
+                endPoint: .bottom)
+            .ignoresSafeArea()
         }
         .frame(minWidth: 1080, idealWidth: 1180, minHeight: 620, maxHeight: .infinity)
         .onAppear {
@@ -85,27 +100,157 @@ struct SystemStatusView: View {
 
     // MARK: - Header and overview
 
-    /// Left rail: logo, identity and the two component indicators.
+    /// Left rail: logo, identity, bundled versions, component indicators and
+    /// the troubleshooting actions.
     private var rail: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            AppLogoView(size: 128)
-            VStack(alignment: .leading, spacing: 2) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                AppLogoView(size: 128)
                 Text("System status")
                     .font(.system(size: 20, weight: .semibold, design: .rounded))
-                Text("Kancerbero \(model.appVersion)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
 
-            VStack(alignment: .leading, spacing: 6) {
-                railChip(railDaemonLabel, tint: railDaemonTint)
-                railChip(filter.filterHealth.shortLabel,
-                         tint: filter.filterHealth.tint)
-            }
-            .padding(.top, 4)
+                railVersions
 
-            Spacer(minLength: 0)
+                VStack(alignment: .leading, spacing: 6) {
+                    railChip(railDaemonLabel, tint: railDaemonTint)
+                    railChip(filter.filterHealth.shortLabel,
+                             tint: filter.filterHealth.tint)
+                }
+                .padding(.top, 2)
+
+                railTroubleshooting
+            }
+            .padding(.bottom, 18)
         }
+    }
+
+    private var railTroubleshooting: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionHeader("Troubleshooting")
+
+            VStack(spacing: 4) {
+                primaryActionButton
+
+                if model.serviceStatus != .requiresApproval {
+                    railAction("Open Login Items") {
+                        model.openLoginItemsSettings()
+                    }
+                    .disabled(model.serviceActionInFlight)
+                }
+
+                if showsExplicitRepair {
+                    railAction("Repair…") {
+                        showRepairConfirmation = true
+                    }
+                    .help("Remove and re-add the background helper; macOS may ask for approval again.")
+                }
+
+                railAction("Retry connection") {
+                    model.retryDaemonConnection()
+                }
+                .disabled(!canRetryConnection)
+
+                railAction("Refresh status") {
+                    model.refreshServiceStatus()
+                    model.refreshFullDiskAccess(force: true)
+                }
+
+                railAction("Reveal app in Finder") {
+                    model.revealAppInFinder()
+                }
+
+                if !model.appIsInApplications {
+                    railAction("Open Applications folder") {
+                        model.openApplicationsFolder()
+                    }
+                }
+
+                if model.serviceActionInFlight {
+                    ProgressView().controlSize(.small)
+                }
+            }
+
+            Text("Repair removes and re-adds the background helper. macOS may ask you to approve Kancerbero again in Login Items; privileged data pauses until it is approved.")
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if !model.appIsInApplications
+                || !model.daemonHelperPresent
+                || !model.daemonPlistPresent
+                || model.serviceStatus == .notFound {
+                Text("Kancerbero cannot reinstall itself. Quit it, replace Kancerbero.app in /Applications with a complete signed build, reopen it, then repair the background service.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// Full-width rail button: compact enough for the 190 pt panel and easy to
+    /// scan as a vertical action list.
+    @ViewBuilder
+    private func railAction(_ title: String,
+                            prominent: Bool = false,
+                            action: @escaping () -> Void) -> some View {
+        if prominent {
+            Button(action: action) {
+                railActionLabel(title)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .help(title)
+        } else {
+            Button(action: action) {
+                railActionLabel(title)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help(title)
+        }
+    }
+
+    private func railActionLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 10, weight: .medium))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Versions shipped inside the app bundle, moved into the side panel.
+    private var railVersions: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            sectionHeader("Versions in App Bundle")
+            railVersionRow(icon: "app.badge",
+                           label: "Kancerbero",
+                           value: model.appVersion)
+            railVersionRow(icon: "gearshape.2.fill",
+                           label: "Daemon",
+                           value: model.bundledDaemonVersion)
+            railVersionRow(icon: "shield.lefthalf.filled",
+                           label: "Filter",
+                           value: model.embeddedFilterVersion)
+        }
+    }
+
+    private func railVersionRow(icon: String, label: String, value: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.tertiary)
+                .frame(width: 12)
+            Text(label)
+                .font(.system(size: 9.5, weight: .medium))
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 4)
+            Text(value)
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .help("\(label): \(value)")
     }
 
     private func railChip(_ text: String, tint: Color) -> some View {
@@ -126,7 +271,6 @@ struct SystemStatusView: View {
     }
 
     private var railDaemonTint: Color {
-        if model.legacyServiceDetected { return .orange }
         if model.usingDaemon {
             return model.daemonIsRoot ? .green : .orange
         }
@@ -184,12 +328,6 @@ struct SystemStatusView: View {
     }
 
     private var overallState: OverallState {
-        if model.legacyServiceDetected {
-            return OverallState(
-                level: .warning,
-                title: "Legacy service conflict",
-                message: "An old launchd agent or daemon is installed. Remove it before enabling the modern background service.")
-        }
         if !model.daemonHelperPresent || !model.daemonPlistPresent {
             return OverallState(
                 level: .error,
@@ -304,88 +442,211 @@ struct SystemStatusView: View {
     // MARK: - Checklist
 
     private var checklist: some View {
-        HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 14) {
-                card("Application") {
-                    applicationRow
-                    helperRow
-                }
-                card("Data access") {
-                    dataCollectionRow
-                    trafficAttributionRow
-                    privilegedRow
-                    fullDiskAccessRow
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .top)
-
-            VStack(alignment: .leading, spacing: 14) {
-                card("Background service") {
-                    serviceRow
-                    approvalRow
-                    connectionRow
-                    daemonProcessRow
-                    if model.daemonProcessesIncomplete {
-                        processDataRow
+        VStack(alignment: .leading, spacing: 10) {
+            card("Application",
+                 version: model.appVersion,
+                 versionLevel: model.appIsInApplications ? .ok : .info) {
+                columns {
+                    cardColumn {
+                        helperRow
+                    }
+                    cardColumn {
+                        applicationRow
                     }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .top)
 
-            VStack(alignment: .leading, spacing: 14) {
-                card("Network filter") {
+            card("Background Services",
+                 version: backgroundVersion,
+                 versionLevel: backgroundVersionLevel) {
+                columns {
+                    cardColumn {
+                        serviceRow
+                        connectionRow
+                    }
+                    cardColumn {
+                        approvalRow
+                        daemonProcessRow
+                        if model.daemonProcessesIncomplete {
+                            processDataRow
+                        }
+                    }
+                }
+            }
+
+            card("Network Filter",
+                 version: filterRunningVersion,
+                 versionLevel: filterVersionLevel) {
+                cardColumn {
                     filterExtensionRow
                     filterConfigurationRow
                 }
-                card("Compatibility") {
-                    legacyRow
+            }
+
+            card("Data Access") {
+                columns {
+                    cardColumn {
+                        dataCollectionRow
+                        privilegedRow
+                    }
+                    cardColumn {
+                        trafficAttributionRow
+                        fullDiskAccessRow
+                    }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .top)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func card<Content: View>(_ title: String,
+                                     version: String? = nil,
+                                     versionLevel: StatusLevel = .info,
                                      @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            sectionHeader(title)
-            content()
+        // Cards without a running version (Data Access) get the accent tint.
+        let tint = version == nil ? Color.accentColor : versionLevel.color
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                sectionHeader(title)
+                Spacer(minLength: 8)
+                if let version {
+                    versionBadge(version, level: versionLevel)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background {
+                LinearGradient(
+                    colors: [tint.opacity(colorScheme == .dark ? 0.26 : 0.16),
+                             tint.opacity(colorScheme == .dark ? 0.10 : 0.05)],
+                    startPoint: .leading,
+                    endPoint: .trailing)
+            }
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(tint.opacity(colorScheme == .dark ? 0.22 : 0.12))
+                    .frame(height: 0.5)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                content()
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
         }
-        .padding(12)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .background {
-            RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.55))
+            ZStack {
+                RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
+                    .fill(cardFill)
+                // Soft accent glow in the corner so the surface reads as lit.
+                RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
+                    .fill(RadialGradient(
+                        colors: [Color.accentColor.opacity(colorScheme == .dark ? 0.16 : 0.06),
+                                 .clear],
+                        center: .topLeading,
+                        startRadius: 0,
+                        endRadius: 300))
+            }
         }
+        .clipShape(RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
-                .strokeBorder(Color.secondary.opacity(0.14), lineWidth: 1)
+                .strokeBorder(cardStroke, lineWidth: 1)
         }
+        .compositingGroup()
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.60 : 0.12),
+                radius: 14, x: 0, y: 7)
     }
 
-    private var footerColumns: some View {
-        HStack(alignment: .top, spacing: 14) {
-            if showsSetupSteps {
-                setupSteps
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-            }
-            actions
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+    /// Elevated, opaque surface that stands out from the window background in
+    /// both appearances: a lighter top, a deeper base and a bright hairline.
+    private var cardFill: LinearGradient {
+        LinearGradient(
+            colors: colorScheme == .dark
+                ? [Color(red: 0.21, green: 0.22, blue: 0.25),
+                   Color(red: 0.145, green: 0.15, blue: 0.175)]
+                : [Color.white,
+                   Color(red: 0.955, green: 0.96, blue: 0.97)],
+            startPoint: .top,
+            endPoint: .bottom)
+    }
+
+    private var cardStroke: LinearGradient {
+        LinearGradient(
+            colors: colorScheme == .dark
+                ? [Color.white.opacity(0.40), Color.white.opacity(0.12)]
+                : [Color.black.opacity(0.16), Color.black.opacity(0.06)],
+            startPoint: .top,
+            endPoint: .bottom)
+    }
+
+    /// Compact capsule that carries the running version next to a card title.
+    /// It sits on the tinted title band, so the fill is neutral and the level
+    /// color stays in the dot and the digits.
+    private func versionBadge(_ text: String, level: StatusLevel) -> some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(level.color)
+                .frame(width: 5, height: 5)
+            Text(text)
+                .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                .foregroundStyle(level.color)
+                .lineLimit(1)
+                .fixedSize()
         }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2.5)
+        .background(Color(nsColor: .controlBackgroundColor)
+            .opacity(colorScheme == .dark ? 0.70 : 0.85), in: Capsule())
+        .overlay {
+            Capsule().strokeBorder(
+                Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.08),
+                lineWidth: 0.5)
+        }
+        .accessibilityLabel("Version \(text)")
     }
 
     private var applicationRow: some View {
         let inApplications = model.appIsInApplications
+        let location = Bundle.main.bundleURL.deletingLastPathComponent().lastPathComponent
         return statusRow(
             inApplications ? .ok : .info,
             title: "Application",
             value: inApplications ? "Running" : "Development build",
-            detail: "\(model.appVersion) · \(model.appBundlePath)"
-                + (inApplications ? "" : "\nInstall in /Applications for production use."),
+            detail: inApplications
+                ? "Installed in /Applications."
+                : "Development build in \(location).\nInstall in /Applications for production use.",
             actionTitle: inApplications ? nil : "Reveal",
             action: { model.revealAppInFinder() }
         )
+        .help(model.appBundlePath)
     }
+
+    /// Version reported by the daemon process through the XPC handshake.
+    private var backgroundVersion: String {
+        model.usingDaemon ? (model.daemonVersion ?? "unknown") : "Not running"
+    }
+
+    private var backgroundVersionLevel: StatusLevel {
+        guard model.usingDaemon else { return .warning }
+        return model.daemonIsRoot ? .ok : .warning
+    }
+
+    /// Version reported by the running system extension.
+    private var filterRunningVersion: String {
+        filter.isConnected ? (filter.status?.version ?? "unknown") : "Not running"
+    }
+
+    private var filterVersionLevel: StatusLevel {
+        if filter.isConnected { return .ok }
+        if case .failed = filter.filterHealth { return .error }
+        return .warning
+    }
+
+    /// Versions shipped inside the app bundle live in the side rail; they are
+    /// independent of what may still be running from an older installation.
+    /// The build is the last version component, so it is not repeated.
 
     private var helperRow: some View {
         let present = model.daemonHelperPresent && model.daemonPlistPresent
@@ -402,7 +663,7 @@ struct SystemStatusView: View {
             title: "Bundle helper",
             value: value,
             detail: present
-                ? "Contents/Library/LaunchDaemons/KancerberoDaemon and its launchd plist are present."
+                ? "Daemon executable and launchd plist are present."
                 : "The app bundle is missing the daemon executable or plist. Kancerbero cannot reinstall itself; replace the app in /Applications with a complete signed build.",
             actionTitle: "Reveal",
             action: { model.revealAppInFinder() }
@@ -534,7 +795,6 @@ struct SystemStatusView: View {
                 action = { showRepairConfirmation = true }
                 actionDisabled = actionDisabled
                     || model.isConnectingToDaemon
-                    || model.legacyServiceDetected
             } else {
                 actionTitle = "Reveal"
                 action = { model.revealAppInFinder() }
@@ -595,8 +855,7 @@ struct SystemStatusView: View {
         if connected {
             level = model.daemonIsRoot ? .ok : .warning
             value = "Connected"
-            let build = model.daemonBuild.map { " (\($0))" } ?? ""
-            detail = "Daemon \(model.daemonVersion ?? "unknown")\(build) · \(model.daemonIsRoot ? "root" : "non-root")."
+            detail = "Daemon \(model.daemonVersion ?? "unknown") · \(model.daemonIsRoot ? "root" : "non-root")."
         } else if connecting {
             level = .info
             value = "Connecting…"
@@ -616,7 +875,7 @@ struct SystemStatusView: View {
             detail = "The app is collecting data locally."
         }
         let canRetry = !connected && !connecting && !model.serviceActionInFlight
-            && (model.serviceStatus == .enabled || model.legacyServiceDetected)
+            && model.serviceStatus == .enabled
         return statusRow(level, title: "Daemon connection",
                          value: value, detail: detail,
                          actionTitle: "Retry",
@@ -742,60 +1001,10 @@ struct SystemStatusView: View {
                          })
     }
 
-    private var legacyRow: some View {
-        let detected = model.legacyServiceDetected
-        let value: String
-        let detail: String
-        switch (model.legacyAgentDetected, model.legacyDaemonDetected) {
-        case (true, true):
-            value = "Agent and daemon"
-            detail = "Both an old launch agent and an old system daemon are installed. Remove both before repairing the service."
-        case (true, false):
-            value = "Legacy agent"
-            detail = "An old launch agent uses the same label. Remove it, then click Refresh status."
-        case (false, true):
-            value = "Legacy daemon"
-            detail = "An old system daemon uses the same label and Mach service. Removing it requires sudo."
-        case (false, false):
-            value = "None"
-            detail = "No old launchd jobs were found."
-        }
-
-        return VStack(alignment: .leading, spacing: 8) {
-            statusRow(detected ? .warning : .ok,
-                      title: "Legacy services", value: value, detail: detail)
-            if detected {
-                Text(model.legacyRemovalCommands)
-                    .font(.system(size: 10, design: .monospaced))
-                    .textSelection(.enabled)
-                    .padding(8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.secondary.opacity(0.08),
-                                in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-
-                HStack(spacing: 10) {
-                    Button(copiedLegacyCommands ? "Copied" : "Copy removal commands") {
-                        model.copyLegacyRemovalCommands()
-                        copiedLegacyCommands = true
-                        Task { @MainActor in
-                            try? await Task.sleep(for: .seconds(2))
-                            copiedLegacyCommands = false
-                        }
-                    }
-                    .buttonStyle(.link)
-                    Text("Run these in Terminal. Kancerbero never runs sudo commands.")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-
     // MARK: - Setup guidance
 
     private var showsSetupSteps: Bool {
         !model.hasFullDataAccess
-            || model.legacyServiceDetected
             || !model.daemonHelperPresent
             || !model.daemonPlistPresent
     }
@@ -805,11 +1014,7 @@ struct SystemStatusView: View {
             Text("To enable full access")
                 .font(.system(size: 12, weight: .semibold))
 
-            if model.legacyServiceDetected {
-                Text("Remove the legacy services listed under Compatibility first.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.orange)
-            } else if !model.daemonHelperPresent || !model.daemonPlistPresent {
+            if !model.daemonHelperPresent || !model.daemonPlistPresent {
                 Text("Reinstall a complete Kancerbero app first; this bundle is missing its helper.")
                     .font(.system(size: 10))
                     .foregroundStyle(.orange)
@@ -827,9 +1032,15 @@ struct SystemStatusView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        // Fill the content width so the tinted panel matches the cards.
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
         .background(Color.accentColor.opacity(0.06),
                     in: RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: KBTheme.smallRadius, style: .continuous)
+                .strokeBorder(Color.accentColor.opacity(0.16), lineWidth: 1)
+        }
     }
 
     private func stepRow(_ number: Int, _ text: String, done: Bool) -> some View {
@@ -847,123 +1058,37 @@ struct SystemStatusView: View {
 
     // MARK: - Actions
 
-    private var primaryActions: some View {
-        HStack(spacing: 10) {
-            primaryActionButton
-
-            if model.serviceStatus != .requiresApproval {
-                Button("Open Login Items") {
-                    model.openLoginItemsSettings()
-                }
-                .buttonStyle(.bordered)
-                .disabled(model.serviceActionInFlight)
-            }
-
-            if canRepair && model.serviceStatus != .notFound {
-                Button("Repair…") {
-                    showRepairConfirmation = true
-                }
-                .buttonStyle(.bordered)
-                .help("Remove and re-add the background helper; macOS may ask for approval again.")
-            }
-
-            if model.serviceActionInFlight {
-                ProgressView().controlSize(.small)
-            }
-        }
-    }
-
-    private var actions: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            sectionHeader("Troubleshooting")
-
-            HStack(spacing: 10) {
-                Button("Retry connection") {
-                    model.retryDaemonConnection()
-                }
-                .buttonStyle(.bordered)
-                .disabled(!canRetryConnection)
-
-                Button("Refresh status") {
-                    model.refreshServiceStatus()
-                    model.refreshFullDiskAccess(force: true)
-                }
-                .buttonStyle(.bordered)
-
-                Button("Reveal app in Finder") {
-                    model.revealAppInFinder()
-                }
-                .buttonStyle(.bordered)
-            }
-
-            if !model.appIsInApplications {
-                Button("Open Applications folder") {
-                    model.openApplicationsFolder()
-                }
-                .buttonStyle(.bordered)
-            }
-
-            Text("Repair removes and re-adds the background helper. macOS may ask you to approve Kancerbero again in Login Items; privileged data pauses until it is approved.")
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if !model.appIsInApplications
-                || !model.daemonHelperPresent
-                || !model.daemonPlistPresent
-                || model.serviceStatus == .notFound {
-                Text("Kancerbero cannot reinstall itself. Quit it, replace Kancerbero.app in /Applications with a complete signed build, reopen it, then repair the background service.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
     @ViewBuilder
     private var primaryActionButton: some View {
-        if model.legacyServiceDetected {
+        if !model.daemonHelperPresent || !model.daemonPlistPresent {
+            // "Reveal app in Finder" is already in the rail action list.
             EmptyView()
-        } else if !model.daemonHelperPresent || !model.daemonPlistPresent {
-            Button("Reveal app in Finder") {
-                model.revealAppInFinder()
-            }
-            .buttonStyle(.borderedProminent)
         } else {
             switch model.serviceStatus {
             case .notRegistered:
-                Button("Enable background service") {
+                railAction("Enable background service", prominent: true) {
                     Task { await model.registerDaemonService() }
                 }
-                .buttonStyle(.borderedProminent)
                 .disabled(model.serviceActionInFlight)
             case .requiresApproval:
-                Button("Open Login Items") {
+                railAction("Open Login Items", prominent: true) {
                     model.openLoginItemsSettings()
                 }
-                .buttonStyle(.borderedProminent)
                 .disabled(model.serviceActionInFlight)
             case .enabled:
-                if model.usingDaemon {
+                if model.usingDaemon || model.daemonProcessRunning {
+                    // Retry connection and Repair… are in the rail.
                     EmptyView()
-                } else if !model.daemonProcessRunning {
-                    Button("Repair / re-register…") {
+                } else {
+                    railAction("Repair / re-register…", prominent: true) {
                         showRepairConfirmation = true
                     }
-                    .buttonStyle(.borderedProminent)
                     .disabled(!canRepair)
-                } else {
-                    Button("Retry connection") {
-                        model.retryDaemonConnection()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(model.serviceActionInFlight || model.isConnectingToDaemon)
                 }
             case .notFound:
-                Button("Repair / re-register…") {
+                railAction("Repair / re-register…", prominent: true) {
                     showRepairConfirmation = true
                 }
-                .buttonStyle(.borderedProminent)
                 .disabled(!canRepair)
             @unknown default:
                 EmptyView()
@@ -971,17 +1096,29 @@ struct SystemStatusView: View {
         }
     }
 
+    /// The prominent button already offers a repair in these states, so the
+    /// secondary "Repair…" would be a duplicate.
+    private var showsExplicitRepair: Bool {
+        guard canRepair, model.serviceStatus != .notFound else { return false }
+        guard model.daemonHelperPresent, model.daemonPlistPresent else { return false }
+        if model.serviceStatus == .enabled,
+           !model.usingDaemon,
+           !model.daemonProcessRunning {
+            return false
+        }
+        return true
+    }
+
     private var canRetryConnection: Bool {
         !model.usingDaemon
             && !model.isConnectingToDaemon
             && !model.serviceActionInFlight
-            && (model.serviceStatus == .enabled || model.legacyServiceDetected)
+            && model.serviceStatus == .enabled
     }
 
     private var canRepair: Bool {
         !model.serviceActionInFlight
             && !model.isConnectingToDaemon
-            && !model.legacyServiceDetected
             && model.daemonHelperPresent
             && model.daemonPlistPresent
     }
@@ -1000,11 +1137,27 @@ struct SystemStatusView: View {
                   action: action)
     }
 
+    /// Two equal-width columns inside a card.
+    private func columns<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            content()
+        }
+    }
+
+    /// One vertical column of rows inside a card. Both columns share the card
+    /// width equally, so the rows stay compact without overflowing it.
+    private func cardColumn<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            content()
+        }
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
+    }
+
     private func sectionHeader(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.system(size: 9, weight: .semibold))
-            .tracking(0.6)
-            .foregroundStyle(.tertiary)
+            .font(.system(size: 9.5, weight: .bold))
+            .tracking(0.7)
+            .foregroundStyle(.secondary)
             .padding(.top, 2)
     }
 
@@ -1089,7 +1242,7 @@ private struct StatusRow: View {
                 .foregroundStyle(level.color)
                 .frame(width: 18)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1.5) {
                 // A single wrapping paragraph so a long title or value wraps
                 // instead of being truncated in a narrow column.
                 (Text(title).font(.system(size: 11, weight: .semibold))
@@ -1103,19 +1256,18 @@ private struct StatusRow: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .layoutPriority(1)
-
-            Spacer(minLength: 6)
+            // Take the width the row has, minus the icon and the action, so
+            // the row never negotiates a flexible spacer with a fixed button.
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
                     .buttonStyle(.link)
                     .font(.system(size: 10))
                     .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
                     .disabled(actionDisabled)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 1.5)
     }
 }

@@ -12,7 +12,7 @@ FILTER_BUILD="$(kancerbero_component_value "$COMPONENTS" KANCERBERO_FILTER_BUILD
 kancerbero_require_filter_version "$APP" "$FILTER_MARKETING" "$FILTER_BUILD"
 
 OUT="$ROOT/build/updates"
-ZIP="$OUT/Kancerbero-$VERSION-$BUILD.zip"
+ZIP="$OUT/Kancerbero-$VERSION.zip"
 
 mkdir -p "$OUT"
 rm -f "$ZIP"

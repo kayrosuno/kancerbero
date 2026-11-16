@@ -128,46 +128,64 @@ automáticas.
 genera `build/Generated/Version.xcconfig`:
 
 ```xcconfig
-KANCERBERO_MARKETING_VERSION = 0.1.261116   # <prefijo>.<YYMMDD>
-KANCERBERO_BUILD_VERSION = 20261116084509   # YYYYMMDDHHMMSS UTC, creciente
+KANCERBERO_MARKETING_VERSION = 0.2.20261116095540   # <prefijo>.<build>
+KANCERBERO_BUILD_VERSION = 20261116095540           # YYYYMMDDHHMMSS UTC, creciente
 ```
 
-`Config/Version.xcconfig` guarda el prefijo (`0.1`, cambiable con `scripts/set-version.sh`) y los
+`Config/Version.xcconfig` guarda el prefijo (`0.2`, cambiable con `scripts/set-version.sh`) y los
 fallbacks, e incluye el fichero generado. `KBVersion.current`/`KBVersion.build` salen de
 `kb_version()`/`kb_build_version()`; el `Info.plist` de la app usa los mismos build settings. La
-build de la app es la clave de Sparkle y del appcast.
+build de la app es la clave de Sparkle y del appcast; **el último componente de la versión es
+exactamente el build**.
 
 ### Daemon y filtro (solo al cambiar)
 
 `Config/ComponentVersions.xcconfig` (versionado) anota la identidad de cada componente:
 
 ```xcconfig
-KANCERBERO_DAEMON_MARKETING_VERSION = 0.1.0
-KANCERBERO_DAEMON_BUILD_VERSION = 20261116084205
+KANCERBERO_DAEMON_VERSION_PREFIX = 0.2
+KANCERBERO_DAEMON_BUILD_VERSION = 20261116095438
 KANCERBERO_DAEMON_SOURCE_HASH = ...
-KANCERBERO_FILTER_MARKETING_VERSION = 0.2.0
-KANCERBERO_FILTER_BUILD_VERSION = 20261116084205
+KANCERBERO_FILTER_VERSION_PREFIX = 0.2
+KANCERBERO_FILTER_BUILD_VERSION = 20261116095438
 KANCERBERO_FILTER_SOURCE_HASH = ...
+KANCERBERO_DAEMON_MARKETING_VERSION = 0.2.20261116095438
+KANCERBERO_FILTER_MARKETING_VERSION = 0.2.20261116095438
 ```
 
-- El generador hashea las fuentes/config de cada componente (incluida su versión de marketing).
-  Si el hash cambia, fija el build del componente al timestamp del build y anota el nuevo hash.
-  Si no cambia, conserva build y hash.
+- El generador hashea **solo fuentes/config** de cada componente (sin marketing/build, para no
+  crear un bucle). Si el hash cambia, fija el build al timestamp y reescribe la versión literal
+  `prefijo.build`; si no, conserva build y versión.
+- El marketing se escribe literal para que los scripts de release lo lean con `awk`.
 - El fichero está versionado: un cambio de componente lo deja modificado; hay que commitearlo
   (el release lo exige).
 - El daemon recibe sus macros `KANCERBERO_DAEMON_*` y reporta `daemonVersion`/`daemonBuild` en el
   handshake; el filtro usa `KANCERBERO_FILTER_MARKETING_VERSION`/`BUILD` en su `Info.plist`.
 - `KBVersion.daemonVersion`/`daemonBuild` y `FilterVersion.expectedBuild` (build del filtro
   embebido en la app) son los valores esperados.
-- Cambiar `Config/ComponentVersions.xcconfig` a mano (p. ej. la versión de marketing) también
-  incrementa el build, porque está incluido en el hash.
+- Cambiar el prefijo de marketing a mano no incrementa el build por sí solo; cambiar fuentes o
+  configuración del componente sí.
 - `FilterVersion.schema` solo cambia si cambia el protocolo del filtro.
 
 ### Comparaciones
 
 - Daemon: `hello.daemonBuild == KBVersion.daemonBuild`.
 - Filtro: el ACK del filtro (`FilterVersion.build`) contra `FilterVersion.expectedBuild`.
-- La versión de marketing de la app cambia cada día y **no** participa en estas comparaciones.
+- Las versiones de marketing no participan en estas comparaciones; solo los builds. La versión
+  de la app cambia en cada compilación.
+
+### System Status
+
+- **Application**, **Background Services** y **Network Filter** muestran la versión en ejecución
+  como una insignia compacta en la banda superior de la tarjeta (con fondo tintado por estado):
+  una sola línea, sin build.
+- El **panel lateral** muestra **Versions in App Bundle** con las versiones del ejecutable/app
+  bundle: Kancerbero, daemon y filtro, sin build.
+- Las acciones de servicio (Enable background service, Open Login Items, Repair, Retry y Refresh)
+  están en **Troubleshooting**, dentro del panel lateral.
+- El build no se repite en la UI porque es el último componente de la versión
+  (`prefijo.<build>`). Tras el bump de migración, las versiones en ejecución y las embebidas
+  coinciden.
 
 ## Qué ocurre al actualizar
 
@@ -215,8 +233,7 @@ spctl -a -vvv -t exec /Applications/Kancerbero.app
 - **Feed 404**: Pages no está activado o el despliegue aún no terminó (puede tardar minutos).
 - **“Unable to check for updates”**: comprobar red, `SUFeedURL`, `SUPublicEDKey` y la firma del
   feed. Un appcast sin firma se rechaza con `SURequireSignedFeed`.
-- **El daemon sigue en la versión vieja**: System status → Repair / re-register. Si el daemon es
-  legacy, retirarlo antes.
+- **El daemon sigue en la versión vieja**: System status → Repair / re-register.
 - **El filtro sigue viejo**: `systemextensionsctl list`; si macOS pide reinicio, reiniciar. Como
   último recurso, `sudo systemextensionsctl uninstall AK37TK8X2Y uno.kayros.kancerbero.filter` y
   reactivar desde Ajustes.

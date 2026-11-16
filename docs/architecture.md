@@ -146,12 +146,14 @@
   reduce/trunca antes)
   y no cambia con la selección; el gráfico no tiene bloque de resumen y el flag `--volumes-focus`
   permite filtrar la lista para capturas.
-- `DaemonsView`: inventario launchd deduplicado por label (`DaemonDeduplicator`). Los filtros de
-  tipo, ámbito, origen y estado son chips multiselección (`MultiSelectChipBar`): todos los valores
-  están pulsados al arrancar, se muestran las filas de los valores pulsados y un grupo sin nada
-  pulsado no coincide con ninguna fila. La búsqueda vive en la cabecera de la tarjeta sobre la
-  tabla (patrón de `CPUProcessTable`), y las tarjetas Running/Stopped/Disabled alternan ese estado
-  dentro del conjunto; la tarjeta Services restablece todos los grupos y la búsqueda. La tabla es
+- `DaemonsView`: inventario launchd deduplicado por label (`DaemonDeduplicator`). Las tarjetas
+  **Agents** y **Daemons** alternan el tipo dentro del conjunto, y **Running / Stopped / Disabled /
+  Not loaded** alternan ese estado, con la misma semántica: se muestran las filas de los valores
+  pulsados y apagar todos los de un grupo no coincide con ninguna fila. Las seis tarjetas usan una
+  rejilla fija de seis columnas para caber en una fila. **Scope** y **Origin** son
+  `CheckboxFilterGroup` (cápsulas con checkboxes, como NetworkingFilterBar). La búsqueda vive en
+  la cabecera de la tarjeta sobre la tabla (patrón de `CPUProcessTable`), con el
+  contador “N of M services” justo al lado del campo. La tabla es
   ordenable por cualquiera de sus columnas mediante claves no opcionales de `DaemonListEntry`
   (rangos enteros para los enums y centinelas para valores ausentes); el criterio vive en
   `DaemonsUIState.sortOrder` y, sin orden elegido, se conserva el del deduplicador.
@@ -233,12 +235,11 @@
   `openWindow(id:)`) desde el indicador Local/Daemon del sidebar, el pill Local/Daemon de la
   barra inferior o el icono de la cabecera del sidebar. Muestra un checklist de aplicación,
   helper embebido,
-  colección, privilegios, registro SMAppService, aprobación en Login Items, conexión XPC y
-  servicios legacy. `AppModel` expone el estado derivado (`appVersion`, `appBundlePath`,
+  colección, privilegios, registro SMAppService, aprobación en Login Items y conexión XPC. `AppModel` expone el estado derivado (`appVersion`, `appBundlePath`,
   `appIsInApplications`, `daemonHelperPresent`, `daemonPlistPresent`, `hasFullDataAccess`,
-  `isConnectingToDaemon`, `legacyAgentDetected`, `legacyDaemonDetected`) y las acciones
+  `isConnectingToDaemon`) y las acciones
   `retryDaemonConnection`, `repairDaemonService` (unregister + register para re-lanzar la
-  aprobación), `revealAppInFinder`, `openApplicationsFolder` y `copyLegacyRemovalCommands`. La
+  aprobación), `revealAppInFinder` y `openApplicationsFolder`. La
   ventana abre Settings/Finder y usa SMAppService; no ejecuta sudo ni scripts.
 - Persistencia: `@AppStorage("selectedSection")`, `@AppStorage("networkingTab")`,
   `@AppStorage("diskTab")` y `@AppStorage("dockIconStyle")`. El estado de UI de cada sección (filtros, tarjeta activa, selección,
@@ -296,7 +297,11 @@
   `FilterVersion.expectedBuild` (build del filtro embebido) para reenviar la activación si está
   viejo. La versión/build de la app se genera en cada compilación (pre-action del scheme); las
   identidades de daemon y filtro se anotan en `Config/ComponentVersions.xcconfig` y solo cambian
-  cuando cambia su componente. Runbook: `docs/updates.md`.
+  cuando cambia su componente. La versión de cada identidad es `<prefijo>.<build>`. En System
+  Status, las tarjetas Application, Background Services y Network Filter muestran la versión en
+  ejecución como insignia en la banda del título y el panel lateral lista las versiones del
+  ejecutable/app bundle (Kancerbero, daemon y filtro). La UI no repite el build. Runbook:
+  `docs/updates.md`.
 - Disk → Volumes mantiene `expanded`, `volumesFocus`, `volumeColumnWidths` y
   `volumesSplitFraction` en `UIState`. La
   expansión inicial se hace una sola vez (`didExpandVolumesOnce`); los refrescos de inventario solo
@@ -607,8 +612,7 @@
   `SMAppService.daemon(plistName:)` y el usuario aprueba en Login Items. El cliente usa
   `NSXPCConnection` con `.privileged` para el daemon de sistema. El plist incluye
   `AssociatedBundleIdentifiers`, que asocia el servicio con el icono/nombre de la app. Requiere
-  Developer ID + notarización. Los scripts `install-agent.sh`/`install-daemon.sh` son el modo
-  legacy de desarrollo y no pueden convivir con el daemon SMAppService.
+  Developer ID + notarización.
 
 ## Filtro de red (Network Extension)
 

@@ -139,7 +139,7 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Text("Kancerbero \(model.appVersion) (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"))")
+                Text("Kancerbero \(model.appVersion)")
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
