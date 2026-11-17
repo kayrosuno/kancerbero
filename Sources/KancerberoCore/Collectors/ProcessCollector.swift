@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 public enum KBCollectionError: Error, LocalizedError, Sendable {
@@ -41,6 +42,39 @@ public enum ProcessCollector {
         let result = kb_process_path(pid, &buffer, buffer.count)
         guard result > 0 else { return nil }
         return String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    }
+
+    /// Exact identity for a single PID, used immediately before signaling.
+    /// One `proc_pidinfo` plus `proc_pidpath`, unlike the full snapshots.
+    public static func identity(pid: Int32) -> KBProcessInfo? {
+        guard pid > 0 else { return nil }
+        var raw = proc_bsdinfo()
+        let size = Int32(MemoryLayout<proc_bsdinfo>.size)
+        guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &raw, size) == size else {
+            return nil
+        }
+        var name = KBInterop.string(raw.pbi_name)
+        if name.isEmpty {
+            name = KBInterop.string(raw.pbi_comm)
+        }
+        let state: KBProcessState?
+        switch raw.pbi_status {
+        case 1: state = .idle
+        case 4: state = .stopped
+        case 5: state = .zombie
+        default: state = nil
+        }
+        let pgid = Int32(clamping: raw.pbi_pgid)
+        return KBProcessInfo(
+            pid: Int32(clamping: raw.pbi_pid),
+            ppid: Int32(clamping: raw.pbi_ppid),
+            uid: raw.pbi_uid,
+            startTimeUS: raw.pbi_start_tvsec * 1_000_000 + raw.pbi_start_tvusec,
+            name: name,
+            path: path(for: pid) ?? "",
+            state: state,
+            nice: raw.pbi_nice,
+            processGroupID: pgid > 0 ? pgid : nil)
     }
 
     public static func snapshot() throws -> [KBProcessInfo] {

@@ -26,10 +26,12 @@ final class DaemonDelegate: NSObject, NSXPCListenerDelegate {
         let isApp = uid != 0 && path.contains("/Kancerbero.app/Contents/MacOS/")
         let canControl = isApp || uid == geteuid()
         let canTrash = isApp
+        let canSignal = isApp
         #else
         newConnection.setCodeSigningRequirement(DaemonClientPolicy.requirement)
         let canControl = uid != 0
         let canTrash = DaemonClientPolicy.isTrusted(pid: pid)
+        let canSignal = canTrash
         #endif
 
         guard let peer = PeerIdentity(pid: pid, uid: uid) else {
@@ -37,11 +39,12 @@ final class DaemonDelegate: NSObject, NSXPCListenerDelegate {
             return false
         }
 
-        logger.notice("incoming pid=\(pid) uid=\(uid) canControl=\(canControl) canTrash=\(canTrash) path=\(path, privacy: .public)")
+        logger.notice("incoming pid=\(pid) uid=\(uid) canControl=\(canControl) canTrash=\(canTrash) canSignal=\(canSignal) path=\(path, privacy: .public)")
 
         let service = DaemonService(peer: peer,
                                     canControl: canControl,
                                     canTrash: canTrash,
+                                    canSignal: canSignal,
                                     connection: newConnection,
                                     collector: collector)
         newConnection.exportedInterface = NSXPCInterface(with: KancerberoDaemonXPC.self)

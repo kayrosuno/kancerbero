@@ -421,16 +421,19 @@ public struct KBCapabilities: Codable, Sendable {
     public var interfaceSplits: Bool
     /// The daemon handles `trashItems`. Optional so an older daemon decodes as nil.
     public var trash: Bool?
+    /// The daemon handles the `processSignal` request. Nil on older daemons.
+    public var kill: Bool?
 
     public init(nstat: Bool = false, root: Bool = false, statisticsPrivcheck: Int = 0,
                 libprocAllUsers: Bool = false, interfaceSplits: Bool = false,
-                trash: Bool? = nil) {
+                trash: Bool? = nil, kill: Bool? = nil) {
         self.nstat = nstat
         self.root = root
         self.statisticsPrivcheck = statisticsPrivcheck
         self.libprocAllUsers = libprocAllUsers
         self.interfaceSplits = interfaceSplits
         self.trash = trash
+        self.kill = kill
     }
 }
 

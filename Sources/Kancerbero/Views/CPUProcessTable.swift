@@ -7,6 +7,7 @@ struct CPUProcessTable: View {
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
     @Environment(\.openWindow) private var openWindow
+    @State private var killConfirmation: ProcessKillConfirmation?
 
     private var selection: Binding<KBProcessKey?> {
         Binding(
@@ -90,6 +91,9 @@ struct CPUProcessTable: View {
                     Button("Inspect \(row.commandText)") {
                         inspect(row.process)
                     }
+                    Divider()
+                    processKillMenuButton(process: row.process, model: model,
+                                          confirmation: $killConfirmation)
                 }
             } primaryAction: { keys in
                 if let key = keys.first, let row = rows.first(where: { $0.id == key }) {
@@ -97,6 +101,7 @@ struct CPUProcessTable: View {
                 }
             }
         }
+        .processKillConfirmation($killConfirmation)
         .onChange(of: rows.map(\.id), initial: true) { _, ids in
             if let pid = ui.cpu.pendingSelectionPID {
                 if let row = rows.first(where: { $0.process.pid == pid }) {

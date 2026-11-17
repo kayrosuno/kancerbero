@@ -196,6 +196,19 @@
   cuando el daemon reporta menos procesos que macOS y expone `daemonProcessesIncomplete`; System
   status muestra el aviso y la tabla marca “N restricted”. Con el daemon root actualizado los
   contadores e hilos están completos; sin root quedan restringidos.
+- **Kill de procesos.** Las tablas de procesos (CPU, Memory, Energy, Disk I/O y las dos de
+  Networking) y el `ProcessInspectorView` comparten `ProcessKillControls`: una entrada destructiva
+  «Kill Process…» en el menú contextual y un botón `xmark.octagon` en la cabecera del inspector.
+  Ambos abren una confirmación con `Terminate` (SIGTERM) y `Force Kill` (SIGKILL); nunca se envía
+  nada sin confirmar. `AppModel.killAvailability(for:)` decide si la acción está activa a partir de
+  la identidad conocida, la política (`KBProcessSignalPolicy`) y, para otro uid/root, de
+  `usingDaemon && daemonIsRoot && daemonSupportsKill` (`KBCapabilities.kill`). `AppModel.signalProcess`
+  enruta: mismo uid (o app root) → `ProcessSignaler.signalLocally`; otro uid/root →
+  `ProcessKillClient` pide `system.privilege.admin`, obtiene el external form y llama a
+  `DaemonMetricsSource.signalProcess` (`processSignal`). El daemon revalida la identidad con
+  `ProcessCollector.identity(pid:)` y `ProcessSignalService` antes y después de la autorización, y
+  aplica la misma política con el uid del peer. `signalingKeys` evita peticiones duplicadas
+  mientras una señal está en vuelo.
 - `MemoryView`: panel dedicado tipo Activity Monitor. En una franja superior fija
   (`KBTheme.cardStripHeight`, 190 pt) van la presión con
   `MemoryPressureChart` y su explicación, la composición App/Wired/Compressed/Cached/Free
@@ -605,6 +618,11 @@
 
 - Mach service: `uno.kayros.kancerbero.daemon.service` (label del job y plist: el mismo nombre).
 - Protocolo: `handshake`, `subscribe`, `request`, `unsubscribe`; callback `push`.
+- `request` transporta un `KBRequestMessage` con `kind`: `trashItems`, `daemonAction`,
+  `daemonServices` y `processSignal`. `processSignal` lleva `pid`, `startTimeUS`, `expectedUID`,
+  `expectedPath` opcional, la señal enumerada y, solo para otro uid/root, el external form de
+  Authorization Services; la respuesta es in-band (`KBProcessSignalResult`). La UI deshabilita la
+  ruta privilegiada si `hello.capabilities.kill` no está presente (daemon anterior).
 - Envelopes `KBWireEnvelope` con `schemaVersion`, `kind`, `sequence` y payload
   `PropertyListEncoder` binario.
 - `KBCollectionSnapshot` transporta `socketInventory` y `hostMetrics` como campos opcionales;

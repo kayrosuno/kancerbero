@@ -108,6 +108,50 @@ launchctl print system/uno.kayros.kancerbero.daemon.service
 "$K" --unregister-service
 ```
 
+## Kill de procesos
+
+Pruebas independientes de política y de la premisa de autorización (no requieren build):
+
+```bash
+xcrun swiftc -parse-as-library \
+  Sources/KancerberoCore/Support/ProcessSignalPolicy.swift \
+  Tests/KancerberoTests/ProcessSignalPolicyTests.swift \
+  -o "$TMPDIR/kancerbero-signal-tests"
+"$TMPDIR/kancerbero-signal-tests"
+
+xcrun swiftc -parse-as-library -framework Security \
+  Tests/KancerberoTests/AuthorizationSemanticsTests.swift \
+  -o "$TMPDIR/kancerbero-authorization-tests"
+"$TMPDIR/kancerbero-authorization-tests"
+sudo "$TMPDIR/kancerbero-authorization-tests"
+```
+
+El test de autorización debe imprimir `ok (status -60005)` sin mostrar ningún prompt: un external
+form creado sin derechos no autoriza `system.privilege.admin` con flags vacíos, ni como usuario
+normal ni con `sudo`. Si imprimiera `ok` sin error, el daemon podría autoautorizarse y el diseño
+debe revisarse.
+
+Casos manuales (con el daemon conectado y luego sin él):
+
+1. `sleep 600 &` → seleccionar en CPU → menú contextual **Kill Process…** → `Terminate`. La fila
+   desaparece y el inspector, si estaba abierto, pasa a «Process Ended». Repetir con `Force Kill`.
+2. Proceso que ignora SIGTERM: `zsh -c 'trap "" TERM; sleep 600' &`. `Terminate` no lo mata
+   (la UI no escala sola); `Force Kill` sí.
+3. `sudo /bin/sleep 600 &` (u otro proceso de otro uid) → la confirmación avisa de que macOS pedirá
+   contraseña; el prompt de SecurityAgent aparece; `Cancel` deja el proceso vivo y no envía nada;
+   con credenciales correctas se mata. Comprobar en el log que no aparece el external form.
+4. `WindowServer`, `loginwindow`, `launchd`, PID 1 y el propio `Kancerbero`/daemon: acción
+   deshabilitada con el motivo en el tooltip.
+5. Sin daemon: mismo uid funciona; cross-UID/root se deshabilita con explicación. Con un daemon
+   anterior (`hello.capabilities.kill` ausente) se mantiene igual: local sí, privilegiado no.
+6. Doble clic rápido sobre la acción: `signalingKeys` evita la segunda petición; el daemon además
+   rechaza una segunda señal en vuelo y limita a 10/minuto.
+7. `log stream --predicate 'subsystem == "uno.kayros.kancerbero"' --info` muestra pid, uid,
+   `startTimeUS`, señal, autorización administrativa, peer y resultado; nunca credenciales ni el
+   form de 32 bytes.
+8. Verificar que toda acción pasa por la confirmación, también desde el botón `xmark.octagon` del
+   `ProcessInspectorView`, y que Cancel no envía ninguna señal.
+
 ## Captura visual de la UI sin TCC
 
 `screencapture` requiere el permiso de Grabación de pantalla para el proceso host. La app puede

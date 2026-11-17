@@ -35,7 +35,8 @@
 - Sin root, macOS solo enumera y expone procesos del uid actual (`proc_listallpids` incluido).
   Con el daemon root se ven todos; el daemon no necesita entitlements adicionales.
 - Los contadores de procesos de otro uid no legibles se marcan como no disponibles (`—`), nunca
-  como 0. No se implementan kill, renice ni `task_for_pid`.
+  como 0. `kill` se limita a lo descrito en «Terminar procesos (kill)»; no se implementan renice
+  ni `task_for_pid`.
 - `getpwuid_r` puede bloquear con cuentas de DirectoryService; se ejecuta en un task detached y
   se cachean resultados positivos y negativos. Nunca se llama desde el hilo principal.
 - No se lee contenido de ficheros ni se ejecutan comandos para obtener estas métricas.
@@ -89,14 +90,58 @@ Pendiente para producción:
 - Límite de 10 acciones/minuto por cliente y una acción en vuelo; timeout de 5–10 s.
 - La UI pide confirmación para acciones de sistema y para stop/disable.
 
+## Terminar procesos (kill)
+
+- **Dos rutas.** Un proceso del mismo uid se señala en la app con `kill(2)` directamente
+  (`ProcessSignaler.signalLocally`); funciona sin daemon. Un proceso de otro uid o de root se envía
+  al daemon root por XPC (`processSignal`) y exige autorización de administrador. Si el daemon no
+  anuncia `KBCapabilities.kill`, la UI deshabilita la ruta privilegiada; el mismo uid sigue
+  funcionando en local.
+- **Solo `SIGTERM` y `SIGKILL`.** El wire transporta un enum (`terminate`/`forceKill`), nunca un
+  número de señal. No se señalan grupos (`killpg`), PIDs negativos ni PIDs ≤ 1. La UI siempre pide
+  confirmación con dos botones explícitos; `Terminate` no escala solo a `Force Kill`.
+- **Identidad revalidada.** Cada petición lleva `pid`, `startTimeUS` y `expectedUID` obligatorios
+  (y `expectedPath` cuando se conoce). App y daemon re-resuelven la identidad con
+  `proc_pidinfo(PROC_PIDTBSDINFO)` inmediatamente antes de la señal; si el pid se reutilizó o el uid
+  no coincide, se rechaza con `stale`/`notfound`. El daemon repite la comprobación justo antes de
+  `kill` para reducir la ventana TOCTOU (macOS no ofrece `pidfd`; la ventana residual es de
+  microsegundos).
+- **Lista protegida.** Se rechazan siempre, incluso con autorización de administrador:
+  `kernel_task`, `launchd`, `WindowServer`, `loginwindow`, `securityd`, `syspolicyd`, `tccd`,
+  `trustd`, `amfid`, `authd`, `SecurityAgent`, `coreauthd`, `configd`, `notifyd`, `distnoted`,
+  `opendirectoryd`, `launchservicesd`, `runningboardd`, `watchdogd`, `powerd`,
+  `thermalmonitord`, `coreduetd`, `Kancerbero`, `KancerberoDaemon` y `KancerberoFilter`; los
+  prefijos `/System/`, `/usr/libexec/`, `/usr/sbin/`, `/sbin/`, `/Library/Apple/` y cualquier ruta
+  dentro de `Kancerbero.app`; y los procesos de usuarios del sistema (uid < 500, salvo root). Los
+  servicios launchd se gestionan con la parada existente, no por PID. Es una denylist deliberada:
+  también bloquea apps Apple normales y puede producir falsos positivos, a cambio de que ni una
+  autorización de administrador robe el foco o tumbe la sesión.
+- **Autorización de administrador.** La app pide el right `system.privilege.admin`
+  (`kAuthorizationRightExecute`) con `.interactionAllowed | .extendRights | .preAuthorize` y un
+  prompt que nombra el proceso y el PID. El `AuthorizationRef` vive solo durante la petición; el
+  daemon recibe el **external form de 32 bytes**, lo internaliza con
+  `AuthorizationCreateFromExternalForm` y valida el right con `AuthorizationCopyRights` y flags
+  **vacíos**. Es crítico no usar `ExtendRights` en el daemon: el authdb de macOS tiene
+  `allow-root = true` para ese right y root se autoautorizaría sin el prompt del usuario.
+  `AuthorizationSemanticsTests` verifica ambas premisas. El form es un bearer temporal: nunca se
+  persiste, nunca se loguea y se borra de memoria tras usarlo.
+- **Cliente autorizado.** `processSignal` solo se acepta si la conexión pasó `canSignal` (en
+  Release, el mismo requisito de firma que `trashItems`; en Debug, la ruta de `Kancerbero.app`).
+  El uid que decide la política es el del peer XPC, nunca el euid del daemon.
+- **Límites y auditoría.** Una petición en vuelo y 10/minuto por cliente. Se registra con
+  `os.Logger` pid, uid, `startTimeUS`, señal, si hubo autorización administrativa, el peer y el
+  resultado; jamás el external form ni credenciales.
+
 ## Superficie de ataque
 
 - Los mensajes XPC se decodifican con `PropertyListDecoder` desde `Data`; un payload inválido
   devuelve `NSError` y no tumba el servicio.
 - `pid` se valida > 0 antes de usarlo en libproc; no se pasa a ninguna shell.
-- No hay ninguna ruta que reciba rutas de fichero del cliente.
-- Los límites de tamaño (32 MB) y de frecuencia aún no están implementados; ver la lista
-  pendiente.
+- Las únicas rutas de fichero que llegan del cliente son las de `trashItems` (revalidadas con
+  `realpath` y `KBPathPolicy`) y el `expectedPath` opcional de `processSignal`, que solo se compara
+  con la ruta resuelta por el daemon. No se abre ni se ejecuta nada de lo que envía el cliente.
+- Límites por operación: 32 MB de payload, 4 clientes, una operación en vuelo y 10/minuto para
+  señales y acciones launchd, 6/minuto para borrados. Ver «Terminar procesos (kill)».
 
 ## Filtro de red (system extension)
 
