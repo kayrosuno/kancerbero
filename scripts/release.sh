@@ -50,6 +50,7 @@ fi
 ./scripts/notarize.sh
 ./scripts/package-release.sh
 ./scripts/generate-appcast.sh
+./scripts/package-dmg.sh
 
 source "$ROOT/scripts/lib/version.sh"
 APP="$(kancerbero_require_release_app "$ROOT")"
@@ -57,6 +58,7 @@ kancerbero_read_app_version "$APP"
 
 echo "release artifacts: Kancerbero $VERSION ($BUILD)"
 echo "  zip: build/updates/Kancerbero-$VERSION.zip"
+echo "  dmg: build/updates/dmg/Kancerbero-$VERSION.dmg"
 
 if [[ "$PUBLISH" == "--publish" ]]; then
     ./scripts/publish-release.sh

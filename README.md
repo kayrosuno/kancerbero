@@ -454,32 +454,33 @@ Requisitos de distribución:
 xcrun notarytool store-credentials kancerbero-notary \
   --apple-id "<Apple ID>" --team-id AK37TK8X2Y --password "<app-specific password>"
 
-# Release completo, sin publicar (build + notarización + ZIP + appcast).
+# Release completo, sin publicar (build + notarización + ZIP + appcast + DMG).
 # La versión/build de la app se generan en cada compilación; el daemon y el
 # filtro solo cambian cuando cambia su código (Config/ComponentVersions.xcconfig).
 ./scripts/release.sh
 
 # Publicar en GitHub Releases + Pages con gh autenticado (gh auth login).
+# Publica el ZIP de Sparkle y el DMG en los assets de la misma release.
 # Alternativa sin gh: exportar GITHUB_TOKEN con Contents: Read and write.
 ./scripts/release.sh --publish
 
 ./scripts/install-app.sh        # instalación manual para probar
 ```
 
-DMG de distribución (manual, opcional):
+DMG de distribución:
 
 ```bash
-# Requiere la app Release ya notarizada/stapled y el perfil kancerbero-notary.
-# Ejecutar desde una sesión gráfica y permitir a la terminal controlar Finder
-# la primera vez (Automatización).
+# release.sh ya genera y publica el DMG junto al ZIP. Para generarlo solo,
+# tras notarizar la app:
 ./scripts/package-dmg.sh
 # -> build/updates/dmg/Kancerbero-<version>.dmg
 ```
 
-El DMG es un artefacto manual: `release.sh` no lo genera y `publish-release.sh` no lo sube; el
-appcast de Sparkle sigue apuntando al ZIP. El script firma el DMG con Developer ID, lo notariza,
-le grapa el ticket y verifica la imagen y la app embebida. Para probar el layout sin notarización:
-`KANCERBERO_DMG_DEV=1`; en entornos sin Finder: `KANCERBERO_DMG_SKIP_LAYOUT=1` (sin fondo).
+El DMG se firma con Developer ID, se notariza, se le grapa el ticket y se verifica la imagen y la
+app embebida. `release.sh` lo crea después del ZIP y `publish-release.sh` sube ambos assets a la
+misma release; el appcast de Sparkle sigue apuntando al ZIP. Para probar el layout sin
+notarización: `KANCERBERO_DMG_DEV=1`; en entornos sin Finder:
+`KANCERBERO_DMG_SKIP_LAYOUT=1` (sin fondo).
 
 La app se actualiza con **Sparkle 2** (feed EdDSA en GitHub Pages, ZIP en GitHub Releases). La
 primera versión con Sparkle se instala a mano; a partir de ahí las actualizaciones son

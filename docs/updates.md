@@ -27,8 +27,8 @@ extraer, reemplaza el bundle con rollback y relanza la app.
 3. **Primer release en orden.** No usar `release.sh --publish` la primera vez: Pages aún no está
    activo y `verify-release.sh` fallaría. Ejecutar:
    ```bash
-   ./scripts/release.sh              # build + notarización + ZIP + appcast local
-   ./scripts/publish-release.sh     # tag v<build> + release + asset
+   ./scripts/release.sh              # build + notarización + ZIP + appcast + DMG
+   ./scripts/publish-release.sh     # tag v<build> + release + assets (ZIP y DMG)
    ./scripts/publish-appcast.sh     # crea/actualiza gh-pages
    # activar Pages (paso 4)
    ./scripts/verify-release.sh
@@ -137,6 +137,8 @@ El script:
 4. `package-release.sh`: crea `Kancerbero-<version>.zip` **después** del stapling. La versión ya
    contiene el build, así que el nombre es único.
 5. `generate-appcast.sh`: descarga el feed anterior, añade la versión nueva y firma el appcast.
+6. `package-dmg.sh`: crea y notariza `Kancerbero-<version>.dmg` desde la misma app stapled. El DMG
+   queda en `build/updates/dmg/`, fuera del directorio que escanea `generate_appcast`.
 
 Para publicar:
 
@@ -146,10 +148,10 @@ gh auth login          # una vez
 ```
 
 Con `gh` no hace falta `GITHUB_TOKEN`; si no está instalado, exportarlo como antes.
-`publish-release.sh` es idempotente: reutiliza la release existente y reemplaza el asset en un
-reintento. `generate-appcast.sh` rechaza publicar un build que no sea mayor que el item más nuevo
-del feed. `release.sh --publish` comprueba antes de compilar que la credencial y el upstream estén
-listos; si `github/main` está obsoleto, `git fetch github`.
+`publish-release.sh` es idempotente: reutiliza la release existente y reemplaza el ZIP y el DMG en
+un reintento. `generate-appcast.sh` rechaza publicar un build que no sea mayor que el item más
+nuevo del feed. `release.sh --publish` comprueba antes de compilar que la credencial y el upstream
+estén listos; si `github/main` está obsoleto, `git fetch github`.
 
 El tag es `v<build de la app>` y la release se llama `Kancerbero <version> (<build>)`. No hay
 commit de bump: la versión/build de la app se generan en el build y el tag apunta al HEAD ya
@@ -162,22 +164,30 @@ commiteado.
 ./scripts/notarize.sh
 ./scripts/package-release.sh
 ./scripts/generate-appcast.sh
+./scripts/package-dmg.sh
 ./scripts/publish-release.sh
 ./scripts/publish-appcast.sh
 ./scripts/verify-release.sh
 ```
 
-Nunca publicar el appcast antes que el asset: Sparkle daría 404 al descargar.
+Nunca publicar el appcast antes que los assets: Sparkle daría 404 al descargar.
 
 ### Bootstrap
 
 La primera versión con Sparkle se instala a mano (`gh release download v<build> --repo
 kayrosuno/kancerbero` o `curl`); a partir de ahí las actualizaciones son automáticas.
 
-## DMG de distribución (manual)
+## DMG de distribución
 
-El DMG no forma parte de Sparkle ni de `release.sh`. Se genera a partir de la app Release ya
-notarizada y stapled:
+El DMG no forma parte del appcast de Sparkle, pero sí del release: `release.sh` lo genera después
+del ZIP y `publish-release.sh` sube ambos a los assets de la misma release de GitHub.
+
+```bash
+./scripts/release.sh              # ZIP + appcast + DMG local
+./scripts/release.sh --publish   # publica ZIP y DMG en la release
+```
+
+Para generarlo de forma aislada a partir de la app Release ya notarizada y stapled:
 
 ```bash
 ./scripts/build-release.sh
@@ -192,8 +202,8 @@ fondo y las posiciones de los iconos se configuran con AppleScript.
 
 - El fondo está versionado en `Resources/DMG/background.png` (1320×896, 144 DPI) y se regenera con
   `scripts/lib/dmg-background.swift`.
-- El DMG **no** se publica automáticamente. Para subirlo a mano:
-  `gh release upload v<build> build/updates/dmg/Kancerbero-<version>.dmg --repo kayrosuno/kancerbero`
+- `publish-release.sh` sube el DMG como `application/x-apple-diskimage` junto al ZIP de Sparkle y
+  verifica que ambos assets devuelven 200. El appcast sigue apuntando al ZIP.
 - No mover el DMG al nivel superior de `build/updates`: `generate_appcast` escanea ese directorio y
   trata `.dmg` como archivo de actualización. El subdirectorio `dmg/` se ignora.
 - Modos de prueba: `KANCERBERO_DMG_DEV=1` (firma sin notarizar, salida `-dev.dmg`) y

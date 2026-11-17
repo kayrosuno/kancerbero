@@ -140,17 +140,23 @@ Casos manuales (con el daemon conectado y luego sin él):
 3. `sudo /bin/sleep 600 &` (u otro proceso de otro uid) → la confirmación avisa de que macOS pedirá
    contraseña; el prompt de SecurityAgent aparece; `Cancel` deja el proceso vivo y no envía nada;
    con credenciales correctas se mata. Comprobar en el log que no aparece el external form.
-4. `WindowServer`, `loginwindow`, `launchd`, PID 1 y el propio `Kancerbero`/daemon: acción
-   deshabilitada con el motivo en el tooltip.
-5. Sin daemon: mismo uid funciona; cross-UID/root se deshabilita con explicación. Con un daemon
-   anterior (`hello.capabilities.kill` ausente) se mantiene igual: local sí, privilegiado no.
-6. Doble clic rápido sobre la acción: `signalingKeys` evita la segunda petición; el daemon además
+4. En CPU, filtrar por el usuario actual: Finder, Safari, `photoanalysisd`, `secd` y `cfprefsd`
+   deben mostrar **Kill Process…** habilitado aunque vivan en `/System/`, `/usr/libexec/` o
+   `/usr/sbin/`. Abrir la confirmación y cancelar (no matar servicios reales durante la prueba).
+5. `WindowServer`, `loginwindow`, `tccd`, `distnoted`, `launchd`, PID 1 y el propio
+   `Kancerbero`/daemon: acción deshabilitada con el motivo en el tooltip. `WindowServer` además
+   queda fuera por uid de sistema.
+6. Sin daemon: mismo uid funciona (incluidos los paths del caso 4); cross-UID/root se deshabilita
+   con explicación. Con un daemon anterior (`hello.capabilities.kill` ausente) se mantiene igual:
+   local sí, privilegiado no.
+7. Doble clic rápido sobre la acción: `signalingKeys` evita la segunda petición; el daemon además
    rechaza una segunda señal en vuelo y limita a 10/minuto.
-7. `log stream --predicate 'subsystem == "uno.kayros.kancerbero"' --info` muestra pid, uid,
+8. `log stream --predicate 'subsystem == "uno.kayros.kancerbero"' --info` muestra pid, uid,
    `startTimeUS`, señal, autorización administrativa, peer y resultado; nunca credenciales ni el
    form de 32 bytes.
-8. Verificar que toda acción pasa por la confirmación, también desde el botón `xmark.octagon` del
-   `ProcessInspectorView`, y que Cancel no envía ninguna señal.
+9. Verificar que toda acción pasa por la confirmación, también desde el botón `xmark.octagon` del
+   `ProcessInspectorView`, y que Cancel no envía ninguna señal. Un proceso de otro usuario bajo
+   `/System` sigue deshabilitado o se rechaza al confirmar.
 
 ## Captura visual de la UI sin TCC
 
@@ -1697,10 +1703,11 @@ xcrun stapler validate /Applications/Kancerbero.app
 spctl -a -vvv -t exec /Applications/Kancerbero.app
 ```
 
-### DMG de distribución (manual)
+### DMG de distribución
 
-`scripts/package-dmg.sh` genera el DMG a partir de la app Release ya notarizada/stapled. No forma
-parte de `release.sh` ni de la publicación de Sparkle.
+`scripts/package-dmg.sh` genera el DMG a partir de la app Release ya notarizada/stapled.
+`release.sh` lo ejecuta tras el ZIP y `publish-release.sh` sube ambos assets; el appcast de
+Sparkle sigue apuntando al ZIP.
 
 ```bash
 DMG=build/updates/dmg/Kancerbero-<version>.dmg
@@ -1716,6 +1723,10 @@ codesign --verify --deep --strict --verbose=2 "$MP/Kancerbero.app"
 xcrun stapler validate "$MP/Kancerbero.app"
 hdiutil detach "$MP"
 rm -rf "$MP"
+
+# Tras publicar, ambos assets de la release deben existir:
+curl -fsSIL "https://github.com/kayrosuno/kancerbero/releases/download/v<build>/Kancerbero-<version>.zip" | head -1
+curl -fsSIL "https://github.com/kayrosuno/kancerbero/releases/download/v<build>/Kancerbero-<version>.dmg" | head -1
 ```
 
 Abrir el DMG en Finder para comprobar visualmente el fondo, la flecha y la alineación de
