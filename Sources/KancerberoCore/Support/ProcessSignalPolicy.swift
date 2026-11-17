@@ -118,9 +118,8 @@ public enum KBProcessSignalDecision: Sendable, Equatable {
 }
 
 public enum KBProcessSignalPolicy {
-    /// Processes that must never be signaled, even with administrator rights.
-    /// Apple apps and system paths are included deliberately; third-party
-    /// processes remain killable.
+    /// Critical processes that must never be signaled, even with administrator
+    /// rights, regardless of the target's uid.
     private static let protectedNames: Set<String> = [
         "kernel_task", "launchd", "windowserver", "loginwindow",
         "securityd", "securityd_system", "syspolicyd", "tccd", "trustd",
@@ -130,7 +129,11 @@ public enum KBProcessSignalPolicy {
         "coreduetd", "kancerbero", "kancerberodaemon", "kancerberofilter"
     ]
 
-    private static let protectedPathPrefixes: [String] = [
+    /// System paths are protected only when the request is elevated (another
+    /// uid, a root target, or a privileged requester). A user killing their own
+    /// process needs no extra privilege, and many of their processes live under
+    /// these paths (Apple apps, per-user agents).
+    private static let protectedSystemPathPrefixes: [String] = [
         "/system/", "/usr/libexec/", "/usr/sbin/", "/sbin/", "/library/apple/"
     ]
 
@@ -151,28 +154,44 @@ public enum KBProcessSignalPolicy {
         if target.isZombie {
             return .refused(.zombie)
         }
-        if target.path.isEmpty {
-            return .refused(.unknownPath)
-        }
-        if isProtected(target) {
+        if isProtectedName(target) {
             return .refused(.protectedProcess)
         }
-        if target.uid != 0 && target.uid < 500 {
+        if isInsideKancerberoBundle(target) {
+            return .refused(.protectedProcess)
+        }
+
+        let sameUID = target.uid == context.localUID
+        // localUID == 0 covers a root XPC peer: the daemon builds the context
+        // with isRoot = false, so it must not require an administrator form.
+        let requiresAdministrator = !(context.isRoot || context.localUID == 0 || sameUID)
+        let elevated = context.isRoot || context.localUID == 0 || !sameUID
+
+        if elevated {
+            if target.path.isEmpty {
+                return .refused(.unknownPath)
+            }
+            if hasProtectedSystemPath(target) {
+                return .refused(.protectedProcess)
+            }
+        }
+        if target.uid != 0 && target.uid < 500 && !sameUID {
             return .refused(.systemUser)
         }
-        let sameUser = context.isRoot || target.uid == context.localUID
-        return .allowed(requiresAdministrator: !sameUser)
+        return .allowed(requiresAdministrator: requiresAdministrator)
     }
 
-    private static func isProtected(_ target: KBProcessSignalTarget) -> Bool {
-        let name = target.name.lowercased()
-        if protectedNames.contains(name) {
-            return true
-        }
+    private static func isProtectedName(_ target: KBProcessSignalTarget) -> Bool {
+        protectedNames.contains(target.name.lowercased())
+    }
+
+    private static func isInsideKancerberoBundle(_ target: KBProcessSignalTarget) -> Bool {
         let path = target.path.lowercased()
-        if path.contains("/kancerbero.app/") || path.contains("/kancerbero.appex/") {
-            return true
-        }
-        return protectedPathPrefixes.contains { path.hasPrefix($0) }
+        return path.contains("/kancerbero.app/") || path.contains("/kancerbero.appex/")
+    }
+
+    private static func hasProtectedSystemPath(_ target: KBProcessSignalTarget) -> Bool {
+        let path = target.path.lowercased()
+        return protectedSystemPathPrefixes.contains { path.hasPrefix($0) }
     }
 }

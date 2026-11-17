@@ -207,7 +207,10 @@
   `ProcessKillClient` pide `system.privilege.admin`, obtiene el external form y llama a
   `DaemonMetricsSource.signalProcess` (`processSignal`). El daemon revalida la identidad con
   `ProcessCollector.identity(pid:)` y `ProcessSignalService` antes y después de la autorización, y
-  aplica la misma política con el uid del peer. `signalingKeys` evita peticiones duplicadas
+  aplica la misma política con el uid del peer. La disponibilidad exige solo `startTimeUS != 0`;
+  para el propio uid los prefijos de sistema no bloquean (Finder, Safari y agentes en
+  `/usr/libexec` son matables sin elevar), mientras que otro uid/root conserva el endurecimiento
+  completo de rutas y nombres. `signalingKeys` evita peticiones duplicadas
   mientras una señal está en vuelo.
 - `MemoryView`: panel dedicado tipo Activity Monitor. En una franja superior fija
   (`KBTheme.cardStripHeight`, 190 pt) van la presión con

@@ -106,16 +106,23 @@ Pendiente para producción:
   no coincide, se rechaza con `stale`/`notfound`. El daemon repite la comprobación justo antes de
   `kill` para reducir la ventana TOCTOU (macOS no ofrece `pidfd`; la ventana residual es de
   microsegundos).
-- **Lista protegida.** Se rechazan siempre, incluso con autorización de administrador:
+- **Lista protegida siempre.** Se rechazan incluso con autorización de administrador:
   `kernel_task`, `launchd`, `WindowServer`, `loginwindow`, `securityd`, `syspolicyd`, `tccd`,
   `trustd`, `amfid`, `authd`, `SecurityAgent`, `coreauthd`, `configd`, `notifyd`, `distnoted`,
   `opendirectoryd`, `launchservicesd`, `runningboardd`, `watchdogd`, `powerd`,
-  `thermalmonitord`, `coreduetd`, `Kancerbero`, `KancerberoDaemon` y `KancerberoFilter`; los
-  prefijos `/System/`, `/usr/libexec/`, `/usr/sbin/`, `/sbin/`, `/Library/Apple/` y cualquier ruta
-  dentro de `Kancerbero.app`; y los procesos de usuarios del sistema (uid < 500, salvo root). Los
-  servicios launchd se gestionan con la parada existente, no por PID. Es una denylist deliberada:
-  también bloquea apps Apple normales y puede producir falsos positivos, a cambio de que ni una
-  autorización de administrador robe el foco o tumbe la sesión.
+  `thermalmonitord`, `coreduetd`, `Kancerbero`, `KancerberoDaemon` y `KancerberoFilter`; cualquier
+  ruta dentro de `Kancerbero.app`; y los procesos de usuarios del sistema ajenos (uid < 500, salvo
+  root). Los servicios launchd se gestionan con la parada existente, no por PID.
+- **Endurecimiento por ruta solo al elevar.** Los prefijos `/System/`, `/usr/libexec/`,
+  `/usr/sbin/`, `/sbin/`, `/Library/Apple/` y la exigencia de un path conocido se aplican cuando la
+  petición está elevada: otro uid, un objetivo root, la app corriendo como root o un peer XPC root.
+  Para el propio uid sin elevación no se consulta el path: el kernel ya permite `kill(2)` y muchos
+  procesos legítimos del usuario (Finder, Safari, agentes en `/usr/libexec`) viven en esas rutas.
+  La denylist de nombres sigue siendo la protección efectiva de los daemons de sesión
+  (`loginwindow`, `tccd`, `distnoted`, `securityd`). El path que usa la política es siempre el
+  recién resuelto con `proc_pidpath` antes de decidir y de matar, no el de una fila antigua o
+  fusionada sin path: `expectedPath` es una comprobación best-effort, no una entrada de
+  autorización.
 - **Autorización de administrador.** La app pide el right `system.privilege.admin`
   (`kAuthorizationRightExecute`) con `.interactionAllowed | .extendRights | .preAuthorize` y un
   prompt que nombra el proceso y el PID. El `AuthorizationRef` vive solo durante la petición; el

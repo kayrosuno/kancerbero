@@ -826,7 +826,7 @@ final class AppModel {
                 status: .disabled,
                 reason: "A kill request is already in progress.")
         }
-        if process.startTimeUS == 0 || process.path.isEmpty {
+        if process.startTimeUS == 0 {
             return ProcessKillAvailability(
                 status: .disabled,
                 reason: "Process identity is unavailable; wait for the next refresh.")
