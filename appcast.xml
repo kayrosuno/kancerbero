@@ -6,6 +6,16 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Kancerbero</title>
         <item>
+            <title>0.2.2611170059</title>
+            <pubDate>Tue, 17 Nov 2026 02:00:01 +0100</pubDate>
+            <link>https://github.com/kayrosuno/kancerbero/releases/tag/v2611170059</link>
+            <sparkle:version>2611170059</sparkle:version>
+            <sparkle:shortVersionString>0.2.2611170059</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.6</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/kayrosuno/kancerbero/releases/download/v2611170059/Kancerbero-0.2.2611170059.zip" length="8863835" type="application/octet-stream" sparkle:edSignature="F+VcFN6i1bBZBRMq2obpHiwW2hDBK/hti+rr3f4p26RvuTqpWQ8LqQl9Kccj3U8OhP00lDpg9S6yPklCEIkuAQ=="/>
+        </item>
+        <item>
             <title>0.2.2611170018</title>
             <pubDate>Tue, 17 Nov 2026 01:19:08 +0100</pubDate>
             <link>https://github.com/kayrosuno/kancerbero/releases/tag/v2611170018</link>
@@ -13,7 +23,7 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
             <sparkle:shortVersionString>0.2.2611170018</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.6</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/kayrosuno/kancerbero/releases/download/v2611170018/Kancerbero-0.2.2611170018.zip" length="8762328" type="application/octet-stream" sparkle:edSignature="EKbqC2IWonSuDm28qlTAyJiDgh1wv4V6pCcQMsBI4kFUNKf5yqM4MoQEUj6fX4c/84dsvb9Uw+/E1DVCzEqeAQ=="/>
+            <enclosure url="https://github.com/kayrosuno/kancerbero/releases/download/v2611170059/Kancerbero-0.2.2611170018.zip" length="8762328" type="application/octet-stream" sparkle:edSignature="EKbqC2IWonSuDm28qlTAyJiDgh1wv4V6pCcQMsBI4kFUNKf5yqM4MoQEUj6fX4c/84dsvb9Uw+/E1DVCzEqeAQ=="/>
         </item>
         <item>
             <title>0.1.1</title>
@@ -23,11 +33,11 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
             <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.6</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/kayrosuno/kancerbero/releases/download/v2611170018/Kancerbero-0.1.1.zip" length="8710805" type="application/octet-stream" sparkle:edSignature="isaZ3p8VmXL88ECpZqLzgA0REs8Q2d/1Uo99z93tDSForBwKtwnVMiazVv3NRiKw3MLb22uwiXL3xOZlKIxoCQ=="/>
+            <enclosure url="https://github.com/kayrosuno/kancerbero/releases/download/v2611170059/Kancerbero-0.1.1.zip" length="8710805" type="application/octet-stream" sparkle:edSignature="isaZ3p8VmXL88ECpZqLzgA0REs8Q2d/1Uo99z93tDSForBwKtwnVMiazVv3NRiKw3MLb22uwiXL3xOZlKIxoCQ=="/>
         </item>
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: 16F5gjh7m2hzO6v/nG/Z8AVl7Y5JCcnjQOKZmRDiq/ccE+7ZD4OwYla4bKgjEPqunssMLth2P34Wsdu8E99JAw==
-length: 2034
+edSignature: vmwJgdVZMmIf9StNwlaNvUFg1g6+uEh0qa544EJryvPVwMN2LjXzJ2yb+CyCmthsUheShBBFzhBJ7Pi6Gs5pAQ==
+length: 2850
 -->
