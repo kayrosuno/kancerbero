@@ -287,7 +287,11 @@ macOS. El selector del toolbar cambia el intervalo solo durante la sesión y no 
 preferencia de arranque.
 
 El panel se oculta con el toggle de la toolbar o `Cmd+Ctrl+S`; `Cmd+1/2/3/4/5/6/7` cambia de sección
-(Networking, Disk, Daemons, CPU, Memory, Energy, Applications).
+(Networking, Disk, Daemons, CPU, Memory, Energy, Applications). El título de la ventana es el de la
+app, como texto nativo. Cuando la sidebar está oculta, el selector segmentado con los 7 iconos se
+centra en el hueco entre el título y los controles de la derecha y se mantiene centrado al
+redimensionar; al mostrar la sidebar, el selector y su reborde desaparecen. Los controles de la
+derecha conservan su posición.
 
 Las tarjetas de dashboard se pueden colapsar para dejar solo la cabecera, los filtros y la tabla.
 El botón de la toolbar (delante del selector de intervalo) colapsa o expande **todas** las

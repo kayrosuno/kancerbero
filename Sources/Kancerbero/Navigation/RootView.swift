@@ -61,11 +61,15 @@ struct RootView: View {
             get: { currentSection },
             set: { value in
                 guard let value else { return }
-                withAnimation(sectionAnimation) {
-                    sectionRaw = value.rawValue
-                }
+                selectSection(value)
             }
         )
+    }
+
+    private func selectSection(_ section: AppSection) {
+        withAnimation(sectionAnimation) {
+            sectionRaw = section.rawValue
+        }
     }
 
     private var networkingTab: Binding<NetworkingTab> {
@@ -155,6 +159,23 @@ struct RootView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .toolbar {
+            if columnVisibility == .detailOnly {
+                if #available(macOS 26.0, *) {
+                    ToolbarItem(id: "sidebarSections", placement: .principal) {
+                        SidebarSectionsSelector(currentSection: currentSection,
+                                                onSelect: selectSection)
+                            .offset(x: -69)
+                    }
+                    .sharedBackgroundVisibility(.hidden)
+                } else {
+                    ToolbarItem(id: "sidebarSections", placement: .principal) {
+                        SidebarSectionsSelector(currentSection: currentSection,
+                                                onSelect: selectSection)
+                            .offset(x: -69)
+                    }
+                }
+            }
+
             ToolbarItemGroup(placement: .primaryAction) {
                 Button(action: toggleAppearance) {
                     Image(systemName: appearanceIsDark ? "sun.max" : "moon")
