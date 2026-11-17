@@ -40,6 +40,12 @@ struct DiskAnalyzerView: View {
 
     var body: some View {
         VStack(spacing: 14) {
+            if let snapshot = disk.activeSnapshot,
+               !ui.cardsCollapsed(for: .disk) {
+                cards(snapshot)
+                    .transition(.opacity)
+            }
+
             controls
 
             if case .failed(let message) = disk.scanState {
@@ -51,10 +57,6 @@ struct DiskAnalyzerView: View {
             }
 
             if let snapshot = disk.activeSnapshot {
-                if !ui.cardsCollapsed(for: .disk) {
-                    cards(snapshot)
-                        .transition(.opacity)
-                }
                 if snapshot.cancelled {
                     banner("Scan cancelled. Showing partial results.",
                            icon: "stop.circle", tint: Color.secondary)

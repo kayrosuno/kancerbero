@@ -191,7 +191,9 @@ El detalle de binarios, permisos, instalación y librerías está en
   - **Analyzer** — escaneo local de una carpeta o volumen con `getattrlistbulk`, mapa radial
     interactivo (un clic selecciona un sector y su fila en las tablas; doble clic en un sector
     para bajar, doble clic en el centro para subir), drill-down, mayores archivos, progreso y
-    cancelación. **Hidden** viene activado por defecto: el mapa y las tablas muestran entradas
+    cancelación. Las tarjetas resumen (Scanned/Files/Folders/Denied) van encima de la barra de
+    ruta, que queda debajo junto con los controles de escaneo. **Hidden** viene activado por
+    defecto: el mapa y las tablas muestran entradas
     ocultas y Largest files incluye ficheros ocultos (el ajuste se aplica al iniciar el escaneo).
     La selección se comparte entre el mapa, la tabla de contenidos y la de mayores archivos; se
     limpia al navegar o al iniciar un escaneo, y en sectores anidados el mapa resalta el sector

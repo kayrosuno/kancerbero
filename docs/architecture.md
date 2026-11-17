@@ -147,9 +147,10 @@
   largas no caben. Mounted solo se calcula para volúmenes y snapshots (`mountPoint`); el resto
   muestra `—`. Usa
   `KBDiskItem.spaceUsage` para las celdas, `usageFraction` para la mini barra de Used y `—` en
-  Free para volúmenes (libre compartido). Un inspector y `CapacityBar`; Analyzer muestra
-  controles de escaneo, progreso, `RadialDiskMap` y las tablas de contenidos y mayores archivos;
-  I/O muestra el gráfico Data/Operations y la tabla de procesos por actividad de disco.
+  Free para volúmenes (libre compartido). Un inspector y `CapacityBar`; Analyzer muestra las
+  tarjetas resumen (Scanned/Files/Folders/Denied) encima de la barra de ruta y, debajo, los
+  controles de escaneo, el progreso, `RadialDiskMap` y las tablas de contenidos y mayores
+  archivos; I/O muestra el gráfico Data/Operations y la tabla de procesos por actividad de disco.
   En Analyzer las tarjetas filtran el contenido; en Volumes la cabecera de la tarjeta muestra el
   disco que se está viendo con los chips de capacidad y de
   particiones/contenedores/volúmenes (con nombre y número, en una sola línea; el título se

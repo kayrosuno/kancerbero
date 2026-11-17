@@ -1242,9 +1242,10 @@ $K --screenshot /tmp/kb-disk-live-b.png --section disk --disk-tab analyzer \
   --disk-path="$HOME/Library" --disk-scan --screenshot-delay 5
 ```
 
-- En ambas capturas deben verse la tarjeta de progreso, las tarjetas Scanned/Files/Folders/Denied
-  con valores crecientes (Scanned con caption “scanning…”), el mapa radial creciendo y las
-  etiquetas con nombre + tamaño humano. El panel derecho muestra el aviso de espera, sin tablas.
+- En ambas capturas las tarjetas Scanned/Files/Folders/Denied van arriba (encima de la barra de
+  ruta) con valores crecientes (Scanned con caption “scanning…”), la tarjeta de progreso queda
+  debajo de esa barra, y se ven el mapa radial creciendo y las etiquetas con nombre + tamaño
+  humano. El panel derecho muestra el aviso de espera, sin tablas.
 - Comparar `live-a` y `live-b`: los bytes, ficheros y sectores deben ser distintos (más grandes a
   los 5 s).
 - Al terminar, las tablas de contenidos y mayores archivos aparecen y la tarjeta Scanned muestra la
