@@ -1,0 +1,33 @@
+<?xml version="1.0" standalone="yes"?>
+<!-- sparkle-sign-warning:
+IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
+-->
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Kancerbero</title>
+        <item>
+            <title>0.2.2611170018</title>
+            <pubDate>Tue, 17 Nov 2026 01:19:08 +0100</pubDate>
+            <link>https://github.com/kayrosuno/kancerbero/releases/tag/v2611170018</link>
+            <sparkle:version>2611170018</sparkle:version>
+            <sparkle:shortVersionString>0.2.2611170018</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.6</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/kayrosuno/kancerbero/releases/download/v2611170018/Kancerbero-0.2.2611170018.zip" length="8762328" type="application/octet-stream" sparkle:edSignature="EKbqC2IWonSuDm28qlTAyJiDgh1wv4V6pCcQMsBI4kFUNKf5yqM4MoQEUj6fX4c/84dsvb9Uw+/E1DVCzEqeAQ=="/>
+        </item>
+        <item>
+            <title>0.1.1</title>
+            <pubDate>Mon, 16 Nov 2026 00:30:41 +0100</pubDate>
+            <link>https://github.com/kayrosuno/kancerbero/releases/tag/v0.1.1</link>
+            <sparkle:version>2026111601</sparkle:version>
+            <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.6</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/kayrosuno/kancerbero/releases/download/v2611170018/Kancerbero-0.1.1.zip" length="8710805" type="application/octet-stream" sparkle:edSignature="isaZ3p8VmXL88ECpZqLzgA0REs8Q2d/1Uo99z93tDSForBwKtwnVMiazVv3NRiKw3MLb22uwiXL3xOZlKIxoCQ=="/>
+        </item>
+    </channel>
+</rss>
+<!-- sparkle-signatures:
+edSignature: 16F5gjh7m2hzO6v/nG/Z8AVl7Y5JCcnjQOKZmRDiq/ccE+7ZD4OwYla4bKgjEPqunssMLth2P34Wsdu8E99JAw==
+length: 2034
+-->
