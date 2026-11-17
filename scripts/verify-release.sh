@@ -56,5 +56,10 @@ case "$enclosure" in
 esac
 curl -fsSIL "$enclosure" | grep -q "200"
 
+TAG="v$BUILD"
+DMG_URL="https://github.com/$REPO/releases/download/$TAG/Kancerbero-$VERSION.dmg"
+curl -fsSIL "$DMG_URL" | grep -q "200"
+
 echo "feed OK: $FEED"
 echo "asset OK: $enclosure"
+echo "asset OK: $DMG_URL"
