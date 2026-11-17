@@ -19,6 +19,13 @@
   (`KBTheme.sidebarWidth`), y el mínimo de la ventana se deriva de la visibilidad: 1340 pt con la
   sidebar y 1088 pt cuando está oculta (`.detailOnly`), de modo que al redimensionar la sidebar
   nunca se recorta y, al ocultarla, el contenido aprovecha el espacio liberado.
+- El título es el nativo de la app (texto). Con la sidebar oculta (`.detailOnly`), un `if` inserta
+  `ToolbarItem(.principal)` con `SidebarSectionsSelector`, un `Picker(.segmented)` con los 7 iconos
+  de `AppSection`, dentro de una cápsula Liquid Glass propia (macOS 26+; `ultraThinMaterial` en
+  versiones anteriores) y con el fondo compartido del toolbar oculto. El item se desplaza dentro
+  del área principal para quedar centrado en el hueco entre el título y el grupo trailing, y se
+  elimina por completo al expandir la sidebar, así que no queda reborde. El grupo trailing no se
+  toca y conserva sus posiciones. La selección usa el mismo binding y la misma transacción.
 - Gráficos temporales: todos usan un paso X fijo por slot (`ancho / (ventana - 1)`) con la muestra
   más reciente a la izquierda y la ventana completa de 60 muestras (120 en Traffic y Disk); así el
   contenido crece por slots en vez de estirarse con 2-3 muestras. Battery conserva su eje de 12 h

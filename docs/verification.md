@@ -269,6 +269,12 @@ $K --screenshot /tmp/kb-col-disk-analyzer.png --section disk --disk-tab analyzer
   `--screenshot-size 1088x700` deja la ventana en 1088 (2176 px de ancho) y el contenido cabe
   entero, incluidas la columna Iface y la barra de estado. Pedir 1000 se queda también en 1088.
   Al volver a mostrar la sidebar el mínimo sube de nuevo a 1340.
+- El título es el nativo de la app, como texto. Con la sidebar oculta, el selector segmentado de 7
+  iconos queda centrado en el hueco entre el título y los controles de la derecha, también a
+  1088×700; al expandir, el selector y su reborde desaparecen. Los controles de la derecha
+  conservan su posición. Clicar un segmento o usar `Cmd+1…7` cambia la sección. `--screenshot` no
+  captura la barra de título: comprobar visualmente o con `screencapture -l <windowID>` si hay
+  permiso de Grabación de pantalla.
 - Reduce Motion o “Animate tab changes” desactivado: el cambio es instantáneo. El estado no se
   guarda en `UserDefaults` y desaparece al reiniciar.
 
