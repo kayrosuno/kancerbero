@@ -612,9 +612,20 @@ fuente (red, inventario de disco, servicios launchd o CPU/memoria).
 
 ## Settings y animaciones de pestaña
 
-Abrir **Kancerbero → Settings…** (⌘,) y comprobar el toggle “Animate tab changes”. La preferencia
-se guarda en `UserDefaults` con la clave `tabAnimationsEnabled`; si la clave no existe, el valor
-por defecto es activado.
+Abrir **Kancerbero → Settings…** (⌘,) y comprobar la nueva ventana: barra lateral con **General**,
+**Monitoring**, **Interface** y **Updates**, y tarjetas agrupadas en el panel derecho.
+
+- General: cambiar la apariencia (System/Light/Dark) debe aplicar el cambio a todas las ventanas y
+  menús al momento y persistir en `appearanceMode`; las unidades Decimal/Binary persisten en
+  `diskByteUnitSystem` y cambian Disk, la barra de estado e inspectores.
+- Monitoring: los intervalos de arranque y de conexiones activas son los mismos selectores de
+  antes, ahora en tarjetas; sus claves no cambian.
+- Interface: comprobar el toggle “Animate tab changes”, el de la barra de estado, y la rejilla de
+  iconos del Dock (el estilo persiste en `dockIconStyle`; “Clear history” vacía los históricos).
+- Updates: las opciones de Sparkle, la versión y los avisos de daemon/filtro siguen igual.
+
+El toggle “Animate tab changes” se guarda en `UserDefaults` con la clave `tabAnimationsEnabled`;
+si la clave no existe, el valor por defecto es activado.
 
 ```bash
 defaults read uno.kayros.kancerbero tabAnimationsEnabled
@@ -683,7 +694,7 @@ log stream --predicate 'subsystem == "uno.kayros.kancerbero"' --info --debug
   actualizar aunque esté pausado.
 - El selector está en el toolbar de todas las pestañas. Daemons mantiene su refresco de 5 s y Disk
   su caché de inventario, así que el selector no cambia la cadencia de esas dos vistas.
-- El intervalo de arranque se ajusta en **Settings → Sampling** (`startupSamplingInterval`, por
+- El intervalo de arranque se ajusta en **Settings → Monitoring** (`startupSamplingInterval`, por
   defecto 2 s). Cambiar el selector del toolbar y reiniciar la app debe volver al valor de
   Settings, no al último elegido. Para probar sin la UI:
   `defaults write uno.kayros.kancerbero startupSamplingInterval -float 5` (y
@@ -761,6 +772,10 @@ $K --screenshot /tmp/kb-cpu-selected.png --section cpu \
   (`KBTheme.cardStripHeight`, Traffic 190, Activity 100 + Protocols 80) y todo el espacio extra lo
   absorbe la tabla de procesos. Con las tarjetas colapsadas la franja desaparece y la tabla ocupa
   todo el alto. Comparar una captura a 1440×860 con otra de ventana más alta.
+- Ancho de las cards de Disk → Analyzer y Daemons: en una ventana ancha las cuatro tarjetas del
+  Analyzer (170 pt cada una) y las seis de Daemons (máximo 170 pt) mantienen el mismo ancho que a
+  1340×700 y quedan alineadas a la izquierda, con espacio libre a la derecha; nada se recorta ni se
+  reparte de más. Comparar capturas a `--screenshot-size 1340x700`, 1440×860 y 1800×900.
 - Temperaturas: `$P symbols` debe informar `Thermal: available`; `$P thermal --seconds 5
   --interval 1` muestra paquete, fuente (`PMU tdie` en Apple Silicon; `eACC/pACC` o `SOC MTR` como
   respaldo) y temperatura por core, y `$P cpu --interval 1` añade `temp=` a cada `cpuN`.
@@ -835,7 +850,7 @@ ioreg -r -d 1 -w 0 -c IOBlockStorageDriver | grep Statistics
 - Se generan `/tmp/dock-<estilo>.png` (CPU usage/history, red, disco, memoria, presión, GPU,
   energía). Cada tile debe ser legible: CPU History apilado, NET/DISK con dos gráficos
   (RX/TX, lectura/escritura) e importes que coinciden con las pestañas.
-- En la app, el menú **Dock Icon** (y Ajustes → Dock) cambia el icono en vivo; “Show Application
+- En la app, el menú **Dock Icon** (y Settings → Interface → Dock icon) cambia el icono en vivo; “Show Application
   Icon” restaura el icono; la elección persiste en `dockIconStyle` y `Clear History` vacía los
   históricos. El controlador sigue refrescando con la ventana cerrada.
 - La actividad de disco sale de `IOBlockStorageDriver.Statistics` (`Bytes (Read)`/`Bytes (Write)`)
@@ -913,8 +928,8 @@ $APP --screenshot /tmp/kb-net-process-independent.png --section networking \
   estados TCP no clasificados: desmarcarla no oculta las filas UDP, que dependen de
   **Transport › UDP** (desmarcar UDP las elimina). La familia de dirección desconocida se excluye
   cuando el grupo IP no está completo.
-- Ventana configurable: en **Settings → Network activity** el picker “Active connections
-  window” ofrece 5/10/20/30/60/120 s (10 por defecto). Al cambiarlo, la caption del tile pasa a
+- Ventana configurable: en **Settings → Monitoring** el selector “Active window” ofrece
+  5/10/20/30/60/120 s (10 por defecto). Al cambiarlo, la caption del tile pasa a
   «last N s» y el hint se actualiza; el contador y el filtro Active usan la nueva ventana en el
   siguiente refresco. Lanzar una descarga, pararla y comprobar que el flujo sigue activo hasta que
   expira la ventana elegida.

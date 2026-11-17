@@ -148,7 +148,8 @@
   muestra `—`. Usa
   `KBDiskItem.spaceUsage` para las celdas, `usageFraction` para la mini barra de Used y `—` en
   Free para volúmenes (libre compartido). Un inspector y `CapacityBar`; Analyzer muestra las
-  tarjetas resumen (Scanned/Files/Folders/Denied) encima de la barra de ruta y, debajo, los
+  tarjetas resumen (Scanned/Files/Folders/Denied) encima de la barra de ruta, en cuatro columnas
+  fijas de 170 pt alineadas a la izquierda (no crecen al ampliar la ventana), y debajo los
   controles de escaneo, el progreso, `RadialDiskMap` y las tablas de contenidos y mayores
   archivos; I/O muestra el gráfico Data/Operations y la tabla de procesos por actividad de disco.
   En Analyzer las tarjetas filtran el contenido; en Volumes la cabecera de la tarjeta muestra el
@@ -161,7 +162,9 @@
   **Agents** y **Daemons** alternan el tipo dentro del conjunto, y **Running / Stopped / Disabled /
   Not loaded** alternan ese estado, con la misma semántica: se muestran las filas de los valores
   pulsados y apagar todos los de un grupo no coincide con ninguna fila. Las seis tarjetas usan una
-  rejilla fija de seis columnas para caber en una fila. **Scope** y **Origin** son
+  rejilla fija de seis columnas para caber en una fila y se quedan en su ancho mínimo (máximo
+  170 pt, el de `KBTheme.summaryCardMinWidth`), alineadas a la izquierda: al ampliar la ventana el
+  espacio libre queda a la derecha. **Scope** y **Origin** son
   `CheckboxFilterGroup` (cápsulas con checkboxes, como NetworkingFilterBar). La búsqueda vive en
   la cabecera de la tarjeta sobre la tabla (patrón de `CPUProcessTable`), con el
   contador “N of M services” justo al lado del campo. La tabla es
@@ -296,7 +299,16 @@
   que solo viven en las tarjetas: `networking.focus`, `disk.volumesFocus` y
   `disk.analyzerFocus` a `.scanned`. Los overrides `--cards-collapsed`, `--cards-expanded` y
   `--cards-collapsed-sections` permiten capturar los estados sin tocar `UserDefaults`.
-- Settings: `KancerberoApp` añade una escena nativa `Settings` con `SettingsView`. El toggle
+- Settings: `KancerberoApp` añade una escena nativa `Settings` con `SettingsView`, con tamaño por
+  defecto 940×680, mínimo 880×620 y redimensionable. La vista es una ventana propia con barra
+  lateral de categorías (`SettingsCategory`: General, Monitoring, Interface, Updates) y panel
+  derecho con scroll; las tarjetas (`SettingsCard`) usan el mismo material, radio 16 y borde
+  degradado que el resto de la app, y las filas (`SettingsRow`) llevan título, detalle y control a
+  la derecha. General agrupa apariencia (`appearanceMode`, aplicada con `KBAppearance.apply`) y
+  unidades de disco (`diskByteUnitSystem`); Monitoring, el intervalo de arranque y la ventana de
+  conexiones; Interface, las animaciones (con el aviso de Reduce Motion) y el icono del Dock
+  (rejilla de `DockIconStyle` y `AppModel.clearHistories()`); Updates, Sparkle y el estado de
+  versión, daemon y filtro. El toggle
   “Animate tab changes” persiste en `@AppStorage("tabAnimationsEnabled")` (por defecto `true`) y
   condiciona únicamente las transiciones de cambio de pestaña: `RootView` (secciones),
   `PillTabBar` + `NetworkingView`/`DiskView` (subpestañas) y el resaltado del sidebar. Con
@@ -304,10 +316,10 @@
   El toggle “Animate status bar values” persiste en
   `@AppStorage("statusBarTextAnimationsEnabled")` (por defecto `false`) y controla el
   `numericText` y la animación de las cifras de la barra inferior.
-  El picker “Startup interval” persiste en `@AppStorage("startupSamplingInterval")` (por defecto
+  El selector “Startup interval” persiste en `@AppStorage("startupSamplingInterval")` (por defecto
   `2` s) y solo fija el valor inicial de `AppModel.interval`: el selector del toolbar cambia la
   cadencia de la sesión actual sin modificar esa preferencia.
-  El picker “Active connections window” persiste en
+  El selector “Active window” persiste en
   `@AppStorage("activeConnectionWindowSeconds")` (por defecto `10` s; opciones 5/10/20/30/60/120;
   cualquier otro valor cae al default) y fija la ventana que `AppModel` usa para
   `activeSourceIDs`, el tile Active y su filtro. `AppModel` lee `UserDefaults` en cada tick: subir

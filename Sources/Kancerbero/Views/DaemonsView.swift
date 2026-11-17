@@ -148,7 +148,7 @@ struct DaemonsView: View {
         let disabled = base.filter { $0.service.state == .disabled }.count
         let unloaded = base.filter { $0.service.state == .unloaded }.count
 
-        return LazyVGrid(columns: cardColumns, spacing: 8) {
+        return LazyVGrid(columns: cardColumns, alignment: .leading, spacing: 8) {
             SummaryCard(
                 title: "Agents",
                 value: KBFormat.compactCount(agents),
@@ -216,11 +216,15 @@ struct DaemonsView: View {
             )
             .help("Services whose plist exists but launchd has not loaded. Click to toggle this state.")
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Six cards in a single row at the window's minimum width.
+    /// Six cards in a single row, capped at the theme minimum so widening the
+    /// window leaves free space on the right instead of stretching the cards.
     private var cardColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(minimum: 120), spacing: 8), count: 6)
+        Array(repeating: GridItem(.flexible(minimum: 120,
+                                            maximum: KBTheme.summaryCardMinWidth),
+                                  spacing: 8), count: 6)
     }
 
     private var controls: some View {

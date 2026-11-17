@@ -158,8 +158,16 @@ struct DiskAnalyzerView: View {
         }
     }
 
+    /// Four fixed tracks at the theme minimum, so widening the window leaves
+    /// free space to the right instead of stretching the cards.
+    private var cardColumns: [GridItem] {
+        Array(repeating: GridItem(.fixed(KBTheme.summaryCardMinWidth),
+                                  spacing: KBTheme.summaryGridSpacing), count: 4)
+    }
+
     private func cards(_ snapshot: KBDiskScanSnapshot) -> some View {
-        LazyVGrid(columns: KBTheme.summaryColumns,
+        LazyVGrid(columns: cardColumns,
+                  alignment: .leading,
                   spacing: KBTheme.summaryGridSpacing) {
             SummaryCard(
                 title: "Scanned",
@@ -204,6 +212,7 @@ struct DiskAnalyzerView: View {
                 filterHint: "List paths that could not be read"
             )
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func mapCard(_ snapshot: KBDiskScanSnapshot) -> some View {

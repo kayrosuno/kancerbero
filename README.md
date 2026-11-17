@@ -192,7 +192,8 @@ El detalle de binarios, permisos, instalación y librerías está en
     interactivo (un clic selecciona un sector y su fila en las tablas; doble clic en un sector
     para bajar, doble clic en el centro para subir), drill-down, mayores archivos, progreso y
     cancelación. Las tarjetas resumen (Scanned/Files/Folders/Denied) van encima de la barra de
-    ruta, que queda debajo junto con los controles de escaneo. **Hidden** viene activado por
+    ruta, en cuatro columnas de ancho fijo que no crecen al ampliar la ventana, y debajo quedan
+    esa barra y los controles de escaneo. **Hidden** viene activado por
     defecto: el mapa y las tablas muestran entradas
     ocultas y Largest files incluye ficheros ocultos (el ajuste se aplica al iniciar el escaneo).
     La selección se comparte entre el mapa, la tabla de contenidos y la de mayores archivos; se
@@ -218,7 +219,9 @@ El detalle de binarios, permisos, instalación y librerías está en
   y estado (running / stopped / disabled / not loaded). Todos los valores están pulsados al
   arrancar; solo se muestran las filas de los valores pulsados y un grupo sin nada pulsado no
   muestra filas. La búsqueda vive en la cabecera de la tarjeta Services y las tarjetas Running /
-  Stopped / Disabled alternan ese estado en el filtro. La tabla es ordenable por cualquiera de sus
+  Stopped / Disabled alternan ese estado en el filtro. Las seis tarjetas caben en una fila y
+  conservan su ancho mínimo (alineadas a la izquierda) al ampliar la ventana. La tabla es
+  ordenable por cualquiera de sus
   columnas. Los agentes duplicados entre los dominios
   GUI y User se deduplican por label, conservando ambos dominios en el detalle. Inspector con
   Start / Stop / Restart / Enable·Disable / Load·Unload / Reveal.
@@ -291,14 +294,16 @@ Extension y aprobar la system extension; el detalle de binario y permisos está 
 Las selecciones y configuraciones de cada sección (filtros, tarjeta activa, fila seleccionada,
 panel de detalle y tablas expandidas) se conservan al cambiar de pestaña o sección durante la
 sesión; al reiniciar la app se vuelven a los valores iniciales. **Kancerbero → Settings… (⌘,)** o el
-botón **Settings** (engranaje) al pie del sidebar permiten ajustar las animaciones de cambio de
-sección/subpestaña y del resaltado del sidebar y las píldoras, las animaciones de los valores de
-la barra de estado (desactivadas por defecto), el intervalo de muestreo con el que arranca la app
-(2 s por defecto), la ventana de conexiones activas (10 s por defecto; 5/10/20/30/60/120) y el
-icono del Dock. Todo se guarda en `UserDefaults` y las animaciones respetan
-Reduce Motion de
-macOS. El selector del toolbar cambia el intervalo solo durante la sesión y no modifica la
-preferencia de arranque.
+botón **Settings** (engranaje) al pie del sidebar abren una ventana con barra lateral de categorías
+(**General**, **Monitoring**, **Interface** y **Updates**) y tarjetas por grupo. General reúne la
+apariencia (sistema/claro/oscuro) y las unidades de disco (decimal/binario); Monitoring el intervalo
+de muestreo con el que arranca la app (2 s por defecto) y la ventana de conexiones activas (10 s por
+defecto; 5/10/20/30/60/120); Interface las animaciones de pestañas y de la barra de estado
+(desactivada por defecto), con aviso si Reduce Motion está activo, y el icono del Dock con una
+rejilla de nueve estilos y un botón para vaciar los históricos; y Updates las opciones de Sparkle,
+la versión y el estado del daemon y del filtro. Todo se guarda en `UserDefaults` y las animaciones
+respetan Reduce Motion de macOS. El selector del toolbar cambia el intervalo solo durante la sesión
+y no modifica la preferencia de arranque.
 
 El panel se oculta con el toggle de la toolbar o `Cmd+Ctrl+S`; `Cmd+1/2/3/4/5/6/7` cambia de sección
 (Networking, Disk, Daemons, CPU, Memory, Energy, Applications). El título de la ventana es el de la

@@ -164,5 +164,7 @@ struct KancerberoApp: App {
                 .environment(filter)
                 .environment(updater)
         }
+        .defaultSize(width: 940, height: 680)
+        .windowResizability(.contentMinSize)
     }
 }
