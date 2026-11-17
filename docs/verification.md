@@ -322,9 +322,11 @@ $K --screenshot /tmp/kb-col-disk-analyzer.png --section disk --disk-tab analyzer
 - El título es el nativo de la app, como texto. Con la sidebar oculta, el selector segmentado de 7
   iconos queda centrado en el hueco entre el título y los controles de la derecha, también a
   1088×700; al expandir, el selector y su reborde desaparecen. Los controles de la derecha
-  conservan su posición. Clicar un segmento o usar `Cmd+1…7` cambia la sección. `--screenshot` no
-  captura la barra de título: comprobar visualmente o con `screencapture -l <windowID>` si hay
-  permiso de Grabación de pantalla.
+  conservan su posición. Los **siete segmentos responden al clic**, en especial el primero
+  (Networking) y la mitad izquierda del segundo (Disk); el padding transparente del item no
+  bloquea los controles de la derecha ni el arrastre de la ventana. Clicar un segmento o usar
+  `Cmd+1…7` cambia la sección. `--screenshot` no captura la barra de título: comprobar visualmente
+  o con `screencapture -l <windowID>` si hay permiso de Grabación de pantalla.
 - Reduce Motion o “Animate tab changes” desactivado: el cambio es instantáneo. El estado no se
   guarda en `UserDefaults` y desaparece al reiniciar.
 
@@ -1251,6 +1253,50 @@ $K --screenshot /tmp/kb-disk-live-b.png --section disk --disk-tab analyzer \
   tarjetas con el parcial y montar las tablas una sola vez; no debe haber más actualizaciones.
 - Consola sin avisos de reentrancy de `NSTableView` durante el escaneo (las tablas no están
   montadas).
+- `Hidden` aparece marcado por defecto. Al escanear una ruta con entradas ocultas, el mapa no
+  muestra el sector gris “Hidden”, Contents/Folders incluye directorios ocultos y Largest files
+  incluye ficheros ocultos. Desmarcarlo después del escaneo oculta los directorios del mapa pero
+  no cambia Largest files hasta el siguiente escaneo.
+- `Contents` lista carpetas y los ficheros directos retenidos (200 mayores por carpeta, tope
+  global). Un `.ssh`/`.aws` con solo ficheros ya no aparece vacío; la tarjeta Files muestra solo
+  ficheros y Folders solo carpetas, y Hidden se aplica al instante. Con más de 200 ficheros en una
+  carpeta se ven los 200 mayores y la cabecera indica “top 200 of N files”. Un clic en un fichero
+  lo selecciona (con wedge en el mapa si su padre es el foco) y el doble clic no navega.
+
+Interacción del mapa (manual; `--screenshot` no captura clics ni hover):
+
+- Un solo clic en un sector lo deja seleccionado (anillo blanco grueso con halo oscuro) y
+  selecciona la fila correspondiente en Contents; en un sector anidado el mapa resalta ese sector
+  y Contents resalta su ancestro de primer nivel. Un solo clic en el fondo, en el centro o en
+  “Hidden”/“Other”/“Not scanned” limpia la selección.
+- El sector seleccionado se dibuja por encima de los anillos hijos y crece hacia fuera hasta
+  10 pt, además del anillo blanco con halo oscuro; el borde no se recorta (quedan al menos 2 pt
+  hasta el Canvas) y un clic o hover dentro de la banda crecida siguen apuntando a ese sector.
+- Un solo clic en una fila de Contents o de Largest files actualiza la selección compartida. En
+  Contents el mapa resalta la ruta cuando existe como sector visible; en Largest files el mapa
+  navega al directorio contenedor (breadcrumb y centro) y dibuja un sector sintético resaltado
+  para el fichero, recortado del residual “Other”/“Not scanned”. Un clic en el fondo de Largest
+  files solo limpia si la selección actual pertenece a esa tabla.
+- Bajar o subir de nivel (doble clic o breadcrumb) y lanzar un escaneo limpian la selección. La
+  navegación automática al seleccionar una fila de Largest files es la excepción: conserva la ruta
+  del fichero como selección.
+- El separador horizontal entre Contents y Largest files se arrastra con el cursor ↕, respeta los
+  mínimos de ambas tablas y no aparece con el foco Folders ni en Denied. La altura es solo de
+  sesión: al relanzar la app vuelve a 190 pt.
+- Un solo clic en un sector o en el centro no navega: el drill-down y el drill-up siguen
+  reservados al doble clic. El resaltado y el tooltip de hover siguen funcionando con el puntero.
+- Las etiquetas de los sectores (10/9 pt) y el texto del centro (14/13/11 pt) no se recortan con
+  nombres largos. Un fichero seleccionado con arco menor a 0.28 rad no muestra etiqueta; el
+  tooltip de hover sigue mostrando nombre y tamaño.
+- Doble clic en un sector de directorio baja a ese nodo (cambian el centro, el breadcrumb y las
+  tablas del panel derecho); doble clic en el centro sube un nivel. En la raíz, el doble clic en
+  el centro no hace nada.
+- Doble clic en un sector de fichero, en “Hidden”/“Other”/“Not scanned” o en un paquete con
+  “Packages” desactivado no hace nada.
+- El intervalo y la tolerancia del doble clic siguen los ajustes del sistema (probar con la
+  velocidad de doble clic al mínimo y al máximo en Ajustes del Sistema → Ratón/Trackpad).
+- Arrastrar de un sector a otro y soltar ya no selecciona el sector de destino (cambio
+  intencional).
 
 Nota: usa `--disk-path=<ruta>` (un solo argumento). Un valor posicional que sea una ruta existente
 puede ser interpretado por macOS como “abrir documento” y bloquear la ventana antes de la captura.

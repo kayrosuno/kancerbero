@@ -189,8 +189,20 @@ El detalle de binarios, permisos, instalación y librerías está en
     pestañas cambia todas las cifras de Disk: Decimal (por defecto, como Finder) usa KB/MB/GB con
     base 1000; Binary usa KiB/MiB/GiB con base 1024. La elección se recuerda.
   - **Analyzer** — escaneo local de una carpeta o volumen con `getattrlistbulk`, mapa radial
-    interactivo (clic en un sector para bajar, clic en el centro para subir), drill-down, mayores
-    archivos, progreso y cancelación. El mapa y las tarjetas se actualizan en vivo durante el
+    interactivo (un clic selecciona un sector y su fila en las tablas; doble clic en un sector
+    para bajar, doble clic en el centro para subir), drill-down, mayores archivos, progreso y
+    cancelación. **Hidden** viene activado por defecto: el mapa y las tablas muestran entradas
+    ocultas y Largest files incluye ficheros ocultos (el ajuste se aplica al iniciar el escaneo).
+    La selección se comparte entre el mapa, la tabla de contenidos y la de mayores archivos; se
+    limpia al navegar o al iniciar un escaneo, y en sectores anidados el mapa resalta el sector
+    exacto mientras la tabla resalta su ancestro de primer nivel. **Contents** lista carpetas y
+    los ficheros directos retenidos por el escaneo (los 200 mayores de cada carpeta, con un tope
+    global); la cabecera indica “top N of M files” cuando hay truncado y la tarjeta Files filtra
+    solo ficheros. Al seleccionar un fichero en **Contents** o en **Largest files** el mapa
+    navega al directorio que lo contiene y dibuja un sector sintético resaltado para el fichero;
+    el sector seleccionado se expande hacia fuera hasta ~10 pt sobre su geometría normal, además
+    del halo. El panel derecho reparte su altura entre ambas tablas con un separador horizontal
+    arrastrable, con mínimos por tabla. El mapa y las tarjetas se actualizan en vivo durante el
     escaneo; las tablas de contenidos y mayores archivos aparecen al terminar. Las etiquetas del
     mapa muestran el nombre y el tamaño en formato humano. Las tarjetas filtran el panel derecho
     (todo, solo ficheros, solo carpetas o rutas denegadas); no se lee contenido de ficheros.

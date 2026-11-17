@@ -4,8 +4,9 @@ import KancerberoCore
 
 struct DiskLargestFilesTable: View {
     let files: [KBDiskFile]
+    /// Shared Analyzer selection (exact node path).
+    @Binding var selection: String?
 
-    @State private var selection: String?
     @Environment(\.byteUnitSystem) private var byteUnitSystem
 
     var body: some View {
@@ -32,7 +33,7 @@ struct DiskLargestFilesTable: View {
                 )
                 .frame(maxWidth: .infinity, minHeight: 90)
             } else {
-                Table(files, selection: $selection) {
+                Table(files, selection: tableSelection) {
                     TableColumn("Name") { file in
                         HStack(spacing: 6) {
                             Image(systemName: "doc")
@@ -68,6 +69,27 @@ struct DiskLargestFilesTable: View {
             RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
                 .strokeBorder(.quaternary.opacity(0.5), lineWidth: 1)
         }
+    }
+
+    /// Only shows and clears paths this table actually contains, so a nested
+    /// selection made in the map is not cleared when its row is not here.
+    private var tableSelection: Binding<String?> {
+        Binding(
+            get: {
+                guard let selection,
+                      files.contains(where: { $0.path == selection }) else { return nil }
+                return selection
+            },
+            set: { newValue in
+                if newValue == selection { return }
+                if let newValue {
+                    selection = newValue
+                } else if let current = selection,
+                          files.contains(where: { $0.path == current }) {
+                    selection = nil
+                }
+            }
+        )
     }
 
     private func reveal(_ file: KBDiskFile) {

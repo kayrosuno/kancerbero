@@ -315,6 +315,9 @@ struct DiskUIState: Equatable {
     /// Detail card maximized over the Volumes area.
     var maximizedVolumesPanel: DiskVolumesPanel?
     var analyzerFocus: DiskAnalyzerFocus = .scanned
+    /// Session-only height of the Analyzer's Largest files card. Contents takes
+    /// the remainder; both are clamped by DiskAnalyzerSplit.
+    var analyzerLargestFilesHeight: CGFloat = DiskAnalyzerSplit.defaultLargestHeight
     /// nil means "use DiskModel.scanRootPath".
     var analyzerPathDraft: String?
 

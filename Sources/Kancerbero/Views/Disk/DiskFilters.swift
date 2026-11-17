@@ -67,6 +67,32 @@ enum DiskVolumesSplit {
     }
 }
 
+/// Layout constants and clamping for the Analyzer's two right-hand tables.
+enum DiskAnalyzerSplit {
+    /// Height of the horizontal divider row; the 1 pt line is centered in it
+    /// and it replaces the previous 12 pt spacing between the two cards.
+    static let dividerHeight: CGFloat = 12
+    static let childrenMinimumHeight: CGFloat = 160
+    static let largestMinimumHeight: CGFloat = 110
+    static let defaultLargestHeight: CGFloat = 190
+    static let collapsedLargestHeight: CGFloat = 80
+
+    static func clampedLargestHeight(_ height: CGFloat,
+                                     availableHeight: CGFloat) -> CGFloat {
+        guard availableHeight > 0 else { return 0 }
+        let requested = height.isFinite ? height : defaultLargestHeight
+        let maximum = availableHeight - childrenMinimumHeight
+
+        // Too short for both minimums: keep a usable Largest files card (80 pt
+        // floor or half the space) and give the rest to Contents.
+        if maximum < largestMinimumHeight {
+            let floor = min(collapsedLargestHeight, availableHeight * 0.5)
+            return min(max(requested, floor), max(floor, maximum))
+        }
+        return min(max(requested, largestMinimumHeight), maximum)
+    }
+}
+
 /// Detail card that can be maximized in Disk → Volumes.
 enum DiskVolumesPanel: String, CaseIterable, Identifiable, Sendable {
     case tree

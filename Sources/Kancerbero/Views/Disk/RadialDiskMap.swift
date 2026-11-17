@@ -4,14 +4,21 @@ import KancerberoCore
 
 /// Sunburst map of the scanned tree. The current node is the center; each ring
 /// represents one level of descendants, and each sector's angle is proportional
-/// to its allocated size. Clicking a directory drills into it.
+/// to its allocated size. A single click selects a sector (or clears the
+/// selection on empty space, the center or a synthetic sector); double-clicking
+/// a directory drills into it, and double-clicking the center drills up.
 struct RadialDiskMap: View {
     let root: KBDiskNode
     let focus: KBDiskNode
     let volumeCapacity: UInt64?
     let showHidden: Bool
     let showPackageContents: Bool
+    let selectedPath: String?
+    /// A file selected in Contents or Largest files. Files are not tree nodes,
+    /// so the map draws a synthetic wedge for it when its parent is the focus.
+    let selectedFile: KBDiskFile?
     let onSelect: (KBDiskNode) -> Void
+    let onPick: (KBDiskNode?) -> Void
     let onCenterTap: () -> Void
 
     @Environment(\.byteUnitSystem) private var byteUnitSystem
@@ -51,20 +58,19 @@ struct RadialDiskMap: View {
                     hoveredID = nil
                 }
             }
+            // A single click selects (or clears); a double click navigates.
+            // Both recognizers report `location` in this view's local coordinate
+            // space, the same one used by `makeLayout`, hover and the hit-test
+            // helpers below. They run simultaneously so the count-2 recognizer
+            // is never blocked by the count-1 one.
             .gesture(
-                DragGesture(minimumDistance: 0).onEnded { value in
-                    if isInsideCenter(value.startLocation, layout: layout) {
-                        if isInsideCenter(value.location, layout: layout) {
-                            onCenterTap()
-                        }
-                        return
-                    }
-                    guard let sector = sector(at: value.location, layout: layout),
-                          let node = sector.node,
-                          node.isDirectory,
-                          !node.isAggregate,
-                          !(node.isPackage && !showPackageContents) else { return }
-                    onSelect(node)
+                SpatialTapGesture(count: 2).onEnded { value in
+                    handleDoubleTap(at: value.location, layout: layout)
+                }
+            )
+            .simultaneousGesture(
+                SpatialTapGesture(count: 1).onEnded { value in
+                    handleSingleTap(at: value.location, layout: layout)
                 }
             )
         }
@@ -97,12 +103,14 @@ struct RadialDiskMap: View {
         let center: CGPoint
         let centerRadius: CGFloat
         let maxRadius: CGFloat
+        let canvasRadius: CGFloat
     }
 
     private func makeLayout(in size: CGSize) -> Layout {
         let side = min(size.width, size.height)
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
-        let maxRadius = max(0, side / 2 - 14)
+        let canvasRadius = max(0, side / 2)
+        let maxRadius = max(0, canvasRadius - 14)
         let centerRadius = max(40, min(78, side * 0.11))
         let ringWidth = max(0, (maxRadius - centerRadius) / CGFloat(maxDepth))
 
@@ -178,24 +186,54 @@ struct RadialDiskMap: View {
             .reduce(UInt64(0)) { $0 &+ $1.allocatedBytes }
         let accounted = visibleSize &+ hiddenSize
         let residual = total > accounted ? total - accounted : 0
-        if residual > 0 && (focus.allocatedBytes > 0 || isRootVolume) {
-            let span = (end - start) * Double(residual) / Double(total)
+
+        // A `largestFiles` row is not a tree node and its bytes live inside the
+        // residual ("Other"/"Not scanned"). Draw it as its own wedge only when
+        // its direct parent is the focus and carve that size out of the
+        // residual, so the ring still spans exactly [-pi/2, 3pi/2).
+        var injectedFileSize: UInt64 = 0
+        if let selectedFile,
+           (selectedFile.path as NSString).deletingLastPathComponent == focus.path {
+            let candidate = min(selectedFile.allocatedBytes, residual)
+            let span = (end - start) * Double(candidate) / Double(total)
+            if candidate > 0, span > 0 {
+                sectors.append(Sector(
+                    id: "\(selectedFile.path)|file",
+                    node: KBDiskNode(displayFile: selectedFile),
+                    depth: 0,
+                    startAngle: angle,
+                    endAngle: min(angle + span, end),
+                    innerRadius: centerRadius,
+                    outerRadius: centerRadius + ringWidth,
+                    color: .accentColor,
+                    label: selectedFile.name,
+                    size: selectedFile.allocatedBytes
+                ))
+                angle = min(angle + span, end)
+                injectedFileSize = candidate
+            }
+        }
+
+        let residualSize = residual - injectedFileSize
+        if residualSize > 0 && (focus.allocatedBytes > 0 || isRootVolume) {
+            let span = (end - start) * Double(residualSize) / Double(total)
             sectors.append(Sector(
                 id: "\(focus.path)|residual",
                 node: nil,
                 depth: 0,
                 startAngle: angle,
-                endAngle: angle + span,
+                endAngle: min(angle + span, end),
                 innerRadius: centerRadius,
                 outerRadius: centerRadius + ringWidth,
                 color: .gray.opacity(0.22),
                 label: isRootVolume ? "Not scanned" : "Other",
-                size: residual
+                size: residualSize
             ))
         }
 
         return Layout(sectors: sectors, center: center,
-                      centerRadius: centerRadius, maxRadius: maxRadius)
+                      centerRadius: centerRadius, maxRadius: maxRadius,
+                      canvasRadius: canvasRadius)
     }
 
     private func appendChildren(of node: KBDiskNode,
@@ -285,53 +323,19 @@ struct RadialDiskMap: View {
     // MARK: - Drawing
 
     private func draw(layout: Layout, context: inout GraphicsContext) {
+        let selected = selectedSector(in: layout)
+
+        // Draw the selected sector last: its outward growth overlaps the child
+        // rings, so it must sit on top of them (and of their labels).
         for sector in layout.sectors {
-            var path = Path()
-            path.addArc(center: layout.center,
-                        radius: sector.outerRadius,
-                        startAngle: .radians(sector.startAngle),
-                        endAngle: .radians(sector.endAngle),
-                        clockwise: false)
-            path.addArc(center: layout.center,
-                        radius: sector.innerRadius,
-                        startAngle: .radians(sector.endAngle),
-                        endAngle: .radians(sector.startAngle),
-                        clockwise: true)
-            path.closeSubpath()
-
-            let hovered = hoveredID == sector.id
-            context.fill(path, with: .color(sector.color.opacity(hovered ? 1 : 0.92)))
-            context.stroke(path, with: .color(.black.opacity(0.10)), lineWidth: 0.5)
-            if hovered {
-                context.stroke(path, with: .color(.white.opacity(0.85)), lineWidth: 1.5)
-            }
-
-            let span = sector.endAngle - sector.startAngle
-            if span >= minimumLabelAngle,
-               sector.outerRadius - sector.innerRadius >= 20 {
-                let middle = (sector.startAngle + sector.endAngle) / 2
-                let radius = (sector.innerRadius + sector.outerRadius) / 2
-                let point = CGPoint(
-                    x: layout.center.x + cos(middle) * radius,
-                    y: layout.center.y + sin(middle) * radius
-                )
-                let nameText = context.resolve(
-                    Text(sector.label)
-                        .font(.system(size: 8, weight: .medium))
-                        .foregroundColor(.white)
-                )
-                let sizeText = context.resolve(
-                    Text(KBFormat.bytes(sector.size, units: byteUnitSystem))
-                        .font(.system(size: 7, weight: .regular))
-                        .foregroundColor(.white.opacity(0.82))
-                )
-                context.draw(nameText,
-                             at: CGPoint(x: point.x, y: point.y - 4.5),
-                             anchor: .center)
-                context.draw(sizeText,
-                             at: CGPoint(x: point.x, y: point.y + 5),
-                             anchor: .center)
-            }
+            if let selected, sector.id == selected.id { continue }
+            drawSector(sector, layout: layout, context: &context,
+                       highlighted: false, outerGrowth: 0)
+        }
+        if let selected {
+            drawSector(selected, layout: layout, context: &context,
+                       highlighted: true,
+                       outerGrowth: growth(for: selected, layout: layout))
         }
 
         let centerRect = CGRect(
@@ -346,21 +350,95 @@ struct RadialDiskMap: View {
                        lineWidth: 1)
     }
 
+    private func drawSector(_ sector: Sector, layout: Layout,
+                            context: inout GraphicsContext,
+                            highlighted: Bool, outerGrowth: CGFloat) {
+        let outerRadius = sector.outerRadius + outerGrowth
+        var path = Path()
+        path.addArc(center: layout.center,
+                    radius: outerRadius,
+                    startAngle: .radians(sector.startAngle),
+                    endAngle: .radians(sector.endAngle),
+                    clockwise: false)
+        path.addArc(center: layout.center,
+                    radius: sector.innerRadius,
+                    startAngle: .radians(sector.endAngle),
+                    endAngle: .radians(sector.startAngle),
+                    clockwise: true)
+        path.closeSubpath()
+
+        let hovered = hoveredID == sector.id
+        context.fill(path,
+                     with: .color(sector.color.opacity((hovered || highlighted) ? 1 : 0.92)))
+        context.stroke(path, with: .color(.black.opacity(0.10)), lineWidth: 0.5)
+        if highlighted {
+            // Dark halo + bright inner ring, so the persistent selection reads
+            // over every palette colour in light and dark appearance.
+            context.stroke(path, with: .color(.black.opacity(0.55)), lineWidth: 4)
+            context.stroke(path, with: .color(.white.opacity(0.95)), lineWidth: 2)
+        } else if hovered {
+            context.stroke(path, with: .color(.white.opacity(0.85)), lineWidth: 1.5)
+        }
+
+        let span = sector.endAngle - sector.startAngle
+        if span >= minimumLabelAngle,
+           outerRadius - sector.innerRadius >= 20 {
+            let middle = (sector.startAngle + sector.endAngle) / 2
+            let radius = (sector.innerRadius + outerRadius) / 2
+            let point = CGPoint(
+                x: layout.center.x + cos(middle) * radius,
+                y: layout.center.y + sin(middle) * radius
+            )
+            let nameText = context.resolve(
+                Text(sector.label)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.white)
+            )
+            let sizeText = context.resolve(
+                Text(KBFormat.bytes(sector.size, units: byteUnitSystem))
+                    .font(.system(size: 9, weight: .regular))
+                    .foregroundColor(.white.opacity(0.82))
+            )
+            context.draw(nameText,
+                         at: CGPoint(x: point.x, y: point.y - 5.5),
+                         anchor: .center)
+            context.draw(sizeText,
+                         at: CGPoint(x: point.x, y: point.y + 5.5),
+                         anchor: .center)
+        }
+    }
+
+    /// Outward growth of the selected sector: ~10 pt, never closer than 3 pt
+    /// to the Canvas edge (the halo already adds 2 pt).
+    private func growth(for sector: Sector, layout: Layout) -> CGFloat {
+        min(10, max(0, layout.canvasRadius - sector.outerRadius - 3))
+    }
+
+    private func selectedSector(in layout: Layout) -> Sector? {
+        guard let selectedPath else { return nil }
+        return layout.sectors.first { $0.node?.path == selectedPath }
+    }
+
     private func centerLabel(centerRadius: CGFloat) -> some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 1) {
             Text(focus.name)
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .lineLimit(2)
+                .minimumScaleFactor(0.85)
                 .multilineTextAlignment(.center)
             Text(KBFormat.bytes(focus.allocatedBytes, units: byteUnitSystem))
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
                 .monospacedDigit()
             if let capacity = volumeCapacity,
                capacity > 0,
                focus.id == root.id {
                 Text(KBFormat.percent(Double(focus.allocatedBytes) / Double(capacity)))
-                    .font(.system(size: 9))
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.9)
                     .monospacedDigit()
             }
         }
@@ -392,6 +470,31 @@ struct RadialDiskMap: View {
 
     // MARK: - Hit testing
 
+    private func handleSingleTap(at location: CGPoint, layout: Layout) {
+        // Center, empty space and synthetic sectors (Hidden/Other/Not scanned)
+        // carry no node, so they clear the shared selection.
+        guard !isInsideCenter(location, layout: layout),
+              let sector = sector(at: location, layout: layout),
+              let node = sector.node else {
+            onPick(nil)
+            return
+        }
+        onPick(node)
+    }
+
+    private func handleDoubleTap(at location: CGPoint, layout: Layout) {
+        if isInsideCenter(location, layout: layout) {
+            onCenterTap()
+            return
+        }
+        guard let sector = sector(at: location, layout: layout),
+              let node = sector.node,
+              node.isDirectory,
+              !node.isAggregate,
+              !(node.isPackage && !showPackageContents) else { return }
+        onSelect(node)
+    }
+
     private func isInsideCenter(_ point: CGPoint, layout: Layout) -> Bool {
         let dx = point.x - layout.center.x
         let dy = point.y - layout.center.y
@@ -402,15 +505,24 @@ struct RadialDiskMap: View {
         let dx = location.x - layout.center.x
         let dy = location.y - layout.center.y
         let distance = sqrt(dx * dx + dy * dy)
-        guard distance >= layout.centerRadius, distance <= layout.maxRadius else {
-            return nil
-        }
+        guard distance >= layout.centerRadius else { return nil }
 
         var angle = atan2(dy, dx)
         if angle < -Double.pi / 2 {
             angle += 2 * Double.pi
         }
 
+        // The selected sector grows outward; test it first with the expanded
+        // radius so its grown band stays clickable and hoverable.
+        if let selected = selectedSector(in: layout),
+           distance >= selected.innerRadius,
+           distance <= selected.outerRadius + growth(for: selected, layout: layout),
+           angle >= selected.startAngle,
+           angle < selected.endAngle {
+            return selected
+        }
+
+        guard distance <= layout.maxRadius else { return nil }
         return layout.sectors.first { sector in
             distance >= sector.innerRadius
                 && distance <= sector.outerRadius

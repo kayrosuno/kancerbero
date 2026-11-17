@@ -22,10 +22,13 @@
 - El título es el nativo de la app (texto). Con la sidebar oculta (`.detailOnly`), un `if` inserta
   `ToolbarItem(.principal)` con `SidebarSectionsSelector`, un `Picker(.segmented)` con los 7 iconos
   de `AppSection`, dentro de una cápsula Liquid Glass propia (macOS 26+; `ultraThinMaterial` en
-  versiones anteriores) y con el fondo compartido del toolbar oculto. El item se desplaza dentro
-  del área principal para quedar centrado en el hueco entre el título y el grupo trailing, y se
-  elimina por completo al expandir la sidebar, así que no queda reborde. El grupo trailing no se
-  toca y conserva sus posiciones. La selección usa el mismo binding y la misma transacción.
+  versiones anteriores) y con el fondo compartido del toolbar oculto. El item reserva 138 pt de
+  padding transparente a su derecha (2 × 69) para que el selector de 298 pt quede 69 pt a la
+  izquierda del centro principal, centrado en el hueco entre el título y el grupo trailing. Se usa
+  padding de layout, no `.offset`: el offset solo mueve el dibujo y deja fuera del frame del item
+  los 69 pt de la izquierda (el segmento Networking no recibía clics). El item se elimina por
+  completo al expandir la sidebar, así que no queda reborde. El grupo trailing no se toca y
+  conserva sus posiciones. La selección usa el mismo binding y la misma transacción.
 - Gráficos temporales: todos usan un paso X fijo por slot (`ancho / (ventana - 1)`) con la muestra
   más reciente a la izquierda y la ventana completa de 60 muestras (120 en Traffic y Disk); así el
   contenido crece por slots en vez de estirarse con 2-3 muestras. Battery conserva su eje de 12 h
@@ -530,20 +533,53 @@
   - Se cuentan hidden y packages, pero no se desciende por symlinks ni por puntos de montaje
     (salvo opción). Los errores `EACCES`/`EPERM` se registran como rutas denegadas.
   - Top-N de mayores archivos por inserción ordenada; progreso cada 100 ms; cancelación cooperativa.
+  - Además del Top-N global, se retienen hasta `maxFilesRetainedPerDirectory` (200) ficheros
+    directos por directorio para la tabla Contents, con inserción ordenada y un presupuesto global
+    `maxRetainedFiles` (100 000) de tipo first-come: cuando se agota, los directorios posteriores
+    no retienen ficheros (un directorio ya en su tope aún puede sustituir su entrada menor). Los
+    ficheros no entran nunca en `children`; el mapa sigue viendo solo directorios. El total exacto
+    de ficheros directos se deriva con `directFileCount` (fileCount menos la suma de los hijos).
   - Snapshots parciales opcionales cada 400 ms (`partial:` en `DiskScanner.scan`): recorren la
     cadena abierta de la pila y reutilizan `closeFrame` para plegar/ordenar, sin mutar la pila
-    real. Los frames en `pending` aún no visitados se omiten. Llevan `isPartial: true`.
+    real. Los frames en `pending` aún no visitados se omiten. Llevan `isPartial: true` y un
+    `filesByDirectory` vacío (el panel derecho solo se monta con el snapshot final y así se evita
+    una copia CoW del diccionario en cada emisión).
 - **Estado y UI (`DiskModel`)**
   - `@MainActor @Observable`, inyectado en `KancerberoApp`. Conserva el inventario, la selección, el
-    estado del escaneo, el snapshot final, el `liveSnapshot` parcial, el nodo actual y las rutas
-    denegadas. `activeSnapshot` prefiere el final y cae al vivo mientras se escanea.
+    estado del escaneo, el snapshot final, el `liveSnapshot` parcial, el nodo actual, la selección
+    compartida del Analyzer (`selectedNodeID`) y las rutas denegadas. `activeSnapshot` prefiere el
+    final y cae al vivo mientras se escanea. `showHidden` arranca en `true`; el mapa y las tablas
+    filtran con él y `startScan` lo copia a `options.includeHiddenInLargestFiles`, de modo que los
+    ficheros ocultos entran en Largest files solo desde ese escaneo. `selectedNodeID` puede ser la
+    ruta de un nodo, de un fichero retenido en Contents (`filesByDirectory`) o de una fila de
+    `largestFiles`, y se conserva al cerrar un escaneo si el fichero sigue retenido o en esa lista.
+  - `selectNode(_:)` reemplaza la selección normal para rutas de directorio. Para un fichero de
+    Contents cuyo padre ya es el foco solo cambia la selección (sin navegar); para un fichero de
+    otra carpeta o de `largestFiles`, `nearestNode` resuelve el ancestro que existe en el árbol,
+    `focus(on:)` navega y después se restaura la ruta del fichero (la navegación normal sigue
+    limpiándola). `file(at:)` resuelve la ruta con un lookup por carpeta padre, sin recorrer el
+    árbol. Si el padre real del fichero no es el nodo enfocado (p. ej. quedó plegado en “Other”),
+    no se dibuja el sector sintético para no contar sus bytes dos veces.
   - `DiskAnalyzerView` actualiza tarjetas y mapa con `activeSnapshot`; las tablas del panel derecho
     solo se montan con el snapshot final. Mientras tanto se muestra un panel de espera del mismo
-    ancho para evitar saltos de layout.
+    ancho para evitar saltos de layout. `Contents` combina las filas de `node.children` con las de
+    `snapshot.files(in: node.path)` convertidas con `KBDiskNode(displayFile:)`; la cabecera
+    indica “top N of M files” cuando la retención está truncada. El reparto de altura entre
+    Contents y Largest files vive en
+    `UIState.DiskUIState.analyzerLargestFilesHeight` (solo sesión) y se acota con
+    `DiskAnalyzerSplit`; el divisor horizontal no existe con el foco Folders ni en Denied.
   - `RadialDiskMap` dibuja un sunburst con `Canvas`: anillos = profundidad, ángulo = tamaño
     asignado; hit-test por radio/ángulo. Las etiquetas muestran nombre y tamaño humano en dos
-    líneas. El centro muestra el nodo actual y el porcentaje del volumen; pulsarlo sube un
-    nivel. Respeta Reduce Motion.
+    líneas. El centro muestra el nodo actual y el porcentaje del volumen; un clic selecciona el
+    sector y su fila (el mapa resalta el sector exacto y la tabla su ancestro de primer nivel) y el
+    fondo/centro/sectores sintéticos limpian la selección, que también se limpia al navegar y al
+    iniciar un escaneo; doble clic en un sector baja a ese directorio y doble clic en el centro
+    sube un nivel. Un fichero seleccionado en Contents o Largest files se dibuja como sector
+    sintético
+    (`node.isDirectory == false`) recortado del residual “Other”/“Not scanned”, solo si su padre
+    directo es el foco. El sector seleccionado se dibuja el último, por encima de los anillos
+    hijos, y crece hacia fuera `min(10, canvasRadius - outerRadius - 3)` pt además del halo; el
+    hit-test lo comprueba primero con ese radio expandido. Respeta Reduce Motion.
 - **Actividad de E/S (`DiskIOView`)**
   - Host: `kb_disk_io_read` recorre `IOBlockStorageDriver` y suma su `Statistics` (`Bytes
     (Read/Write)`, `Operations (Read/Write)`); `DiskIOReader` y `AppModel` derivan tasas por

@@ -12,6 +12,12 @@ public struct KBDiskScanOptions: Sendable, Hashable {
     public var maxNodes: Int
     public var largestFilesLimit: Int
     public var includeHiddenInLargestFiles: Bool
+    /// Retain a bounded per-directory file list for the Contents table.
+    public var retainDirectoryFiles: Bool
+    /// Files retained per directory, largest by allocated size.
+    public var maxFilesRetainedPerDirectory: Int
+    /// Global cap on retained file rows across the whole scan.
+    public var maxRetainedFiles: Int
 
     public init(descendPackages: Bool = true,
                 crossMountPoints: Bool = false,
@@ -19,7 +25,10 @@ public struct KBDiskScanOptions: Sendable, Hashable {
                 maxChildrenRetained: Int = 200,
                 maxNodes: Int = 150_000,
                 largestFilesLimit: Int = 100,
-                includeHiddenInLargestFiles: Bool = false) {
+                includeHiddenInLargestFiles: Bool = false,
+                retainDirectoryFiles: Bool = true,
+                maxFilesRetainedPerDirectory: Int = 200,
+                maxRetainedFiles: Int = 100_000) {
         self.descendPackages = descendPackages
         self.crossMountPoints = crossMountPoints
         self.maxDepth = maxDepth
@@ -27,6 +36,9 @@ public struct KBDiskScanOptions: Sendable, Hashable {
         self.maxNodes = maxNodes
         self.largestFilesLimit = largestFilesLimit
         self.includeHiddenInLargestFiles = includeHiddenInLargestFiles
+        self.retainDirectoryFiles = retainDirectoryFiles
+        self.maxFilesRetainedPerDirectory = maxFilesRetainedPerDirectory
+        self.maxRetainedFiles = maxRetainedFiles
     }
 }
 
@@ -103,6 +115,36 @@ public struct KBDiskNode: Sendable, Identifiable {
         }
         return []
     }
+
+    /// Files directly inside this directory (not in child directories).
+    /// Files are never `children`, so `fileCount` minus child subtrees is exact
+    /// even when directories were folded into an aggregate or truncated.
+    public var directFileCount: Int {
+        let nested = children.reduce(0) { $0 + $1.fileCount }
+        return max(0, fileCount - nested)
+    }
+}
+
+extension KBDiskNode {
+    /// A display-only node for a file row or wedge. Never inserted into the
+    /// tree: files are not tree nodes and the scanner only attaches directories.
+    public init(displayFile file: KBDiskFile) {
+        self.init(name: file.name,
+                  path: file.path,
+                  isDirectory: false,
+                  isPackage: false,
+                  isHidden: file.isHidden,
+                  isMountPoint: false,
+                  accessDenied: false,
+                  isAggregate: false,
+                  allocatedBytes: file.allocatedBytes,
+                  logicalBytes: file.logicalBytes,
+                  fileCount: 1,
+                  folderCount: 0,
+                  children: [],
+                  aggregatedChildren: 0,
+                  truncated: false)
+    }
 }
 
 public struct KBDiskFile: Sendable, Identifiable, Hashable {
@@ -157,6 +199,12 @@ public struct KBDiskScanSnapshot: Sendable {
     public let error: String?
     /// True for the intermediate snapshots emitted while a scan is running.
     public let isPartial: Bool
+    /// Files retained per scanned directory, keyed by the directory's exact
+    /// path and sorted by descending allocated size. Empty on partial
+    /// snapshots: the right panel only mounts for the final snapshot, and
+    /// sharing a growing dictionary with the main actor would force a CoW
+    /// copy on every later insertion.
+    public let filesByDirectory: [String: [KBDiskFile]]
 
     public init(root: KBDiskNode,
                 largestFiles: [KBDiskFile],
@@ -166,7 +214,8 @@ public struct KBDiskScanSnapshot: Sendable {
                 duration: TimeInterval,
                 cancelled: Bool,
                 error: String?,
-                isPartial: Bool = false) {
+                isPartial: Bool = false,
+                filesByDirectory: [String: [KBDiskFile]] = [:]) {
         self.root = root
         self.largestFiles = largestFiles
         self.deniedPaths = deniedPaths
@@ -176,6 +225,20 @@ public struct KBDiskScanSnapshot: Sendable {
         self.cancelled = cancelled
         self.error = error
         self.isPartial = isPartial
+        self.filesByDirectory = filesByDirectory
+    }
+
+    /// Direct files retained for `directory` (empty when the cap was reached
+    /// before that directory was scanned or retention is disabled).
+    public func files(in directory: String) -> [KBDiskFile] {
+        filesByDirectory[directory] ?? []
+    }
+
+    /// Lookup by full path: one dictionary lookup by the parent path plus a
+    /// scan bounded by the per-directory cap, independent of tree size.
+    public func file(at path: String) -> KBDiskFile? {
+        let parent = (path as NSString).deletingLastPathComponent
+        return filesByDirectory[parent]?.first { $0.path == path }
     }
 }
 

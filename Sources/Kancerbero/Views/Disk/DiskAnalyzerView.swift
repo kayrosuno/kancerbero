@@ -15,6 +15,14 @@ struct DiskAnalyzerView: View {
         )
     }
 
+    /// Selection shared by the radial map and both right-hand tables.
+    private var selection: Binding<String?> {
+        Binding(
+            get: { disk.selectedNodeID },
+            set: { disk.selectNode($0) }
+        )
+    }
+
     private var hiddenBinding: Binding<Bool> {
         Binding(get: { disk.showHidden }, set: { disk.showHidden = $0 })
     }
@@ -207,7 +215,13 @@ struct DiskAnalyzerView: View {
                     volumeCapacity: volumeCapacity(for: snapshot),
                     showHidden: disk.showHidden,
                     showPackageContents: disk.showPackageContents,
+                    selectedPath: disk.selectedNodeID,
+                    selectedFile: disk.selectedNodeID.flatMap { selected in
+                        snapshot.file(at: selected)
+                            ?? snapshot.largestFiles.first { $0.path == selected }
+                    },
                     onSelect: { disk.drillDown(to: $0) },
+                    onPick: { disk.selectNode($0?.path) },
                     onCenterTap: {
                         guard let node = disk.currentNode,
                               node.id != snapshot.root.id else { return }
@@ -252,7 +266,7 @@ struct DiskAnalyzerView: View {
                                 .foregroundStyle(.tertiary)
                         }
                         Button {
-                            disk.currentNodeID = node.path
+                            disk.focus(on: node)
                         } label: {
                             Text(node.name)
                                 .font(.system(size: 11,
@@ -304,27 +318,57 @@ struct DiskAnalyzerView: View {
         }
     }
 
+    @ViewBuilder
     private func rightPanel(_ snapshot: KBDiskScanSnapshot) -> some View {
-        VStack(spacing: 12) {
-            if ui.disk.analyzerFocus == .denied {
-                DeniedPathsList(paths: disk.deniedPaths)
-                    .frame(maxHeight: .infinity)
+        if ui.disk.analyzerFocus == .denied {
+            DeniedPathsList(paths: disk.deniedPaths)
+                .frame(maxHeight: .infinity)
+        } else if let node = disk.currentNode {
+            if ui.disk.analyzerFocus == .folders {
+                DiskChildrenTable(
+                    node: node,
+                    showHidden: disk.showHidden,
+                    showPackageContents: disk.showPackageContents,
+                    filter: ui.disk.analyzerFocus,
+                    selection: selection,
+                    onSelect: { disk.drillDown(to: $0) },
+                    files: snapshot.files(in: node.path)
+                )
+                .frame(maxHeight: .infinity)
             } else {
-                if let node = disk.currentNode {
-                    DiskChildrenTable(
-                        node: node,
-                        showHidden: disk.showHidden,
-                        showPackageContents: disk.showPackageContents,
-                        filter: ui.disk.analyzerFocus,
-                        onSelect: { disk.drillDown(to: $0) }
-                    )
-                    .frame(maxHeight: .infinity)
-                }
+                GeometryReader { proxy in
+                    let available = max(0, proxy.size.height
+                                           - DiskAnalyzerSplit.dividerHeight)
+                    let largest = DiskAnalyzerSplit.clampedLargestHeight(
+                        ui.disk.analyzerLargestFilesHeight,
+                        availableHeight: available)
+                    let children = max(0, available - largest)
 
-                if ui.disk.analyzerFocus != .folders {
-                    DiskLargestFilesTable(files: snapshot.largestFiles)
-                        .frame(height: 190)
+                    VStack(spacing: 0) {
+                        DiskChildrenTable(
+                            node: node,
+                            showHidden: disk.showHidden,
+                            showPackageContents: disk.showPackageContents,
+                            filter: ui.disk.analyzerFocus,
+                            selection: selection,
+                            onSelect: { disk.drillDown(to: $0) },
+                            files: snapshot.files(in: node.path)
+                        )
+                        .frame(height: children)
+
+                        DiskAnalyzerDivider(
+                            availableHeight: available,
+                            currentHeight: largest,
+                            onResize: { ui.disk.analyzerLargestFilesHeight = $0 }
+                        )
+                        .frame(height: DiskAnalyzerSplit.dividerHeight)
+
+                        DiskLargestFilesTable(files: snapshot.largestFiles,
+                                              selection: selection)
+                            .frame(height: largest)
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
@@ -488,5 +532,65 @@ private struct DeniedPathsList: View {
             RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
                 .strokeBorder(.quaternary.opacity(0.5), lineWidth: 1)
         }
+    }
+}
+
+/// Horizontal divider between the Analyzer's Contents and Largest files cards.
+/// Modeled on `VolumePanelDivider` in DiskVolumesView.
+private struct DiskAnalyzerDivider: View {
+    let availableHeight: CGFloat
+    let currentHeight: CGFloat
+    let onResize: (CGFloat) -> Void
+
+    @State private var startHeight: CGFloat?
+    @State private var hovering = false
+
+    var body: some View {
+        ZStack {
+            Color.clear
+            Rectangle()
+                .fill(hovering
+                      ? Color.accentColor.opacity(0.8)
+                      : Color.primary.opacity(0.18))
+                .frame(height: 1)
+            Capsule()
+                .fill(hovering
+                      ? Color.accentColor.opacity(0.9)
+                      : Color.primary.opacity(0.22))
+                .frame(width: 36, height: 3)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                .onChanged { value in
+                    let base = startHeight ?? currentHeight
+                    if startHeight == nil {
+                        startHeight = currentHeight
+                    }
+                    // Largest files sits below the divider: dragging down shrinks it.
+                    let candidate = base - value.translation.height
+                    let next = DiskAnalyzerSplit.clampedLargestHeight(
+                        candidate, availableHeight: availableHeight)
+                    if next != currentHeight {
+                        onResize(next)
+                    }
+                }
+                .onEnded { _ in
+                    startHeight = nil
+                }
+        )
+        .onHover { inside in
+            hovering = inside
+            (inside ? NSCursor.resizeUpDown : NSCursor.arrow).set()
+        }
+        .onDisappear {
+            NSCursor.arrow.set()
+        }
+        .help("Drag to resize the Analyzer tables")
+        .accessibilityLabel("Resize Analyzer tables")
+        .accessibilityHint("Drag up or down")
+        .accessibilityValue(
+            "\(Int((currentHeight / max(availableHeight, 1) * 100).rounded())) percent")
     }
 }

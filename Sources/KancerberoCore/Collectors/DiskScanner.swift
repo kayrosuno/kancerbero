@@ -38,6 +38,8 @@ public enum DiskScanner {
         var listed: Bool = false
         var children: [KBDiskNode] = []
         var pending: [Frame] = []
+        /// Direct files retained for the Contents table, largest first.
+        var files: [KBDiskFile] = []
     }
 
     private struct LargestFiles {
@@ -46,18 +48,31 @@ public enum DiskScanner {
         private(set) var items: [KBDiskFile] = []
 
         mutating func consider(_ file: KBDiskFile) {
-            guard limit > 0 else { return }
             guard includeHidden || !file.isHidden else { return }
-            if items.count >= limit {
-                guard let last = items.last,
-                      file.allocatedBytes > last.allocatedBytes else { return }
-                items.removeLast()
-            }
-            let index = items.firstIndex {
-                $0.allocatedBytes < file.allocatedBytes
-            } ?? items.endIndex
-            items.insert(file, at: index)
+            DiskScanner.insertRanked(file, into: &items, limit: limit)
         }
+    }
+
+    /// Sorted descending insertion with a hard cap. Returns true when a new
+    /// slot was allocated (the array grew); a replacement returns false.
+    @discardableResult
+    private static func insertRanked(_ file: KBDiskFile,
+                                     into items: inout [KBDiskFile],
+                                     limit: Int) -> Bool {
+        guard limit > 0 else { return false }
+        if items.count >= limit {
+            guard let last = items.last,
+                  file.allocatedBytes > last.allocatedBytes else { return false }
+            items.removeLast()
+            let index = items.firstIndex { $0.allocatedBytes < file.allocatedBytes }
+                ?? items.endIndex
+            items.insert(file, at: index)
+            return false
+        }
+        let index = items.firstIndex { $0.allocatedBytes < file.allocatedBytes }
+            ?? items.endIndex
+        items.insert(file, at: index)
+        return true
     }
 
     public static func scan(
@@ -86,6 +101,8 @@ public enum DiskScanner {
         var largestFiles = LargestFiles(
             limit: options.largestFilesLimit,
             includeHidden: options.includeHiddenInLargestFiles)
+        var filesByDirectory: [String: [KBDiskFile]] = [:]
+        var retainedFiles = 0
         var deniedPaths: [String] = []
         var scannedFiles = 0
         var scannedFolders = 0
@@ -351,13 +368,35 @@ public enum DiskScanner {
                         stack[currentIndex].fileCount += 1
                         stack[currentIndex].allocated &+= entry.alloc_size
                         stack[currentIndex].logical &+= entry.total_size
-                        largestFiles.consider(KBDiskFile(
+                        let file = KBDiskFile(
                             name: name,
                             path: childPath,
                             allocatedBytes: entry.alloc_size,
                             logicalBytes: entry.total_size,
                             isHidden: hidden
-                        ))
+                        )
+
+                        if options.retainDirectoryFiles {
+                            // First-come global pool. A directory already at
+                            // its local cap may still replace its smallest
+                            // entry; directories reached after the pool is
+                            // exhausted retain nothing.
+                            let atLocalCap =
+                                options.maxFilesRetainedPerDirectory > 0
+                                && stack[currentIndex].files.count
+                                    >= options.maxFilesRetainedPerDirectory
+                            if retainedFiles < options.maxRetainedFiles || atLocalCap {
+                                if Self.insertRanked(
+                                    file,
+                                    into: &stack[currentIndex].files,
+                                    limit: options.maxFilesRetainedPerDirectory
+                                ) {
+                                    retainedFiles += 1
+                                }
+                            }
+                        }
+
+                        largestFiles.consider(file)
                     }
 
                     reportProgress(path: frame.path)
@@ -383,6 +422,9 @@ public enum DiskScanner {
 
             // The directory and all its children are complete: close it.
             let frame = stack.removeLast()
+            if !frame.files.isEmpty {
+                filesByDirectory[frame.path] = frame.files
+            }
             let node = closeFrame(frame)
             if let parentIndex = stack.indices.last {
                 attach(node, to: parentIndex)
@@ -404,7 +446,8 @@ public enum DiskScanner {
                     generatedAt: Date(),
                     duration: Date().timeIntervalSince(startedAt),
                     cancelled: cancelled,
-                    error: scanError
+                    error: scanError,
+                    filesByDirectory: filesByDirectory
                 )
             }
         }
@@ -412,6 +455,9 @@ public enum DiskScanner {
         // Cancelled or stopped: close any open frames bottom-up.
         var rootNode: KBDiskNode?
         while let frame = stack.popLast() {
+            if !frame.files.isEmpty {
+                filesByDirectory[frame.path] = frame.files
+            }
             let node = closeFrame(frame)
             if let parentIndex = stack.indices.last {
                 attach(node, to: parentIndex)
@@ -456,7 +502,8 @@ public enum DiskScanner {
             generatedAt: Date(),
             duration: Date().timeIntervalSince(startedAt),
             cancelled: cancelled,
-            error: scanError
+            error: scanError,
+            filesByDirectory: filesByDirectory
         )
     }
 

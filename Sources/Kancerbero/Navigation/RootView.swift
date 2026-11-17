@@ -103,6 +103,24 @@ struct RootView: View {
         columnVisibility == .detailOnly ? Self.contentMinWidth : Self.windowMinWidth
     }
 
+    /// Visual shift of the collapsed-sidebar selector from the principal
+    /// item's center. It is reserved as layout padding, never `.offset`: the
+    /// toolbar centers the item's frame, while `.offset` only moves the
+    /// drawing and left the first 69 pt of the control outside the item's hit
+    /// region (the Networking segment could not be clicked).
+    private static let sectionSelectorShift: CGFloat = 69
+
+    /// Principal toolbar content while the sidebar is collapsed. Reserving
+    /// twice the shift as trailing padding makes the toolbar center a 436 pt
+    /// item; the 298 pt selector sits at its leading edge, so its visible
+    /// center lands `shift` points left of the principal center — where the
+    /// offset used to draw it — but every segment stays clickable.
+    private var sectionSelectorItem: some View {
+        SidebarSectionsSelector(currentSection: currentSection,
+                                onSelect: selectSection)
+            .padding(.trailing, 2 * Self.sectionSelectorShift)
+    }
+
     private var appearanceMode: KBAppearanceMode {
         KBAppearanceMode(rawValue: appearanceRaw) ?? .system
     }
@@ -162,16 +180,12 @@ struct RootView: View {
             if columnVisibility == .detailOnly {
                 if #available(macOS 26.0, *) {
                     ToolbarItem(id: "sidebarSections", placement: .principal) {
-                        SidebarSectionsSelector(currentSection: currentSection,
-                                                onSelect: selectSection)
-                            .offset(x: -69)
+                        sectionSelectorItem
                     }
                     .sharedBackgroundVisibility(.hidden)
                 } else {
                     ToolbarItem(id: "sidebarSections", placement: .principal) {
-                        SidebarSectionsSelector(currentSection: currentSection,
-                                                onSelect: selectSection)
-                            .offset(x: -69)
+                        sectionSelectorItem
                     }
                 }
             }

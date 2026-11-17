@@ -133,9 +133,12 @@ final class DiskModel {
     var scanSnapshot: KBDiskScanSnapshot?
     var liveSnapshot: KBDiskScanSnapshot?
     var currentNodeID: String?
+    /// Shared Analyzer selection (map, contents and largest files tables).
+    /// Stored as a path: either a tree node or a `largestFiles` row.
+    var selectedNodeID: String?
     var deniedPaths: [String] = []
 
-    var showHidden = false
+    var showHidden = true
     var showPackageContents = false
     var autoScan = false
 
@@ -268,6 +271,7 @@ final class DiskModel {
         scanSnapshot = nil
         liveSnapshot = nil
         currentNodeID = nil
+        selectedNodeID = nil
         deniedPaths = []
 
         var options = scanOptions
@@ -308,6 +312,12 @@ final class DiskModel {
                 self.liveSnapshot = nil
                 self.scanProgress = nil
                 self.currentNodeID = resolvedID
+                if let selected = self.selectedNodeID,
+                   snapshot.root.node(at: selected) == nil,
+                   snapshot.file(at: selected) == nil,
+                   !snapshot.largestFiles.contains(where: { $0.path == selected }) {
+                    self.selectedNodeID = nil
+                }
                 self.deniedPaths = snapshot.deniedPaths
                 if let error = snapshot.error {
                     self.scanState = .failed(error)
@@ -337,17 +347,67 @@ final class DiskModel {
         if node.isPackage && !showPackageContents { return }
         guard let snapshot = activeSnapshot,
               snapshot.root.node(at: node.path) != nil else { return }
-        currentNodeID = node.path
+        focus(on: node)
     }
 
     func drillUp() {
         guard let snapshot = activeSnapshot, let node = currentNode else { return }
         let lineage = snapshot.root.lineage(to: node.path)
         if lineage.count >= 2 {
-            currentNodeID = lineage[lineage.count - 2].path
+            focus(on: lineage[lineage.count - 2])
         } else {
-            currentNodeID = snapshot.root.path
+            focus(on: snapshot.root)
         }
+    }
+
+    /// Single navigation entry point so the shared selection always clears
+    /// when the focus changes.
+    func focus(on node: KBDiskNode) {
+        guard let snapshot = activeSnapshot,
+              snapshot.root.node(at: node.path) != nil else { return }
+        if currentNodeID != node.path {
+            selectedNodeID = nil
+        }
+        currentNodeID = node.path
+    }
+
+    /// Shared Analyzer selection. `nil` clears it. Directory paths replace the
+    /// selection normally. A retained Contents file or a `largestFiles` row is
+    /// not a tree node: if its direct parent is already the focus, only the
+    /// selection changes (so the map draws the synthetic wedge); otherwise
+    /// navigate to the nearest visible ancestor and keep the file path. The
+    /// current focus (the center) clears it.
+    func selectNode(_ path: String?) {
+        guard let path, let snapshot = activeSnapshot else {
+            selectedNodeID = nil
+            return
+        }
+
+        if let node = snapshot.root.node(at: path) {
+            selectedNodeID = node.path == currentNode?.path ? nil : path
+            return
+        }
+
+        let parentPath = (path as NSString).deletingLastPathComponent
+        let focusPath = currentNodeID ?? snapshot.root.path
+        if parentPath == focusPath, snapshot.file(at: path) != nil {
+            // No navigation: Contents only lists direct children of the focus.
+            selectedNodeID = path
+            return
+        }
+
+        guard snapshot.file(at: path) != nil
+                || snapshot.largestFiles.contains(where: { $0.path == path }),
+              let directory = Self.nearestNode(to: path, in: snapshot.root) else {
+            selectedNodeID = nil
+            return
+        }
+
+        // `focus(on:)` clears the selection when it actually moves the focus,
+        // so navigate first and restore the file path afterwards. Keeping the
+        // clear inside `focus(on:)` preserves normal navigation semantics.
+        focus(on: directory)
+        selectedNodeID = path
     }
 
     func volume(for path: String) -> KBDiskItem? {

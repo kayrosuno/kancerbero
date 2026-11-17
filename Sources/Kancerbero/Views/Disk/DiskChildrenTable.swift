@@ -7,23 +7,43 @@ struct DiskChildrenTable: View {
     let showHidden: Bool
     let showPackageContents: Bool
     var filter: DiskAnalyzerFocus? = nil
+    /// Shared Analyzer selection (exact node path).
+    @Binding var selection: String?
     let onSelect: (KBDiskNode) -> Void
+    /// Direct files retained for this directory by the scan, largest first.
+    var files: [KBDiskFile] = []
 
-    @State private var selection: String?
     @Environment(\.byteUnitSystem) private var byteUnitSystem
 
-    private var rows: [KBDiskNode] {
-        node.children
+    private var directoryRows: [KBDiskNode] {
+        guard filter != .files else { return [] }
+        return node.children
             .filter { showHidden || !$0.isHidden }
             .filter { showPackageContents || !$0.isPackage || $0.allocatedBytes > 0 }
-            .filter { child in
-                switch filter {
-                case .files: return !child.isDirectory
-                case .folders: return child.isDirectory
-                default: return true
-                }
+    }
+
+    private var fileRows: [KBDiskNode] {
+        guard filter != .folders else { return [] }
+        return files
+            .filter { showHidden || !$0.isHidden }
+            .map(KBDiskNode.init(displayFile:))
+    }
+
+    private var rows: [KBDiskNode] {
+        (directoryRows + fileRows).sorted {
+            if $0.allocatedBytes != $1.allocatedBytes {
+                return $0.allocatedBytes > $1.allocatedBytes
             }
-            .sorted { $0.allocatedBytes > $1.allocatedBytes }
+            // Deterministic tie-break: Swift's sort is not stable.
+            return $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        }
+    }
+
+    private var headerText: String {
+        let total = node.directFileCount
+        guard files.count < total else { return "\(rows.count) items" }
+        let retained = "top \(files.count) of \(KBFormat.compactCount(total)) files"
+        return filter == .files ? retained : "\(rows.count) items · \(retained)"
     }
 
     var body: some View {
@@ -32,7 +52,7 @@ struct DiskChildrenTable: View {
                 Text("Contents")
                     .font(.system(size: 11, weight: .semibold))
                 Spacer()
-                Text("\(rows.count) items")
+                Text(headerText)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
@@ -43,14 +63,23 @@ struct DiskChildrenTable: View {
             Divider().opacity(0.5)
 
             if rows.isEmpty {
-                ContentUnavailableView(
-                    "Nothing to show",
-                    systemImage: "folder",
-                    description: Text("This folder is empty or its contents are hidden.")
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if filter == .files, node.directFileCount > 0 {
+                    ContentUnavailableView(
+                        "No file list",
+                        systemImage: "doc",
+                        description: Text("The scan did not retain the files of this folder.")
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ContentUnavailableView(
+                        "Nothing to show",
+                        systemImage: "folder",
+                        description: Text("This folder is empty or its contents are hidden.")
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             } else {
-                Table(rows, selection: $selection) {
+                Table(rows, selection: tableSelection(rows: rows)) {
                     TableColumn("Name") { child in
                         HStack(spacing: 6) {
                             Image(systemName: icon(for: child))
@@ -60,6 +89,7 @@ struct DiskChildrenTable: View {
                             Text(child.name)
                                 .lineLimit(1)
                                 .onTapGesture(count: 2) {
+                                    guard child.isDirectory else { return }
                                     onSelect(child)
                                 }
                             if child.isAggregate {
@@ -98,11 +128,17 @@ struct DiskChildrenTable: View {
                     .width(min: 44, ideal: 54)
 
                     TableColumn("Items") { child in
-                        Text("\(child.folderCount)/\(child.fileCount)")
-                            .font(.system(size: 10))
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                            .help("\(child.folderCount) folders, \(child.fileCount) files")
+                        if child.isDirectory {
+                            Text("\(child.folderCount)/\(child.fileCount)")
+                                .font(.system(size: 10))
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                                .help("\(child.folderCount) folders, \(child.fileCount) files")
+                        } else {
+                            Text("—")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     .width(min: 38, ideal: 46)
 
@@ -125,6 +161,40 @@ struct DiskChildrenTable: View {
             RoundedRectangle(cornerRadius: KBTheme.cardRadius, style: .continuous)
                 .strokeBorder(.quaternary.opacity(0.5), lineWidth: 1)
         }
+    }
+
+    /// The row that represents the selected path: the node itself when it is a
+    /// direct child, or its first-level ancestor under the current focus. The
+    /// map still highlights the exact nested sector.
+    private func ancestorRow(for path: String, rows: [KBDiskNode]) -> KBDiskNode? {
+        guard path != node.path else { return nil }
+        return rows.first { row in
+            path == row.path || path.hasPrefix(row.path + "/")
+        }
+    }
+
+    private func tableSelection(rows: [KBDiskNode]) -> Binding<String?> {
+        Binding(
+            get: {
+                guard let selection,
+                      let row = ancestorRow(for: selection, rows: rows) else { return nil }
+                return row.path
+            },
+            set: { newValue in
+                let mapped = selection.flatMap {
+                    ancestorRow(for: $0, rows: rows)?.path
+                }
+                // Table echoes the value it is showing; ignore it so a nested
+                // selection is not collapsed to its ancestor row.
+                if newValue == mapped { return }
+                if let newValue {
+                    selection = newValue
+                } else if let current = selection,
+                          rows.contains(where: { $0.path == current }) {
+                    selection = nil
+                }
+            }
+        )
     }
 
     private func parentPercent(_ child: KBDiskNode) -> String {
