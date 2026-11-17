@@ -58,6 +58,7 @@ struct ProcessInspectorWindowView: View {
     /// restricted process never listed there must not show a false "ended".
     @State private var sawLiveProcess = false
     @State private var ended = false
+    @State private var killConfirmation: ProcessKillConfirmation?
 
     private var unitSystem: KBByteUnitSystem {
         KBByteUnitSystem.fromCommandLine()
@@ -146,6 +147,7 @@ struct ProcessInspectorWindowView: View {
         .frame(minWidth: 820, minHeight: 520)
         .navigationTitle(displayProcess?.name ?? "Process \(pid)")
         .navigationSubtitle(Text(verbatim: "PID \(pid)"))
+        .processKillConfirmation($killConfirmation)
         .task(id: key) {
             await refreshLoop()
         }
@@ -221,6 +223,15 @@ struct ProcessInspectorWindowView: View {
                                tint: headerTint) {
                         Task { await refresh() }
                     }
+                    let killAvailability = model.killAvailability(for: process)
+                    iconButton("xmark.octagon",
+                               help: killAvailability.reason ?? "Kill Process…",
+                               tint: .red) {
+                        killConfirmation = ProcessKillConfirmation(
+                            process: process,
+                            requiresAdministrator: killAvailability.status == .needsAdministrator)
+                    }
+                    .disabled(!killAvailability.isEnabled || ended)
                     iconButton("xmark", help: "Close", tint: headerTint) {
                         close()
                     }

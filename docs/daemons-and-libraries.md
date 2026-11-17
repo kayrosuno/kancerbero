@@ -202,12 +202,14 @@ Tipos de `request`:
 | `processDetail` | `KBProcessDetail` (proceso, sockets, ficheros abiertos) | `pid > 0`; mismo uid salvo root |
 | `daemonServices` | `KBDaemonSnapshotPayload` del dominio `system` | Ninguna adicional |
 | `daemonAction` | `KBDaemonActionResultPayload` con el resultado y el snapshot posterior | Solo dominio `system`, `canControl` y límite de 10 acciones/minuto |
+| `processSignal` | `KBProcessSignalResponsePayload` con `KBProcessSignalResult` (ok, código, mensaje) | `canSignal`; identidad `pid + startTimeUS + uid`; `SIGTERM`/`SIGKILL` solo; otro uid/root exige external form de `system.privilege.admin`; política y límites de «Terminar procesos (kill)» |
 
 La colección la hace `CollectionActor.refresh()`: procesos (libproc), sockets y ficheros por PID,
 interfaces (IFMIB), tráfico por proceso (NetworkStatistics), CPU/memoria (`host_processor_info`,
 `host_statistics64`, `getloadavg`), inventario launchd y disco. El daemon no lee contenido de
 ficheros ni ejecuta comandos arbitrarios; las acciones son operaciones concretas de
-`/bin/launchctl` con dominio explícito y sin shell.
+`/bin/launchctl` con dominio explícito y sin shell, y las señales solo llegan a un `pid`
+revalidado con `proc_pidinfo` (nunca a grupos ni PIDs negativos).
 
 Uso desde la app:
 
@@ -243,11 +245,12 @@ registrar desde la app (afecta a todos los ítems de Login Items del sistema).
 - Las tasas por intervalo se validan con `RateTiming`: el hueco entre muestras debe cumplir
   `elapsed <= max(5 s, 2,5 × cadencia)`. Así 5 s (selector) y hasta 10 s (suscripción) producen
   tasas reales; solo un hueco mayor (pausa, desconexión) se descarta y reporta 0 en esa muestra.
-- Las acciones están limitadas a **10 por minuto y cliente**; no hay todavía guardia de una
-  acción en vuelo, límite de 4 clientes ni payload máximo de 32 MB (figuran como pendientes en
-  `docs/security.md`).
+- Las acciones y las señales están limitadas a **10 por minuto y cliente**; `processSignal`
+  además permite una sola petición en vuelo. No hay todavía límite de 4 clientes ni payload
+  máximo de 32 MB (figuran como pendientes en `docs/security.md`).
 - Las acciones de `gui`/`user` no pasan por el daemon: las ejecuta la app en local. Sin daemon,
-  el dominio `system` es de solo lectura.
+  el dominio `system` es de solo lectura. El kill del mismo uid también funciona sin daemon; si
+  falta `KBCapabilities.kill`, la app deshabilita solo la ruta privilegiada.
 - `restart` se implementa como `kill SIGTERM` + `kickstart`, no con `launchctl kickstart -k`,
   porque `-k` se queda esperando con servicios de larga duración en macOS 27.
 
@@ -572,10 +575,10 @@ consumidor.
 | Directorio | Archivos | Responsabilidad |
 |---|---|---|
 | `Models/` | `KBModels.swift`, `KBDaemonModels.swift`, `KBDiskModels.swift`, `KBHostMetrics.swift` | Procesos, sockets, interfaces, snapshots, daemons, disco, CPU/memoria y tasas |
-| `Wire/` | `KBWire.swift`, `KancerberoXPC.swift` | `KBWireEnvelope`, `KBHello*`, `KBSubscription`, `KBRequestMessage`, codec binario y protocolos `KancerberoDaemonXPC`/`KancerberoClientXPC` |
+| `Wire/` | `KBWire.swift`, `KancerberoXPC.swift` | `KBWireEnvelope`, `KBHello*`, `KBSubscription`, `KBRequestMessage` (incluye `processSignal` y el external form), codec binario y protocolos `KancerberoDaemonXPC`/`KancerberoClientXPC` |
 | `Collectors/` | `CollectionActor.swift`, `NStatCollector`, `ProcessCollector`, `DescriptorCollector`, `InterfaceCollector`, `DaemonsCollector`, `LaunchdQuery`, `LaunchctlRunner`, `DiskInventoryCollector`, `DiskScanner`, `HostMetricsCollector`, `ThermalStatsReader`, `SocketSummaryCollector`, `UserCollector` | Recolección y contabilidad de cada fuente |
 | `Diagnostics/` | `KBCapabilitiesProbe.swift` | Modo efectivo (local/daemon), disponibilidad de NetworkStatistics y privacidad |
-| `Support/` | `KBInterop.swift`, `CPUTopology.swift` | Conversión entre structs C y modelos Swift; clústeres Performance/Efficiency |
+| `Support/` | `KBInterop.swift`, `CPUTopology.swift`, `ProcessSignalPolicy.swift`, `ProcessSignaler.swift` | Conversión entre structs C y modelos Swift; clústeres Performance/Efficiency; política de kill y `kill(2)` local |
 | — | `KBVersion`, `KBRates`, `KBProcessKey` | Versión de schema, tasas y claves estables |
 
 `CollectionActor` es el punto de entrada: `refresh()` devuelve un `KBCollectionSnapshot` y

@@ -45,6 +45,8 @@ final class AppModel {
     /// The connected daemon advertises `trashItems`. Older daemons decode the
     /// capability as nil, which reads as false here.
     var daemonSupportsTrash = false
+    /// The connected daemon handles privileged process signals.
+    var daemonSupportsKill = false
     /// TCC Full Disk Access for this process. Independent from `hasFullDataAccess`
     /// (which describes root/daemon access) and refreshed on demand.
     private(set) var fullDiskAccess: KBFullDiskAccessStatus = .unknown
@@ -152,6 +154,7 @@ final class AppModel {
 
     private let collector = CollectionActor()
     private var daemonSource: DaemonMetricsSource?
+    private var signalingKeys: Set<KBProcessKey> = []
     private var task: Task<Void, Never>?
     private var sleepTask: Task<Void, Never>?
     private var batteryGraphFetchedAt = Date.distantPast
@@ -571,6 +574,7 @@ final class AppModel {
         usingDaemon = false
         daemonIsRoot = false
         daemonSupportsTrash = false
+        daemonSupportsKill = false
         serviceError = nil
         let plistName = Self.daemonServicePlist
         do {
@@ -717,6 +721,7 @@ final class AppModel {
         usingDaemon = false
         daemonIsRoot = false
         daemonSupportsTrash = false
+        daemonSupportsKill = false
         Task { await collector.stop() }
     }
 
@@ -815,6 +820,95 @@ final class AppModel {
         return result
     }
 
+    func killAvailability(for process: KBProcessInfo) -> ProcessKillAvailability {
+        if signalingKeys.contains(process.id) {
+            return ProcessKillAvailability(
+                status: .disabled,
+                reason: "A kill request is already in progress.")
+        }
+        if process.startTimeUS == 0 || process.path.isEmpty {
+            return ProcessKillAvailability(
+                status: .disabled,
+                reason: "Process identity is unavailable; wait for the next refresh.")
+        }
+        let context = KBProcessSignalContext(
+            localUID: isRoot ? 0 : UInt32(getuid()),
+            daemonPID: daemonProcessPID,
+            clientPID: getpid(),
+            isRoot: isRoot)
+        switch KBProcessSignalPolicy.decide(target: .init(process: process),
+                                            context: context) {
+        case .refused(let reason):
+            return ProcessKillAvailability(status: .disabled,
+                                           reason: reason.uiMessage)
+        case .allowed(requiresAdministrator: false):
+            return ProcessKillAvailability(status: .enabled, reason: nil)
+        case .allowed(requiresAdministrator: true):
+            guard usingDaemon, daemonSupportsKill, daemonIsRoot else {
+                return ProcessKillAvailability(
+                    status: .disabled,
+                    reason: "Killing another user's or a root process requires the "
+                          + "root background daemon (enable it in System status).")
+            }
+            return ProcessKillAvailability(
+                status: .needsAdministrator,
+                reason: "macOS will ask for an administrator password.")
+        }
+    }
+
+    func signalProcess(_ process: KBProcessInfo,
+                       signal: KBProcessSignal) async -> KBProcessSignalResult {
+        let availability = killAvailability(for: process)
+        guard availability.isEnabled else {
+            return KBProcessSignalResult(
+                ok: false, code: KBProcessSignalCode.invalid,
+                message: availability.reason, pid: process.pid,
+                startTimeUS: process.startTimeUS)
+        }
+        signalingKeys.insert(process.id)
+        defer { signalingKeys.remove(process.id) }
+
+        let request = KBProcessSignalRequest(
+            pid: process.pid, startTimeUS: process.startTimeUS,
+            expectedUID: process.uid,
+            expectedPath: process.path.isEmpty ? nil : process.path,
+            signal: signal)
+
+        if availability.status == .needsAdministrator {
+            guard usingDaemon, daemonSupportsKill, daemonIsRoot,
+                  let source = daemonSource else {
+                return KBProcessSignalResult(
+                    ok: false, code: KBProcessSignalCode.daemon,
+                    message: "The root background daemon is required.",
+                    pid: process.pid, startTimeUS: process.startTimeUS)
+            }
+            NSApp.activate(ignoringOtherApps: true)
+            let name = process.name
+            return await Task.detached(priority: .userInitiated) {
+                do {
+                    return try ProcessKillClient.signal(request, client: source,
+                                                        processName: name)
+                } catch ProcessKillAuthorizationError.canceled {
+                    return KBProcessSignalResult(
+                        ok: false, code: KBProcessSignalCode.canceled,
+                        message: "Authorization was canceled.",
+                        pid: request.pid, startTimeUS: request.startTimeUS)
+                } catch {
+                    return KBProcessSignalResult(
+                        ok: false, code: KBProcessSignalCode.authorization,
+                        message: error.localizedDescription,
+                        pid: request.pid, startTimeUS: request.startTimeUS)
+                }
+            }.value
+        }
+
+        let daemonPID = daemonProcessPID
+        return await Task.detached(priority: .userInitiated) {
+            ProcessSignaler.signalLocally(request, clientPID: getpid(),
+                                          daemonPID: daemonPID)
+        }.value
+    }
+
     func detail(for process: KBProcessInfo) async -> KBProcessDetail {
         let pid = process.pid
         if usingDaemon, let source = daemonSource {
@@ -873,6 +967,7 @@ final class AppModel {
                     self.daemonBuild = nil
                     self.daemonIsRoot = false
                     self.daemonSupportsTrash = false
+                    self.daemonSupportsKill = false
                     self.daemonConnectionError = "Daemon connection closed."
                 }
             }
@@ -908,6 +1003,7 @@ final class AppModel {
                 }
                 self.daemonIsRoot = hello.capabilities.root
                 self.daemonSupportsTrash = hello.capabilities.trash ?? false
+                self.daemonSupportsKill = hello.capabilities.kill ?? false
                 self.usingDaemon = true
                 self.daemonConnecting = false
                 self.daemonConnectionError = nil
@@ -1047,6 +1143,7 @@ final class AppModel {
         daemonVersion = nil
         daemonBuild = nil
         daemonSupportsTrash = false
+        daemonSupportsKill = false
         daemonConnectionError = nil
         daemonConnecting = false
         lastDaemonAttempt = .distantPast

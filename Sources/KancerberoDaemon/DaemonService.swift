@@ -42,16 +42,20 @@ final class DaemonService: NSObject, KancerberoDaemonXPC, @unchecked Sendable {
     private var subscribedAt: Date?
     private let canControl: Bool
     private let canTrash: Bool
+    private let canSignal: Bool
     private let peer: PeerIdentity
     private var actionTimestamps: [Date] = []
     private var trashTimestamps: [Date] = []
     private var trashInFlight = false
+    private var signalTimestamps: [Date] = []
+    private var signalInFlight = false
 
-    init(peer: PeerIdentity, canControl: Bool, canTrash: Bool,
+    init(peer: PeerIdentity, canControl: Bool, canTrash: Bool, canSignal: Bool,
          connection: NSXPCConnection, collector: CollectionActor) {
         self.peer = peer
         self.canControl = canControl
         self.canTrash = canTrash
+        self.canSignal = canSignal
         self.connection = connection
         self.collector = collector
         super.init()
@@ -256,6 +260,31 @@ final class DaemonService: NSObject, KancerberoDaemonXPC, @unchecked Sendable {
                 self?.finishTrashRequest()
                 box.send(try? KBWireCodec.encode(KBTrashResponsePayload(results: results)))
             }
+        case .processSignal:
+            guard let signalRequest = request.signalRequest else {
+                reply(nil, NSError(domain: "kancerbero", code: 15,
+                                   userInfo: [NSLocalizedDescriptionKey: "missing signal request"]))
+                return
+            }
+            guard isSignalAllowed() else {
+                logger.warning("rejected signal request from unauthorized client")
+                reply(nil, NSError(domain: "kancerbero", code: 16,
+                                   userInfo: [NSLocalizedDescriptionKey: "client is not authorized to signal processes"]))
+                return
+            }
+            guard allowSignalRate() else {
+                reply(nil, NSError(domain: "kancerbero", code: 17,
+                                   userInfo: [NSLocalizedDescriptionKey: "too many signal requests, wait a minute"]))
+                return
+            }
+            let box = ReplyBox(reply)
+            let peer = self.peer
+            Task.detached(priority: .userInitiated) { [weak self] in
+                defer { self?.finishSignalRequest() }
+                let result = ProcessSignalService.signal(signalRequest, peer: peer)
+                box.send(try? KBWireCodec.encode(
+                    KBProcessSignalResponsePayload(result: result)))
+            }
         }
     }
 
@@ -273,6 +302,10 @@ final class DaemonService: NSObject, KancerberoDaemonXPC, @unchecked Sendable {
 
     private func isTrashAllowed() -> Bool {
         canTrash
+    }
+
+    private func isSignalAllowed() -> Bool {
+        canSignal
     }
 
     private func allowActionRate() -> Bool {
@@ -302,6 +335,26 @@ final class DaemonService: NSObject, KancerberoDaemonXPC, @unchecked Sendable {
     private func finishTrashRequest() {
         lock.lock()
         trashInFlight = false
+        lock.unlock()
+    }
+
+    /// Signals are destructive but cheap: one in flight and a handful per
+    /// minute per connection.
+    private func allowSignalRate() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !signalInFlight else { return false }
+        let cutoff = Date().addingTimeInterval(-60)
+        signalTimestamps.removeAll { $0 < cutoff }
+        guard signalTimestamps.count < 10 else { return false }
+        signalTimestamps.append(Date())
+        signalInFlight = true
+        return true
+    }
+
+    private func finishSignalRequest() {
+        lock.lock()
+        signalInFlight = false
         lock.unlock()
     }
 

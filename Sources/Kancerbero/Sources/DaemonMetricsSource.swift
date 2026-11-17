@@ -131,6 +131,15 @@ final class DaemonMetricsSource: NSObject, KancerberoClientXPC, @unchecked Senda
         return payload.results
     }
 
+    func signalProcess(_ request: KBProcessSignalRequest) throws -> KBProcessSignalResult {
+        let message = try KBWireCodec.encode(
+            KBRequestMessage(kind: .processSignal, signalRequest: request))
+        let data = try requestData(message, timeout: 10)
+        let payload = try KBWireCodec.decode(KBProcessSignalResponsePayload.self,
+                                             from: data)
+        return payload.result
+    }
+
     private func requestData(_ message: Data, timeout: TimeInterval = 5) throws -> Data {
         lock.lock()
         let remote = self.remote

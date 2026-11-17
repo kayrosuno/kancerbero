@@ -85,20 +85,72 @@ public struct KBRequestMessage: Codable, Sendable {
         case daemonServices
         case daemonAction
         case trashItems
+        case processSignal
     }
 
     public var kind: Kind
     public var pid: Int32?
     public var daemonRequest: KBDaemonActionRequest?
     public var trashRequest: KBTrashRequest?
+    public var signalRequest: KBProcessSignalRequest?
 
     public init(kind: Kind, pid: Int32? = nil,
                 daemonRequest: KBDaemonActionRequest? = nil,
-                trashRequest: KBTrashRequest? = nil) {
+                trashRequest: KBTrashRequest? = nil,
+                signalRequest: KBProcessSignalRequest? = nil) {
         self.kind = kind
         self.pid = pid
         self.daemonRequest = daemonRequest
         self.trashRequest = trashRequest
+        self.signalRequest = signalRequest
+    }
+}
+
+public struct KBProcessSignalRequest: Codable, Sendable {
+    public var pid: Int32
+    /// Exact process start time; required and must not be zero.
+    public var startTimeUS: UInt64
+    /// Authoritative check is server-side; the daemon re-derives the current UID.
+    public var expectedUID: UInt32
+    public var expectedPath: String?
+    public var signal: KBProcessSignal
+    /// 32-byte AuthorizationExternalForm; only sent for cross-UID/root targets.
+    public var authorizationExternalForm: Data?
+
+    public init(pid: Int32, startTimeUS: UInt64, expectedUID: UInt32,
+                expectedPath: String? = nil, signal: KBProcessSignal,
+                authorizationExternalForm: Data? = nil) {
+        self.pid = pid
+        self.startTimeUS = startTimeUS
+        self.expectedUID = expectedUID
+        self.expectedPath = expectedPath
+        self.signal = signal
+        self.authorizationExternalForm = authorizationExternalForm
+    }
+}
+
+public struct KBProcessSignalResult: Codable, Sendable {
+    public var ok: Bool
+    public var code: String?
+    public var message: String?
+    public var pid: Int32
+    public var startTimeUS: UInt64
+
+    public init(ok: Bool, code: String? = nil, message: String? = nil,
+                pid: Int32, startTimeUS: UInt64) {
+        self.ok = ok
+        self.code = code
+        self.message = message
+        self.pid = pid
+        self.startTimeUS = startTimeUS
+    }
+}
+
+public struct KBProcessSignalResponsePayload: Codable, Sendable {
+    public var result: KBProcessSignalResult
+
+    public init(result: KBProcessSignalResult) {
+        self.result = result
     }
 }
 

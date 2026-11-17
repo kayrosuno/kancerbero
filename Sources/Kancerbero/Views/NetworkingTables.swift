@@ -119,6 +119,7 @@ struct ConnectionsView: View {
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
     @Environment(\.openWindow) private var openWindow
+    @State private var killConfirmation: ProcessKillConfirmation?
 
     private var selection: Binding<String?> {
         Binding(
@@ -245,6 +246,10 @@ struct ConnectionsView: View {
                     Button("Inspect \(source.processName)") {
                         inspect(process(for: source))
                     }
+                    Divider()
+                    processKillMenuButton(process: process(for: source),
+                                          model: model,
+                                          confirmation: $killConfirmation)
                 }
             } primaryAction: { keys in
                 if let id = keys.first, let source = rows.first(where: { $0.id == id }) {
@@ -252,6 +257,7 @@ struct ConnectionsView: View {
                 }
             }
         }
+        .processKillConfirmation($killConfirmation)
         .onChange(of: rows.map(\.id), initial: true) { _, ids in
             guard let selected = ui.networking.selectedConnection,
                   !ids.contains(selected) else { return }
@@ -394,6 +400,7 @@ struct ProcessesView: View {
     @Environment(UIState.self) private var ui
     @Environment(FilterModel.self) private var filterModel
     @Environment(\.openWindow) private var openWindow
+    @State private var killConfirmation: ProcessKillConfirmation?
 
     private var selection: Binding<KBProcessKey?> {
         Binding(
@@ -536,6 +543,9 @@ struct ProcessesView: View {
                             filterModel.watch(row.process)
                         }
                     }
+                    Divider()
+                    processKillMenuButton(process: row.process, model: model,
+                                          confirmation: $killConfirmation)
                 }
             } primaryAction: { keys in
                 if let key = keys.first,
@@ -544,6 +554,7 @@ struct ProcessesView: View {
                 }
             }
         }
+        .processKillConfirmation($killConfirmation)
         .onChange(of: rows.map(\.id), initial: true) { _, ids in
             guard let selected = ui.networking.selectedProcess,
                   !ids.contains(selected) else { return }
