@@ -769,6 +769,28 @@
   con el valor sin sufijo (`content-filter-provider`), que es lo que conceden los perfiles Mac
   Team (ver `docs/verification.md`).
 
+## Variante Mac App Store
+
+- El target `KancerberoAppStore` (mismo bundle ID `uno.kayros.kancerbero`) comparte
+  `Sources/Kancerbero` con la app Developer ID y compila con `APP_STORE` (Swift) y `APP_STORE=1`
+  (C) en todas sus configuraciones; la scheme `Kancerbero-AppStore` lo archiva con la
+  configuración `AppStore`. No enlaza Sparkle, no embebe el daemon y sí la system extension actual.
+- Con `APP_STORE`: `UpdaterModel` es un stub (actualizaciones por la App Store), el menú Daemon
+  desaparece, `AppModel` arranca solo el bucle local, el registro/auto-registro/conexión del daemon
+  y las acciones privilegiadas quedan desactivadas, y las APIs privadas se mantienen compiladas
+  (máxima funcionalidad) con sus fallbacks actuales.
+- Sandbox del analyzer: `ScanRoot` envuelve una URL con security scope en el build App Store y una
+  ruta normal en Developer ID; el bookmark se guarda en `UserDefaults` y se resuelve al relanzar.
+  La UI usa “Choose Folder…”, oculta la ruta editable y “Cross mounts”, y explica las rutas
+  denegadas por el sandbox. `--disk-path` se ignora y `--disk-scan` solo repite un bookmark.
+- La ventana **App Store version** (`AppStoreLimitationsView`) explica las limitaciones y enlaza a
+  `https://kayros.uno`; los avisos `AppStoreLimitationNotice` aparecen en Settings, Daemons,
+  Applications, System status y el aviso del analyzer.
+- Entitlements: `app-sandbox`, `files.user-selected.read-only`, `files.bookmarks.app-scope`,
+  `network.client`, Network Extension, system-extension y app group. Firma automática con Apple
+  Distribution/Mac Team Store al exportar; Developer ID (Release, Sparkle, daemon, perfiles) no
+  cambia.
+
 ## Modos
 
 | Modo | Significado |

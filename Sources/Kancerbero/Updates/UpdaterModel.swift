@@ -1,3 +1,37 @@
+#if APP_STORE
+
+import Foundation
+import Observation
+
+/// App Store builds receive updates through the Mac App Store. The stub keeps
+/// the same API as the Sparkle-backed model.
+@MainActor
+@Observable
+final class UpdaterModel {
+    private(set) var canCheckForUpdates = false
+    private(set) var statusText = "Updates are delivered by the Mac App Store."
+    private(set) var lastError: String?
+    private(set) var updateAvailable: String?
+    private(set) var automaticallyChecksForUpdates = false
+    private(set) var automaticallyDownloadsUpdates = false
+    private(set) var updateCheckInterval: TimeInterval = 86_400
+    private(set) var isEnabled = false
+
+    var allowsAutomaticUpdates: Bool { false }
+
+    init() {}
+
+    func checkForUpdates() {}
+    func setAutomaticallyChecksForUpdates(_ value: Bool) {}
+    func setAutomaticallyDownloadsUpdates(_ value: Bool) {}
+    func setUpdateCheckInterval(_ value: TimeInterval) {}
+    func noteUpdateFound(_ version: String) {}
+    func noteUpToDate() {}
+    func noteFailure(_ error: Error?) {}
+}
+
+#else
+
 import Combine
 import Foundation
 import Sparkle
@@ -131,3 +165,5 @@ final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
         model?.noteFailure(error)
     }
 }
+
+#endif

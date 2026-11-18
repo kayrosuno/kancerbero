@@ -15,11 +15,15 @@
 		ABCDEF000000000000000086 /* libKancerberoCore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000021 /* libKancerberoCore.a */; };
 		ABCDEF000000000000000087 /* KancerberoDaemon in Embed Daemon */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000022 /* KancerberoDaemon */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		ABCDEF000000000000000088 /* uno.kayros.kancerbero.daemon.plist in Embed Daemon */ = {isa = PBXBuildFile; fileRef = ABCDEF00000000000000009C /* uno.kayros.kancerbero.daemon.plist */; };
-		ABCDEF0000000000000000C5 /* uno.kayros.kancerbero.daemon.service.plist in Embed Daemon */ = {isa = PBXBuildFile; fileRef = ABCDEF0000000000000000C4 /* uno.kayros.kancerbero.daemon.service.plist */; };
 		ABCDEF0000000000000000B5 /* libKancerberoFilterContract.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000025 /* libKancerberoFilterContract.a */; };
 		ABCDEF0000000000000000B6 /* libKancerberoFilterContract.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000025 /* libKancerberoFilterContract.a */; };
 		ABCDEF0000000000000000B7 /* uno.kayros.kancerbero.filter.systemextension in Embed Filter Extension */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000026 /* uno.kayros.kancerbero.filter.systemextension */; };
+		ABCDEF0000000000000000C5 /* uno.kayros.kancerbero.daemon.service.plist in Embed Daemon */ = {isa = PBXBuildFile; fileRef = ABCDEF0000000000000000C4 /* uno.kayros.kancerbero.daemon.service.plist */; };
 		ABCDEF0000000000000000D0 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = ABCDEF0000000000000000D1 /* Sparkle */; };
+		ABCDEF00000000000000010A /* uno.kayros.kancerbero.filter.systemextension in Embed Filter Extension */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000026 /* uno.kayros.kancerbero.filter.systemextension */; };
+		ABCDEF00000000000000010B /* libKancerberoC.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000020 /* libKancerberoC.a */; };
+		ABCDEF00000000000000010C /* libKancerberoCore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000021 /* libKancerberoCore.a */; };
+		ABCDEF00000000000000010D /* libKancerberoFilterContract.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000025 /* libKancerberoFilterContract.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -79,6 +83,34 @@
 			remoteGlobalIDString = ABCDEF000000000000000016;
 			remoteInfo = KancerberoFilter;
 		};
+		ABCDEF00000000000000010F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = ABCDEF000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = ABCDEF000000000000000011;
+			remoteInfo = KancerberoCore;
+		};
+		ABCDEF000000000000000111 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = ABCDEF000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = ABCDEF000000000000000010;
+			remoteInfo = KancerberoC;
+		};
+		ABCDEF000000000000000113 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = ABCDEF000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = ABCDEF000000000000000015;
+			remoteInfo = KancerberoFilterContract;
+		};
+		ABCDEF000000000000000115 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = ABCDEF000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = ABCDEF000000000000000016;
+			remoteInfo = KancerberoFilter;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -102,6 +134,17 @@
 			dstSubfolderSpec = 16;
 			files = (
 				ABCDEF0000000000000000B7 /* uno.kayros.kancerbero.filter.systemextension in Embed Filter Extension */,
+			);
+			name = "Embed Filter Extension";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		ABCDEF000000000000000109 /* Embed Filter Extension */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(SYSTEM_EXTENSIONS_FOLDER_PATH)";
+			dstSubfolderSpec = 16;
+			files = (
+				ABCDEF00000000000000010A /* uno.kayros.kancerbero.filter.systemextension in Embed Filter Extension */,
 			);
 			name = "Embed Filter Extension";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -131,7 +174,6 @@
 		ABCDEF000000000000000097 /* KancerberoProbe.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = KancerberoProbe.xcconfig; sourceTree = "<group>"; };
 		ABCDEF000000000000000099 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		ABCDEF00000000000000009C /* uno.kayros.kancerbero.daemon.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = uno.kayros.kancerbero.daemon.plist; sourceTree = "<group>"; };
-		ABCDEF0000000000000000C4 /* uno.kayros.kancerbero.daemon.service.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = uno.kayros.kancerbero.daemon.service.plist; sourceTree = "<group>"; };
 		ABCDEF00000000000000009D /* KancerberoFilterContract.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = KancerberoFilterContract.xcconfig; sourceTree = "<group>"; };
 		ABCDEF00000000000000009E /* KancerberoFilter.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = KancerberoFilter.xcconfig; sourceTree = "<group>"; };
 		ABCDEF00000000000000009F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -140,6 +182,13 @@
 		ABCDEF0000000000000000A2 /* Kancerbero-Development.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Kancerbero-Development.entitlements"; sourceTree = "<group>"; };
 		ABCDEF0000000000000000C1 /* KancerberoFilter-Development.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "KancerberoFilter-Development.entitlements"; sourceTree = "<group>"; };
 		ABCDEF0000000000000000C2 /* KancerberoDaemon.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = KancerberoDaemon.entitlements; sourceTree = "<group>"; };
+		ABCDEF0000000000000000C4 /* uno.kayros.kancerbero.daemon.service.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = uno.kayros.kancerbero.daemon.service.plist; sourceTree = "<group>"; };
+		ABCDEF0000000000000000E8 /* AppStore.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = AppStore.xcconfig; sourceTree = "<group>"; };
+		ABCDEF0000000000000000E9 /* Kancerbero-AppStore.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Kancerbero-AppStore.entitlements"; sourceTree = "<group>"; };
+		ABCDEF0000000000000000EA /* KancerberoFilter-AppStore.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "KancerberoFilter-AppStore.entitlements"; sourceTree = "<group>"; };
+		ABCDEF000000000000000101 /* KancerberoAppStore.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KancerberoAppStore.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		ABCDEF000000000000000116 /* Info-AppStore.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info-AppStore.plist"; sourceTree = "<group>"; };
+		ABCDEF000000000000000117 /* KancerberoAppStore.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = KancerberoAppStore.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -239,6 +288,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		ABCDEF000000000000000107 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				ABCDEF00000000000000010C /* libKancerberoCore.a in Frameworks */,
+				ABCDEF00000000000000010B /* libKancerberoC.a in Frameworks */,
+				ABCDEF00000000000000010D /* libKancerberoFilterContract.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -264,6 +323,7 @@
 				ABCDEF000000000000000024 /* KancerberoProbe */,
 				ABCDEF000000000000000025 /* libKancerberoFilterContract.a */,
 				ABCDEF000000000000000026 /* uno.kayros.kancerbero.filter.systemextension */,
+				ABCDEF000000000000000101 /* KancerberoAppStore.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -295,6 +355,8 @@
 				ABCDEF000000000000000097 /* KancerberoProbe.xcconfig */,
 				ABCDEF00000000000000009D /* KancerberoFilterContract.xcconfig */,
 				ABCDEF00000000000000009E /* KancerberoFilter.xcconfig */,
+				ABCDEF0000000000000000E8 /* AppStore.xcconfig */,
+				ABCDEF000000000000000117 /* KancerberoAppStore.xcconfig */,
 			);
 			path = Config;
 			sourceTree = "<group>";
@@ -316,6 +378,8 @@
 				ABCDEF000000000000000099 /* Info.plist */,
 				ABCDEF0000000000000000A1 /* Kancerbero.entitlements */,
 				ABCDEF0000000000000000A2 /* Kancerbero-Development.entitlements */,
+				ABCDEF0000000000000000E9 /* Kancerbero-AppStore.entitlements */,
+				ABCDEF000000000000000116 /* Info-AppStore.plist */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -346,6 +410,7 @@
 				ABCDEF00000000000000009F /* Info.plist */,
 				ABCDEF0000000000000000A0 /* KancerberoFilter.entitlements */,
 				ABCDEF0000000000000000C1 /* KancerberoFilter-Development.entitlements */,
+				ABCDEF0000000000000000EA /* KancerberoFilter-AppStore.entitlements */,
 			);
 			path = Filter;
 			sourceTree = "<group>";
@@ -509,6 +574,31 @@
 			productReference = ABCDEF000000000000000026 /* uno.kayros.kancerbero.filter.systemextension */;
 			productType = "com.apple.product-type.system-extension";
 		};
+		ABCDEF000000000000000100 /* KancerberoAppStore */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = ABCDEF000000000000000102 /* Build configuration list for PBXNativeTarget "KancerberoAppStore" */;
+			buildPhases = (
+				ABCDEF000000000000000106 /* Sources */,
+				ABCDEF000000000000000107 /* Frameworks */,
+				ABCDEF000000000000000108 /* Resources */,
+				ABCDEF000000000000000109 /* Embed Filter Extension */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				ABCDEF00000000000000010E /* PBXTargetDependency */,
+				ABCDEF000000000000000110 /* PBXTargetDependency */,
+				ABCDEF000000000000000112 /* PBXTargetDependency */,
+				ABCDEF000000000000000114 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				ABCDEF000000000000000033 /* Kancerbero */,
+			);
+			name = KancerberoAppStore;
+			productName = KancerberoAppStore;
+			productReference = ABCDEF000000000000000101 /* KancerberoAppStore.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -540,6 +630,9 @@
 					ABCDEF000000000000000016 = {
 						CreatedOnToolsVersion = 27.0;
 					};
+					ABCDEF000000000000000100 = {
+						CreatedOnToolsVersion = 27.0;
+					};
 				};
 			};
 			buildConfigurationList = ABCDEF000000000000000003 /* Build configuration list for PBXProject "Kancerbero" */;
@@ -566,12 +659,20 @@
 				ABCDEF000000000000000014 /* KancerberoProbe */,
 				ABCDEF000000000000000015 /* KancerberoFilterContract */,
 				ABCDEF000000000000000016 /* KancerberoFilter */,
+				ABCDEF000000000000000100 /* KancerberoAppStore */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		ABCDEF000000000000000048 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		ABCDEF000000000000000108 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -652,6 +753,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		ABCDEF000000000000000106 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -694,6 +802,26 @@
 			isa = PBXTargetDependency;
 			target = ABCDEF000000000000000016 /* KancerberoFilter */;
 			targetProxy = ABCDEF0000000000000000BA /* PBXContainerItemProxy */;
+		};
+		ABCDEF00000000000000010E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = ABCDEF000000000000000011 /* KancerberoCore */;
+			targetProxy = ABCDEF00000000000000010F /* PBXContainerItemProxy */;
+		};
+		ABCDEF000000000000000110 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = ABCDEF000000000000000010 /* KancerberoC */;
+			targetProxy = ABCDEF000000000000000111 /* PBXContainerItemProxy */;
+		};
+		ABCDEF000000000000000112 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = ABCDEF000000000000000015 /* KancerberoFilterContract */;
+			targetProxy = ABCDEF000000000000000113 /* PBXContainerItemProxy */;
+		};
+		ABCDEF000000000000000114 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = ABCDEF000000000000000016 /* KancerberoFilter */;
+			targetProxy = ABCDEF000000000000000115 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -948,6 +1076,173 @@
 			};
 			name = Release;
 		};
+		ABCDEF0000000000000000E0 /* AppStore */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = ABCDEF0000000000000000E8 /* AppStore.xcconfig */;
+			buildSettings = {
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = AK37TK8X2Y;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+			};
+			name = AppStore;
+		};
+		ABCDEF0000000000000000E1 /* AppStore */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = ABCDEF000000000000000093 /* KancerberoC.xcconfig */;
+			buildSettings = {
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_MODULE_VERIFIER = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"APP_STORE=1",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+			};
+			name = AppStore;
+		};
+		ABCDEF0000000000000000E2 /* AppStore */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = ABCDEF000000000000000094 /* KancerberoCore.xcconfig */;
+			buildSettings = {
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_MODULE_VERIFIER = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) APP_STORE";
+			};
+			name = AppStore;
+		};
+		ABCDEF0000000000000000E3 /* AppStore */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = ABCDEF000000000000000095 /* KancerberoDaemon.xcconfig */;
+			buildSettings = {
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
+			};
+			name = AppStore;
+		};
+		ABCDEF0000000000000000E4 /* AppStore */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = ABCDEF000000000000000096 /* Kancerbero.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = AK37TK8X2Y;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Kancerbero;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
+			};
+			name = AppStore;
+		};
+		ABCDEF0000000000000000E5 /* AppStore */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = ABCDEF000000000000000097 /* KancerberoProbe.xcconfig */;
+			buildSettings = {
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = AK37TK8X2Y;
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
+			};
+			name = AppStore;
+		};
+		ABCDEF0000000000000000E6 /* AppStore */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = ABCDEF00000000000000009D /* KancerberoFilterContract.xcconfig */;
+			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
+			};
+			name = AppStore;
+		};
+		ABCDEF0000000000000000E7 /* AppStore */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = ABCDEF00000000000000009E /* KancerberoFilter.xcconfig */;
+			buildSettings = {
+				DEVELOPMENT_TEAM = AK37TK8X2Y;
+				"DEVELOPMENT_TEAM[sdk=macosx*]" = AK37TK8X2Y;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
+			};
+			name = AppStore;
+		};
+		ABCDEF000000000000000103 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = ABCDEF000000000000000117 /* KancerberoAppStore.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = AK37TK8X2Y;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Kancerbero;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
+				PRODUCT_BUNDLE_IDENTIFIER = uno.kayros.kancerbero;
+				PRODUCT_NAME = KancerberoAppStore;
+			};
+			name = Debug;
+		};
+		ABCDEF000000000000000104 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = ABCDEF000000000000000117 /* KancerberoAppStore.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = AK37TK8X2Y;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Kancerbero;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
+				PRODUCT_BUNDLE_IDENTIFIER = uno.kayros.kancerbero;
+				PRODUCT_NAME = KancerberoAppStore;
+			};
+			name = Release;
+		};
+		ABCDEF000000000000000105 /* AppStore */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = ABCDEF000000000000000117 /* KancerberoAppStore.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = AK37TK8X2Y;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Kancerbero;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
+				PRODUCT_BUNDLE_IDENTIFIER = uno.kayros.kancerbero;
+				PRODUCT_NAME = KancerberoAppStore;
+			};
+			name = AppStore;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -956,6 +1251,7 @@
 			buildConfigurations = (
 				ABCDEF000000000000000004 /* Debug */,
 				ABCDEF000000000000000005 /* Release */,
+				ABCDEF0000000000000000E0 /* AppStore */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -965,6 +1261,7 @@
 			buildConfigurations = (
 				ABCDEF000000000000000060 /* Debug */,
 				ABCDEF000000000000000061 /* Release */,
+				ABCDEF0000000000000000E1 /* AppStore */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -974,6 +1271,7 @@
 			buildConfigurations = (
 				ABCDEF000000000000000062 /* Debug */,
 				ABCDEF000000000000000063 /* Release */,
+				ABCDEF0000000000000000E2 /* AppStore */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -983,6 +1281,7 @@
 			buildConfigurations = (
 				ABCDEF000000000000000064 /* Debug */,
 				ABCDEF000000000000000065 /* Release */,
+				ABCDEF0000000000000000E3 /* AppStore */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -992,6 +1291,7 @@
 			buildConfigurations = (
 				ABCDEF000000000000000066 /* Debug */,
 				ABCDEF000000000000000067 /* Release */,
+				ABCDEF0000000000000000E4 /* AppStore */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1001,6 +1301,7 @@
 			buildConfigurations = (
 				ABCDEF000000000000000068 /* Debug */,
 				ABCDEF000000000000000069 /* Release */,
+				ABCDEF0000000000000000E5 /* AppStore */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1010,6 +1311,7 @@
 			buildConfigurations = (
 				ABCDEF00000000000000006A /* Debug */,
 				ABCDEF00000000000000006B /* Release */,
+				ABCDEF0000000000000000E6 /* AppStore */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1019,6 +1321,17 @@
 			buildConfigurations = (
 				ABCDEF00000000000000006C /* Debug */,
 				ABCDEF00000000000000006D /* Release */,
+				ABCDEF0000000000000000E7 /* AppStore */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		ABCDEF000000000000000102 /* Build configuration list for PBXNativeTarget "KancerberoAppStore" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				ABCDEF000000000000000103 /* Debug */,
+				ABCDEF000000000000000104 /* Release */,
+				ABCDEF000000000000000105 /* AppStore */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

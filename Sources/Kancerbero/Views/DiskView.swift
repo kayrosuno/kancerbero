@@ -80,7 +80,13 @@ struct DiskView: View {
                         withAnimation(pillAnimation) {
                             tab = .analyzer
                         }
+#if APP_STORE
+                        // A raw mount point has no sandbox scope. The Analyzer
+                        // asks for a folder with NSOpenPanel instead.
+                        _ = path
+#else
                         Task { await disk.startScan(path: path) }
+#endif
                     }
                 case .filesystems:
                     FilesystemView()

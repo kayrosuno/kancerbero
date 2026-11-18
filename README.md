@@ -554,7 +554,13 @@ Compara con `netstat -ibI`, `lsof -nP -i`, `nettop` y Activity Monitor. Detalle 
 
 ## Limitaciones conocidas
 
-- APIs privadas (`NetworkStatistics.framework`): no apto para App Store.
+- Apps privadas y distribución: la app Developer ID no está sandboxeada y usa
+  `NetworkStatistics.framework`, IOHID y IOAccelerator. Existe además una **variante Mac App Store**
+  (`KancerberoAppStore`, scheme `Kancerbero-AppStore`): sandbox, sin Sparkle ni daemon root,
+  actualizaciones por la App Store y analizador limitado a carpetas elegidas con el selector. Las
+  funciones que el sandbox impide muestran un aviso que abre la ventana **App Store version** con
+  instrucciones para descargar la versión completa desde https://kayros.uno. Las APIs privadas siguen
+  presentes en esa variante (máxima funcionalidad), así que App Review podría rechazarla.
 - Actualizaciones: Sparkle 2 requiere app Developer ID notarizada en `/Applications`; el feed y
   los binarios son públicos. Las instalaciones anteriores a la primera versión con Sparkle no se
   autoactualizan (bootstrap manual).

@@ -1391,6 +1391,59 @@ restante (pasos y troubleshooting) está en el ScrollView. Probar los estados
 `unregister`/`register` y la confirmación de Repair; no se puede automatizar la aprobación de
 macOS. Evitar capturas de pantalla completa: pueden incluir ventanas ajenas.
 
+## Variante Mac App Store
+
+La app Developer ID no cambia. La variante sandboxeada es el target
+`KancerberoAppStore` (producto `KancerberoAppStore.app`, mismo bundle ID
+`uno.kayros.kancerbero` y misma system extension), que comparte `Sources/Kancerbero` con
+`APP_STORE`, no enlaza Sparkle y no embebe el daemon. La scheme `Kancerbero-AppStore` la archiva
+con la configuración `AppStore`; las configuraciones AppStore de `KancerberoC`/`KancerberoCore`
+definen `APP_STORE` para el código C y Swift compartido.
+
+- Entitlements de app: `Resources/App/Kancerbero-AppStore.entitlements` (sandbox,
+  `files.user-selected.read-only`, `files.bookmarks.app-scope`, `network.client`,
+  `content-filter-provider`, `system-extension.install`, app group). El filtro mantiene
+  `content-filter-provider`, sandbox y app group.
+- `Config/KancerberoAppStore.xcconfig` y `Config/AppStore.xcconfig`: firma automática (Apple
+  Development al compilar; Apple Distribution y perfiles Mac Team Store al exportar). El daemon no
+  forma parte de la variante. El filtro usa las mismas versiones que la app en `AppStore`.
+- Analyzer: solo carpetas elegidas con `NSOpenPanel`; el bookmark se guarda en `UserDefaults` y se
+  resuelve al relanzar. `--disk-path` se ignora y `--disk-scan` solo repite un bookmark existente.
+- Las funciones que el sandbox no permite (daemon root, otros usuarios, control de servicios del
+  sistema, mount/unmount/eject, desinstalación privilegiada) muestran avisos que abren la ventana
+  **App Store version** con el enlace a la versión completa en `https://kayros.uno`.
+- Sparkle no está presente; las actualizaciones las entrega la App Store.
+
+```bash
+xcodebuild -project Kancerbero.xcodeproj -scheme Kancerbero-AppStore \
+  -configuration AppStore -derivedDataPath build/AppStore \
+  -archivePath build/AppStore/KancerberoAppStore.xcarchive archive
+xcodebuild -exportArchive -archivePath build/AppStore/KancerberoAppStore.xcarchive \
+  -exportOptionsPlist Config/ExportOptions-AppStore.plist -exportPath build/AppStore/export
+```
+
+En Xcode: scheme `Kancerbero-AppStore`, Product > Archive, Organizer > Distribute App >
+App Store Connect > Validate App (firma automática). Comprobar el paquete:
+
+```bash
+APP="build/AppStore/KancerberoAppStore.xcarchive/Products/Applications/KancerberoAppStore.app"
+codesign -d --entitlements :- "$APP" | plutil -p -   # app-sandbox = true
+security cms -D -i "$APP/Contents/embedded.provisionprofile" | plutil -extract Name raw -
+find "$APP" \( -name Sparkle.framework -o -path "*LaunchDaemons*" \)   # debe estar vacío
+codesign -dvv "$APP" 2>&1 | grep Authority                             # Apple Distribution
+```
+
+La validación debe superar ITMS-90296. Riesgo aceptado: las APIs privadas
+(`NetworkStatistics.framework`, IOHID, IOAccelerator) siguen compiladas para conservar funciones y
+App Review podría rechazarlas; las notas de revisión deben justificar el filtro y enlazar a
+kayros.uno para la versión completa.
+
+Regresión Developer ID: la scheme `Kancerbero`, `Release`, `Signing.local.xcconfig`,
+`build-release.sh`, el daemon y Sparkle no se modifican; `CONFIG=Release ./scripts/build.sh`
+compila Release y `./scripts/build-release.sh` mantiene la firma Developer ID.
+
+## Filtro de red (Network Extension)
+
 ## Filtro de red (Network Extension)
 
 ### Prerrequisitos
@@ -1844,8 +1897,9 @@ build/Build/Products/Debug/KancerberoDaemon | head -1
 - **Filtro**: cambiar `Sources/KancerberoFilter` (o `KancerberoFilterContract`/`Resources/Filter`);
   el build del filtro sube, el daemon no cambia y la app envía una activation request `.replace`.
 - **Anotación**: un build que cambia un componente deja `Config/ComponentVersions.xcconfig`
-  modificado; hay que commitearlo. `build-release.sh` se niega a continuar si cambió durante el
-  build y `release.sh` exige el árbol limpio antes de empezar.
+  modificado; hay que commitearlo. `build-release.sh` exige el árbol limpio antes de compilar y,
+  después, se niega a continuar si el build cambió el archivo; `release.sh` comprueba lo mismo
+  antes de empezar.
 - **System Status**: abrir la ventana (`--show-status`) y comprobar:
   - las tarjetas **Application**, **Background Services** y **Network Filter** muestran su
     versión en la banda del título, en una sola línea y sin build;

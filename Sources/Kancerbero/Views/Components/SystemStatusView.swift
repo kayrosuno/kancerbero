@@ -59,7 +59,9 @@ struct SystemStatusView: View {
         .frame(minWidth: 1080, idealWidth: 1180, minHeight: 620, maxHeight: .infinity)
         .onAppear {
             model.refreshServiceStatus()
+#if !APP_STORE
             model.refreshFullDiskAccess(force: true)
+#endif
             // Do not recompute over a transient state: refresh() would erase
             // the activation error or the approval instruction.
             switch filter.controller.state {
@@ -79,7 +81,9 @@ struct SystemStatusView: View {
         }
         .onReceive(NotificationCenter.default.publisher(
             for: NSApplication.didBecomeActiveNotification)) { _ in
+#if !APP_STORE
             model.refreshFullDiskAccess()
+#endif
         }
         .sheet(item: $guide) { guide in
             ActivationGuideView(guide: guide)
@@ -110,6 +114,11 @@ struct SystemStatusView: View {
                     .font(.system(size: 20, weight: .semibold, design: .rounded))
 
                 railVersions
+
+#if APP_STORE
+                AppStoreLimitationNotice(
+                    text: "This is the sandboxed Mac App Store build: no background service, privileged actions or unrestricted disk scanning.")
+#endif
 
                 VStack(alignment: .leading, spacing: 6) {
                     railChip(railDaemonLabel, tint: railDaemonTint)
@@ -152,7 +161,9 @@ struct SystemStatusView: View {
 
                 railAction("Refresh status") {
                     model.refreshServiceStatus()
+#if !APP_STORE
                     model.refreshFullDiskAccess(force: true)
+#endif
                 }
 
                 railAction("Reveal app in Finder") {
@@ -491,7 +502,9 @@ struct SystemStatusView: View {
                     }
                     cardColumn {
                         trafficAttributionRow
+#if !APP_STORE
                         fullDiskAccessRow
+#endif
                     }
                 }
             }

@@ -147,6 +147,14 @@ struct SettingsView: View {
     private var railFooter: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
+#if APP_STORE
+                Circle()
+                    .fill(Color(red: 0.20, green: 0.72, blue: 0.52))
+                    .frame(width: 6, height: 6)
+                Text("App Store · Sandboxed")
+                    .font(.system(size: 10, weight: .medium))
+                    .lineLimit(1)
+#else
                 Circle()
                     .fill(model.usingDaemon
                           ? Color(red: 0.20, green: 0.72, blue: 0.52)
@@ -155,6 +163,7 @@ struct SettingsView: View {
                 Text(model.usingDaemon ? "Background daemon" : "Local mode")
                     .font(.system(size: 10, weight: .medium))
                     .lineLimit(1)
+#endif
                 Spacer(minLength: 4)
             }
             .foregroundStyle(.secondary)
@@ -257,6 +266,12 @@ struct SettingsView: View {
                     ])
                 }
             }
+
+#if APP_STORE
+            AppStoreLimitationNotice(
+                text: "This Mac App Store version is sandboxed: no background service, privileged actions or unrestricted disk scanning.")
+                .padding(.horizontal, 2)
+#endif
         }
     }
 
@@ -366,6 +381,41 @@ struct SettingsView: View {
     // MARK: - Updates
 
     private var updatesSettings: some View {
+#if APP_STORE
+        VStack(spacing: 14) {
+            SettingsCard(title: "Updates",
+                         subtitle: "Delivered by the Mac App Store.",
+                         systemImage: "arrow.triangle.2.circlepath",
+                         tint: Color(red: 0.20, green: 0.72, blue: 0.52)) {
+                SettingsRow(title: "Kancerbero \(model.appVersion)",
+                            detail: "Build \(model.appBuild)") {
+                    EmptyView()
+                }
+                SettingsDivider()
+                AppStoreLimitationNotice(
+                    text: "Sparkle and external updates are not available in the Mac App Store version.")
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 10)
+            }
+
+            if filter.extensionRequiresReboot || filter.extensionNeedsUpdate {
+                SettingsCard(title: "Network filter",
+                             subtitle: "System extension status.",
+                             systemImage: "shield.lefthalf.filled",
+                             tint: Color(red: 0.16, green: 0.62, blue: 0.94)) {
+                    if filter.extensionRequiresReboot {
+                        SettingsCallout("The network filter update completes after a restart.",
+                                        systemImage: "arrow.clockwise",
+                                        style: .warning)
+                    } else if filter.extensionNeedsUpdate {
+                        SettingsCallout("The network filter will be updated automatically.",
+                                        systemImage: "shield.lefthalf.filled",
+                                        style: .info)
+                    }
+                }
+            }
+        }
+#else
         VStack(spacing: 14) {
             SettingsCard(title: "Automatic updates",
                          subtitle: "Sparkle keeps Kancerbero up to date.",
@@ -464,6 +514,7 @@ struct SettingsView: View {
                 }
             }
         }
+#endif
     }
 }
 

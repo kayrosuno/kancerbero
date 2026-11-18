@@ -343,28 +343,38 @@ final class AppModel {
 
     func start() {
         guard task == nil else { return }
+#if !APP_STORE
         refreshServiceStatus()
         refreshFullDiskAccess(force: true)
+#endif
         task = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
+#if !APP_STORE
                 self.refreshServiceStatus()
+#endif
                 if !self.isPaused && !self.usingDaemon {
                     await self.refreshOnce()
                 }
+#if !APP_STORE
                 if !self.usingDaemon && !self.daemonConnecting,
                    Date().timeIntervalSince(self.lastDaemonAttempt) > 30 {
                     self.lastDaemonAttempt = Date()
                     self.connectDaemon()
                 }
+#endif
                 if Task.isCancelled { return }
                 let interval = self.isPaused ? 0.5 : self.interval
                 await self.sleepForRefreshInterval(interval)
             }
         }
+#if !APP_STORE
         connectDaemon()
+#endif
         refreshBatteryChargeGraph(force: true)
+#if !APP_STORE
         scheduleRegistrationHealthCheck()
+#endif
     }
 
     /// Sleeps in an unstructured task so an interval or pause change can cancel
@@ -510,6 +520,10 @@ final class AppModel {
     }
 
     func registerDaemonService() async {
+#if APP_STORE
+        serviceError = AppStoreLimitations.daemonUnavailable
+        return
+#endif
         guard !serviceActionInFlight else { return }
         serviceActionInFlight = true
         defer { serviceActionInFlight = false }
@@ -557,6 +571,10 @@ final class AppModel {
     }
 
     func unregisterDaemonService() async {
+#if APP_STORE
+        serviceError = AppStoreLimitations.daemonUnavailable
+        return
+#endif
         guard !serviceActionInFlight else { return }
         serviceActionInFlight = true
         defer { serviceActionInFlight = false }
@@ -596,6 +614,10 @@ final class AppModel {
     /// Removes and re-adds the service registration so macOS can ask for
     /// approval again. Privileged collection pauses until it is approved.
     func repairDaemonService() async {
+#if APP_STORE
+        serviceError = AppStoreLimitations.daemonUnavailable
+        return
+#endif
         guard !serviceActionInFlight else { return }
         serviceActionInFlight = true
         defer { serviceActionInFlight = false }
@@ -629,7 +651,7 @@ final class AppModel {
     }
 
     private func evaluateDaemonRegistration() async {
-        #if !DEBUG
+        #if !DEBUG && !APP_STORE
         guard appIsInApplications,
               !serviceActionInFlight,
               daemonHelperPresent,
@@ -671,6 +693,10 @@ final class AppModel {
     }
 
     func retryDaemonConnection() {
+#if APP_STORE
+        serviceError = AppStoreLimitations.daemonUnavailable
+        return
+#endif
         serviceError = nil
         refreshServiceStatus()
         guard !daemonConnecting, !usingDaemon else { return }
@@ -844,6 +870,11 @@ final class AppModel {
         case .allowed(requiresAdministrator: false):
             return ProcessKillAvailability(status: .enabled, reason: nil)
         case .allowed(requiresAdministrator: true):
+#if APP_STORE
+            return ProcessKillAvailability(
+                status: .disabled,
+                reason: "Killing another user's process is unavailable in the Mac App Store version.")
+#else
             guard usingDaemon, daemonSupportsKill, daemonIsRoot else {
                 return ProcessKillAvailability(
                     status: .disabled,
@@ -853,6 +884,7 @@ final class AppModel {
             return ProcessKillAvailability(
                 status: .needsAdministrator,
                 reason: "macOS will ask for an administrator password.")
+#endif
         }
     }
 
@@ -941,6 +973,9 @@ final class AppModel {
     }
 
     private func connectDaemon() {
+#if APP_STORE
+        return
+#endif
         guard !daemonConnecting else { return }
         daemonConnecting = true
         lastDaemonAttempt = Date()
@@ -1032,6 +1067,10 @@ final class AppModel {
     /// the daemon after the self-requested SIGTERM. Used when the running daemon
     /// predates the trash API or when a stale helper must be replaced.
     func restartDaemonService() async {
+#if APP_STORE
+        serviceError = AppStoreLimitations.daemonUnavailable
+        return
+#endif
         let previous = daemonSource
         resetDaemonConnection()
         if let previous {

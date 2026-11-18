@@ -6,6 +6,11 @@ DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
 ENABLE_NS_ASSERTIONS = NO
 CODE_SIGN_STYLE = Manual
 CODE_SIGN_IDENTITY = Developer ID Application
+// Optional local signing overrides (Developer ID identity fingerprint and
+// provisioning profile UUIDs). Kept out of Base.xcconfig so the AppStore
+// configuration can use automatic signing without an explicit identity.
+// The file is git-ignored; see Signing.local.xcconfig.example.
+#include? "Signing.local.xcconfig"
 // DEVELOPMENT_TEAM is not set here: the project configuration provides it so
 // every target, including the daemon, can be signed with Developer ID. The
 // daemon must still have no App ID, entitlements or provisioning profile;

@@ -27,6 +27,7 @@ struct KancerberoApp: App {
                 .environment(filter)
                 .environment(updater)
                 .task {
+#if !APP_STORE
                     if CommandLine.arguments.contains("--register-service") {
                         await model.registerDaemonService()
                         print("service status: \(model.serviceStatus)")
@@ -34,6 +35,7 @@ struct KancerberoApp: App {
                         await model.unregisterDaemonService()
                         print("service status: \(model.serviceStatus)")
                     }
+#endif
                     model.start()
                     filter.start()
                     dockIcon.start(model: model)
@@ -52,12 +54,14 @@ struct KancerberoApp: App {
                 }
             }
 
+#if !APP_STORE
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") {
                     updater.checkForUpdates()
                 }
                 .disabled(!updater.isEnabled || !updater.canCheckForUpdates)
             }
+#endif
 
             CommandMenu("Sections") {
                 ForEach(AppSection.allCases) { section in
@@ -69,6 +73,7 @@ struct KancerberoApp: App {
                 }
             }
 
+#if !APP_STORE
             CommandMenu("Daemon") {
                 Button("Enable Background Daemon") {
                     Task { await model.registerDaemonService() }
@@ -88,6 +93,7 @@ struct KancerberoApp: App {
                     model.openLoginItemsSettings()
                 }
             }
+#endif
 
             CommandMenu("Dock Icon") {
                 Picker("Dock icon", selection: $dockIconStyle) {
@@ -157,6 +163,14 @@ struct KancerberoApp: App {
         .defaultSize(width: 1040, height: 660)
         .windowResizability(.contentMinSize)
         .restorationBehavior(.disabled)
+
+#if APP_STORE
+        Window("App Store version", id: AppStoreLimitationsWindow.id) {
+            AppStoreLimitationsView()
+        }
+        .defaultSize(width: 620, height: 520)
+        .windowResizability(.contentMinSize)
+#endif
 
         Settings {
             SettingsView()

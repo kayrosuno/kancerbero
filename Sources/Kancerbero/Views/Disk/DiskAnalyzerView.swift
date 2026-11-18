@@ -7,6 +7,7 @@ struct DiskAnalyzerView: View {
     @Environment(UIState.self) private var ui
     @Environment(AppModel.self) private var appModel
     @Environment(\.byteUnitSystem) private var byteUnitSystem
+    @Environment(\.openWindow) private var openWindow
 
     private var pathDraft: Binding<String> {
         Binding(
@@ -90,6 +91,29 @@ struct DiskAnalyzerView: View {
 
     private var controls: some View {
         HStack(spacing: 10) {
+#if APP_STORE
+            Text(disk.scanRootPath.isEmpty ? "No folder chosen" : disk.scanRootPath)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(disk.scanRootPath.isEmpty ? .secondary : .primary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button("Choose Folder…") { chooseFolder() }
+                .buttonStyle(.bordered)
+
+            if disk.isScanning {
+                Button("Cancel") { disk.cancelScan() }
+                    .buttonStyle(.bordered)
+            } else {
+                Button("Scan Again") {
+                    Task { await disk.startScan() }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(AppSection.disk.tint)
+                .disabled(disk.scanRootPath.isEmpty)
+            }
+#else
             TextField("Folder or volume path", text: pathDraft)
                 .textFieldStyle(.roundedBorder)
                 .frame(minWidth: 240)
@@ -106,6 +130,7 @@ struct DiskAnalyzerView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(AppSection.disk.tint)
             }
+#endif
 
             Spacer(minLength: 6)
 
@@ -115,9 +140,11 @@ struct DiskAnalyzerView: View {
             Toggle("Packages", isOn: packagesBinding)
                 .toggleStyle(.checkbox)
                 .help("Allow drilling into application bundles and other packages")
+#if !APP_STORE
             Toggle("Cross mounts", isOn: crossMountsBinding)
                 .toggleStyle(.checkbox)
                 .help("Follow mount points into other file systems")
+#endif
         }
     }
 
@@ -396,6 +423,11 @@ struct DiskAnalyzerView: View {
         } description: {
             Text("Choose a folder or volume and scan it to see its largest folders and files.")
         } actions: {
+#if APP_STORE
+            Button("Choose Folder…") { chooseFolder() }
+                .buttonStyle(.borderedProminent)
+                .tint(AppSection.disk.tint)
+#else
             Button("Scan Home Folder") {
                 Task {
                     await disk.startScan(
@@ -405,6 +437,7 @@ struct DiskAnalyzerView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(AppSection.disk.tint)
+#endif
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -413,6 +446,17 @@ struct DiskAnalyzerView: View {
         HStack(spacing: 8) {
             Image(systemName: "lock.fill")
                 .foregroundStyle(.orange)
+#if APP_STORE
+            Text("\(disk.deniedPaths.count) paths are protected by macOS or outside the selected folder. Choose a wider folder to scan them.")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("Why?") {
+                openWindow(id: AppStoreLimitationsWindow.id)
+            }
+            .buttonStyle(.link)
+            .font(.system(size: 10))
+#else
             Text("\(disk.deniedPaths.count) paths could not be read. Grant Full Disk Access to scan them.")
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
@@ -422,6 +466,7 @@ struct DiskAnalyzerView: View {
             }
             .buttonStyle(.link)
             .font(.system(size: 10))
+#endif
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
@@ -475,12 +520,19 @@ struct DiskAnalyzerView: View {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
-        panel.directoryURL = URL(fileURLWithPath: pathDraft.wrappedValue)
         panel.prompt = "Scan"
+#if APP_STORE
+        if panel.runModal() == .OK, let url = panel.url {
+            ui.disk.analyzerPathDraft = url.path
+            Task { await disk.startScan(url: url) }
+        }
+#else
+        panel.directoryURL = URL(fileURLWithPath: pathDraft.wrappedValue)
         if panel.runModal() == .OK, let url = panel.url {
             ui.disk.analyzerPathDraft = url.path
             Task { await disk.startScan(path: url.path) }
         }
+#endif
     }
 }
 

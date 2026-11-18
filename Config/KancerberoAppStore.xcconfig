@@ -1,0 +1,38 @@
+#include "Base.xcconfig"
+
+// Mac App Store variant. It shares Sources/Kancerbero with the Developer ID app
+// but compiles the APP_STORE branches, links no Sparkle and embeds no launchd
+// daemon.
+PRODUCT_NAME = KancerberoAppStore
+PRODUCT_BUNDLE_IDENTIFIER = uno.kayros.kancerbero
+MARKETING_VERSION = $(KANCERBERO_MARKETING_VERSION)
+CURRENT_PROJECT_VERSION = $(KANCERBERO_BUILD_VERSION)
+GENERATE_INFOPLIST_FILE = NO
+INFOPLIST_FILE = $(SRCROOT)/Resources/App/Info-AppStore.plist
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES
+MACOSX_DEPLOYMENT_TARGET = 15.6
+
+// Automatic signing: the archive build uses Apple Development and
+// exportArchive with method app-store-connect re-signs with Apple Distribution
+// and the Xcode-managed Mac Team Store profiles.
+CODE_SIGN_STYLE = Automatic
+CODE_SIGN_IDENTITY = Apple Development
+DEVELOPMENT_TEAM = AK37TK8X2Y
+PROVISIONING_PROFILE_SPECIFIER =
+CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO
+CODE_SIGN_INJECT_BASE_ENTITLEMENTS[config=Debug] = YES
+CODE_SIGN_ENTITLEMENTS = $(SRCROOT)/Resources/App/Kancerbero-AppStore.entitlements
+ENABLE_APP_SANDBOX = YES
+ENABLE_HARDENED_RUNTIME = YES
+
+// Every configuration of this target is the App Store variant.
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) APP_STORE
+GCC_PREPROCESSOR_DEFINITIONS = $(inherited) APP_STORE=1
+SWIFT_INCLUDE_PATHS = $(BUILT_PRODUCTS_DIR) $(inherited)
+
+// The embedded filter extension is already signed; builtin-copy must not strip
+// it.
+COPY_PHASE_STRIP = NO
+OTHER_LDFLAGS = $(inherited) -framework CoreFoundation -framework Security -framework IOKit -framework DiskArbitration -framework ServiceManagement -framework NetworkExtension -framework SystemExtensions
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/../Frameworks

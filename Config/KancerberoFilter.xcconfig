@@ -18,6 +18,13 @@ INFOPLIST_FILE = $(SRCROOT)/Resources/Filter/Info.plist
 // both targets; see scripts/build.sh.
 CODE_SIGN_ENTITLEMENTS = $(SRCROOT)/Resources/Filter/KancerberoFilter.entitlements
 CODE_SIGN_ENTITLEMENTS[config=Debug] = $(SRCROOT)/Resources/Filter/KancerberoFilter-Development.entitlements
+// Mac App Store diagnostic build: unsuffixed Network Extension values and the
+// Xcode-managed Mac Team Store profile (automatic signing).
+CODE_SIGN_STYLE[config=AppStore] = Automatic
+CODE_SIGN_ENTITLEMENTS[config=AppStore] = $(SRCROOT)/Resources/Filter/KancerberoFilter-AppStore.entitlements
+// App Store processing requires the extension version to match the app.
+MARKETING_VERSION[config=AppStore] = $(KANCERBERO_MARKETING_VERSION)
+CURRENT_PROJECT_VERSION[config=AppStore] = $(KANCERBERO_BUILD_VERSION)
 CODE_SIGN_STYLE[config=Release] = Manual
 PROVISIONING_PROFILE_SPECIFIER[config=Release] = $(KANCERBERO_FILTER_PROFILE)
 SKIP_INSTALL = YES

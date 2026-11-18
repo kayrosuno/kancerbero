@@ -11,6 +11,10 @@ ENABLE_APP_SANDBOX = NO
 // Release only: Debug signs automatically with Apple Development and does not
 // use a provisioning profile specifier.
 PROVISIONING_PROFILE_SPECIFIER[config=Release] = $(KANCERBERO_APP_PROFILE)
+// Mac App Store diagnostic build: unsuffixed Network Extension values and
+// Xcode-managed Mac Team Store profiles (automatic signing).
+CODE_SIGN_STYLE[config=AppStore] = Automatic
+CODE_SIGN_ENTITLEMENTS[config=AppStore] = $(SRCROOT)/Resources/App/Kancerbero-AppStore.entitlements
 // The app embeds already-signed products (daemon and system extension) and
 // re-signs them with CodeSignOnCopy. COPY_PHASE_STRIP makes builtin-copy try to
 // strip them, which it refuses with "not stripping binary because it is signed".

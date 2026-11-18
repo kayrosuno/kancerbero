@@ -1,0 +1,23 @@
+#include "Base.xcconfig"
+
+// Mac App Store distribution. Independent of Release.xcconfig and of the
+// Developer ID values in Signing.local.xcconfig: every signing key here is
+// overridden per configuration in the target xcconfigs.
+SWIFT_COMPILATION_MODE = wholemodule
+SWIFT_OPTIMIZATION_LEVEL = -O
+DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
+ENABLE_NS_ASSERTIONS = NO
+MACOSX_DEPLOYMENT_TARGET = 15.6
+
+KANCERBERO_APPSTORE_IDENTITY = Apple Distribution
+
+// The Mac App Store profiles in this account are Xcode-managed, so the app and
+// extension use automatic signing and let Xcode select the identity and
+// profile. The daemon keeps manual signing in its own xcconfig (bare tool, no
+// profile).
+CODE_SIGN_STYLE = Automatic
+DEVELOPMENT_TEAM = AK37TK8X2Y
+
+CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO
+ENABLE_HARDENED_RUNTIME = YES
+OTHER_CODE_SIGN_FLAGS = --options runtime --timestamp

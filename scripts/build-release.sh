@@ -7,6 +7,15 @@ TEAM="${DEVELOPMENT_TEAM:-AK37TK8X2Y}"
 cd "$ROOT"
 source "$ROOT/scripts/lib/version.sh"
 
+# Release artifacts must come from a committed tree: publish-release.sh tags
+# HEAD and publish-appcast.sh publishes what was built. Fail here instead of
+# after a full Release build.
+if [[ -n "$(git status --porcelain)" ]]; then
+    echo "working tree is not clean; commit or stash before releasing" >&2
+    git status --short >&2
+    exit 1
+fi
+
 SIGNING="$ROOT/Config/Signing.local.xcconfig"
 if [[ ! -f "$SIGNING" ]]; then
     echo "missing $SIGNING" >&2

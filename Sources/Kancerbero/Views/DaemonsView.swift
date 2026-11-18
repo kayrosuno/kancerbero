@@ -63,6 +63,10 @@ struct DaemonsView: View {
                 subtitle: "launchd services, agents and daemons"
             )
 
+#if APP_STORE
+            AppStoreLimitationNotice(text: AppStoreLimitations.daemonUnavailable)
+#endif
+
             if !ui.cardsCollapsed(for: .daemons) {
                 cards
                     .transition(.opacity)

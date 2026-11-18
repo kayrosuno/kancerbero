@@ -159,6 +159,9 @@ commiteado.
 
 ### Orden manual equivalente
 
+Todos los pasos exigen un árbol limpio: `build-release.sh` lo comprueba antes de compilar, igual
+que `release.sh`.
+
 ```bash
 ./scripts/build-release.sh
 ./scripts/notarize.sh

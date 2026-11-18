@@ -145,18 +145,32 @@ final class DiskModel {
     private let inventoryCollector = DiskInventoryCollector()
     private var scanTask: Task<Void, Never>?
     private var scanGeneration = 0
+#if APP_STORE
+    private static let scanBookmarkDefaultsKey = "analyzer.scanRootBookmark.v1"
+    private static let scanPathDefaultsKey = "analyzer.scanRootPath.v1"
+    private var activeScanRoot: ScanRoot?
+#endif
     /// Retained so the mount/unmount observers stay registered for the app lifetime.
     private var mountObservers: [NSObjectProtocol] = []
 
     init() {
+#if APP_STORE
+        // The sandbox home directory is the app container, so it is not a
+        // useful default. The bookmark (not the path) is the source of truth.
+        scanRootPath = UserDefaults.standard.string(forKey: Self.scanPathDefaultsKey) ?? ""
+        autoScan = CommandLine.arguments.contains("--disk-scan")
+            && UserDefaults.standard.data(forKey: Self.scanBookmarkDefaultsKey) != nil
+        scanOptions.crossMountPoints = false
+#else
         scanRootPath = FileManager.default.homeDirectoryForCurrentUser.path
         if let path = Self.argumentValue("--disk-path") {
             scanRootPath = path
         }
+        autoScan = CommandLine.arguments.contains("--disk-scan")
+#endif
         if let identifier = Self.argumentValue("--disk-item") {
             selectedItemID = identifier
         }
-        autoScan = CommandLine.arguments.contains("--disk-scan")
 
         let center = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification] {
@@ -254,15 +268,62 @@ final class DiskModel {
     }
 
     func startScan(path: String? = nil) async {
+#if APP_STORE
+        _ = path
+        await startScanFromStoredBookmark()
+#else
         let requested = path ?? scanRootPath
-        let target = (requested as NSString).expandingTildeInPath
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let root = ScanRoot(path: requested)
+        guard !root.path.isEmpty else { return }
+        await startScan(using: root)
+#endif
+    }
+
+#if APP_STORE
+    /// Scans a folder chosen with `NSOpenPanel` and persists an app-scoped
+    /// bookmark so later launches can rescan it without another panel.
+    func startScan(url: URL) async {
+        do {
+            let root = try ScanRoot(url: url)
+            if let bookmark = try? root.bookmarkData {
+                UserDefaults.standard.set(bookmark, forKey: Self.scanBookmarkDefaultsKey)
+                UserDefaults.standard.set(root.path, forKey: Self.scanPathDefaultsKey)
+            }
+            await startScan(using: root)
+        } catch {
+            scanState = .failed(error.localizedDescription)
+        }
+    }
+
+    private func startScanFromStoredBookmark() async {
+        guard let data = UserDefaults.standard.data(forKey: Self.scanBookmarkDefaultsKey) else {
+            scanState = .failed(ScanRootError.missingBookmark.localizedDescription)
+            return
+        }
+        do {
+            let (root, refreshed) = try ScanRoot.fromBookmark(data)
+            if let refreshed {
+                UserDefaults.standard.set(refreshed, forKey: Self.scanBookmarkDefaultsKey)
+            }
+            UserDefaults.standard.set(root.path, forKey: Self.scanPathDefaultsKey)
+            await startScan(using: root)
+        } catch {
+            scanState = .failed(error.localizedDescription)
+        }
+    }
+#endif
+
+    private func startScan(using root: ScanRoot) async {
+        let target = root.path
         guard !target.isEmpty else { return }
 
         if isScanning {
             cancelScan()
         }
 
+#if APP_STORE
+        activeScanRoot = root
+#endif
         scanRootPath = target
         scanGeneration &+= 1
         let generation = scanGeneration
@@ -279,9 +340,11 @@ final class DiskModel {
 
         let task = Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
+            // Capture the root so the security scope lives until the scan ends.
+            let scanRoot = root
 
             let snapshot = DiskScanner.scan(
-                rootPath: target,
+                rootPath: scanRoot.path,
                 options: options,
                 partial: { partial in
                     Task { @MainActor in
@@ -330,6 +393,9 @@ final class DiskModel {
 
         scanTask = task
         await task.value
+#if APP_STORE
+        activeScanRoot = nil
+#endif
     }
 
     func cancelScan() {

@@ -148,27 +148,38 @@ struct RootView: View {
                                                 max: KBTheme.sidebarWidth)
         } detail: {
             VStack(spacing: 0) {
-                Group {
-                    switch currentSection {
-                    case .networking:
-                        NetworkingView(tab: networkingTab)
-                    case .disk:
-                        DiskView(tab: diskTab)
-                    case .daemons:
-                        DaemonsView()
-                    case .cpu:
-                        CPUView()
-                    case .memory:
-                        MemoryView()
-                    case .energy:
-                        EnergyView()
-                    case .applications:
-                        ApplicationsView()
+                // Section tables report their whole content height as their
+                // ideal size. Without a size proposal from here,
+                // NavigationSplitView grows the detail to that ideal (the
+                // Daemons and Applications tables have thousands of rows) and
+                // centers it in the window, drawing the section header and
+                // cards under the titlebar. Pinning each section to the
+                // proposed size keeps tables scrollable inside the window.
+                GeometryReader { proxy in
+                    Group {
+                        switch currentSection {
+                        case .networking:
+                            NetworkingView(tab: networkingTab)
+                        case .disk:
+                            DiskView(tab: diskTab)
+                        case .daemons:
+                            DaemonsView()
+                        case .cpu:
+                            CPUView()
+                        case .memory:
+                            MemoryView()
+                        case .energy:
+                            EnergyView()
+                        case .applications:
+                            ApplicationsView()
+                        }
                     }
+                    .id(currentSection)
+                    .transition(sectionTransition)
+                    .frame(width: proxy.size.width,
+                           height: proxy.size.height,
+                           alignment: .topLeading)
                 }
-                .id(currentSection)
-                .transition(sectionTransition)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 Divider().opacity(0.5)
                 StatusBar(section: currentSection)

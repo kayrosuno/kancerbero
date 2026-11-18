@@ -20,9 +20,16 @@ struct ApplicationsView: View {
                 subtitle: "Apps, widgets & plugins"
             )
 
+#if APP_STORE
+            AppStoreLimitationNotice(
+                text: "Privileged removal, system launchd items and other users' data are unavailable in the Mac App Store version.")
+#endif
+
+#if !APP_STORE
             if appModel.fullDiskAccess == .denied {
                 fullDiskAccessBanner
             }
+#endif
 
             if !ui.cardsCollapsed(for: .applications) {
                 summary
@@ -47,14 +54,18 @@ struct ApplicationsView: View {
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .task {
+#if !APP_STORE
             appModel.refreshFullDiskAccess()
+#endif
             if model.bundles.isEmpty {
                 await model.refresh()
             }
         }
         .onReceive(NotificationCenter.default.publisher(
             for: NSApplication.didBecomeActiveNotification)) { _ in
+#if !APP_STORE
             appModel.refreshFullDiskAccess()
+#endif
         }
         .sheet(isPresented: $confirming) { confirmation }
         .alert("Removal finished", isPresented: Binding(
