@@ -263,7 +263,7 @@ registrar desde la app (afecta a todos los ítems de Login Items del sistema).
 ./scripts/install-app.sh
 ```
 
-Los requisitos de firma y notarización están en `README.md` y `docs/verification.md`.
+Los requisitos de firma y notarización están en `kancerbero.md` y `verification.md`.
 
 Categorías de log: `daemon.lifecycle`, `daemon.listener` y `daemon`.
 
@@ -667,7 +667,7 @@ de red (Network Extension)»).
 
 ## Referencias cruzadas
 
-- Visión general y compilación: `README.md`.
+- Visión general y compilación: `kancerbero.md`.
 - Arquitectura, targets y XPC: `docs/architecture.md`.
 - Modelo de seguridad, autorización XPC y entitlements: `docs/security.md`.
 - Evidencia de ingeniería inversa (NetworkStatistics, libproc, sysctl, launchd): `docs/private-apis.md`.
